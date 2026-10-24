@@ -21,7 +21,11 @@ account layout, instruction, check, PDA seed or program id changed; every binary
 migrates no on-chain authority, config or registry, and none needed migrating: no account of this
 program exists on any public cluster. The hashes of 2.3 were measured again for the renamed source
 (Appendix B); the superseded ones are kept beside them. Sections 8 and 11 and Appendix A predate the
-rename and keep the names and hashes of their day.
+rename and keep the names and hashes of their day. **The outside audit must be of `23c0bfa` or a later
+commit, with the hashes of 2.3; a report on `bf17550` or on the binary `0a5beef2...` does not cover the
+build to be deployed.** A review of the rename on the same day found no program defect; its items
+(NOTES 107, "Review of the rename") changed two off-chain tools of 1.3 in `2e0a277` and documentation,
+not the program, the crate, the IDL or any binary (Appendix B, second run).
 
 Status: nothing of this program has been deployed to mainnet or signed for it, and the repository
 holds no mainnet program id for it (3.1: the owner generates that key on his own machine). The
@@ -36,7 +40,7 @@ Contents: 1 Scope. 2 Building and the expected hashes. 3 Running the tests. 4 Pu
 flows. 5 Roles and keys. 6 Threat model. 7 Invariants and where they are checked. 8 Review
 history. 9 Known limitations and accepted risks. 10 Open owner decisions. 11 Rehearsal D01. 12
 Questions for the auditor. Appendix A: the gate run for `bf17550` (before the rename). Appendix B: the
-gate run for the rename.
+gate runs for the rename and after its review.
 
 ---
 
@@ -48,7 +52,7 @@ gate run for the rename.
 |---|---|
 | repository | `https://github.com/FunnyCircuitBoard/citycoindev` (renamed from `FunnyCircuitBoard/Vicinity-Launchpad`) |
 | branch | `feat/vicinity-curve` (draft PR #83; the branch keeps its name) |
-| commit of the code in scope | `23c0bfab5e878e510ea37fa2465dd7d45a1eb6ee` (this revision: the rename, in `2b96ed8` the names and in `23c0bfa` the leaf tag and the metadata prefix); before the rename the pack named `bf17550612b6b6ec56fec6bb8beb964d69bfefaf`, and its first revision (`0ed0ef8`) `cd56508fc3274a84960b04c06b4f4f8f2282e656` |
+| commit of the code in scope | `23c0bfab5e878e510ea37fa2465dd7d45a1eb6ee` (this revision: the rename, in `2b96ed8` the names and in `23c0bfa` the leaf tag and the metadata prefix); before the rename the pack named `bf17550612b6b6ec56fec6bb8beb964d69bfefaf`, and its first revision (`0ed0ef8`) `cd56508fc3274a84960b04c06b4f4f8f2282e656`. The off-chain tools of 1.3: `2e0a277` (after the review of the rename: `preflight.mjs` prints the website's metadata route among what the operator confirms by hand, `batch.mjs` warns `OLD_ARCHIVE`; `git diff --stat 23c0bfa 2e0a277 -- solana/programs solana/crates solana/sdk` is empty) |
 | what changed in scope since `bf17550` | only the rename (NOTES 107): the names, the product text, the constants `LAUNCH_LEAF_TAG` and `METADATA_URI_PREFIX`, the IDL and fixtures regenerated from them, and the U11 and U13 unit tests that pin them. Between `bf17550` and `ec148c2` (the merge of `main` that precedes the rename) `git diff --stat bf17550 ec148c2 -- solana/programs solana/crates solana/sdk/curve solana/sdk/idl solana/scripts/vcurve solana/Cargo.toml solana/Cargo.lock` is empty |
 | last change to the program or crate source | `23c0bfa` (the rename) |
 | last change to the program binary | `23c0bfa`: production sha256 `86754c66...` (2.3). Superseded: `0a5beef2...`, the production build from review round 6 (`ae8e071`) to the rename |
@@ -56,7 +60,9 @@ gate run for the rename.
 | `main` | the branch merged `main` at `4aa408e` (`ec148c2`, before the rename); `main` has moved 4 commits since (to `2639c50`), none of them under `solana/` |
 
 The commit that adds this revision of the pack (on top of `23c0bfa`) changes documentation
-only: `git diff --stat 23c0bfa <that commit>` lists `.md` files and nothing else.
+only: `git diff --stat 23c0bfa <that commit>` lists `.md` files and nothing else. After the review of
+the rename, `2e0a277` changed `scripts/vcurve/preflight.mjs`, `scripts/vcurve/batch.mjs`, two test files
+and `solana/.gitignore`, and the commit after it documentation only.
 
 ### 1.2 In scope: the on-chain code
 
@@ -115,9 +121,9 @@ protection relies on the SDK (T78 to T80). We ask the auditor to include them.
 
 | file (under `solana/`) | lines | what the design relies on it for |
 |---|---|---|
-| `scripts/vcurve/batch.mjs` | 1,117 | the owner's batch verifier (`verify`, `--tx`, `--correct`), `confirm` and the monitor's `check` (8.4 steps 2, 3 and 5) |
+| `scripts/vcurve/batch.mjs` | 1,132 (1,117 at `23c0bfa`) | the owner's batch verifier (`verify`, `--tx`, `--correct`), `confirm` and the monitor's `check` (8.4 steps 2, 3 and 5) |
 | `scripts/vcurve/guardian-stop.mjs` | 501 | a guardian member's one-transaction stop through Squads v4 (8.4 step 5, review R7-1) |
-| `scripts/vcurve/preflight.mjs` | 580 | the deploy checklist and its proposed-key checks (8.4 preconditions and operating rules, the multisigs behind the admin, the guardian and the approver) |
+| `scripts/vcurve/preflight.mjs` | 588 (580 at `23c0bfa`) | the deploy checklist and its proposed-key checks (8.4 preconditions and operating rules, the multisigs behind the admin, the guardian and the approver) |
 | `sdk/curve/batch.mjs` | 448 | the launch leaf, tree and proof builder and the in-force function (3.12, 8.6) |
 | `sdk/curve/math.mjs` | 689 | the JavaScript port of the math crate (the checker and every client quote use it) |
 | `sdk/curve/prechecks.mjs`, `compose.mjs` | 130, 352 | the size-dependent slippage policy and the composed buy (5.15, 14.1, T78 to T80) |
@@ -209,8 +215,12 @@ this pack and D01 refer to these): at `bf17550` and `cd56508`, for the program t
 devnet 738,064 `d052b8fccf5ed0fc9bbb0ee56e4a77ae5a3ec99c6fa6c906119f51db71c18fa3`, halt-all 736,840
 `4d631647c38230690ad57a28e49d021e0ad956a7edbc454dc107558849a0d868`, and the client IDL
 `sdk/idl/vicinity_curve.json` (6,398 lines) `2ecf3e686204b8d723cde124d69b0b7030e29835678bc0d08cf6428957ed4db7`.
-The binaries grew by 8 bytes (the longer metadata prefix and the new names in the embedded source paths);
-the IDL's line count is unchanged (only its name, description, two docs and two constant values changed).
+The binaries grew by 8 bytes, one SBF instruction (`.text` 0xae050 to 0xae058 in the production build;
+`.rodata` keeps its size, 0x60b8): the store of the two bytes by which `METADATA_URI_PREFIX` is longer
+(32 to 34). The renamed source paths and the leaf tag are as long as the old ones and change no size.
+The prefix is not one string in the binary (the compiler writes it as immediate values), so `strings`
+cannot show it; the `04-launch` tests pin the URI a launch writes. The IDL's line count is unchanged
+(only its name, description, one doc (`MAX_PLATFORM_FEE_BPS`) and two constant values changed).
 A build with the `short-windows` feature, which the program accepts and ignores (it is never deployed),
 has the production size but another hash, `0fda787b22916c303310cf2653d906a419bed049e8c0859d91c8ea0a6002b4ae`:
 cargo's per-crate metadata hash includes the feature set (Appendix B, step 16).
@@ -229,9 +239,11 @@ says the compute figures are measured again with that id. Every place the throwa
 | `programs/citycoin-curve/src/lib.rs` line 56, `declare_id!` | the program's own id | **the binary** (the only place compiled into it) |
 | `Anchor.toml`, `[programs.localnet]` and `[programs.devnet]` | which keypair `anchor build` and `anchor deploy` expect | the build configuration, not the bytes |
 | `crates/citycoin-curve-math/src/constants.rs`, `PROGRAM_ID` (in scope) | the owner `decode_coin` requires, for off-chain readers | not the binary: `decode_coin` is not linked into the program (before the rename a clean build with `PROGRAM_ID` replaced by other bytes gave the same production hash, then `0a5beef2...`; the rename did not touch `decode_coin`); the crate's tests (`tests/unit.rs` line 1209) |
+| `crates/citycoin-curve-math/tests/unit.rs` line 1209 | the test that pins `PROGRAM_ID` | the test |
 | `sdk/idl/citycoin_curve.json`, `address` | the client IDL | regenerated by `npm run vcurve:idl` |
 | `sdk/curve/constants.mjs`, `CURVE_PROGRAM_ID` | the SDK's id: every client, the owner's tools, the checker | the SDK and the tools |
 | `sdk/fixtures/launch-batch.json`; `sdk/curve/batch.test.mjs`; `programs/citycoin-curve/src/batch.rs` line 285 (a unit test); `tests-curve/27-checker-gaps.test.mjs` (a message pattern) | the shared leaf fixture (every leaf contains the program id, so its leaves and root change) and tests | the fixtures and tests |
+| `rehearsals/vicinity-curve-d01/` (the D01 driver, its log, state, lists and tool outputs) | the record of rehearsal D01 | nothing: history, kept as it ran |
 | the `.md` files | text | nothing |
 
 **CI builds other binaries.** CI installs Agave 4.3.0 from `release.anza.xyz`, whose
@@ -295,7 +307,7 @@ row says otherwise.
 | property tests at 10^6 cases | `PROPTEST_CASES=1000000 cargo test --release -p citycoin-curve-math --test props` and `--test no_free_value` | 12.2's "at least 10^6 cases each" (CI runs 1,024 to 4,096 cases, NOTES 1, 35) | not run again for the rename, which changed the crate's name and doc comments only (the gate's `cargo test` ran the 4,096 and 1,024 cases); before it: run for the first revision of this file (23 October; the crate has not changed since), release build: 12 passed (85.6 s) and 3 passed (32.1 s); the review of the pack ran them again: 12 and 3 passed |
 | smoke | `npm run test:vcurve` | `tests-vcurve/00-smoke`: one coin's life on the production build, then the halt-all build over it and back | 1 passed |
 | SDK | `npm run sdk-test:curve` | `sdk/curve/*.test.mjs`: math parity, events, IDL, batch leaves and proofs, the client pre-checks | 52 passed |
-| litesvm lifecycle and attack suites | `npm run test:curve` | `tests-curve/01` to `34` (the table in `tests-curve/README.md`); the checker of section 7 after every successful transaction, with the exceptions section 7 names | 204 passed (about 3 minutes; 203 before this revision's checklist test) |
+| litesvm lifecycle and attack suites | `npm run test:curve` | `tests-curve/01` to `34` (the table in `tests-curve/README.md`); the checker of section 7 after every successful transaction, with the exceptions section 7 names | 206 passed at `2e0a277` (about 3 minutes; 204 at `23c0bfa`, before the two tests of the review of the rename; 203 before this revision's checklist test) |
 | fuzz, longer | `VCURVE_FUZZ_STEPS=n VCURVE_FUZZ_SEEDS=s node --test tests-curve/23-fuzz.test.mjs` | F01 and F02 with the model byte-equal after every transaction (CI: 300 steps on seeds 1 and 2) | for the rename only the CI length inside `test:curve` (300 steps on seeds 1 and 2, passed); the long runs below are of the build before the rename: run for the first revision of this file (23 October; the program has not changed since): seed 11, 20,000 steps, passed in 7 min 30 s: 16,155 transactions, 9,696 succeeded and 6,459 failed: 3,830 as the model predicted, 2,370 invalid variants refused and 259 steps whose outcome the model leaves open (`fuzz.mjs`, `anyOutcome`). Of the 2,392 invalid variants, 2,370 were refused, 14 succeeded legitimately (4 replaced a free slot and were re-synced, 10 replaced the `program` slot of an instruction that emitted nothing) and 8 could not be built (never sent, so not among the 16,155); 16 coins launched and graduated; 283 publications, 70 clears and 9 batch launches accepted. The run is deterministic for a seed (reproduced exactly in the review of this pack). Earlier long runs: seed 7 at 100,000 steps and seed 8 at 30,000 before the batch path (NOTES 38), eight seeds of 2,500 steps with it (NOTES 76) |
 | batch mutants | `python3 scripts/vcurve/batch-mutants.py . <out dir>` | 46 mutant programs, one batch rule removed or weakened in each, run against `30-batch` (H02 for the halt-all mutant) with and without the checker (`MUTANT_CHECKS_OFF=1`; NOTES 77, 82) | not run again for the rename (no batch rule, pattern or test changed; the script's paths follow the new crate directory); before it: 43 of them were last recorded (NOTES 77) at `fd516a6` (18 October), before round 6's `ae8e071` changed `publish_launch_batch`, `clear_launch_batch` and `set_launch_approver`; NOTES 82 ran only its three new mutants on the round-6 binary. Run again for this revision on `git archive 0ed0ef8` (the program and tests of the commit in scope): on 23 October 2026, 46 of 46 killed with the checker (23:26 to 23:42 UTC) and 46 of 46 without it (23:42 to 23:54); every pattern still applied, and each mutant was killed by a failing test of `30-batch` (45) or, for the halt-all mutant, `11-halts` (H02); the reviewer of this pack reported the same result independently |
 
@@ -697,7 +709,13 @@ repository): limitation 3 on O2, 4 on O25, 5 on O29, 6 on O36, 9 on O33, 16 on O
     (`METADATA_URI_PREFIX` since the rename; the URI is written into each coin's immutable metadata at
     launch); its SHA-256 is stored and emitted, so a change is detectable, not prevented (T37, O28).
     The site does not serve `/coin-meta/v1/` yet: it must before the first coin of this program
-    launches (8.4; a website step, outside this audit's scope).
+    launches (8.4; a website step, outside this audit's scope). A coin launched before then keeps a
+    URI that answers 404 until the site serves it, so wallets and explorers show no metadata for it
+    in the meantime. The deploy checklist reads only the chain and cannot check the route; since
+    `2e0a277` its last line names it among what the operator confirms by hand. An automated check
+    (a request for an unknown mint expecting a JSON 404 with CORS, like the legacy `/coin-meta/` row
+    of `scripts/mainnet-preflight.mjs`) is open for the website stage, to be recorded under rebrand
+    inventory row P15 when this branch merges (review of the rename, META-1, BEQ-4, SEC-R1).
 20. **Native SOL custody** is not proven to route through every aggregator and terminal; written
     confirmation is required before the audit freeze (M1, O10, O23).
 21. **Binary size**: 738,072 bytes (738,064 before the rename) against 11.4's 450 KB target, costing rent (about 3.75 SOL at
@@ -906,7 +924,7 @@ results. Logs are not committed.
 | 26 | `cp <pinned dumps>/*.so tests-launchpad/fixtures/programs/` | PASS | 0 s |  |
 | 27 | `npm run test:launchpad` | PASS | 35 s | 155 tests, 155 passed, 0 failed |
 | 28 | `node scripts/copy-assets.mjs && node scripts/pages/build.mjs && npm test` | PASS | 65 s | 1910 tests, 1909 passed, 0 failed, 1 skipped |
-| 29 | `git status --porcelain` | PASS | 0 s | modified: `solana/README.md`, `solana/CITYCOIN-CURVE-AUDIT.md`, `-DESIGN.md`, `-DEVNET.md`, `-NOTES.md`; untracked symlinks, never committed: `node_modules`, `solana/node_modules`, `solana/target` |
+| 29 | `git status --porcelain` | PASS | 0 s | modified: `solana/README.md`, `solana/VICINITY-CURVE-AUDIT.md`, `-DESIGN.md`, `-DEVNET.md`, `-NOTES.md`; untracked symlinks, never committed: `node_modules`, `solana/node_modules`, `solana/target` |
 
 ## Appendix B: the gate run for the rename (24 October 2026)
 
@@ -949,3 +967,32 @@ generators' checks and the hash checks of 2.3. Logs are not committed.
 After the gate, the three builds of 2.4 step 2 (a clean copy of `23c0bfa`) gave the same three hashes,
 and the `strings` check of 2.4 found no absolute path. The 10^6-case property tests, the long fuzz runs
 and the batch mutants were not run again (section 3).
+
+### Second run: after the review of the rename (24 October 2026)
+
+Run on 24 October 2026 from 18:34 to 18:42 UTC with the same toolchain and script, on `2e0a277` (the tools
+fixed after the review of the rename) with this file's, the specification's and the notes' changes for
+that review not yet committed (no test reads them except `12-compute`, which reads 11.1's range, and
+`prechecks.test.mjs`, which reads 7.4); four CI steps the first run left out were added (rows 24 to 27).
+Steps 1 to 23 and 28 to 31 are the first run's steps 1 to 27 in the same order.
+
+| # | step | result | detail |
+|---|---|---|---|
+| 1 to 5 | `cargo fmt --check`; the four `cargo clippy -D warnings` runs | PASS | |
+| 6 to 8 | `cargo test`; `-p citycoin-curve --features devnet`; `--features halt-all` | PASS | 187 passed (77, 54, 27, 29); 77; 77 |
+| 9 to 14 | `anchor build`, no stack warning, the three IDL diffs, `npm run vcurve:idl:check` | PASS | IDL `752e3934...` unchanged |
+| 15 to 17 | `npm run vcurve:sbf`; the `short-windows` build; `cmp` with `anchor build`'s output | PASS | production 738,072 `86754c66...`, devnet 738,072 `03361f06...`, halt-all 736,848 `a1f4353e...`, short-windows `0fda787b...`: the hashes of 2.3, unchanged |
+| 18 to 20 | `npm run curve:router`; `test:vcurve`; `sdk-test:curve` | PASS | 1; 52 passed |
+| 21 | `npm run test:curve` | PASS | 206 tests, 206 passed (194 s; the two new: SEC-R1 in `28-governance`, SEC-R2 in `33-batch-verifier`) |
+| 22, 23 | `npm run test:launchpad`; `npm run sdk-test` | PASS | 158; 47 passed |
+| 24 | `npm run typecheck` | PASS | |
+| 25 | `npm run sdk-fixtures && git diff --exit-code -- sdk/fixtures` | PASS | no diff |
+| 26 | `npm run sdk-test:launchpad` | PASS | 61 tests, 57 passed, 4 skipped (the live ones) |
+| 27 | `npm run typecheck:launchpad` | PASS | |
+| 28, 29 | the launch-batch fixture's and the golden vectors' `--check` | PASS | |
+| 30 | the website suite (`copy-assets`, `pages/build`, `npm test`) | PASS | 2,159 tests, 2,158 passed, 1 skipped |
+| 31 | `git status --porcelain` | PASS | modified: `solana/CITYCOIN-CURVE-AUDIT.md`, `-DESIGN.md`, `-NOTES.md`, `solana/tests-curve/README.md` (this documentation, committed next); the `solana/target` symlink is now ignored |
+
+The launch compute figures of 11.1 were measured the same day on the production build `86754c66...`
+(a 600-city sweep with the checker off, and `04-launch`, `12-compute` and `30-batch` three times each);
+the same sweep ran on the superseded binary `0a5beef2...` for the comparison NOTES 107 gives.

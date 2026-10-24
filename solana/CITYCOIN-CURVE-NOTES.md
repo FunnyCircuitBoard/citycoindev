@@ -3513,7 +3513,9 @@ the old tag; `LAUNCH_LEAF_VERSION` stays 1 because the leaf layout did not chang
 `https://citycoin.dev/coin-meta/v1/` (34 bytes; a URI is at most 34 + 44 + 5 = 83 bytes, under Metaplex's
 200; `metadata_uri` sizes its `String` from the prefix, so no buffer is fixed; the Metaplex metadata account
 is 607 bytes in litesvm with either prefix, measured by launching a coin on the old and on the new production
-build against the pinned Metaplex dump, so a launch costs the same rent). The `v1/` segment
+build against the pinned Metaplex dump, so a launch costs the same rent; its compute is not the same:
+`launch`, and `launch_from_batch` through the same Metaplex call, cost -91 to +199 CU more depending on the
+city, +33 for 468 of 600 city ids, measured after the review of the rename below and restated in 11.1). The `v1/` segment
 versions the metadata layout: a later layout takes a new path rather than a rewrite of URIs that are
 immutable once written. citycoin.dev must serve `/coin-meta/v1/<mint>.json` before the first coin of this
 program launches (8.4; a website step, not built). The test-only router's address seed is now
@@ -3536,3 +3538,42 @@ Every binary changed: production 738,072 bytes (8 more than 738,064), devnet 738
 hashes before and after are in `CITYCOIN-CURVE-AUDIT.md` 2.3, with the gate run in its Appendix B. No fee
 value, fee-share rule, account, instruction or check changed; the review rounds and D01 measured the build
 before the rename.
+
+**Review of the rename (24 October 2026).** A review of `2b96ed8`, `23c0bfa` and `9bf3f63` found the
+behaviour unchanged apart from the two constants (the IDL's instructions, accounts, events, types and errors
+deep-equal, every discriminator recomputed, the binaries' instructions equal up to the prefix's immediates,
+the hashes reproduced from a clean copy) and no program defect. Its items, and what was done:
+
+* HIST-1: row 29 of the audit pack's Appendix A, the `git status` output of the gate run for `bf17550`,
+  had been renamed with the file; it names `solana/VICINITY-CURVE-AUDIT.md` again, as it was run.
+* BEQ-1: 11.1 still gave `launch` figures from earlier builds as "measured on the production build"
+  (110,382 to 152,266 over 600 city ids, 151,008 for city 1000, stale before the rename). Measured again on
+  the renamed production build with the same 600-city sweep (cities 1000 + 7919 i, symbols C0 to C599):
+  110,737 to 152,759, median 124,237, p99 145,267; city 1000 with the name A 151,510, inside the range that
+  `12-compute` reads. The same sweep on the superseded binary `0a5beef2...` gives 110,685 to 152,560 and
+  151,311, so the rename moved each city by -91 to +199 CU (+33 for 468 cities, +79 for 86, -58 for 30,
+  +199 for 10, -91 for 3, +24 for 2, +70 for 1), not by a fixed amount. The other launch figures of 11.1 (`launch` + first buy,
+  `launch_from_batch`, the proof cost, the worst batch launch) were measured again in the same runs; the
+  230,000 and 250,000 budgets keep their margins.
+* SEC-R1, META-1, BEQ-4: the deploy checklist reads only the chain and so cannot check that citycoin.dev
+  serves `/coin-meta/v1/<mint>.json`; its header and its last line now name the route among what the
+  operator confirms by hand (`readyLine`, test SEC-R1 in `28-governance`). An automated check, a request
+  for an unknown mint expecting a JSON 404 with CORS like the legacy `/coin-meta/` row of the website's
+  `scripts/mainnet-preflight.mjs`, is open for the website stage (rebrand inventory row P15 on `main`, to
+  be updated when this branch merges).
+* SEC-R2: the batch tool prints `warning OLD_ARCHIVE` when `$VICINITY_BATCH_ARCHIVE` is set or
+  `~/.vicinity-curve/` exists, which it no longer reads (test SEC-R2 in `33-batch-verifier`). Only D01 used
+  the old paths.
+* SEC-R3: `solana/.gitignore` also ignores a symlink named `target` (`target/` matched only a directory).
+* DOC-1, BEQ-2, BEQ-3, SEC-R4: the audit pack's 2.3 and 11.4 said the binaries grew partly for the new
+  names in the embedded paths; those are as long as the old ones, `.rodata` keeps its size, and the 8
+  bytes are one instruction that stores the prefix's two extra bytes. The IDL changed one doc
+  (`MAX_PLATFORM_FEE_BPS`), not two. The pack now says that an audit report on `bf17550` or `0a5beef2...`
+  does not cover the build to be deployed. The throwaway-id table of 2.3 lists `tests/unit.rs` and the
+  D01 record in rows of their own (HOUSE-1).
+* Kept on purpose (NAME-1, PKG-1): the `vcurve` paths, npm scripts and `VCURVE_*` switches, and the
+  shared package name `vicinity-rewards-solana`, which also covers the deployed programs; renaming them
+  is the owner's choice for a later stage.
+
+No program, crate, IDL, fixture or binary changed: the tools in `2e0a277`, the rest documentation; the gate
+ran again (audit pack, Appendix B, second run).

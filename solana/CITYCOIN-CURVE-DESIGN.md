@@ -2965,7 +2965,7 @@ call (I19).
   below (`CONFIG_BUYBACK_THROUGHPUT`; a disabled one is a warning, review R9-PF-1); the time lock is set (unless the owner chose
   O11's alternative); and citycoin.dev serves `https://citycoin.dev/coin-meta/v1/<mint>.json`
   write-once (3.10; a website step that the checklist, which reads only the chain, does not
-  check). **Afterwards, as an operating rule** (review
+  check, and which its last line names among what the operator confirms by hand). **Afterwards, as an operating rule** (review
   R2-DIFF-1, SPEC-1): the upgrade authority is never moved to `FEE_RECIPIENT` (the program
   checks it only at `init_launchpad`), and `set_guardian` and `set_payout_config` never name a
   key that already holds a coin's founder seat (the program refuses the guardian and the payout
@@ -3606,24 +3606,33 @@ compute): zero-copy `Coin`, stored event-authority bump, untyped user token acco
 
 Measured on the production build (NOTES 30; C01 asserts every figure against its test budget):
 a curve buy about 26,100 CU and a sell about 23,500; the graduating buy 29,600; pool trades about
-25,500 and 23,500; `buyback_burn` about 20,000; `launch` 110,382 to 152,266 CU over 600 city ids
-(median 123,882, p99 145,022; review TL-INFO-1: the spread is the bump searches of the PDAs
+25,500 and 23,500; `buyback_burn` about 20,000; `launch` 110,737 to 152,759 CU over 600 city ids
+(median 124,237, p99 145,267; review TL-INFO-1: the spread is the bump searches of the PDAs
 `launch` derives or re-derives, which depend on the city id, the mint and the ticker, about 1,500
-to 1,700 CU per extra iteration; the worst known city under the localnet id, 1000 with name A and
-symbol C0, takes 151,008, asserted by `12-compute`); `launch` + token account + first buy about
-165,000 to 171,000 in total for one city (169,519 in the last run: the founder's token-account bump
-varies with its key); settings instructions 3,900 to 23,200 (re-measured after reviews OPS-1 and
-R5-CONS-1). The batch launch approval (NOTES 76): `init_launch_batch` 10,396, `set_launch_approver`
-13,368, `publish_launch_batch` 13,420, `clear_launch_batch` 12,486 (7,479, 7,174 and 6,761 before
-review R6-RT-3 made their events event CPIs: 5,700 to 6,300 CU more each); `launch_from_batch` with a full 9-hash
-proof (512 leaves) about 127,740 CU for city 801 of `12-compute` (127,734 and 127,742 in two runs), against `launch` 118,646 for city 800 in the same
-run; each proof hash costs about 242 CU (`30-batch` C01: 154,188 CU with no hash to 156,370 with 9 for one
-city, name and founder), so the 13-level proof of a 2^13-leaf tree, which the program refuses
-(`MAX_BATCH_PROOF_LEN` 9, `ProofTooLong` before any hashing), would add about 3,150 CU, well inside the
-250,000 budget; the worst batch launch with the founder's token account and first buy (9 hashes, a 32-byte
-name, a 10-byte ticker) about 178,000 to 179,300 CU in one transaction (177,763 and 179,279 in two runs: the
-founder's token-account bump varies with its random key). Every figure is inside its test
-budget. The suggested client limits are per instruction: the website's first buy adds the
+to 1,700 CU per extra iteration; the worst known city under the localnet id is 1000 with symbol C0,
+152,759 in that sweep with the name "Demo City" and 151,510 with the name A, the figure `12-compute`
+asserts); `launch` + token account + first buy about 165,000 to 171,000 in total for one city (168,401
+twice and 166,901 in three runs: the founder's token-account bump varies with its key); settings instructions
+3,900 to 23,200 (re-measured after reviews OPS-1 and R5-CONS-1). The batch launch approval (NOTES 76):
+`init_launch_batch` 10,396, `set_launch_approver` 13,368, `publish_launch_batch` 13,420,
+`clear_launch_batch` 12,486 (7,479, 7,174 and 6,761 before review R6-RT-3 made their events event CPIs:
+5,700 to 6,300 CU more each); `launch_from_batch` with a full 9-hash proof (512 leaves) 127,960 CU for
+city 801 of `12-compute` (the same in three runs), against `launch` 118,389 for city 800 in the same
+run; each proof hash costs about 242 CU (`30-batch` C01: 154,437 CU with no hash to 156,607 to 156,627
+with 9 for one city, name and founder), so the 13-level proof of a 2^13-leaf tree, which the program
+refuses (`MAX_BATCH_PROOF_LEN` 9, `ProofTooLong` before any hashing), would add about 3,150 CU, well
+inside the 250,000 budget; the worst batch launch with the founder's token account and first buy (9
+hashes, a 32-byte name, a 10-byte ticker) about 177,800 to 182,400 CU in one transaction (177,824 twice
+and 182,336 in three runs: the founder's token-account bump varies with its random key). Every figure
+is inside its test budget. *Measured again on 24 October 2026 on the renamed production build
+(`86754c66...`, AUDIT 2.3).* The rename's two bytes longer metadata URI changed `launch` by -91 to +199
+CU depending on the city (+33 for 468 of the 600 city ids, +199 for city 1000; the same sweep on the
+superseded binary `0a5beef2...` gave 110,685 to 152,560, median 124,185, p99 145,325, and 151,311
+for city 1000 with the name A); `launch_from_batch` goes through the same Metaplex call. Before
+that date this paragraph gave the range 110,382 to 152,266 (median 123,882, p99 145,022), 151,008 for
+city 1000, 169,519, 127,740, 118,646, 154,188 to 156,370 and 177,763 to 179,279, measured on earlier
+builds (NOTES 65, 74, 76 and the review rounds after them); the 230,000 and 250,000 budgets are
+unchanged. The suggested client limits are per instruction: the website's first buy adds the
 idempotent token-account create, about `13,430 + 1,500 x k` CU with `k` the owner's extra bump
 iterations (13,424 to 25,424 over 300 owners; the base is the associated token program's own cost
 and differs by a few CU between runtimes; `12-compute` asserts the formula), so a first buy
@@ -3684,7 +3693,7 @@ handlers; measure (C03). Measured: 605,664 bytes for the production build of rev
 review round 5, 728,256 bytes with the batch launch approval (devnet 728,256, halt-all 727,032)
 738,064 from review round 6, which made its three settings events event CPIs (devnet 738,064, halt-all
 736,840; about 0.05 SOL more rent; NOTES 20, 76 and 82), and 738,072 since the rename of 24 October 2026
-(devnet 738,072, halt-all 736,848; the longer metadata prefix and the new names; NOTES 107; `npm run
+(devnet 738,072, halt-all 736,848; one instruction more, for the 2 bytes longer metadata prefix; NOTES 107; `npm run
 vcurve:sbf`; cargo-build-sbf 4.4.0, platform-tools v1.57), above
 the target, which costs rent (about 0.62 SOL more for the program data account and as much for each
 buffer), not
@@ -4740,8 +4749,8 @@ buybacks, 11,973 payouts, 300 graduations, never a non-completing buy with dust)
 under its earlier name `vicinity_curve` (crate `vicinity-curve`, math crate `vicinity-curve-math`, leaf tag
 `vicinity_curve/launch_leaf`, metadata prefix `https://vicinity.city/coin-meta/`), and the binary hashes
 they cite (`0a5beef2...` among them) are of those builds. Their text is kept as it was; only the links to
-this file and its companions follow the new file names. The rename itself is the last subsection of this
-appendix.*
+this file and its companions follow the new file names. The rename itself and its review are the last two
+subsections of this appendix.*
 
 Each finding was checked against the code and the math before it was applied. "Applied" means
 the fix is in this file as the reviewer proposed or in an equivalent form; where a part was not
@@ -5179,3 +5188,20 @@ require for this not-yet-deployed program. NOTES 107 has the details.
 
 No fee value, fee-share rule, account layout, instruction, check, PDA seed or program id changed; the
 deployed programs and every reference to them keep their names.
+
+### Revision 3: the review of the rename (24 October 2026)
+
+A review of the rename's three commits found no program defect: the IDL's instructions, accounts, events,
+types and errors are deep-equal to the old ones, every discriminator recomputes, the binaries differ only in
+the prefix's immediates and one store instruction, and the hashes reproduce from a clean copy. NOTES 107
+("Review of the rename") has the details.
+
+| id | lens, severity | finding (short) | response |
+|---|---|---|---|
+| HIST-1 | history, low | the audit pack's Appendix A row 29 (a recorded `git status` output) was renamed with the file | **Applied**: the row names `solana/VICINITY-CURVE-AUDIT.md` again, as run |
+| BEQ-1 | behaviour, low | 11.1's `launch` range and city-1000 figure were from earlier builds; the longer URI moves `launch` by a few hundred CU at most | **Applied**: 11.1 measured again on the renamed build (110,737 to 152,759 over 600 city ids; city 1000 / A 151,510), with the per-city change (-91 to +199 CU) and the old figures named; NOTES 107 says compute changed, rent did not |
+| META-1, BEQ-4, SEC-R1 | deployment, low | nothing automated checks that citycoin.dev serves `/coin-meta/v1/` before the first launch | **Applied in part**: the deploy checklist's header and last line name the route among what the operator confirms by hand (8.4). The automated check is open for the website stage (rebrand inventory row P15) |
+| SEC-R2 | tools, nit | the old archive settings are ignored silently | **Applied**: `warning OLD_ARCHIVE` |
+| SEC-R3 | repository, nit | `target/` in `.gitignore` does not match a symlink named `target` | **Applied**: a bare `target` line |
+| DOC-1, BEQ-2, BEQ-3, SEC-R4, HOUSE-1 | documentation, nit | the binary growth was put partly down to the renamed paths; "two docs" in the IDL; no sentence that an audit of the old build does not cover the new one; the throwaway-id table | **Applied**: 11.4 and the audit pack's 2.3 and header corrected |
+| NAME-1, PKG-1 | naming, nit | the `vcurve` paths and switches and the package name `vicinity-rewards-solana` keep the old product's trace | **Kept**: none reaches the chain; renaming them is the owner's choice for a later stage |
