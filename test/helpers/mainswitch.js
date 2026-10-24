@@ -5,7 +5,10 @@ import { _pagesBuiltForTests } from "../../src/v5policy.js";
 
 /** The settings the v5 configuration check needs for the switch: a named environment and the legacy seats frozen. */
 export const ACCEPTED = Object.freeze({ MAIN_TOKEN_V5: "on", DEPLOYMENT_ENV: "test", LEGACY_SEATS: "frozen" });
-/** As if the deployed pages had been built with MAIN_TOKEN_V5 (and today's label set). */
-export const pagesBuiltWithSwitch = () => _pagesBuiltForTests({ mainTokenV5: true, brand: "" });
+/** As if the deployed pages had been built with MAIN_TOKEN_V5 (and today's label set). The build accepts the switch only with
+ *  LEGACY_SEATS=frozen (the v5 check, MAIN_TOKEN_ON_WITH_LEGACY_SEATS), so those pages carry the legacy seat freeze too (stage S16). */
+export const pagesBuiltWithSwitch = () => _pagesBuiltForTests({ mainTokenV5: true, brand: "", legacySeats: "frozen" });
+/** As if the deployed pages had been built with LEGACY_SEATS=frozen in wrangler.jsonc (stage S16: src/pages-built.js legacySeats "frozen"). */
+export const pagesBuiltFrozen = () => _pagesBuiltForTests({ legacySeats: "frozen" });
 /** Back to the committed src/pages-built.js (the pages were built without the switch). */
 export const pagesAsCommitted = () => _pagesBuiltForTests(null);

@@ -4,7 +4,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
-import { buildPages, buildStandalonePages, deployedVars, pageBrand } from "../scripts/pages/build.mjs";
+import { PAGES_BUILT_FILE, buildPages, buildStandalonePages, deployedVars, pageBrand, pageLegacySeats, pagesBuiltSource } from "../scripts/pages/build.mjs";
+import { FROZEN_COPY } from "../scripts/pages/frozen-copy.mjs";
 import { BRANDS, LEGACY_BRAND, brandLabels, brandOf } from "../src/brand.js";
 import { SOCIAL_PROFILES } from "../src/official.js";
 
@@ -80,4 +81,28 @@ test("labels are escaped where the layout writes them into markup", () => {
 test("an unknown BRAND stops the page build instead of shipping today's labels under a new switch value", () => {
   assert.throws(() => pageBrand({ BRAND: "citycoin" }), /BRAND="citycoin" is not a label set of src\/brand\.js \(BRAND_UNKNOWN\)/);
   assert.throws(() => brandLabels({ ...LEGACY_BRAND, productName: " " }), /productName must be a non-empty string/);
+});
+
+test("the legacy seat freeze (stage S16): unset in wrangler.jsonc, every page and src/pages-built.js are today's bytes; the shell never reaches it", () => {
+  assert.equal(Object.hasOwn(deployedVars(), "LEGACY_SEATS"), false, "LEGACY_SEATS is not set in wrangler.jsonc");
+  assert.deepEqual(pageLegacySeats(), { legacySeats: "on" });
+  sameBytes(all(), "default build");
+  sameBytes(all({ legacySeats: "on" }), "legacySeats on");
+  const before = process.env.LEGACY_SEATS;
+  process.env.LEGACY_SEATS = "frozen";
+  try { sameBytes(all(), "LEGACY_SEATS=frozen set in the shell only"); } finally { if (before === undefined) delete process.env.LEGACY_SEATS; else process.env.LEGACY_SEATS = before; }
+  // the record the Worker reads: the same four lines as before the freeze existed (the key is written only for pages built frozen)
+  const file = readFileSync(PAGES_BUILT_FILE, "utf8");
+  assert.equal(file, pagesBuiltSource());
+  assert.equal(file, [
+    "// Written by scripts/pages/build.mjs from the settings of wrangler.jsonc; do not edit (test/build-parity.test.js checks it).",
+    "// What the deployed pages in public/ were built with, and whether wrangler.jsonc sends them through the Worker (run_worker_first true).",
+    "// src/v5policy.js counts MAIN_TOKEN_V5 only when mainTokenV5 is true here, and HOST_REDIRECT only when pagesReachWorker is true.",
+    "export const PAGES_BUILT = Object.freeze({ mainTokenV5: false, brand: \"\", pagesReachWorker: false });",
+    "",
+  ].join("\n"));
+  // frozen, only the pages the frozen copy names change (the others stay today's bytes); an unknown value never builds
+  const frozen = all({ legacySeats: "frozen" });
+  for (const [f, html] of frozen) assert.equal(Buffer.from(html, "utf8").equals(committed(f)), !Object.hasOwn(FROZEN_COPY, f), f);
+  assert.throws(() => buildPages({ legacySeats: "maybe" }), /legacySeats must be "on" or "frozen"/);
 });

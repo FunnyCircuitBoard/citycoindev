@@ -336,9 +336,11 @@
   let lastLookup = null;
   const pop = $("#rank-pop");
   async function lookup(addr) {
-    const set = (id, t) => ($(id).textContent = t);
+    const set = (id, t) => { const e = $(id); if (e) e.textContent = t; }; // (guarded: the pages built with the legacy seats frozen have no founder amount)
+    // the legacy seats frozen (/api/me says legacySeats "frozen", stage S16): the founder amount is no rule any more, so its row stays hidden
+    const frozen = Boolean(window.V.me && window.V.me() && window.V.me().legacySeats === "frozen");
     /** "To pass the next wallet" and "Founder amount": shown, or not (a team wallet). Guarded: a page from before them still checks a rank. */
-    const extraFacts = (on) => ["#rank-next-row", "#rank-founder-row"].forEach((id) => { const e = $(id); if (e) e.hidden = !on; });
+    const extraFacts = (on) => ["#rank-next-row", "#rank-founder-row"].forEach((id) => { const e = $(id); if (e) e.hidden = !on || (frozen && id === "#rank-founder-row"); });
     const btn = $("#lookup button"); if (btn.disabled) return; // one check at a time (Enter while the last one is on its way)
     lastLookup = null; // set again only when the pop-up shows a wallet's facts: a message alone has no row to show, after a refresh too
     // every lookup starts from a blank card: nothing of the wallet looked up before may stay on it

@@ -65,10 +65,11 @@ export function memberMe({ wallet = null, handle = "SwiftHarbor10", name = "Sa N
  *   meDelay          page time (ms) before /api/me answers (Infinity: never); /api/me?lite=1 (the header's) answers at once
  *   v2Delay          page time (ms) /dashboard-v2.js takes to load once dashboard.js asks for it
  *   atDefer(doc, win) runs after theme.js and before the deferred scripts (what happened while they loaded)
+ *   html             the page itself, when not the built public/dashboard.html (a build with other settings: the legacy seats frozen, stage S16)
  */
-export async function openDashboard({ ua = UA.desktop, search = "", hash = "", me = memberMe(), api = async () => undefined, storage = {}, session: sessionStore = {}, wallets = [], confirm = true, touchPoints, official = { ok: true }, globals = {}, without = [], theme = false, meDelay = 0, v2Delay = 0, atDefer = null } = {}) {
+export async function openDashboard({ ua = UA.desktop, search = "", hash = "", me = memberMe(), api = async () => undefined, storage = {}, session: sessionStore = {}, wallets = [], confirm = true, touchPoints, official = { ok: true }, globals = {}, without = [], theme = false, meDelay = 0, v2Delay = 0, atDefer = null, html = null } = {}) {
   const doc = new Doc();
-  doc.append(...parse(doc, read("dashboard.html")));
+  doc.append(...parse(doc, html ?? read("dashboard.html")));
   let now = 0, seq = 0, hidden = false;
   const timers = [];
   const setTimeout_ = (fn, ms = 0) => { const id = ++seq; timers.push({ id, at: now + Math.max(0, Number(ms) || 0), fn }); return id; };

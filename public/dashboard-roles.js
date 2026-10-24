@@ -14,6 +14,8 @@
   let ctx = null, queue = {}, lastData = null;
   // the tabbed dashboard (DASHBOARD_V2=on): window.VDash exists only then; the flag-off page keeps its emoji and its buttons as they were
   const tabbed = () => Boolean(window.VDash);
+  // the legacy seats frozen (LEGACY_SEATS=frozen: /api/me says legacySeats "frozen", stage S16): see frozenProfile below. Without the key: as before
+  const frozenSeats = (d) => Boolean(d && d.legacySeats === "frozen");
 
   /* ---------- the shared icon set (SPEC "Icons": 24 viewBox, stroke 1.7, currentColor), built as SVG nodes, never from text ---------- */
   const ICONS = {
@@ -87,6 +89,7 @@
 
   /** What this person is, right now: icon, title, lead, status tag, meters, tools. */
   function profile(d) {
+    if (frozenSeats(d)) return frozenProfile(d);
     const home = d.user.home, city = home ? home.name : "your city", cc = d.national ? d.national.country : "";
     const seat = d.founder.seat, c = d.community, weight = d.roles.weight;
     const p = { icon: "🌱", ico: ["pin", ""], title: `Member of ${city}`, lead: "", tag: null, meters: [], tools: [], notes: [], weight, danger: null };
@@ -170,6 +173,65 @@
     return p;
   }
 
+  /**
+   * The legacy seats frozen (/api/me legacySeats "frozen"; Citycoin.dev master v5 stage S16): the same panel without the old founder rules. A seat
+   * or a term on record keeps its title, its vote weight and its coin tools; nothing offers a claim, an endorsement, a squad, a vote, a challenge
+   * or a resignation (their routes answer 410), and no probation, grace, founder amount or election is told as current. A seat alone no longer
+   * moderates (src/roles.js), so "Moderator tools" is offered only where /api/mod says so (the Moderate tab).
+   */
+  function frozenProfile(d) {
+    const home = d.user.home, city = home ? home.name : "your city", cc = d.national ? d.national.country : "";
+    const seat = d.founder && d.founder.seat, weight = d.roles.weight;
+    const p = { icon: "🌱", ico: ["pin", ""], title: `Member of ${city}`, lead: "", tag: null, meters: [], tools: [], notes: [], weight, danger: null };
+    const invite = tool("Invite locals · copy link", () => copy(`I'm repping ${city} on Vicinity. One city, one coin: join us → ${location.origin}/connect`, "Invite copied. Send it to your locals!"));
+    const ON_RECORD = "Founder seats, squads and elections are closed for changes.";
+    if (seat) {
+      const ready = d.coinV2Ready === true, live = seat.status === "active" || seat.status === "steward";
+      p.icon = "👑"; p.ico = ["crown", "gold"];
+      p.title = { steward: `Seed Steward of ${seat.city}`, provisional: `Chosen founder of ${seat.city}` }[seat.status] || `City Founder of ${seat.city}`;
+      p.tag = { text: "On record", cls: "tag--gold" };
+      p.lead = live ? `Your founder seat for ${seat.city} is on record. You ${ready ? "choose and launch its coin (made by Vicinity from the city list)" : "design its coin"} and your vote counts ×${weight}. ${ON_RECORD}`
+        : `Your founder seat for ${seat.city} is on record as it was. ${ON_RECORD}`;
+      if (live) p.tools.push(ready ? jump("Your city coin", "#coin-ready") : jump("Design the city's coin", "#coin"));
+      p.tools.push(invite);
+    } else if (d.level === "holder") {
+      p.icon = "🏅"; p.ico = ["medal", "ok"]; p.title = `Holder in ${city}`;
+      p.lead = `You can post and vote in ${city}.`;
+      p.tools.push(jump("Post to your city", "#feed"), invite);
+    } else if (!d.user.wallet) {
+      p.tag = { text: "You are in", cls: "tag--ok" };
+      p.lead = `Member of ${city}. You are in. Link a wallet to see your $VICINITY and your rank.`;
+      if (!tabbed()) p.tools.push(link("Link my wallet", "/connect?mode=link", "btn btn--primary btn--sm"));
+      p.tools.push(invite);
+    } else {
+      p.tag = { text: d.launched ? "Not holding yet" : "Early member", cls: d.launched ? "tag--warn" : "tag--ok" };
+      p.lead = d.launched ? "You're signed in and local, but this wallet holds no $VICINITY yet. Holding any amount unlocks posting, voting and your rank."
+        : "You're in before launch: 🌱 Early member, which can never be earned again. After launch, holding any $VICINITY unlocks posting and voting.";
+      p.tools.push(link("Get $VICINITY", "/token#buy", "btn btn--primary btn--sm"), invite);
+    }
+    if (d.level === "manager") {
+      const m = d.national && d.national.manager;
+      p.icon = "🛡️"; p.ico = ["shield", "gold"]; p.title = `Country Manager · ${ctx.countryName(cc)}`;
+      p.tag = { text: m ? `Term until ${date(m.endsAt)}` : "Manager", cls: "tag--gold" };
+      p.lead = `You moderate ${ctx.countryName(cc)}, advise on "add my town" requests, and your vote counts ×${weight}. Your term runs until its end date; no new election opens.`;
+      if (m) { const st = Date.parse(m.startsAt); p.meters.unshift(meter("Term", pct(Date.now() - st, Date.parse(m.endsAt) - st), `${daysLeft(m.endsAt)} days left`)); }
+      p.tools = [jump("Moderator tools", "#mod", "btn btn--primary btn--sm"), ...p.tools];
+    }
+    if (d.level === "admin") {
+      p.icon = "⚙️"; p.ico = ["shield", "gold"]; p.title = "Admin";
+      p.tag = { text: "Runs Vicinity within the published rules", cls: "tag--gold" };
+      p.lead = "Everything that needs a decision is in the moderator tools. Launch settings, team wallets and snapshots live in the admin console.";
+      p.tools = [link("Admin console", "/admin", "btn btn--primary btn--sm"), jump("Moderator tools", "#mod"), link("Public log", "/api/audit"), link("The rules", "/rules"), ...p.tools.filter((t) => t.tagName === "BUTTON" && /Invite/.test(t.textContent))];
+    }
+    const row = d.level === "member" ? "holder" : d.level;
+    p.tools.push(tool("What my role can do", () => {
+      const r = $(`#roles details[data-role="${row}"]`);
+      if (r) r.open = true;
+      scrollTo("#roles");
+    }, "link-btn"));
+    return p;
+  }
+
   const QUEUE_LABEL = { posts: ["reported post", "reported posts"], proposals: ["ban proposal", "ban proposals"], appeals: ["appeal", "appeals"],
     objections: ["objection", "objections"], towns: ["town request", "town requests"], coins: ["coin contract to check", "coin contracts to check"], bios: ["reported bio", "reported bios"] };
   // the old Raydium LaunchLab path closed (the queue's own answer, launchLabClosed): nobody checks such a contract, it can only be rejected
@@ -218,7 +280,7 @@
     host.replaceChildren(...parts);
     renderQueue();
     renderSquad(d);
-    danger(p.danger);
+    danger(p.danger); // (frozen: never a Resign button, so the Danger zone stays hidden)
   }
   /** The Founder tab's "Danger zone" (the tabbed dashboard): the Resign button and what it does, folded; hidden without a seat. */
   function danger(btn) {
@@ -245,6 +307,7 @@
 
   function renderSquad(d) {
     const box = $("#squad"); if (!box) return;
+    if (frozenSeats(d)) { box.hidden = true; box.replaceChildren(); return; } // frozen: a squad on record is history; nothing to start, join, apply or leave
     const sq = d.squad, home = d.user.home;
     if (!d.launched || !home || !sq || (!sq.mine && !sq.joinable && !sq.canCreate)) { box.hidden = true; return; }
     box.hidden = false;

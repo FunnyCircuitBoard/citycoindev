@@ -256,15 +256,15 @@ test("active: the legend, the city card, the tags and the tooltip carry the colo
   assert.match(polish, /\.tip-active \{ color: var\(--st-active\); font-weight: 600; \}/);
   // the card
   assert.match(js, /const FOCUS_TAG = \{ open: \["tag tag--open", "Open"\], active: \["tag tag--active", "Active"\], choosing:/, "the card's pills: open in the open marker's blue, not the green of tag--ok");
-  assert.match(js, /else if \(st === "active"\) l4 = `\$\{fmt\(h\)\} holder\$\{h === 1 \? "" : "s"\} · \$\{fmt\(m\)\} member\$\{m === 1 \? "" : "s"\} · no founder yet`;/, "the numbers first: a 320 px card cut the members count off the end of the old line");
+  assert.match(js, /else if \(st === "active"\) l4 = `\$\{fmt\(h\)\} holder\$\{h === 1 \? "" : "s"\} · \$\{fmt\(m\)\} member\$\{m === 1 \? "" : "s"\} · no founder\$\{frozen \? "" : " yet"\}`;/, "the numbers first: a 320 px card cut the members count off the end of the old line");
   assert.doesNotMatch(js, /"tag tag--ok", mine \? "Yours"|"tag tag--ok", cl \? "Founded"|open: \["tag tag--ok"/, "no status pill is green any more (the nearby list's Join is an action, it keeps tag--ok)");
   assert.match(js, /const STATUS_WORD = \{ open: "Open", active: "Active", choosing: "Choosing its founder", founded: "Founded", mine: "Yours" \};/, "the chips and the announcement");
   // the tooltip, the panel, the list, Most wanted
   assert.match(js, /el\("span", cl \? "tip-claimed" : st === "active" \? "tip-active" : "tip-open",/);
-  assert.ok(js.includes('st === "active" ? `Active: ${fmt(h)} verified holder${h === 1 ? "" : "s"}, no founder yet` : "Open")'));
+  assert.ok(js.includes('st === "active" ? `Active: ${fmt(h)} verified holder${h === 1 ? "" : "s"}, no founder${seatsFrozen() ? "" : " yet"}` : statusWord("open"))')); // ("yet" and "Open" while the legacy seats are not frozen)
   assert.ok(js.includes('activeIds.has(selected.id) ? "Active · verified holders, no founder yet" : "Open city"'), "the panel's kicker");
-  assert.ok(js.includes('activeIds.has(c.id) ? "tag tag--active" : "tag tag--open", mine ? "Yours" : cl ? "Founded" : windows.has(c.id) ? "Choosing" : activeIds.has(c.id) ? "Active" : "Open"'), "the list's rows");
-  assert.ok(js.includes('cl ? "tag tag--no" : win ? "tag tag--gold" : act ? "tag tag--active" : "tag tag--open", cl ? "Founded" : win ? "Choosing" : act ? "Active" : "Seat open"'), "Most wanted: Active instead of Seat open, in the map's order (founded, choosing, active)");
+  assert.ok(js.includes('activeIds.has(c.id) ? "tag tag--active" : "tag tag--open", mine ? "Yours" : cl ? "Founded" : windows.has(c.id) ? "Choosing" : activeIds.has(c.id) ? "Active" : statusWord("open")'), "the list's rows");
+  assert.ok(js.includes('cl ? "tag tag--no" : win ? "tag tag--gold" : act ? "tag tag--active" : "tag tag--open", cl ? "Founded" : win ? "Choosing" : act ? "Active" : seatsFrozen() ? "No founder" : "Seat open"'), "Most wanted: Active instead of Seat open, in the map's order (founded, choosing, active)");
   assert.match(js, /win = windows\.has\(String\(c\.id\)\), h = holderCount\.get\(String\(c\.id\)\) \|\| 0, act = !cl && !win && h > 0;/, "Most wanted reads the counts the map keeps (the last known ones while the server has no sample), not the row's own");
   assert.ok(js.includes("${h ? ` · ${fmt(h)} holder${h === 1 ? \"\" : \"s\"}` : \"\"}"), "Most wanted: the holders next to the members");
 });
@@ -283,9 +283,10 @@ test("active: the card's fourth line for an active city, and a founded city's li
     ov: { failed: false }, compact: new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }), fmt: (n) => Number(n).toLocaleString("en-US"), placeOf: () => "New York, United States",
     tickerOf: () => "SYRACUSE", founderMin: () => 240000, until: () => "1h", toLonLat: () => [0, 0], nearestCommunities: () => [], fcx: 0, fcy: 0,
     FOCUS_TAG: { open: ["tag tag--open", "Open"], active: ["tag tag--active", "Active"], founded: ["tag tag--no", "Founded"] }, STATUS_WORD: { open: "Open", active: "Active", founded: "Founded" },
-    setTimeout: (f) => { f(); return 1; }, clearTimeout() {}, Date: { now: () => 0 } };
+    setTimeout: (f) => { f(); return 1; }, clearTimeout() {}, Date: { now: () => 0 }, seatsFrozen: () => false };
   vm.createContext(ctx);
   vm.runInContext(`let focusId = "5140405", focusSig = "", nearestGo = null, swapping = 0, sayTimer = 0, reduced = true, membersKnown = true, st0 = "active";
+    const statusWord = (st) => STATUS_WORD[st];
     const statusOf = () => st0; const areaFacts = () => null; const areaNote = () => ""; const announce = (t) => { $("#mf-say").textContent = t; };
     ${RENDER}
     this.api = { renderFocus, set: (s) => { st0 = s; focusSig = ""; } };`, ctx);
@@ -307,7 +308,7 @@ test("active: the card's fourth line for an active city, and a founded city's li
 function membersPage() {
   const SLICE = js.slice(js.indexOf('  let membersSig = "", activeSig = "";'), js.indexOf("  function renderFeed(fresh = new Set()) {"));
   assert.ok(SLICE.includes("async function refreshMembers()") && SLICE.length < 4000, "the refreshMembers block");
-  const ctx = { calls: [], tags: [], answer: null, $: () => ({ replaceChildren() {} }), byId: new Map(), claims: new Map(), windows: new Map(), countries: { US: "United States" }, fmt: (n) => String(n), sec: {}, reduced: true, select() {} };
+  const ctx = { calls: [], tags: [], answer: null, $: () => ({ replaceChildren() {} }), byId: new Map(), claims: new Map(), windows: new Map(), countries: { US: "United States" }, fmt: (n) => String(n), sec: {}, reduced: true, select() {}, seatsFrozen: () => false };
   ctx.el = (tag, cls, txt) => { if (cls && /\btag\b/.test(cls)) ctx.tags.push(`${cls}|${txt}`); return { className: cls || "", textContent: txt || "", style: {}, append() {}, addEventListener() {} }; };
   ctx.V = () => ({ api: async () => ctx.answer });
   vm.createContext(ctx);

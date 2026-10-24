@@ -10,7 +10,7 @@ import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import * as W from "./helpers/world.js";
 import { seedSeat } from "./helpers/launchpad.js";
-import { ACCEPTED, pagesAsCommitted, pagesBuiltWithSwitch } from "./helpers/mainswitch.js";
+import { ACCEPTED, pagesAsCommitted, pagesBuiltFrozen, pagesBuiltWithSwitch } from "./helpers/mainswitch.js";
 import { handleApi } from "../src/index.js";
 import { runJobs } from "../src/jobs.js";
 import { advanceSeats, legacySeatsFrozen as seatsModuleFrozen } from "../src/seats.js";
@@ -137,6 +137,17 @@ test("the gate: frozen only with LEGACY_SEATS=frozen; held frozen when its own i
   for (const env of [{}, { LEGACY_SEATS: "" }, { LEGACY_SEATS: "  " }, { LEGACY_SEATS: "on" }, { LEGACY_SEATS: " On " }, { LEGACY_SEATS: "on", DEPLOYMENT_ENV: "test" }]) {
     assert.equal(legacySeats(env), "on", JSON.stringify(env));
     assert.equal(legacySeatsFrozen(env), false);
+    assert.deepEqual(legacySeatsRefusals(env), [], JSON.stringify(env));
+  }
+  // the page build's record (src/pages-built.js legacySeats, the copy part of S16): a switch set where the pages were not built with it is held
+  // frozen (the static pages still carry the old copy), and pages built with it hold the freeze whatever this Worker's setting says
+  assert.equal(legacySeats(FROZEN), "held", "set only in the dashboard: the writers freeze, the pages still say the old rules");
+  assert.deepEqual(legacySeatsRefusals(FROZEN), ["LEGACY_SEATS_PAGES_NOT_BUILT"]);
+  pagesBuiltFrozen();
+  for (const env of [{}, { LEGACY_SEATS: "on" }, { LEGACY_SEATS: "off", DEPLOYMENT_ENV: "test" }, { LEGACY_SEATS: "  " }]) {
+    assert.equal(legacySeats(env), "held", `pages built frozen, ${JSON.stringify(env)}: never reopened by a setting`);
+    assert.equal(legacySeatsFrozen(env), true);
+    assert.deepEqual(legacySeatsRefusals(env), ["LEGACY_SEATS_UNSET_PAGES_FROZEN"]);
   }
   assert.equal(legacySeats(FROZEN), "frozen");
   assert.equal(legacySeats({ LEGACY_SEATS: " FROZEN ", DEPLOYMENT_ENV: "Preview" }), "frozen", "trimmed, any letter case, as the v5 check reads it");
@@ -156,13 +167,17 @@ test("the gate: frozen only with LEGACY_SEATS=frozen; held frozen when its own i
     assert.equal(legacySeats(env), "frozen", JSON.stringify(bad));
     assert.deepEqual(legacySeatsRefusals(env), [], JSON.stringify(bad));
   }
-  // a value outside the switch's set does not express it: refused by name (FLAG_VALUE_INVALID), and today's site
+  // a value outside the switch's set does not express it: refused by name (FLAG_VALUE_INVALID), and today's site (pages built without the freeze)
+  pagesAsCommitted();
   for (const v of ["off", "true", "freeze", "1", "yes", "frozen!", "frozen,on"]) {
     assert.equal(legacySeats({ LEGACY_SEATS: v, DEPLOYMENT_ENV: "test" }), "on", v);
     assert.equal(legacySeats({ LEGACY_SEATS: v }), "on", v);
   }
-  // never throws: a setting that cannot be read reads as unset
+  // never throws: a setting that cannot be read reads as unset (with the pages built frozen: held)
   assert.equal(legacySeats({ get LEGACY_SEATS() { throw new Error("boom"); } }), "on");
+  pagesBuiltFrozen();
+  assert.equal(legacySeats({ get LEGACY_SEATS() { throw new Error("boom"); } }), "held");
+  pagesAsCommitted();
   assert.equal(legacySeats(null), "on");
   assert.equal(legacySeats(undefined), "on");
   // the seats module asks the same gate
@@ -173,25 +188,37 @@ test("the gate: frozen only with LEGACY_SEATS=frozen; held frozen when its own i
 // configuration counts the main token with the seats not frozen; this test pins the outcome, not that branch.)
 test("MAIN_TOKEN_V5 counting freezes through the same gate, and a switch that does not count adds nothing to the freeze", () => {
   const full = { ...ACCEPTED, VICINITY_MINT: W.MINT, MAIN_TOKEN_MINT: FAKE_MINT };
+  pagesBuiltFrozen();
   assert.equal(mainTokenV5(full), false, "pages not built for the switch");
   assert.equal(legacySeats(full), "frozen", "LEGACY_SEATS=frozen itself");
   pagesBuiltWithSwitch();
   assert.equal(mainTokenV5(full), true);
   assert.equal(legacySeats(full), "frozen");
-  // the switch without the seats frozen is refused by the v5 check (MAIN_TOKEN_ON_WITH_LEGACY_SEATS): nothing counts, nothing freezes
+  // the switch without the seats frozen is refused by the v5 check (MAIN_TOKEN_ON_WITH_LEGACY_SEATS): nothing counts; the pages built with the
+  // switch carry the freeze, so the writers stay frozen (held); with pages built without either, nothing freezes
   const unfrozen = { ...full, LEGACY_SEATS: undefined };
   assert.equal(mainTokenV5(unfrozen), false);
+  assert.equal(legacySeats(unfrozen), "held");
+  pagesAsCommitted();
   assert.equal(legacySeats(unfrozen), "on");
 });
 
 test("refusals are logged once per isolate by name; with the switch unset, on or accepted nothing is logged about it", () => {
-  checkPolicyConfig({}); checkPolicyConfig({ LEGACY_SEATS: "on" }); checkPolicyConfig(FROZEN); checkPolicyConfig({ ...FROZEN, OFFICIAL_X_URL: "nope" });
+  checkPolicyConfig({}); checkPolicyConfig({ LEGACY_SEATS: "on" });
+  pagesBuiltFrozen(); checkPolicyConfig(FROZEN); checkPolicyConfig({ ...FROZEN, OFFICIAL_X_URL: "nope" });
   assert.deepEqual(errors.filter((e) => /legacy seats/.test(e)), []);
   assert.deepEqual(errors.filter((e) => /LEGACY_SEATS/.test(e)), []);
   _resetPolicyCheck(); errors = [];
   checkPolicyConfig({ LEGACY_SEATS: "frozen" }); checkPolicyConfig({ LEGACY_SEATS: "frozen" });
   assert.deepEqual(errors, ["policy config refused ENVIRONMENT_UNSET deployment.environment",
     "legacy seats switch refused LEGACY_SEATS_POLICY_REFUSED (held frozen)"], "two lines, codes only, once");
+  // the page build's record: pages built frozen with the setting gone, and a setting the pages were not built with, each named once
+  _resetPolicyCheck(); errors = [];
+  checkPolicyConfig({}); checkPolicyConfig({ LEGACY_SEATS: "on" });
+  assert.deepEqual(errors, ["legacy seats switch refused LEGACY_SEATS_UNSET_PAGES_FROZEN (held frozen)"]);
+  pagesAsCommitted(); _resetPolicyCheck(); errors = [];
+  checkPolicyConfig(FROZEN); checkPolicyConfig(FROZEN);
+  assert.deepEqual(errors, ["legacy seats switch refused LEGACY_SEATS_PAGES_NOT_BUILT (held frozen)"]);
   _resetPolicyCheck(); errors = [];
   checkPolicyConfig({ LEGACY_SEATS: "freeze", DEPLOYMENT_ENV: "test" });
   assert.deepEqual(errors, ["policy config refused FLAG_VALUE_INVALID deployment.flags.LEGACY_SEATS"], "a value outside the set: named, and today's site");
@@ -264,7 +291,16 @@ test("the history reads answer exactly as with the switch off: the map, the clai
   for (const p of Object.keys(off)) assert.equal(off[p].status, 200, p);
   W.advance(31_000); // past the 30-second answer cache of /api/seats
   setEnv(w.env, FROZEN);
-  assert.deepEqual(await read(), off);
+  // every history read is the same; the map's answer (/api/seats, /api/claims) only loses the Stake Ladder's figure (founderAmount: no rule
+  // while frozen, and no page built with the freeze reads it; the copy part of S16)
+  const frozen = await read();
+  for (const p of Object.keys(off)) {
+    if (p !== "/api/seats" && p !== "/api/claims") { assert.deepEqual(frozen[p], off[p], p); continue; }
+    const { founderAmount, ...rest } = JSON.parse(off[p].body);
+    assert.equal(typeof founderAmount, "number", `${p}: today's answer carries the ladder's figure`);
+    assert.deepEqual(JSON.parse(frozen[p].body), rest, p);
+    assert.equal(frozen[p].status, off[p].status, p);
+  }
   const squad = await W.browser(w.env).send(`/api/seats/squad/${w.squad}`);
   assert.equal(squad.status, 200);
   assert.equal((await squad.json()).squad.members.length, 1);

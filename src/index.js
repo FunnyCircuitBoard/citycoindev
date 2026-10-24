@@ -251,9 +251,15 @@ async function holdersResponse(env, mint, offset, fetchImpl) {
   }
 }
 
+/**
+ * The Stake Ladder's smallest founder amount, as the rank answers carry it ({ founderMin }), or nothing while the legacy seats are frozen
+ * (stage S16: the ladder is no rule any more and the pages built with the freeze do not show it). With the switch off: exactly as before.
+ */
+const ladderMin = (env) => (legacySeatsFrozen(env) ? {} : { founderMin: founderAmount(0) });
+
 /** Where does a wallet stand? Read-only; the address is not stored. */
 async function rankResponse(env, mint, address, fetchImpl) {
-  const founderMin = founderAmount(0);
+  const ladder = ladderMin(env);
   try {
     const snap = await holderSnapshot(env, mint, fetchImpl, 60_000, { staleMs: SHOW_STALE_MS }); // a shown rank: like /api/holders
     let mine = rankOf(snap, address);
@@ -262,13 +268,13 @@ async function rankResponse(env, mint, address, fetchImpl) {
       // cheap call), so someone who just bought sees what they hold; the others' amounts are the list's, as of updatedAt
       try { mine = rankWithAmount(snap, address, await getHolding(env, address, mint, fetchImpl)); } catch { /* the list's own amount */ }
     }
-    return json({ launched: true, full: true, address, ...mine, supply: snap.facts.supply, founderMin, updatedAt: snap.at, ...(snap.stale ? { stale: true } : {}) });
+    return json({ launched: true, full: true, address, ...mine, supply: snap.facts.supply, ...ladder, updatedAt: snap.at, ...(snap.stale ? { stale: true } : {}) });
   } catch { /* fall back to the balance alone */ }
   try {
     const amount = await getHolding(env, address, mint, fetchImpl);
     // a team wallet's label rides along (the rank check names "Team wallet (FOMO)" from it, list or no list)
     const facts = teamFor(env, mint), team = isTeamWallet(address, facts);
-    return json({ launched: true, full: false, address, amount, rank: null, total: null, team, ...(team ? { label: teamWalletLabel(address) } : {}), ...(isTeamLock(address, facts) ? { lock: true } : {}), founderMin, updatedAt: new Date().toISOString() });
+    return json({ launched: true, full: false, address, amount, rank: null, total: null, team, ...(team ? { label: teamWalletLabel(address) } : {}), ...(isTeamLock(address, facts) ? { lock: true } : {}), ...ladder, updatedAt: new Date().toISOString() });
   } catch {
     return json({ launched: true, error: "chain_unavailable" }, 503);
   }
@@ -583,9 +589,10 @@ export async function handleApi(request, env = {}, fetchImpl = fetch, ctx = null
       const address = url.searchParams.get("address");
       if (!isSolanaAddress(address)) return json({ error: "bad_address" }, 400);
       const mint = tokenMint(env);
-      if (!mint) return json({ launched: false, address, founderMin: founderAmount(0) });
-      // the attempt is counted only when the 30-second cache has no answer: looking at the same wallet again is free
-      return cached(`rank-${mint}-${address}`, 30, async () => (await publicLimit(env, request, "rank")) || rankResponse(env, mint, address, fetchImpl));
+      if (!mint) return json({ launched: false, address, ...ladderMin(env) });
+      // the attempt is counted only when the 30-second cache has no answer: looking at the same wallet again is free (frozen, its own key:
+      // the answer has no founderMin, stage S16)
+      return cached(`rank-${mint}-${address}${legacySeatsFrozen(env) ? "-frozen" : ""}`, 30, async () => (await publicLimit(env, request, "rank")) || rankResponse(env, mint, address, fetchImpl));
     }
     case "/api/message": {
       // Helper so the browser builds exactly the same text the server expects.
@@ -625,11 +632,13 @@ export async function handleApi(request, env = {}, fetchImpl = fetch, ctx = null
       if (!env.DB) return json({ launched: Boolean(tokenMint(env)), seats: [], windows: [] });
       // the map polls this every 30 seconds from every open tab: one answer per 30 seconds per server (the key names the main token's mode:
       // "seats" exactly while MAIN_TOKEN_V5 does not count, src/official.js mainCacheTag)
-      return cached("seats" + mainCacheTag(env), 30, async () => {
+      // (the legacy seats frozen, stage S16: no founderAmount, the ladder is no rule any more; its own cache key. Off: exactly as before)
+      const frozen = legacySeatsFrozen(env);
+      return cached("seats" + mainCacheTag(env) + (frozen ? "-frozen" : ""), 30, async () => {
         await ensureSchema(env.DB);
         const res = await handleSeats(env);
         const body = await res.json();
-        return json({ ...body, launched: Boolean(tokenMint(env)), founderAmount: founderAmount(0) });
+        return json({ ...body, launched: Boolean(tokenMint(env)), ...(frozen ? {} : { founderAmount: founderAmount(0) }) });
       });
     }
     case "/api/seats/apply":

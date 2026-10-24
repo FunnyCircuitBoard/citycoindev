@@ -238,7 +238,7 @@ test("cities, rules, terms: a plain search placeholder; a chip row and folds on 
   assert.match(html["cities.html"], /<input id="map-find-q" type="search" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="map-find-list" aria-describedby="map-find-hint" autocomplete="off" spellcheck="false" maxlength="60" enterkeyhint="go" placeholder="Search a city or town">/);
   assert.doesNotMatch(html["cities.html"], /id="city-q"|city-stats__claims|<span>claims<\/span>/);
   assert.match(html["cities.html"], /<p class="city-status" id="cs-status" hidden>.*Founder applications open<\/p>/);
-  assert.match(read("public/cities.js"), /\$\("#cs-status"\)\.hidden = !open;/, "shown while founder applications are open (/api/seats launched)");
+  assert.match(read("public/cities.js"), /if \(status\) status\.hidden = !open \|\| seatsFrozen\(\);/, "shown while founder applications are open (/api/seats launched), never while the legacy seats are frozen (stage S16)");
   const rules = html["rules.html"];
   const toc = rules.match(/<nav class="rules-toc" aria-label="Rules">([\s\S]*?)<\/nav>/)[1];
   const anchors = [...toc.matchAll(/href="#([a-z]+)"/g)].map((m) => m[1]);

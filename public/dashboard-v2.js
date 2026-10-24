@@ -63,6 +63,10 @@
     ["objections", "objection", "objections"], ["towns", "town request", "town requests"], ["coins", "coin contract to check", "coin contracts to check"]];
   // the coins' words while the old LaunchLab path is closed: nobody checks such a contract any more, it can only be rejected
   const QUEUE_COINS_CLOSED = ["old contract to settle", "old contracts to settle"];
+  // the legacy seats frozen (LEGACY_SEATS=frozen: /api/me says legacySeats "frozen"; Citycoin.dev master v5 stage S16): Today offers no claim,
+  // endorsement, vote, squad, objection period or grace top-up; the city header, Founder Status and the Founder card say only what is on record.
+  // Without the key (today) every line reads as before.
+  const frozenSeats = (d) => Boolean(d && d.legacySeats === "frozen");
 
   let ctx = null, active = "home", pending = null, lastMod = null, coin = null, coinKnown = false, coinQueueN = 0, fcardAction = null, lastTarget = null, targetTimer = 0;
   // the glass pill behind the chosen tab: its box now ({ x, y, w, h }, or null until it has measured a tab), its slide on the way, and
@@ -462,7 +466,8 @@
   function queueCounts() {
     const m = lastMod && lastMod.moderator === true ? lastMod : null;
     const n = (k) => (m && Array.isArray(m[k]) ? (k === "proposals" ? m[k].filter((x) => x.canApprove).length : m[k].length) : 0);
-    const counts = { posts: n("posts"), proposals: n("proposals"), appeals: n("appeals"), objections: n("objections"), towns: n("towns"), coins: coinQueueN };
+    // (frozen: an objection on record cannot be decided, so it is not counted as waiting)
+    const counts = { posts: n("posts"), proposals: n("proposals"), appeals: n("appeals"), objections: frozenSeats(me()) ? 0 : n("objections"), towns: n("towns"), coins: coinQueueN };
     const total = Object.values(counts).reduce((a, b) => a + b, 0);
     const parts = QUEUE.map((q) => (q[0] === "coins" && lpEra() ? ["coins", ...QUEUE_COINS_CLOSED] : q)).filter(([k]) => counts[k]).map(([k, one, many]) => `${counts[k]} ${counts[k] === 1 ? one : many}`);
     return { counts, total, parts };
@@ -515,15 +520,16 @@
     const city = u.home ? u.home.name : "your city", seated = Boolean(seat && (seat.status === "active" || seat.status === "steward"));
     const rows = [];
     const add = (title, sub, tone, tab, go, exact) => rows.push({ title, sub, tone, href: tab[0] === "/" ? tab : "#" + tab, go, exact });
+    const legacy = !frozenSeats(d); // (frozen: none of the seat, window, squad or election steps below is offered)
     // (an account without a wallet: the wallet card is the first card of Home, so Today does not repeat "Link your wallet")
-    if (seat && (seat.status === "grace" || (seat.status === "steward" && seat.graceUntil))) add("Top up your holding", `Hold ${fmt(seat.threshold)} $VICINITY again before ${when(seat.graceUntil)}`, "warn", "home", "#trade");
-    if (seat && seat.status === "provisional") add("Objection period", `${seat.city} chose you · ends ${when(seat.appealUntil)}`, "info", "founder", "#progress");
-    if (!seat && f.application) add(`You applied to found ${city}`, `Window closes ${when(f.application.closesAt)} (${left(f.application.closesAt)})`, "info", "founder", "#progress");
-    if (!seat && !f.application && f.eligible) add(f.challenging ? `Challenge ${city}'s steward` : `Claim ${city}`, "You qualify. Apply from inside the city.", "ok", "founder", "#progress");
+    if (legacy && seat && (seat.status === "grace" || (seat.status === "steward" && seat.graceUntil))) add("Top up your holding", `Hold ${fmt(seat.threshold)} $VICINITY again before ${when(seat.graceUntil)}`, "warn", "home", "#trade");
+    if (legacy && seat && seat.status === "provisional") add("Objection period", `${seat.city} chose you · ends ${when(seat.appealUntil)}`, "info", "founder", "#progress");
+    if (legacy && !seat && f.application) add(`You applied to found ${city}`, `Window closes ${when(f.application.closesAt)} (${left(f.application.closesAt)})`, "info", "founder", "#progress");
+    if (legacy && !seat && !f.application && f.eligible) add(f.challenging ? `Challenge ${city}'s steward` : `Claim ${city}`, "You qualify. Apply from inside the city.", "ok", "founder", "#progress");
     const w = c && c.window;
-    if (w && w.canEndorse && !w.myEndorsement && !(w.applicants || []).some((a) => a.you)) add("Endorse a founder", `${w.applicants.length} applying to found ${c.name} · ${left(w.closesAt)}`, "info", "founder", "#p-window");
+    if (legacy && w && w.canEndorse && !w.myEndorsement && !(w.applicants || []).some((a) => a.you)) add("Endorse a founder", `${w.applicants.length} applying to found ${c.name} · ${left(w.closesAt)}`, "info", "founder", "#p-window");
     const e = n && n.election;
-    if (e && e.canVote && !e.myVote) add("Vote for your Country Manager", `Election closes ${left(e.closesAt)}`, "info", "community", "#national");
+    if (legacy && e && e.canVote && !e.myVote) add("Vote for your Country Manager", `Election closes ${left(e.closesAt)}`, "info", "community", "#national");
     // the ready-made coin (COIN_V2_READY): said only once the founder's coin answer has a coin (a city the list has no ticker for gets none)
     const rf = readyFounder(), rcoin = Boolean(rf && rf.coin);
     if (readyOn()) { if (seated && coinKnown && rcoin && !rf.inUse && !rf.gate && (!coin || (!coin.launched && !coin.waiting))) add(...readyStep(rf, seat.city), "ok", "founder", "#coin-ready"); }
@@ -536,8 +542,8 @@
     else if (seated && coin && coin.waiting && labOpen()) add("Contract being checked", "An admin checks it on the blockchain. Nothing to do.", "info", "city", "#coin", true);
     const q = queueCounts();
     if (modOn() && q.total > 0) add(`${q.total} waiting for you`, q.parts.join(" · "), "warn", "moderate", q.total === q.counts.coins ? "#coin-admin" : "#mod");
-    if (sq && sq.joinable && !sq.joinable.full) add(`A squad is forming in ${city}`, `${sq.joinable.members.length} of ${sq.joinable.max} members · join to pool holdings`, "info", "founder", "#squad");
-    if (sq && sq.mine && sq.mine.ready && sq.mine.status !== "applied") add("Your squad is ready", "Apply as a squad from inside the city.", "ok", "founder", "#squad");
+    if (legacy && sq && sq.joinable && !sq.joinable.full) add(`A squad is forming in ${city}`, `${sq.joinable.members.length} of ${sq.joinable.max} members · join to pool holdings`, "info", "founder", "#squad");
+    if (legacy && sq && sq.mine && sq.mine.ready && sq.mine.status !== "applied") add("Your squad is ready", "Apply as a squad from inside the city.", "ok", "founder", "#squad");
     if (!u.handle) add("Pick a username", "Your public name everywhere on Vicinity.", "info", "profile", "#username-input");
     if (d.launched && h.amount === 0 && !seat && u.wallet) add("Get $VICINITY", "Holding any amount unlocks posting, voting and your rank.", "info", "home", "#trade");
     if (!d.launched) {
@@ -637,7 +643,9 @@
     const c = d.community;
     if (!c) return;
     const tk = coinLabel(c), s = c.seat, st = $("#ch-status");
-    const [text, cls] = s && s.status === "active" ? ["Founded", "tag tag--ok"]
+    // frozen: the seat's recorded status in plain words; no window, probation, objection period or open seat is told
+    const [text, cls] = frozenSeats(d) ? (s ? ({ steward: ["Seed Steward", "tag tag--gold"], provisional: ["Founder chosen", "tag tag--warn"] }[s.status] || ["Founded", "tag tag--ok"]) : ["No founder", "tag"])
+      : s && s.status === "active" ? ["Founded", "tag tag--ok"]
       : s && s.status === "steward" ? ["Seed Steward on probation", "tag tag--gold"]
       : s && s.status === "provisional" ? ["Founder chosen · objections open", "tag tag--warn"]
       : s && s.status === "grace" ? ["Founder in grace", "tag tag--warn"]
@@ -654,7 +662,8 @@
     const note = $("#ca-ticker-note"); if (note) { note.hidden = !c.ticker; note.textContent = c.tickerSource === "chain" ? "on chain" : "fixed by the map"; } // where the ticker comes from; nothing for a city without one
     $("#ca-country").textContent = countryName(c.country);
     const T = (s && s.threshold) || (d.founder && d.founder.threshold);
-    $("#ca-threshold").textContent = T ? `${fmt(T)} $VICINITY` : "Set by city size when the first claim is made (100K to 1M)";
+    const th = $("#ca-threshold"); // (the pages built with the legacy seats frozen have no founder amount row; frozen, a row that is there hides)
+    if (th) { if (frozenSeats(d)) th.parentNode.hidden = true; else th.textContent = T ? `${fmt(T)} $VICINITY` : "Set by city size when the first claim is made (100K to 1M)"; }
     $("#ca-map").href = `/cities?city=${encodeURIComponent(c.id)}`;
     $("#studio-city").textContent = c.name;
   }
@@ -662,6 +671,7 @@
   /* ---------- Founder Status: the server's six steps (rendered by dashboard.js), plus the current step, a state pill and the informational rank ---------- */
   function statePill(d) {
     const f = d.founder || {}, s = f.seat;
+    if (frozenSeats(d)) return s ? ["On record", "tag--gold"] : f.application ? ["Application on record", ""] : null;
     if (s) return { active: ["Founder confirmed", "tag--ok"], steward: ["Seed Steward · probation", "tag--gold"], provisional: ["Chosen · objections open", "tag--warn"], grace: ["In grace", "tag--no"] }[s.status] || null;
     if (f.application) return ["Applied · window open", "tag--warn"];
     if (!d.launched) return ["Opens at launch", ""];
@@ -679,10 +689,13 @@
     st.hidden = !pill;
     if (pill) { st.textContent = pill[0]; st.className = `tag fs-state ${pill[1]}`.trim(); }
     const ranked = Boolean(c && typeof c.rank === "number"), rk = $("#fs-rank");
-    rk.hidden = !ranked;
-    if (ranked) {
-      $("#fs-rank-text").textContent = `You are #${c.rank} of ${c.holders} $VICINITY holder${c.holders === 1 ? "" : "s"} in ${c.name}, with ${fmt(h.amount)} $VICINITY.`;
-      $("#fs-rank-note").textContent = "For information only: rank does not decide the founder. The first qualified claimer becomes Seed Steward at once; if several claim together, a 72-hour window scores them (50% local endorsements, 30% contribution, 20% holdings, capped at 2× the bar).";
+    if (!rk || frozenSeats(d)) { if (rk) rk.hidden = true; } // (frozen: the rank note told the old founder rules; the built page leaves it out)
+    else {
+      rk.hidden = !ranked;
+      if (ranked) {
+        $("#fs-rank-text").textContent = `You are #${c.rank} of ${c.holders} $VICINITY holder${c.holders === 1 ? "" : "s"} in ${c.name}, with ${fmt(h.amount)} $VICINITY.`;
+        $("#fs-rank-note").textContent = "For information only: rank does not decide the founder. The first qualified claimer becomes Seed Steward at once; if several claim together, a 72-hour window scores them (50% local endorsements, 30% contribution, 20% holdings, capped at 2× the bar).";
+      }
     }
     $("#progress").classList.toggle("is-done", Boolean(seat && (seat.status === "active" || seat.status === "steward")));
   }
@@ -693,8 +706,11 @@
     if (!seat) { card.hidden = true; return; }
     const u = d.user, c = d.community, q = c && c.seat && c.seat.quorum, st = seat.status;
     card.hidden = false; card.dataset.state = st;
-    $("#fcard-kicker").textContent = { active: "City Founder ✓", steward: "Seed Steward · trial founder", provisional: "Chosen founder", grace: "City Founder · in grace" }[st] || "City Founder";
-    const [stateText, stateCls] = st === "active" ? ["Active", "tag--ok"] : st === "steward" ? [`Probation · ${daysLeft(seat.probationUntil)} days left`, "tag--gold"]
+    // frozen (the legacy seats, stage S16): the seat as recorded, with no probation, objection period or grace clock and no Resign
+    const frozen = frozenSeats(d);
+    $("#fcard-kicker").textContent = frozen ? ({ steward: "Seed Steward", provisional: "Chosen founder" }[st] || "City Founder")
+      : { active: "City Founder ✓", steward: "Seed Steward · trial founder", provisional: "Chosen founder", grace: "City Founder · in grace" }[st] || "City Founder";
+    const [stateText, stateCls] = frozen ? ["On record", "tag--gold"] : st === "active" ? ["Active", "tag--ok"] : st === "steward" ? [`Probation · ${daysLeft(seat.probationUntil)} days left`, "tag--gold"]
       : st === "provisional" ? ["Objection period", "tag--warn"] : [`Until ${when(seat.graceUntil)}`, "tag--warn"];
     const state = $("#fcard-state"); state.textContent = stateText; state.className = `tag fcard__tag ${stateCls}`;
     $("#fcard-title").textContent = `${seat.city}, ${countryName(seat.country)}`;
@@ -704,13 +720,16 @@
     $("#fcard-since").textContent = date(seat.since);
     $("#fcard-coin").textContent = coinKnown ? coinState() : "Checking…";
     const row = $("#fcard-clock-row"), clockLabel = $("#fcard-clock-label"), clock = $("#fcard-clock");
-    row.hidden = st === "active"; // the only clocks that exist: probation, the 48-hour objection period, grace
-    if (st === "steward") { clockLabel.textContent = "Probation until"; clock.textContent = `${date(seat.probationUntil)}${q ? ` · ${q.have} of ${q.need} verified local holders` : ""}`; }
+    if (frozen) { if (row) row.hidden = true; } // (the pages built with the freeze have no clock row)
+    else row.hidden = st === "active"; // the only clocks that exist: probation, the 48-hour objection period, grace
+    if (frozen) { /* no clock */ }
+    else if (st === "steward") { clockLabel.textContent = "Probation until"; clock.textContent = `${date(seat.probationUntil)}${q ? ` · ${q.have} of ${q.need} verified local holders` : ""}`; }
     else if (st === "provisional") { clockLabel.textContent = "Objections until"; clock.textContent = when(seat.appealUntil); }
     else if (st === "grace") { clockLabel.textContent = "Grace ends"; clock.textContent = when(seat.graceUntil); }
     const go = $("#fcard-go"), note = $("#fcard-note");
     const button = (label, cls, fn) => { go.hidden = false; go.textContent = label; go.className = cls; fcardAction = fn; };
-    if (st === "provisional") { note.textContent = "No founder powers yet. Locals can object until then; if no objection is upheld, you become the founder."; button("Founder path", "btn btn--primary", () => goTo("#progress")); }
+    if (frozen && (st === "provisional" || st === "grace")) { note.textContent = "No founder powers: this seat is on record as it was."; go.hidden = true; fcardAction = null; }
+    else if (st === "provisional") { note.textContent = "No founder powers yet. Locals can object until then; if no objection is upheld, you become the founder."; button("Founder path", "btn btn--primary", () => goTo("#progress")); }
     else if (st === "grace") { note.textContent = `Hold ${fmt(seat.threshold)} $VICINITY again before the deadline or the seat reopens. Moderation is paused meanwhile.`; button("Buy & swap", "btn btn--primary", () => goTo("#trade")); }
     else if (!coinKnown) { note.textContent = ""; go.hidden = true; fcardAction = null; }
     // the ready-made coin (COIN_V2_READY): until the founder has chosen it ("Use this coin"), the card sends them to it, BEFORE the
@@ -745,7 +764,7 @@
     else if (readyOn()) { note.textContent = "Your coin is made by Vicinity from the city list. Check the coin you chose; Vicinity's owner approves it on the blockchain before it can launch."; button("See your city coin", "btn btn--primary", () => goTo("#coin-ready")); }
     else { note.textContent = "Launch it on Raydium LaunchLab, then add the contract here. An admin (never you) checks and records it."; button("Add the contract", "btn btn--primary", () => goTo("#cs-mint")); }
     $("#fcard-alt").hidden = !((st === "active" || st === "steward") && modOn());
-    $("#fcard-meter").hidden = st !== "steward";
+    const meterLink = $("#fcard-meter"); if (meterLink) meterLink.hidden = frozen || st !== "steward";
   }
 
   /**

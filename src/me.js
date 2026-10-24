@@ -72,7 +72,9 @@ export function badgesFor({ u, launched, amount, position, seat, manager, admin,
   ];
   if (admin) list.unshift({ id: "admin", icon: "⚙️", name: "Admin", detail: "Runs Vicinity, within the published rules.", earned: true });
   if (!legacyFrozen) return list;
-  const recorded = { city_founder: "A founder seat on record.", country_manager: "A country manager term on record." };
+  // (and the wallet badge no longer promises a founder path: the dashboards built with the freeze show none)
+  const recorded = { city_founder: "A founder seat on record.", country_manager: "A country manager term on record.",
+    wallet: "A Solana wallet linked to your account with one free signature. It unlocks holdings, rank and badges." };
   return list.filter((b) => b.id !== "founder_ready").map((b) => (recorded[b.id] ? { ...b, detail: recorded[b.id] } : b));
 }
 

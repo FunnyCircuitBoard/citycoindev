@@ -44,6 +44,10 @@
   let challengeId = null;
   /** Is WALLET_ONLY counting? /api/me's answer (site.js); null while it has not answered yet (then walletOnlyLate waits for it). */
   const walletOnlyNow = () => { const m = window.V.me(); return m ? m.walletOnly === true : null; };
+  // the legacy seats frozen (/api/me says legacySeats "frozen"; Citycoin.dev master v5 stage S16): the seat decision, objection decision, election
+  // opening and test-lab seed answer 410, so their buttons give way to one line; the lists stay (history). Without the key: as before
+  const seatsFrozenNow = () => { const m = window.V.me(); return Boolean(m && m.legacySeats === "frozen"); };
+  const CLOSED = "Founder seats, squads and elections are closed for changes.";
   // (a failed /api/me answer reads as today's sign-in, never as an error of its own; review finding PAR-04)
   const walletOnlyLate = async () => { try { return ((await window.V.ready) || {}).walletOnly === true; } catch { return false; } };
   /** The text the wallet signs while WALLET_ONLY counts: an "admin" challenge (two minutes, once). null when it could not be had. */
@@ -897,6 +901,7 @@
       td(tr, `${a.city_name} (${a.country})`); td(tr, a.handle || walletOf(a.wallet));
       td(tr, (a.pitch || "—").slice(0, 80), "adm-text"); td(tr, a.total == null ? "—" : Number(a.total).toFixed(2), "num");
       const act = actTd(tr);
+      if (seatsFrozenNow()) { act.append(el("span", "muted", CLOSED)); return; }
       act.append(btn("Approve", async () => { if (sure("Approve this claim?")) okMsg(await post("/api/admin/seats/decide", { id: a.id, decision: "approve" }), "Claim approved"); }));
       act.append(btn("Reject", async () => { if (sure("Reject this claim? The applicant is removed from the window.")) okMsg(await post("/api/admin/seats/decide", { id: a.id, decision: "reject" }), "Claim rejected"); }));
     });
@@ -1135,7 +1140,8 @@
       td(tr, `${x.city_name} (${x.country}) — ${x.seat_status}`); td(tr, x.handle || x.name || "—");
       td(tr, (x.reason || "").slice(0, 90), "adm-text"); td(tr, ago(x.created_at));
       const act = actTd(tr);
-      if (can(2)) {
+      if (seatsFrozenNow()) act.append(el("span", "muted", CLOSED));
+      else if (can(2)) {
         act.append(btn("Uphold", async () => { if (sure("Uphold this objection? The founder seat is revoked at once.")) okMsg(await post("/api/admin/objections/decide", { id: x.id, uphold: true }), "Objection upheld"); }));
         act.append(btn("Dismiss", async () => { if (sure("Dismiss this objection?")) okMsg(await post("/api/admin/objections/decide", { id: x.id, uphold: false }), "Objection dismissed"); }));
       } else act.append(el("span", "muted", "admin only"));
@@ -1207,7 +1213,8 @@
       ["Country", "Status", "Opens", "Closes", "Votes"],
       d.elections,
       (tr, e) => { td(tr, e.country); td(tr, e.status); td(tr, ago(e.opened_at)); td(tr, ago(e.closes_at)); td(tr, e.votes, "num"); }));
-    if (can(2)) {
+    if (seatsFrozenNow()) p.append(el("p", "muted small", CLOSED));
+    else if (can(2)) {
       p.append(h2("New election"));
       const row = el("div", "admin-row");
       const country = textInput("US"); const seats = textInput("3"); const days = textInput("14");
@@ -1309,7 +1316,8 @@
   async function tabTestlab(p) {
     p.append(intro("Seed clearly-marked test data (8 users, 3 seats, 5 posts, reports, an objection, an election), then wipe only that data. Real rows are never touched."));
     const row = el("div", "admin-row");
-    row.append(btn("Seed test data", async () => okMsg(await post("/api/admin/test/seed", {}), "Test data seeded"), false));
+    if (seatsFrozenNow()) row.append(el("p", "muted small", `${CLOSED} The test lab seeds seats, an objection and an election, so seeding is closed too; Reset still wipes earlier test rows.`));
+    else row.append(btn("Seed test data", async () => okMsg(await post("/api/admin/test/seed", {}), "Test data seeded"), false));
     p.append(row);
     const dz = el("div", "card danger-zone");
     dz.append(el("h3", null, "Reset"));

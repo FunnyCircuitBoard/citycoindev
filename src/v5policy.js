@@ -44,10 +44,12 @@
  *                            job marks unlinked accounts closed_unresolved only after a window was recorded open, src/legacy.js); otherwise off,
  *                            which is today's site (or, under WALLET_ONLY alone, the S10 answers). A date alone never makes a window.
  *   legacySeats(env)         LEGACY_SEATS as the Worker applies it (stage S16, src/seats.js): "frozen" while LEGACY_SEATS=frozen is accepted
- *                            by the v5 check for the switch's OWN inputs (legacySeatsRefusals below), or while MAIN_TOKEN_V5 counts (owner
- *                            amendment 01 freezes the seats with the main token: one gate for both); "held" while LEGACY_SEATS=frozen is set but
- *                            its own inputs are refused (the freeze holds: master section 15, see legacySeats); "on" otherwise, which is today's
- *                            site. An error in an unrelated input (an OFFICIAL_X_URL typo, a refused MAIN_TOKEN_MINT) never unfreezes it.
+ *                            by the v5 check for the switch's OWN inputs and the deployed pages were built with it (legacySeatsRefusals below),
+ *                            or while MAIN_TOKEN_V5 counts (owner amendment 01 freezes the seats with the main token: one gate for both); "held"
+ *                            while LEGACY_SEATS=frozen is set but refused (its own inputs, or pages built without it), or while the deployed
+ *                            pages were built with it and this Worker's setting is not "frozen" (the freeze holds: master section 15, see
+ *                            legacySeats); "on" otherwise, which is today's site. An error in an unrelated input (an OFFICIAL_X_URL typo, a
+ *                            refused MAIN_TOKEN_MINT) never unfreezes it.
  *   legacySeatsFrozen(env)   legacySeats(env) is "frozen" or "held": every legacy seat, squad, endorsement, objection, resign and election
  *                            writer answers 410, the job skips its seats and elections steps, and the founder hold streaks stop.
  *   IDENTITY_POLICY          the two identity lifetimes of the policy (policy.identity: a 120-second single-use challenge, a 300-second
@@ -185,10 +187,9 @@ export function checkPolicyConfig(env, { log = (...args) => console.error(...arg
   let legacyOn = false;
   try { legacyOn = legacyLinkOn(env); } catch { /* the switch reads as off */ }
   if (legacyOn) for (const code of legacyLinkRefusals(env)) say(`legacy|${code}`, "legacy link switch refused", code);
-  // LEGACY_SEATS=frozen whose own inputs are refused (stage S16): the freeze holds, and the log says why the configuration is wrong. Unset: no line
-  let seatsSet = false;
-  try { seatsSet = legacySeatsFrozenOn(env); } catch { /* the switch reads as unset */ }
-  if (seatsSet) for (const code of legacySeatsRefusals(env)) say(`seats|${code}`, "legacy seats switch refused", code, "(held frozen)");
+  // the legacy seat freeze held rather than accepted (stage S16: LEGACY_SEATS=frozen refused, or pages built frozen without it): the freeze holds,
+  // and the log says why the configuration is wrong. Unset with pages built without it (today): no line
+  for (const code of legacySeatsRefusals(env)) say(`seats|${code}`, "legacy seats switch refused", code, "(held frozen)");
   return { ok: r.ok, codes: r.errors.map((e) => e.code) };
 }
 
@@ -200,8 +201,8 @@ export function publicV5(env) {
 /* ---------------------------------------------------------------- MAIN_TOKEN_V5 as the Worker applies it */
 
 let pagesBuilt = PAGES_BUILT;
-/** Tests only: stand in for a page build made with the switch ({ mainTokenV5: true, brand }) or with every page sent through the Worker
- *  ({ pagesReachWorker: true }), or null for the committed src/pages-built.js. */
+/** Tests only: stand in for a page build made with the switch ({ mainTokenV5: true, brand }), with every page sent through the Worker
+ *  ({ pagesReachWorker: true }) or with the legacy seats frozen ({ legacySeats: "frozen" }), or null for the committed src/pages-built.js. */
 export const _pagesBuiltForTests = (p) => { pagesBuilt = p ? Object.freeze({ ...PAGES_BUILT, ...p }) : PAGES_BUILT; };
 
 /**
@@ -399,14 +400,31 @@ export function legacyLinkRefusals(env, now = Date.now()) {
 export const LEGACY_SEATS_CODES = Object.freeze(["CONFIG_CHECK_FAILED", "DEPLOYMENT_MISSING", "ENVIRONMENT_INVALID", "ENVIRONMENT_UNSET"]);
 
 /**
- * Why LEGACY_SEATS=frozen is not ACCEPTED in this environment: [] when it is, else the reasons (codes only, never a value).
- *   LEGACY_SEATS_POLICY_REFUSED  the v5 configuration check refuses one of the switch's own inputs (LEGACY_SEATS_CODES: DEPLOYMENT_ENV unset or
- *                                not a known environment). An error elsewhere in the deployment is not a reason here.
- * A refusal does not unfreeze: legacySeats answers "held" and the writers keep answering 410 (see legacySeats).
+ * Why the legacy seat freeze is HELD rather than accepted in this environment: [] when it is accepted or not set at all, else the reasons
+ * (codes only, never a value).
+ *   LEGACY_SEATS_POLICY_REFUSED     LEGACY_SEATS=frozen and the v5 configuration check refuses one of the switch's own inputs
+ *                                   (LEGACY_SEATS_CODES: DEPLOYMENT_ENV unset or not a known environment). An error elsewhere in the deployment
+ *                                   is not a reason here.
+ *   LEGACY_SEATS_PAGES_NOT_BUILT    LEGACY_SEATS=frozen but the deployed pages were not built with it (src/pages-built.js, written by the page
+ *                                   build from wrangler.jsonc, has no legacySeats "frozen"): a switch set only in the Cloudflare dashboard. The
+ *                                   writers are frozen all the same and the dashboards follow /api/me, but the static pages still carry the old
+ *                                   founder copy until the switch is in wrangler.jsonc and the pages are built with it (stage S16 copy).
+ *   LEGACY_SEATS_UNSET_PAGES_FROZEN the deployed pages were built with LEGACY_SEATS=frozen but this Worker's setting is not "frozen" (removed,
+ *                                   "on", or a value outside the set, set in the Cloudflare dashboard): the pages no longer describe the old
+ *                                   founder rules, so the writers never reopen behind them. Undoing the freeze is a configuration pull request
+ *                                   that removes the switch from wrangler.jsonc and rebuilds the pages.
+ * A refusal never unfreezes: legacySeats answers "held" and the writers keep answering 410 (see legacySeats).
  */
 export function legacySeatsRefusals(env) {
+  let set = false;
+  try { set = legacySeatsFrozenOn(env); } catch { /* a setting that cannot be read reads as unset */ }
   try {
-    return ownErrors(env, LEGACY_SEATS_CODES, "LEGACY_SEATS").length ? ["LEGACY_SEATS_POLICY_REFUSED"] : [];
+    const built = pagesBuilt.legacySeats === "frozen";
+    if (!set) return built ? ["LEGACY_SEATS_UNSET_PAGES_FROZEN"] : [];
+    const out = [];
+    if (ownErrors(env, LEGACY_SEATS_CODES, "LEGACY_SEATS").length) out.push("LEGACY_SEATS_POLICY_REFUSED");
+    if (!built) out.push("LEGACY_SEATS_PAGES_NOT_BUILT");
+    return out;
   } catch {
     return ["LEGACY_SEATS_CHECK_FAILED"];
   }
@@ -414,26 +432,29 @@ export function legacySeatsRefusals(env) {
 
 /**
  * The legacy seats as the Worker applies them (stage S16): "frozen", "held" or "on".
- *   "frozen"  LEGACY_SEATS=frozen (trimmed, any letter case) and the v5 check accepts the switch's own inputs; or MAIN_TOKEN_V5 counts, which
- *             the v5 check accepts only with LEGACY_SEATS=frozen (MAIN_TOKEN_ON_WITH_LEGACY_SEATS), so both freezes are this one gate.
- *   "held"    LEGACY_SEATS=frozen is set but its own inputs are refused (legacySeatsRefusals). The freeze holds, toward the master's intent:
+ *   "frozen"  LEGACY_SEATS=frozen (trimmed, any letter case), the v5 check accepts the switch's own inputs and the deployed pages were built with
+ *             it (src/pages-built.js legacySeats "frozen"); or MAIN_TOKEN_V5 counts, which the v5 check accepts only with LEGACY_SEATS=frozen
+ *             (MAIN_TOKEN_ON_WITH_LEGACY_SEATS), so both freezes are this one gate.
+ *   "held"    LEGACY_SEATS=frozen is set but refused (legacySeatsRefusals: its own inputs, or pages built without it), or the pages were built
+ *             with it and this Worker's setting is not "frozen". The freeze holds, toward the master's intent:
  *             master section 15, "Keep historical records readable, but do not let historical rules authorize new actions" (master-v5.txt
  *             line 924), with section 07 BR-05 "Old seven-day / rotating state: Retain historical records for audit only; remove their
  *             authority over new login, founder, launch and country-manager flows" (line 471) and section 17 "Seven-day stake ladder and
  *             founder-seat/election structures: Retain history for audit only" (line 1010). Freezing ends nobody's seat or term and keeps
  *             every record; reopening the writers on a configuration mistake could seat a founder or elect a manager under rules the master
- *             retired. The reason is logged once per isolate (checkPolicyConfig: "legacy seats switch refused LEGACY_SEATS_POLICY_REFUSED").
+ *             retired. The reason is logged once per isolate (checkPolicyConfig: "legacy seats switch refused <code> (held frozen)").
  *   "on"      anything else: LEGACY_SEATS unset, blank, "on", or a value outside the switch's allowed set ("off", "true", a typo), which the v5
  *             check refuses by name (FLAG_VALUE_INVALID at deployment.flags.LEGACY_SEATS, logged once per isolate) and which, like a
  *             WALLET_ONLY that is not exactly "on", does not express the switch: master section 16, "Runtime validation rejects incompatible flags
- *             and missing required deployment inputs with named errors" (line 982). The page build stops on such a value in wrangler.jsonc
- *             (scripts/pages/build.mjs pageV5Config). This is today's site exactly.
- * Never throws. With LEGACY_SEATS unset this reads one setting and then MAIN_TOKEN_V5 (one setting while that is unset), as before.
+ *             and missing required deployment inputs with named errors" (line 982); with pages built without the freeze. The page build stops
+ *             on such a value in wrangler.jsonc (scripts/pages/build.mjs pageV5Config). This is today's site exactly.
+ * Never throws. With LEGACY_SEATS unset this reads one setting, the committed page record and then MAIN_TOKEN_V5 (one setting while that is
+ * unset), as before.
  */
 export function legacySeats(env) {
   let set = false;
   try { set = legacySeatsFrozenOn(env); } catch { /* a setting that cannot be read reads as unset */ }
-  if (set) return legacySeatsRefusals(env).length ? "held" : "frozen";
+  if (set || pagesBuilt.legacySeats === "frozen") return legacySeatsRefusals(env).length ? "held" : "frozen";
   return mainTokenV5(env) ? "frozen" : "on";
 }
 

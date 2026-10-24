@@ -54,6 +54,11 @@
   // challenge, no transfer proof, no Google sign-in or unlink rows, no new check-in, and no location asked for an application or a town
   // request (master section 19 WP-03; acceptance A04). With the switch off every line below is today's.
   const walletOnly = () => Boolean(me && me.walletOnly === true);
+  // the legacy seats frozen (LEGACY_SEATS=frozen: /api/me says legacySeats "frozen"; Citycoin.dev master v5 stage S16, master section 15 "do not
+  // let historical rules authorize new actions"): no claim, application, endorsement, objection, vote, squad or resignation is offered (their
+  // routes answer 410), and no old founder rule (the seven-day hold, the founder amount, the Seed Steward probation, grace, elections) is told as
+  // current. A seat or a term on record is shown as recorded. Without the key (today) every line below reads as before.
+  const seatsFrozen = (d = me) => Boolean(d && d.legacySeats === "frozen");
   // the launch on our own launchpad (lpMount below): is it switched on here (the server's word in every GET /api/coins answer,
   // launchLabClosed, or the probe asked once); the city whose launch card is shown
   let lpOn = false, lpProbed = false, lpCity = null;
@@ -226,7 +231,7 @@
   $("#locate-cancel").addEventListener("click", () => closeLocate(null, new Error("Cancelled. Nothing was changed.")));
 
   /** What dashboard-roles.js needs from this file. */
-  const roleCtx = { sensitive, refresh: () => refresh(), locateFor, errText, countryName, walletOnly };
+  const roleCtx = { sensitive, refresh: () => refresh(), locateFor, errText, countryName, walletOnly, seatsFrozen: () => seatsFrozen() };
 
   /* ---------- identity ---------- */
   const PROVIDER_LABEL = { google: "Google", email: "Email" };
@@ -321,7 +326,7 @@
         cardReset(card); card.classList.add("is-done", "wcard--folded");
         $("#wcard-kicker").textContent = "Profile complete · 3 of 3";
         $("#wcard-title").textContent = "Wallet linked ✓";
-        $("#wcard-lead").textContent = `${short(u.wallet)} is the wallet of your account. Your holdings, rank and founder path are live.`;
+        $("#wcard-lead").textContent = `${short(u.wallet)} is the wallet of your account. ${seatsFrozen(d) ? "Your holdings and rank are live." : "Your holdings, rank and founder path are live."}`;
         $("#wcard-perks").hidden = true; $("#wcard-actions").hidden = true; $("#wcard-tiny").hidden = false;
         if (wn && wn.notMe) noteLine(wn);
         return;
@@ -342,7 +347,7 @@
     $("#wcard-kicker").textContent = fold ? "Your profile · 2 of 3" : "Complete your profile · 2 of 3";
     $("#wcard-title").textContent = "Connect your wallet";
     $("#wcard-lead").textContent = phone ? `${k ? k.name : "Your wallet app"} opens. Approve once, and you stay there, logged in.`
-      : fold ? "Free, one signature. Unlocks your holdings, rank, badges and the founder path."
+      : fold ? (seatsFrozen(d) ? "Free, one signature. Unlocks your holdings, rank and badges." : "Free, one signature. Unlocks your holdings, rank, badges and the founder path.")
       : "Free: one signature, not a transaction. Vicinity never asks for your recovery phrase or private key.";
     const waiting = linkStarted();
     $("#wcard-wait").hidden = !waiting;
@@ -530,7 +535,7 @@
     for (const b of d.badges) BADGE_NAMES[b.id] = b.name;
     const alert = $("#lost-alert");
     const seat = d.founder.seat;
-    if (seat && seat.status === "grace") {
+    if (seat && seat.status === "grace" && !seatsFrozen(d)) { // (frozen: a seat in grace is only a record; nothing reopens it)
       alert.textContent = `⚠️ Your founder seat for ${seat.city} is in grace until ${when(seat.graceUntil)}. Hold ${fmt(seat.threshold)} $VICINITY again or the seat reopens. Moderation is paused meanwhile.`;
       alert.hidden = false;
     } else if (d.lost.length) {
@@ -687,6 +692,7 @@
   /** "Oct 16" (no year, never broken across lines): the dates of the founder path. */
   const day = (iso) => new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" }).replace(" ", "\u00a0");
   function renderPath(d) {
+    if (seatsFrozen(d)) return renderPathFrozen(d);
     const p = d.progress, f = d.founder, home = d.user.home, c = d.community;
     $("#p-city").textContent = home ? home.name : "your city";
     $("#p-pct").textContent = `${p.percent}%`;
@@ -774,6 +780,33 @@
     panel.replaceChildren(...parts);
     renderWindow(d);
   }
+  /**
+   * The founder card while the legacy seats are frozen: no path, percentage, steps, rank note, application form, window or objection; only what
+   * is on record (the member's own seat or open application, the city's seat, the last published result), in plain words, and one line that
+   * founder seats are closed for changes. Every element is looked up guarded: the pages built with the freeze leave the path's parts out.
+   */
+  function renderPathFrozen(d) {
+    const f = d.founder || {}, home = d.user.home, c = d.community, card = $("#progress");
+    const hide = (sel) => { const e = $(sel); if (e) e.hidden = true; };
+    ["#p-pct", "#p-steps", "#fs-rank", "#p-window"].forEach(hide);
+    const bar = $("#p-bar"); if (bar && bar.parentNode) bar.parentNode.hidden = true;
+    const city = $("#p-city"); if (city) city.textContent = home ? home.name : "your city";
+    const say = (...nodes) => { const x = el("p", "small"); x.append(...nodes); return x; };
+    const STATUS = { active: "", steward: " (Seed Steward)", provisional: " (chosen)", grace: " (in grace)" };
+    const parts = [];
+    if (f.seat) parts.push(say(`Your founder seat for ${f.seat.city} is on record${STATUS[f.seat.status] || ""}, since ${day(f.seat.since)}.`));
+    else if (f.application) parts.push(say(`Your application to found ${home ? home.name : "your city"} is on record.`));
+    if (c && c.seat && !c.seat.you) { const s = c.seat; parts.push(say(`Founder: ${s.handle ? s.name : `${s.name} (${s.wallet})`}${STATUS[s.status] || ""} since ${day(s.since)}`)); }
+    if (!f.seat && !(c && c.seat)) parts.push(say(`No founder on record for ${home ? home.name : "your city"}.`));
+    if (c && c.lastResult) {
+      const a = el("a", "tiny", "How the last window was decided (published result + hash) ↗");
+      a.href = `/api/seats/results/${c.lastResult.windowId}`; a.target = "_blank"; a.rel = "noopener";
+      parts.push(say(a));
+    }
+    parts.push(el("p", "tiny muted", "Founder seats, squads and elections are closed for changes."));
+    $("#p-panel").replaceChildren(...parts);
+    if (card) card.hidden = false;
+  }
   async function objectTo(seatId, name) {
     const reason = prompt(`Why should ${name} not be the founder? (at least 10 characters; an admin reviews it)`);
     if (!reason) return;
@@ -817,6 +850,7 @@
   function renderCommunity(d) {
     const c = d.community;
     if (!c) return;
+    const frozen = seatsFrozen(d);
     const tk = coinDisc(c);
     discText($("#cc-face"), tk);
     discText($("#pass-coin"), tk);
@@ -825,12 +859,13 @@
     $("#cc-members").textContent = fmt(c.members);
     $("#cc-holders").textContent = d.launched ? (c.holders != null ? fmt(c.holders) : "…") : "At launch";
     $("#cc-founder").textContent = c.seat ? (c.seat.you ? `You 👑${c.seat.status !== "active" ? ` (${c.seat.status})` : ""}` : `${c.seat.name}${c.seat.status !== "active" ? ` (${c.seat.status})` : ""}`)
-      : c.window ? `Choosing · ${c.window.applicants.length} applying` : "Open seat 🔥";
+      : frozen ? "None" : c.window ? `Choosing · ${c.window.applicants.length} applying` : "Open seat 🔥";
     const others = c.members - 1;
     $("#cc-fomo").textContent = c.seat && c.seat.you
       ? `You're ${c.name}'s founder. Bring your locals in, and ${d.coinV2Ready === true ? "check and use" : "design"} ${c.name}'s coin so they can see what's coming.`
       : c.seat
       ? `${c.name} has a founder. Climb the local board: the top holders here are the first people the city sees.`
+      : frozen ? (others <= 0 ? `You're the first member of ${c.name}. Bring your locals in.` : `${fmt(others)} other ${others === 1 ? "person" : "people"} from ${c.name} ${others === 1 ? "is" : "are"} here.`)
       : c.window ? `${c.name} is choosing its founder right now (${left(c.window.closesAt)}). Locals' endorsements count most.`
       : others <= 0 ? `You're the first member of ${c.name}. Bring your locals in: they're the ones who choose the founder.`
       : `${fmt(others)} other ${others === 1 ? "person" : "people"} from ${c.name} ${others === 1 ? "is" : "are"} here, and nobody has applied to found it yet.`;
@@ -844,7 +879,7 @@
   }
   $("#cc-share").addEventListener("click", () => {
     const name = me?.community?.name || "my city";
-    copy(`I'm repping ${name} on Vicinity. One city, one coin, chosen by locals: join us → ${location.origin}/connect`, "Invite copied. Send it to your locals!");
+    copy(`I'm repping ${name} on Vicinity. One city, one coin${seatsFrozen() ? "" : ", chosen by locals"}: join us → ${location.origin}/connect`, "Invite copied. Send it to your locals!");
   });
 
   function renderCountry(d) {
@@ -853,9 +888,9 @@
     $("#nc-name").textContent = countryName(n.country);
     $("#nc-members").textContent = fmt(n.members);
     $("#nc-manager").textContent = n.manager ? `${n.manager.you ? "You 🛡️" : n.manager.name} · ${n.manager.city}${n.manager.paused ? " (paused)" : ""} · until ${date(n.manager.endsAt)}`
-      : d.launched ? "None yet: elected from founders with 30+ days" : "Elected after launch";
+      : seatsFrozen(d) ? "None: the admin covers it" : d.launched ? "None yet: elected from founders with 30+ days" : "Elected after launch";
     const box = $("#nc-election"), e = n.election;
-    if (!e) { box.hidden = true; return; }
+    if (!e || seatsFrozen(d)) { box.hidden = true; return; } // (frozen: an election on record is history; nobody votes in it)
     box.hidden = false;
     const why = { not_local: "Only people whose home is in this country can vote.", account_too_new: "To vote, your account had to be 7+ days old when the election opened.",
       home_too_new: "To vote, your home had to be set 7+ days before the election opened.", needs_checkin: "Check in once from your community to vote.", banned: "You can't vote while banned." }[e.whyNot];
@@ -1277,7 +1312,7 @@
     tickerLine();
     const MADE = "Every city coin is made by Vicinity from the city list; the founder chooses it and launches it once Vicinity's owner approves it on the blockchain.";
     $("#coin-note").textContent = rdy && !cd
-      ? (mine ? `${c.name}'s coin is ready in your Founder tab: check it, then use it.` : seat ? `${MADE} ${seat.name}, ${c.name}'s ${founded ? "founder" : "chosen founder"}, hasn't chosen it yet.` : `${MADE} The seat is still open: see the founder path.`)
+      ? (mine ? `${c.name}'s coin is ready in your Founder tab: check it, then use it.` : seat ? `${MADE} ${seat.name}, ${c.name}'s ${founded ? "founder" : "chosen founder"}, hasn't chosen it yet.` : (seatsFrozen() ? MADE : `${MADE} The seat is still open: see the founder path.`))
       : mine
       ? (cd ? (cd.launched ? `${c.name}'s coin is live. Its design is locked, as the rules promise.`
         : rdy ? (byV && !chosenV ? "Your city coin is made by Vicinity, and the city list changed since it was chosen: see your Founder tab. Nothing has launched yet."
@@ -1288,7 +1323,7 @@
         : byV ? "Made by Vicinity from the city list. Nothing has launched yet." : rdy ? `Designed by ${c.name}'s founder. Nothing has launched yet.`
           : `Designed by ${c.name}'s founder. It launches on ${lpOn ? "the Vicinity launchpad" : "Raydium LaunchLab"}.`)
       : seat ? `${seat.name}, ${c.name}'s founder, hasn't designed the coin yet. It'll appear here the moment they do.`
-      : `${c.name}'s founder designs this coin: its name, logo, colour and what it's paired with. The seat is still open: see the founder path.`;
+      : `${c.name}'s founder designs this coin: its name, logo, colour and what it's paired with.${seatsFrozen() ? "" : " The seat is still open: see the founder path."}`;
     // with the ready-made coin on (COIN_V2_READY), the coin is made by Vicinity and chosen in its own card: the old studio stays hidden
     $("#coin-studio").hidden = !mine || Boolean(cd && cd.launched) || me.coinV2Ready === true;
     if (mine && !studioDirty) fillStudio();
@@ -1645,7 +1680,8 @@
     const d = await api("/api/mod");
     if (!d.ok || !d.moderator) { $("#mod").hidden = true; if (v2) v2.mod(d); return; }
     $("#mod").hidden = false;
-    window.VRole.queue({ posts: d.posts.length, proposals: d.proposals.filter((x) => x.canApprove).length, appeals: d.appeals.length, objections: d.objections.length, towns: d.towns.length, bios: d.bios ? d.bios.length : 0 });
+    // (frozen: an objection on record cannot be decided, so it is not counted as waiting; see the Objections section below)
+    window.VRole.queue({ posts: d.posts.length, proposals: d.proposals.filter((x) => x.canApprove).length, appeals: d.appeals.length, objections: seatsFrozen() ? 0 : d.objections.length, towns: d.towns.length, bios: d.bios ? d.bios.length : 0 });
     $("#mod-scope").textContent = `${LEVEL[d.role] || d.role} · ${d.scope}`;
     const sections = [];
     let waiting = 0;
@@ -1678,7 +1714,8 @@
       acts.append(decide("Overturn", () => api("/api/appeals/decide", { id: x.id, overturn: true }), "btn btn--primary btn--sm"), decide("Uphold", () => api("/api/appeals/decide", { id: x.id, overturn: false }), "btn btn--glass btn--sm"));
       li.append(acts); return li;
     }) : [empty("None for you to decide.")]));
-    if (d.role === "admin") sections.push(section("Objections to founders", d.objections.length ? d.objections.map((x) => {
+    // (frozen: an objection on record is history; deciding one answers 410, so the queue is not offered)
+    if (d.role === "admin" && !seatsFrozen()) sections.push(section("Objections to founders", d.objections.length ? d.objections.map((x) => {
       const li = el("li");
       li.append(el("strong", null, `${x.founder} · ${x.city} (${x.seatStatus})`), el("span", "muted", `“${x.reason}” · ${ago(x.at)}`));
       const acts = el("span", "req-actions");
@@ -1938,9 +1975,9 @@
     // the 7 days after a wallet joined from another app, in a browser logged in before: that wallet's own proof is not the way (on a
     // phone it lives in the wallet app, whose sessions may not unlink then): "Remove it" is, and it logs that app out too
     if (me.walletNew && me.walletNew.notMe) { closeProfile(); return removeWallet(); }
-    if (!confirm("Unlink this wallet? Your rank, badges and founder eligibility go with it until you link one again.")) return;
+    if (!confirm(seatsFrozen() ? "Unlink this wallet? Your rank and badges go with it until you link one again." : "Unlink this wallet? Your rank, badges and founder eligibility go with it until you link one again.")) return;
     const r = await sensitive(() => api("/api/me/wallet/unlink", {}));
-    if (!r || !r.ok) return toast(r && r.error === "seat_or_application" ? "Resign or withdraw first." : errText({ reprove: "Please confirm it's you with your wallet first." }, r || {}, "Couldn't unlink. Try again."));
+    if (!r || !r.ok) return toast(r && r.error === "seat_or_application" ? (seatsFrozen() ? "A founder seat, an application or a squad place is on record for this wallet, so it stays linked." : "Resign or withdraw first.") : errText({ reprove: "Please confirm it's you with your wallet first." }, r || {}, "Couldn't unlink. Try again."));
     toast("Wallet unlinked"); linkedNow = false;
     try { localStorage.removeItem(WCARD_SKIP); } catch {}
     await refresh(); openProfile();

@@ -20,7 +20,7 @@ import { allowListedCoins } from "../src/pricehistory.js";
 import { getBlob, putBlob } from "../src/blobs.js";
 import { ensureSchema } from "../src/store.js";
 import { _resetPolicyCheck } from "../src/v5policy.js";
-import { ACCEPTED, pagesBuiltWithSwitch } from "./helpers/mainswitch.js";
+import { ACCEPTED, pagesAsCommitted, pagesBuiltWithSwitch } from "./helpers/mainswitch.js";
 
 pagesBuiltWithSwitch();
 
@@ -261,10 +261,13 @@ test("the scheduled job's steps use tokenMint: the sample, the holder counts and
   assert.deepEqual((await env.DB.prepare("SELECT mint FROM coin_stats").all()).results.map((r) => r.mint), [FAKE_MINT]);
   assert.deepEqual((await allowListedCoins(env)).map((c) => [c.mint, c.launchedAt]), [[FAKE_MINT, null]]);
   assert.deepEqual(errors.filter((e) => /deployment config/.test(e)), [], "a valid configuration reports nothing");
-  // with the switch off the same run is today's: the $VICINITY day and its streaks
+  // with the switch off the same run is today's: the $VICINITY day and its streaks (today's pages: built without the switch or the legacy seat
+  // freeze it brings, stage S16)
+  pagesAsCommitted();
   const off = W.newWorld(BASE); holders();
   const o = net();
   await runJobs(off, Date.now(), o.fetchImpl, () => 0);
+  pagesBuiltWithSwitch();
   assert.ok(o.seen.every((m) => m === LEGACY));
   assert.ok((await off.DB.prepare("SELECT key FROM blobs WHERE key = 'day:2026-10-24'").first()));
   assert.ok((await off.DB.prepare("SELECT COUNT(*) AS n FROM streaks").first()).n > 0);
@@ -300,7 +303,9 @@ test("the balance history under the switch: the new token's own days, no $VICINI
   assert.equal(await latestBalances(env, Date.now()), null, "a $VICINITY day is never read as the new token's");
   await env.DB.prepare("INSERT INTO streaks (wallet, level, above_since) VALUES (?, ?, ?)").bind(H1, 100000, "2026-09-01T00:00:00.000Z").run();
   assert.equal((await tenure(env, H1, 100000, Date.now())).qualified, false, "a $VICINITY hold streak never counts for the new token");
+  pagesAsCommitted(); // (switch off: today's pages, without the legacy seat freeze the switch's pages carry, stage S16)
   assert.equal((await tenure({ ...BASE, DB: env.DB }, H1, 100000, Date.now())).qualified, true, "switch off: the streak counts as before");
+  pagesBuiltWithSwitch();
   await putBlob(env.DB, `mday:${FAKE_MINT}:2026-08-01`, { n: 1 });
   await putBlob(env.DB, `mday:${FAKE_MINT}:2026-10-20`, { n: 1 });
   await pruneLedger(env, Date.now());
