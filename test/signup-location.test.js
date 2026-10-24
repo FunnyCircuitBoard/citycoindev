@@ -77,7 +77,10 @@ test("the person must have a sign-up, must not be signed in, and the call must c
 });
 
 test("coordinates are in no response and in no row of the database, at any step", async () => {
-  const point = { lat: 43.1234567, lon: -75.2345678, accuracy: 31.5 };
+  // the accuracy must be a number no timestamp can contain: useClock pins Date.now but not `new Date()`, so real ISO times
+  // ("...:31.512Z") reach the dump, and an accuracy like 31.5 failed whenever a row was written at 31.5 s past the minute.
+  // Seconds stop at 59, so "873.5" never appears in an ISO time.
+  const point = { lat: 43.1234567, lon: -75.2345678, accuracy: 873.5 };
   const b = browser(env, NET);
   const seen = recordAnswers(b);
   const phone = browser(env, NET);
@@ -92,7 +95,7 @@ test("coordinates are in no response and in no row of the database, at any step"
   const made = await doEmail(b, box, "coords@example.com");
   assert.equal(made.verify.isNew, true, JSON.stringify(made.verify));
   const everything = seen.join("\n") + phoneSeen.join("\n") + (await dumpAll(env.DB));
-  for (const digits of ["43.1234567", "75.2345678", "1234567", "2345678", "31.5"]) assert.ok(!everything.includes(digits), digits);
+  for (const digits of ["43.1234567", "75.2345678", "1234567", "2345678", "873.5"]) assert.ok(!everything.includes(digits), digits);
 });
 
 test("a community inside the boundary is kept as the community; the proven community is never taken from the client", async () => {
