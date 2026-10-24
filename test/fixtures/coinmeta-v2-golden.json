@@ -1,0 +1,236 @@
+{
+ "note": "Golden vectors of src/coinmeta-v2.js (stage S22). Places are the city list's unless marked FAKE; every mint and picture hash is fake except the t2 picture hashes, which are the real t2 PNGs of src/coinart-t2.js for that ticker and coin name (resvg-wasm 2.6.2). Regenerating this file means a new version, never an edit.",
+ "vectors": [
+  {
+   "id": "utica-sol",
+   "note": "SOL quote; a city with a state",
+   "input": {
+    "city": {
+     "id": "5142056",
+     "name": "Utica"
+    },
+    "region": {
+     "id": "US.NY",
+     "name": "New York"
+    },
+    "country": {
+     "id": "US",
+     "name": "United States"
+    },
+    "name": "Utica",
+    "symbol": "UTICA",
+    "artSha256": "8797dae6e2dc945ade6ca793a745a73c61a9a7153b9755ed360d0d46941d6a17",
+    "mint": "HEQjdW7yBWdffwP3awD7bjcDe9YWeRFPaLi6FCqCDR18"
+   },
+   "quote": "SOL",
+   "description": "The city coin of Utica. City: Utica. State or region: New York. Country: United States. Pair: $UTICA / SOL. Launched on Citycoin.dev (https://citycoin.dev) on Solana.",
+   "contentJson": "{\"attribution\":\"GeoNames (geonames.org), CC BY 4.0\",\"city\":{\"id\":\"5142056\",\"name\":\"Utica\"},\"country\":{\"id\":\"US\",\"name\":\"United States\"},\"description\":\"The city coin of Utica. City: Utica. State or region: New York. Country: United States. Pair: $UTICA / SOL. Launched on Citycoin.dev (https://citycoin.dev) on Solana.\",\"descriptionTemplate\":\"cc-desc-1\",\"image\":{\"sha256\":\"8797dae6e2dc945ade6ca793a745a73c61a9a7153b9755ed360d0d46941d6a17\",\"template\":\"t2\"},\"name\":\"Utica\",\"norm\":\"cc-norm-1\",\"quote\":{\"mint\":\"So11111111111111111111111111111111111111112\",\"symbol\":\"SOL\"},\"region\":{\"id\":\"US.NY\",\"name\":\"New York\"},\"symbol\":\"UTICA\",\"text\":null,\"v\":2}",
+   "contentHash": "55a9216e53fbbf8b46db72613a37dd1fc93efdaaef4062b701c342d0448ebaad",
+   "metadataJson": "{\"attributes\":[{\"trait_type\":\"Launchpad\",\"value\":\"Citycoin.dev\"},{\"trait_type\":\"Network\",\"value\":\"Solana\"},{\"trait_type\":\"City\",\"value\":\"Utica\"},{\"trait_type\":\"State or region\",\"value\":\"New York\"},{\"trait_type\":\"Country\",\"value\":\"United States\"},{\"trait_type\":\"Pair\",\"value\":\"$UTICA / SOL\"}],\"city\":{\"attribution\":\"GeoNames (geonames.org), CC BY 4.0\",\"country\":{\"id\":\"US\",\"name\":\"United States\"},\"id\":\"5142056\",\"name\":\"Utica\",\"region\":{\"id\":\"US.NY\",\"name\":\"New York\"}},\"content\":{\"hash\":\"55a9216e53fbbf8b46db72613a37dd1fc93efdaaef4062b701c342d0448ebaad\",\"v\":2},\"createdOn\":\"https://citycoin.dev\",\"description\":\"The city coin of Utica. City: Utica. State or region: New York. Country: United States. Pair: $UTICA / SOL. Launched on Citycoin.dev (https://citycoin.dev) on Solana.\",\"external_url\":\"https://citycoin.dev/coin?mint=HEQjdW7yBWdffwP3awD7bjcDe9YWeRFPaLi6FCqCDR18\",\"image\":\"https://citycoin.dev/coin-meta/v1/art/8797dae6e2dc945ade6ca793a745a73c61a9a7153b9755ed360d0d46941d6a17.png\",\"launchpad\":\"Citycoin.dev\",\"name\":\"Utica\",\"network\":\"Solana\",\"quote\":{\"mint\":\"So11111111111111111111111111111111111111112\",\"symbol\":\"SOL\"},\"showName\":true,\"symbol\":\"UTICA\",\"website\":\"https://citycoin.dev/coin?mint=HEQjdW7yBWdffwP3awD7bjcDe9YWeRFPaLi6FCqCDR18\"}",
+   "metaHash": "1a89dd5146fceb7ed26a86c2d83d1c4e6d2aaef410dfe25d66a61fcd02127b62",
+   "uri": "https://citycoin.dev/coin-meta/v1/HEQjdW7yBWdffwP3awD7bjcDe9YWeRFPaLi6FCqCDR18.json"
+  },
+  {
+   "id": "utica-usdc",
+   "note": "the same city and version with the USDC quote: only the pair, the quote and the hashes differ",
+   "input": {
+    "city": {
+     "id": "5142056",
+     "name": "Utica"
+    },
+    "region": {
+     "id": "US.NY",
+     "name": "New York"
+    },
+    "country": {
+     "id": "US",
+     "name": "United States"
+    },
+    "name": "Utica",
+    "symbol": "UTICA",
+    "artSha256": "8797dae6e2dc945ade6ca793a745a73c61a9a7153b9755ed360d0d46941d6a17",
+    "mint": "E8Zj19qkaNz4TBUg1Qtv1sDDCGJ2z4wUR4UtgG6mCBBj"
+   },
+   "quote": "USDC",
+   "description": "The city coin of Utica. City: Utica. State or region: New York. Country: United States. Pair: $UTICA / USDC. Launched on Citycoin.dev (https://citycoin.dev) on Solana.",
+   "contentJson": "{\"attribution\":\"GeoNames (geonames.org), CC BY 4.0\",\"city\":{\"id\":\"5142056\",\"name\":\"Utica\"},\"country\":{\"id\":\"US\",\"name\":\"United States\"},\"description\":\"The city coin of Utica. City: Utica. State or region: New York. Country: United States. Pair: $UTICA / USDC. Launched on Citycoin.dev (https://citycoin.dev) on Solana.\",\"descriptionTemplate\":\"cc-desc-1\",\"image\":{\"sha256\":\"8797dae6e2dc945ade6ca793a745a73c61a9a7153b9755ed360d0d46941d6a17\",\"template\":\"t2\"},\"name\":\"Utica\",\"norm\":\"cc-norm-1\",\"quote\":{\"mint\":\"EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v\",\"symbol\":\"USDC\"},\"region\":{\"id\":\"US.NY\",\"name\":\"New York\"},\"symbol\":\"UTICA\",\"text\":null,\"v\":2}",
+   "contentHash": "cd5d663e3721e6b809184c343472763c3208bd40356782876ac9b3ea00fcb9eb",
+   "metadataJson": "{\"attributes\":[{\"trait_type\":\"Launchpad\",\"value\":\"Citycoin.dev\"},{\"trait_type\":\"Network\",\"value\":\"Solana\"},{\"trait_type\":\"City\",\"value\":\"Utica\"},{\"trait_type\":\"State or region\",\"value\":\"New York\"},{\"trait_type\":\"Country\",\"value\":\"United States\"},{\"trait_type\":\"Pair\",\"value\":\"$UTICA / USDC\"}],\"city\":{\"attribution\":\"GeoNames (geonames.org), CC BY 4.0\",\"country\":{\"id\":\"US\",\"name\":\"United States\"},\"id\":\"5142056\",\"name\":\"Utica\",\"region\":{\"id\":\"US.NY\",\"name\":\"New York\"}},\"content\":{\"hash\":\"cd5d663e3721e6b809184c343472763c3208bd40356782876ac9b3ea00fcb9eb\",\"v\":2},\"createdOn\":\"https://citycoin.dev\",\"description\":\"The city coin of Utica. City: Utica. State or region: New York. Country: United States. Pair: $UTICA / USDC. Launched on Citycoin.dev (https://citycoin.dev) on Solana.\",\"external_url\":\"https://citycoin.dev/coin?mint=E8Zj19qkaNz4TBUg1Qtv1sDDCGJ2z4wUR4UtgG6mCBBj\",\"image\":\"https://citycoin.dev/coin-meta/v1/art/8797dae6e2dc945ade6ca793a745a73c61a9a7153b9755ed360d0d46941d6a17.png\",\"launchpad\":\"Citycoin.dev\",\"name\":\"Utica\",\"network\":\"Solana\",\"quote\":{\"mint\":\"EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v\",\"symbol\":\"USDC\"},\"showName\":true,\"symbol\":\"UTICA\",\"website\":\"https://citycoin.dev/coin?mint=E8Zj19qkaNz4TBUg1Qtv1sDDCGJ2z4wUR4UtgG6mCBBj\"}",
+   "metaHash": "b4ed39cdbd53505f445d8c84dfa7935562d20da076ba8ec15fb120974a992303",
+   "uri": "https://citycoin.dev/coin-meta/v1/E8Zj19qkaNz4TBUg1Qtv1sDDCGJ2z4wUR4UtgG6mCBBj.json"
+  },
+  {
+   "id": "gibraltar-sol",
+   "note": "no state or region in the list (region null)",
+   "input": {
+    "city": {
+     "id": "2411585",
+     "name": "Gibraltar"
+    },
+    "region": null,
+    "country": {
+     "id": "GI",
+     "name": "Gibraltar"
+    },
+    "name": "Gibraltar",
+    "symbol": "GIBRALTAR",
+    "artSha256": "aefbc02334dc82124ed72da908c8323b46b7fedfb1b6dd0a24c5b9fba5d8c7ad",
+    "mint": "F3Pinxop2f3Eo5s44CgqKybj6GREVVEsmRXRTkcFiAig"
+   },
+   "quote": "SOL",
+   "description": "The city coin of Gibraltar. City: Gibraltar. No state or region. Country: Gibraltar. Pair: $GIBRALTAR / SOL. Launched on Citycoin.dev (https://citycoin.dev) on Solana.",
+   "contentJson": "{\"attribution\":\"GeoNames (geonames.org), CC BY 4.0\",\"city\":{\"id\":\"2411585\",\"name\":\"Gibraltar\"},\"country\":{\"id\":\"GI\",\"name\":\"Gibraltar\"},\"description\":\"The city coin of Gibraltar. City: Gibraltar. No state or region. Country: Gibraltar. Pair: $GIBRALTAR / SOL. Launched on Citycoin.dev (https://citycoin.dev) on Solana.\",\"descriptionTemplate\":\"cc-desc-1\",\"image\":{\"sha256\":\"aefbc02334dc82124ed72da908c8323b46b7fedfb1b6dd0a24c5b9fba5d8c7ad\",\"template\":\"t2\"},\"name\":\"Gibraltar\",\"norm\":\"cc-norm-1\",\"quote\":{\"mint\":\"So11111111111111111111111111111111111111112\",\"symbol\":\"SOL\"},\"region\":null,\"symbol\":\"GIBRALTAR\",\"text\":null,\"v\":2}",
+   "contentHash": "66227098c73955ed0a3fb4036d7130630cff933df2fae8aa1452ffc3b2361f94",
+   "metadataJson": "{\"attributes\":[{\"trait_type\":\"Launchpad\",\"value\":\"Citycoin.dev\"},{\"trait_type\":\"Network\",\"value\":\"Solana\"},{\"trait_type\":\"City\",\"value\":\"Gibraltar\"},{\"trait_type\":\"State or region\",\"value\":\"No state or region\"},{\"trait_type\":\"Country\",\"value\":\"Gibraltar\"},{\"trait_type\":\"Pair\",\"value\":\"$GIBRALTAR / SOL\"}],\"city\":{\"attribution\":\"GeoNames (geonames.org), CC BY 4.0\",\"country\":{\"id\":\"GI\",\"name\":\"Gibraltar\"},\"id\":\"2411585\",\"name\":\"Gibraltar\",\"region\":null},\"content\":{\"hash\":\"66227098c73955ed0a3fb4036d7130630cff933df2fae8aa1452ffc3b2361f94\",\"v\":2},\"createdOn\":\"https://citycoin.dev\",\"description\":\"The city coin of Gibraltar. City: Gibraltar. No state or region. Country: Gibraltar. Pair: $GIBRALTAR / SOL. Launched on Citycoin.dev (https://citycoin.dev) on Solana.\",\"external_url\":\"https://citycoin.dev/coin?mint=F3Pinxop2f3Eo5s44CgqKybj6GREVVEsmRXRTkcFiAig\",\"image\":\"https://citycoin.dev/coin-meta/v1/art/aefbc02334dc82124ed72da908c8323b46b7fedfb1b6dd0a24c5b9fba5d8c7ad.png\",\"launchpad\":\"Citycoin.dev\",\"name\":\"Gibraltar\",\"network\":\"Solana\",\"quote\":{\"mint\":\"So11111111111111111111111111111111111111112\",\"symbol\":\"SOL\"},\"showName\":true,\"symbol\":\"GIBRALTAR\",\"website\":\"https://citycoin.dev/coin?mint=F3Pinxop2f3Eo5s44CgqKybj6GREVVEsmRXRTkcFiAig\"}",
+   "metaHash": "0790f54e8a28e3f74307f71162f62159a24e8f766e7b87073c6a0dcdca5d7188",
+   "uri": "https://citycoin.dev/coin-meta/v1/F3Pinxop2f3Eo5s44CgqKybj6GREVVEsmRXRTkcFiAig.json"
+  },
+  {
+   "id": "oranjestad-usdc",
+   "note": "no state or region, non-SOL quote",
+   "input": {
+    "city": {
+     "id": "3577154",
+     "name": "Oranjestad"
+    },
+    "region": null,
+    "country": {
+     "id": "AW",
+     "name": "Aruba"
+    },
+    "name": "Oranjestad",
+    "symbol": "ORANJESTAD",
+    "artSha256": "f15448fc474db7230eee19f868481566c079947c21649cb598e869ade39491c8",
+    "mint": "9SuRSzcvEMot97zYQ5qSZzzmfpauKGptaHRHVZFLzSC9"
+   },
+   "quote": "USDC",
+   "description": "The city coin of Oranjestad. City: Oranjestad. No state or region. Country: Aruba. Pair: $ORANJESTAD / USDC. Launched on Citycoin.dev (https://citycoin.dev) on Solana.",
+   "contentJson": "{\"attribution\":\"GeoNames (geonames.org), CC BY 4.0\",\"city\":{\"id\":\"3577154\",\"name\":\"Oranjestad\"},\"country\":{\"id\":\"AW\",\"name\":\"Aruba\"},\"description\":\"The city coin of Oranjestad. City: Oranjestad. No state or region. Country: Aruba. Pair: $ORANJESTAD / USDC. Launched on Citycoin.dev (https://citycoin.dev) on Solana.\",\"descriptionTemplate\":\"cc-desc-1\",\"image\":{\"sha256\":\"f15448fc474db7230eee19f868481566c079947c21649cb598e869ade39491c8\",\"template\":\"t2\"},\"name\":\"Oranjestad\",\"norm\":\"cc-norm-1\",\"quote\":{\"mint\":\"EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v\",\"symbol\":\"USDC\"},\"region\":null,\"symbol\":\"ORANJESTAD\",\"text\":null,\"v\":2}",
+   "contentHash": "895c1356dc28ed412be2c1b28559fc791725b67c28e41831a639b0870c387103",
+   "metadataJson": "{\"attributes\":[{\"trait_type\":\"Launchpad\",\"value\":\"Citycoin.dev\"},{\"trait_type\":\"Network\",\"value\":\"Solana\"},{\"trait_type\":\"City\",\"value\":\"Oranjestad\"},{\"trait_type\":\"State or region\",\"value\":\"No state or region\"},{\"trait_type\":\"Country\",\"value\":\"Aruba\"},{\"trait_type\":\"Pair\",\"value\":\"$ORANJESTAD / USDC\"}],\"city\":{\"attribution\":\"GeoNames (geonames.org), CC BY 4.0\",\"country\":{\"id\":\"AW\",\"name\":\"Aruba\"},\"id\":\"3577154\",\"name\":\"Oranjestad\",\"region\":null},\"content\":{\"hash\":\"895c1356dc28ed412be2c1b28559fc791725b67c28e41831a639b0870c387103\",\"v\":2},\"createdOn\":\"https://citycoin.dev\",\"description\":\"The city coin of Oranjestad. City: Oranjestad. No state or region. Country: Aruba. Pair: $ORANJESTAD / USDC. Launched on Citycoin.dev (https://citycoin.dev) on Solana.\",\"external_url\":\"https://citycoin.dev/coin?mint=9SuRSzcvEMot97zYQ5qSZzzmfpauKGptaHRHVZFLzSC9\",\"image\":\"https://citycoin.dev/coin-meta/v1/art/f15448fc474db7230eee19f868481566c079947c21649cb598e869ade39491c8.png\",\"launchpad\":\"Citycoin.dev\",\"name\":\"Oranjestad\",\"network\":\"Solana\",\"quote\":{\"mint\":\"EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v\",\"symbol\":\"USDC\"},\"showName\":true,\"symbol\":\"ORANJESTAD\",\"website\":\"https://citycoin.dev/coin?mint=9SuRSzcvEMot97zYQ5qSZzzmfpauKGptaHRHVZFLzSC9\"}",
+   "metaHash": "ec5d5d8d9f3887ee5db294b572da0887def0ef5a825e080d6a456f315dd63a0a",
+   "uri": "https://citycoin.dev/coin-meta/v1/9SuRSzcvEMot97zYQ5qSZzzmfpauKGptaHRHVZFLzSC9.json"
+  },
+  {
+   "id": "herat-sol",
+   "note": "a non-ASCII city name (ā)",
+   "input": {
+    "city": {
+     "id": "1140026",
+     "name": "Herāt"
+    },
+    "region": {
+     "id": "AF.11",
+     "name": "Herat"
+    },
+    "country": {
+     "id": "AF",
+     "name": "Afghanistan"
+    },
+    "name": "Herāt",
+    "symbol": "HERAT",
+    "artSha256": "eef937c4945c66a4461714c867bf3ec2db4b963d59c803bd6387d8fb4488b071",
+    "mint": "Ap8vqf8DqqxygeZWvnqqyN2DnHNqXqBk5VXdtvpHu84s"
+   },
+   "quote": "SOL",
+   "description": "The city coin of Herāt. City: Herāt. State or region: Herat. Country: Afghanistan. Pair: $HERAT / SOL. Launched on Citycoin.dev (https://citycoin.dev) on Solana.",
+   "contentJson": "{\"attribution\":\"GeoNames (geonames.org), CC BY 4.0\",\"city\":{\"id\":\"1140026\",\"name\":\"Herāt\"},\"country\":{\"id\":\"AF\",\"name\":\"Afghanistan\"},\"description\":\"The city coin of Herāt. City: Herāt. State or region: Herat. Country: Afghanistan. Pair: $HERAT / SOL. Launched on Citycoin.dev (https://citycoin.dev) on Solana.\",\"descriptionTemplate\":\"cc-desc-1\",\"image\":{\"sha256\":\"eef937c4945c66a4461714c867bf3ec2db4b963d59c803bd6387d8fb4488b071\",\"template\":\"t2\"},\"name\":\"Herāt\",\"norm\":\"cc-norm-1\",\"quote\":{\"mint\":\"So11111111111111111111111111111111111111112\",\"symbol\":\"SOL\"},\"region\":{\"id\":\"AF.11\",\"name\":\"Herat\"},\"symbol\":\"HERAT\",\"text\":null,\"v\":2}",
+   "contentHash": "9b45a5dad8af846619cf5a5e8b685a738fda66b6448a0d096b937e00e45c6824",
+   "metadataJson": "{\"attributes\":[{\"trait_type\":\"Launchpad\",\"value\":\"Citycoin.dev\"},{\"trait_type\":\"Network\",\"value\":\"Solana\"},{\"trait_type\":\"City\",\"value\":\"Herāt\"},{\"trait_type\":\"State or region\",\"value\":\"Herat\"},{\"trait_type\":\"Country\",\"value\":\"Afghanistan\"},{\"trait_type\":\"Pair\",\"value\":\"$HERAT / SOL\"}],\"city\":{\"attribution\":\"GeoNames (geonames.org), CC BY 4.0\",\"country\":{\"id\":\"AF\",\"name\":\"Afghanistan\"},\"id\":\"1140026\",\"name\":\"Herāt\",\"region\":{\"id\":\"AF.11\",\"name\":\"Herat\"}},\"content\":{\"hash\":\"9b45a5dad8af846619cf5a5e8b685a738fda66b6448a0d096b937e00e45c6824\",\"v\":2},\"createdOn\":\"https://citycoin.dev\",\"description\":\"The city coin of Herāt. City: Herāt. State or region: Herat. Country: Afghanistan. Pair: $HERAT / SOL. Launched on Citycoin.dev (https://citycoin.dev) on Solana.\",\"external_url\":\"https://citycoin.dev/coin?mint=Ap8vqf8DqqxygeZWvnqqyN2DnHNqXqBk5VXdtvpHu84s\",\"image\":\"https://citycoin.dev/coin-meta/v1/art/eef937c4945c66a4461714c867bf3ec2db4b963d59c803bd6387d8fb4488b071.png\",\"launchpad\":\"Citycoin.dev\",\"name\":\"Herāt\",\"network\":\"Solana\",\"quote\":{\"mint\":\"So11111111111111111111111111111111111111112\",\"symbol\":\"SOL\"},\"showName\":true,\"symbol\":\"HERAT\",\"website\":\"https://citycoin.dev/coin?mint=Ap8vqf8DqqxygeZWvnqqyN2DnHNqXqBk5VXdtvpHu84s\"}",
+   "metaHash": "8b056f17fa1064c7c930f33e28fd2b2a85e423e7667da9b96cc7bd04a42f47dd",
+   "uri": "https://citycoin.dev/coin-meta/v1/Ap8vqf8DqqxygeZWvnqqyN2DnHNqXqBk5VXdtvpHu84s.json"
+  },
+  {
+   "id": "sao-paulo-usdc-nfd",
+   "note": "non-ASCII given decomposed (NFD) and with stray spaces: the content is the NFC form",
+   "input": {
+    "city": {
+     "id": "3448439",
+     "name": " São  Paulo"
+    },
+    "region": {
+     "id": "BR.27",
+     "name": "São Paulo"
+    },
+    "country": {
+     "id": "BR",
+     "name": "Brazil "
+    },
+    "name": "São Paulo",
+    "symbol": "SAOPAULO",
+    "artSha256": "4a7786b2e9eb1ec86b899ba3cf2d143f7b78cfbfaad91e82ccfd02e4796301eb",
+    "mint": "CagvLF3JgZNBTUf6LrTg9ryFh7FsZbVoBaHVmoCnhBba"
+   },
+   "quote": "USDC",
+   "description": "The city coin of São Paulo. City: São Paulo. State or region: São Paulo. Country: Brazil. Pair: $SAOPAULO / USDC. Launched on Citycoin.dev (https://citycoin.dev) on Solana.",
+   "contentJson": "{\"attribution\":\"GeoNames (geonames.org), CC BY 4.0\",\"city\":{\"id\":\"3448439\",\"name\":\"São Paulo\"},\"country\":{\"id\":\"BR\",\"name\":\"Brazil\"},\"description\":\"The city coin of São Paulo. City: São Paulo. State or region: São Paulo. Country: Brazil. Pair: $SAOPAULO / USDC. Launched on Citycoin.dev (https://citycoin.dev) on Solana.\",\"descriptionTemplate\":\"cc-desc-1\",\"image\":{\"sha256\":\"4a7786b2e9eb1ec86b899ba3cf2d143f7b78cfbfaad91e82ccfd02e4796301eb\",\"template\":\"t2\"},\"name\":\"São Paulo\",\"norm\":\"cc-norm-1\",\"quote\":{\"mint\":\"EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v\",\"symbol\":\"USDC\"},\"region\":{\"id\":\"BR.27\",\"name\":\"São Paulo\"},\"symbol\":\"SAOPAULO\",\"text\":null,\"v\":2}",
+   "contentHash": "dd2a5e1ca7d1d36d9c6e82cb66f2548566d722ea48bf1c1651f696013e0de1d1",
+   "metadataJson": "{\"attributes\":[{\"trait_type\":\"Launchpad\",\"value\":\"Citycoin.dev\"},{\"trait_type\":\"Network\",\"value\":\"Solana\"},{\"trait_type\":\"City\",\"value\":\"São Paulo\"},{\"trait_type\":\"State or region\",\"value\":\"São Paulo\"},{\"trait_type\":\"Country\",\"value\":\"Brazil\"},{\"trait_type\":\"Pair\",\"value\":\"$SAOPAULO / USDC\"}],\"city\":{\"attribution\":\"GeoNames (geonames.org), CC BY 4.0\",\"country\":{\"id\":\"BR\",\"name\":\"Brazil\"},\"id\":\"3448439\",\"name\":\"São Paulo\",\"region\":{\"id\":\"BR.27\",\"name\":\"São Paulo\"}},\"content\":{\"hash\":\"dd2a5e1ca7d1d36d9c6e82cb66f2548566d722ea48bf1c1651f696013e0de1d1\",\"v\":2},\"createdOn\":\"https://citycoin.dev\",\"description\":\"The city coin of São Paulo. City: São Paulo. State or region: São Paulo. Country: Brazil. Pair: $SAOPAULO / USDC. Launched on Citycoin.dev (https://citycoin.dev) on Solana.\",\"external_url\":\"https://citycoin.dev/coin?mint=CagvLF3JgZNBTUf6LrTg9ryFh7FsZbVoBaHVmoCnhBba\",\"image\":\"https://citycoin.dev/coin-meta/v1/art/4a7786b2e9eb1ec86b899ba3cf2d143f7b78cfbfaad91e82ccfd02e4796301eb.png\",\"launchpad\":\"Citycoin.dev\",\"name\":\"São Paulo\",\"network\":\"Solana\",\"quote\":{\"mint\":\"EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v\",\"symbol\":\"USDC\"},\"showName\":true,\"symbol\":\"SAOPAULO\",\"website\":\"https://citycoin.dev/coin?mint=CagvLF3JgZNBTUf6LrTg9ryFh7FsZbVoBaHVmoCnhBba\"}",
+   "metaHash": "4eaab14d7c64a212ab14b111e87aedd771ac075e2d499530bdd609e711fb45bd",
+   "uri": "https://citycoin.dev/coin-meta/v1/CagvLF3JgZNBTUf6LrTg9ryFh7FsZbVoBaHVmoCnhBba.json"
+  },
+  {
+   "id": "bogota-sol-text",
+   "note": "an approved descriptive text; a region that ends with a full stop keeps one",
+   "input": {
+    "city": {
+     "id": "3688689",
+     "name": "Bogotá"
+    },
+    "region": {
+     "id": "CO.34",
+     "name": "Bogota D.C."
+    },
+    "country": {
+     "id": "CO",
+     "name": "Colombia"
+    },
+    "name": "Bogotá",
+    "symbol": "BOGOTA",
+    "text": "Coffee, mountains\nand the  Andes",
+    "artSha256": "4e3424dcefec74e0df79a004b9d09b64c3ed0fbb4fda19eba745b9469c27d802",
+    "mint": "5Gr8c3S2nyRtzScA7VJwrAZNdnaSAbjZTvHCxvmLY6CP"
+   },
+   "quote": "SOL",
+   "description": "Coffee, mountains and the Andes. City: Bogotá. State or region: Bogota D.C. Country: Colombia. Pair: $BOGOTA / SOL. Launched on Citycoin.dev (https://citycoin.dev) on Solana.",
+   "contentJson": "{\"attribution\":\"GeoNames (geonames.org), CC BY 4.0\",\"city\":{\"id\":\"3688689\",\"name\":\"Bogotá\"},\"country\":{\"id\":\"CO\",\"name\":\"Colombia\"},\"description\":\"Coffee, mountains and the Andes. City: Bogotá. State or region: Bogota D.C. Country: Colombia. Pair: $BOGOTA / SOL. Launched on Citycoin.dev (https://citycoin.dev) on Solana.\",\"descriptionTemplate\":\"cc-desc-1\",\"image\":{\"sha256\":\"4e3424dcefec74e0df79a004b9d09b64c3ed0fbb4fda19eba745b9469c27d802\",\"template\":\"t2\"},\"name\":\"Bogotá\",\"norm\":\"cc-norm-1\",\"quote\":{\"mint\":\"So11111111111111111111111111111111111111112\",\"symbol\":\"SOL\"},\"region\":{\"id\":\"CO.34\",\"name\":\"Bogota D.C.\"},\"symbol\":\"BOGOTA\",\"text\":\"Coffee, mountains and the Andes\",\"v\":2}",
+   "contentHash": "4ab54e8aeb29768729bc9e98759826cb7c92cb0b02074748f78a5bd60342394d",
+   "metadataJson": "{\"attributes\":[{\"trait_type\":\"Launchpad\",\"value\":\"Citycoin.dev\"},{\"trait_type\":\"Network\",\"value\":\"Solana\"},{\"trait_type\":\"City\",\"value\":\"Bogotá\"},{\"trait_type\":\"State or region\",\"value\":\"Bogota D.C.\"},{\"trait_type\":\"Country\",\"value\":\"Colombia\"},{\"trait_type\":\"Pair\",\"value\":\"$BOGOTA / SOL\"}],\"city\":{\"attribution\":\"GeoNames (geonames.org), CC BY 4.0\",\"country\":{\"id\":\"CO\",\"name\":\"Colombia\"},\"id\":\"3688689\",\"name\":\"Bogotá\",\"region\":{\"id\":\"CO.34\",\"name\":\"Bogota D.C.\"}},\"content\":{\"hash\":\"4ab54e8aeb29768729bc9e98759826cb7c92cb0b02074748f78a5bd60342394d\",\"v\":2},\"createdOn\":\"https://citycoin.dev\",\"description\":\"Coffee, mountains and the Andes. City: Bogotá. State or region: Bogota D.C. Country: Colombia. Pair: $BOGOTA / SOL. Launched on Citycoin.dev (https://citycoin.dev) on Solana.\",\"external_url\":\"https://citycoin.dev/coin?mint=5Gr8c3S2nyRtzScA7VJwrAZNdnaSAbjZTvHCxvmLY6CP\",\"image\":\"https://citycoin.dev/coin-meta/v1/art/4e3424dcefec74e0df79a004b9d09b64c3ed0fbb4fda19eba745b9469c27d802.png\",\"launchpad\":\"Citycoin.dev\",\"name\":\"Bogotá\",\"network\":\"Solana\",\"quote\":{\"mint\":\"So11111111111111111111111111111111111111112\",\"symbol\":\"SOL\"},\"showName\":true,\"symbol\":\"BOGOTA\",\"website\":\"https://citycoin.dev/coin?mint=5Gr8c3S2nyRtzScA7VJwrAZNdnaSAbjZTvHCxvmLY6CP\"}",
+   "metaHash": "8522495f8fde027eaa395b22806a2a93d07f2f75f2504435b60295c5dafc754e",
+   "uri": "https://citycoin.dev/coin-meta/v1/5Gr8c3S2nyRtzScA7VJwrAZNdnaSAbjZTvHCxvmLY6CP.json"
+  },
+  {
+   "id": "limits-fake-spl",
+   "note": "FAKE place and FAKE quote at the limits: a 32-byte name with ä, ß and ñ, a 10-character ticker, the largest u64 city id the program takes, a 20-character region code, a 44-byte country name and a 200-character text",
+   "input": {
+    "city": {
+     "id": "18446744073709551614",
+     "name": "Universitätsstadt Groß-Gerauñ"
+    },
+    "region": {
+     "id": "GS.ABCDEFGHIJKLMNOPQRST",
+     "name": "Fake Region of the Long Names (Test)"
+    },
+    "country": {
+     "id": "GS",
+     "name": "South Georgia and the South Sandwich Islands"
+    },
+    "name": "Universitätsstadt Groß-Gerauñ",
+    "symbol": "GROSSGERAU",
+    "text": "A fake town for the length test: bridges, bakeries, bicycles and a river that bends twice; every street keeps a story, every square a market, and the old harbour a ferry that still runs at dawn daily.",
+    "artSha256": "3c2f9bb82601ebf8b59fda26d81db622e8744b8f11a7d99a66304f65147c6bb8",
+    "mint": "AQY5d9NeyzuT9MFCnJk9wnEFrgNEKQKXjoq2MDbrRPXE"
+   },
+   "quote": {
+    "symbol": "CCTEST",
+    "mint": "A7omaUw6MKG2n9wsPsEmzUJv8eLk4A1AyzVEcSYuUNki"
+   },
+   "description": "A fake town for the length test: bridges, bakeries, bicycles and a river that bends twice; every street keeps a story, every square a market, and the old harbour a ferry that still runs at dawn daily. City: Universitätsstadt Groß-Gerauñ. State or region: Fake Region of the Long Names (Test). Country: South Georgia and the South Sandwich Islands. Pair: $GROSSGERAU / CCTEST. Launched on Citycoin.dev (https://citycoin.dev) on Solana.",
+   "contentJson": "{\"attribution\":\"GeoNames (geonames.org), CC BY 4.0\",\"city\":{\"id\":\"18446744073709551614\",\"name\":\"Universitätsstadt Groß-Gerauñ\"},\"country\":{\"id\":\"GS\",\"name\":\"South Georgia and the South Sandwich Islands\"},\"description\":\"A fake town for the length test: bridges, bakeries, bicycles and a river that bends twice; every street keeps a story, every square a market, and the old harbour a ferry that still runs at dawn daily. City: Universitätsstadt Groß-Gerauñ. State or region: Fake Region of the Long Names (Test). Country: South Georgia and the South Sandwich Islands. Pair: $GROSSGERAU / CCTEST. Launched on Citycoin.dev (https://citycoin.dev) on Solana.\",\"descriptionTemplate\":\"cc-desc-1\",\"image\":{\"sha256\":\"3c2f9bb82601ebf8b59fda26d81db622e8744b8f11a7d99a66304f65147c6bb8\",\"template\":\"t2\"},\"name\":\"Universitätsstadt Groß-Gerauñ\",\"norm\":\"cc-norm-1\",\"quote\":{\"mint\":\"A7omaUw6MKG2n9wsPsEmzUJv8eLk4A1AyzVEcSYuUNki\",\"symbol\":\"CCTEST\"},\"region\":{\"id\":\"GS.ABCDEFGHIJKLMNOPQRST\",\"name\":\"Fake Region of the Long Names (Test)\"},\"symbol\":\"GROSSGERAU\",\"text\":\"A fake town for the length test: bridges, bakeries, bicycles and a river that bends twice; every street keeps a story, every square a market, and the old harbour a ferry that still runs at dawn daily.\",\"v\":2}",
+   "contentHash": "e30535c2468dd54452b7956f464b8ea43190e35d57c523f2f16085993ca7b052",
+   "metadataJson": "{\"attributes\":[{\"trait_type\":\"Launchpad\",\"value\":\"Citycoin.dev\"},{\"trait_type\":\"Network\",\"value\":\"Solana\"},{\"trait_type\":\"City\",\"value\":\"Universitätsstadt Groß-Gerauñ\"},{\"trait_type\":\"State or region\",\"value\":\"Fake Region of the Long Names (Test)\"},{\"trait_type\":\"Country\",\"value\":\"South Georgia and the South Sandwich Islands\"},{\"trait_type\":\"Pair\",\"value\":\"$GROSSGERAU / CCTEST\"}],\"city\":{\"attribution\":\"GeoNames (geonames.org), CC BY 4.0\",\"country\":{\"id\":\"GS\",\"name\":\"South Georgia and the South Sandwich Islands\"},\"id\":\"18446744073709551614\",\"name\":\"Universitätsstadt Groß-Gerauñ\",\"region\":{\"id\":\"GS.ABCDEFGHIJKLMNOPQRST\",\"name\":\"Fake Region of the Long Names (Test)\"}},\"content\":{\"hash\":\"e30535c2468dd54452b7956f464b8ea43190e35d57c523f2f16085993ca7b052\",\"v\":2},\"createdOn\":\"https://citycoin.dev\",\"description\":\"A fake town for the length test: bridges, bakeries, bicycles and a river that bends twice; every street keeps a story, every square a market, and the old harbour a ferry that still runs at dawn daily. City: Universitätsstadt Groß-Gerauñ. State or region: Fake Region of the Long Names (Test). Country: South Georgia and the South Sandwich Islands. Pair: $GROSSGERAU / CCTEST. Launched on Citycoin.dev (https://citycoin.dev) on Solana.\",\"external_url\":\"https://citycoin.dev/coin?mint=AQY5d9NeyzuT9MFCnJk9wnEFrgNEKQKXjoq2MDbrRPXE\",\"image\":\"https://citycoin.dev/coin-meta/v1/art/3c2f9bb82601ebf8b59fda26d81db622e8744b8f11a7d99a66304f65147c6bb8.png\",\"launchpad\":\"Citycoin.dev\",\"name\":\"Universitätsstadt Groß-Gerauñ\",\"network\":\"Solana\",\"quote\":{\"mint\":\"A7omaUw6MKG2n9wsPsEmzUJv8eLk4A1AyzVEcSYuUNki\",\"symbol\":\"CCTEST\"},\"showName\":true,\"symbol\":\"GROSSGERAU\",\"website\":\"https://citycoin.dev/coin?mint=AQY5d9NeyzuT9MFCnJk9wnEFrgNEKQKXjoq2MDbrRPXE\"}",
+   "metaHash": "65d9e04c0b13a8b5bb2483b8e02eea5e2cb0e4b317e4bab66e0900cab18d446d",
+   "uri": "https://citycoin.dev/coin-meta/v1/AQY5d9NeyzuT9MFCnJk9wnEFrgNEKQKXjoq2MDbrRPXE.json"
+  }
+ ]
+}
