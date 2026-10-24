@@ -1,7 +1,7 @@
-// Decoders of the 26 vicinity_curve events (VICINITY-CURVE-DESIGN.md 4.21).
+// Decoders of the 26 citycoin_curve events (CITYCOIN-CURVE-DESIGN.md 4.21).
 //
 // Money movements are emitted by event CPI (`emit_cpi!`): an inner instruction
-// to vicinity_curve whose only account is the event authority PDA
+// to citycoin_curve whose only account is the event authority PDA
 // `["__event_authority"]` (signed by the program) and whose data is
 // EVENT_IX_TAG, the event discriminator and the Borsh fields; so are the batch
 // approval's change of approver, publication and clear (`CPI_EVENTS`; review
@@ -17,10 +17,10 @@
 //     transaction reverts everything: a genuine Trade event CPI from a buy that
 //     was then made to fail costs its sender only the fee and changed nothing;
 //   * for the events of CPI_EVENTS, from an inner instruction (stack height 2 or more) of
-//     vicinity_curve, called by vicinity_curve itself (the enclosing call), with
+//     citycoin_curve, called by citycoin_curve itself (the enclosing call), with
 //     the event authority PDA as its only account;
 //   * for the other settings events, from "Program data:" lines logged while
-//     vicinity_curve was the running program.
+//     citycoin_curve was the running program.
 // `decodeEventCpi` and `decodeEventLogs` check one instruction or one log list
 // only, never the transaction's status: never feed them a failed transaction.
 // Indexers also read at `finalized` commitment (or re-check at it), and never
@@ -132,7 +132,7 @@ export function decodeEventBytes(bytes) {
 
 /**
  * Decode an event CPI: `ix` = `{ programId, accounts: [base58...], data }` of an
- * inner instruction. Returns `{ name, data }` only when it is a vicinity_curve
+ * inner instruction. Returns `{ name, data }` only when it is a citycoin_curve
  * instruction whose single account is the event authority PDA and whose data
  * starts with EVENT_IX_TAG; null otherwise. It checks this one instruction
  * only: whether the transaction succeeded and who called the program are
@@ -150,7 +150,7 @@ export function decodeEventCpi(ix, { programId = CURVE_PROGRAM_ID } = {}) {
 
 /**
  * The `emit!` events in a transaction's logs ("Program data: <base64>" lines of
- * vicinity_curve). The logs of failed transactions are recorded too: use
+ * citycoin_curve). The logs of failed transactions are recorded too: use
  * `decodeTransactionEvents`, which reads them only from a successful one.
  */
 export function decodeEventLogs(logs, { programId = CURVE_PROGRAM_ID } = {}) {
@@ -203,18 +203,18 @@ function instructionOf(ix, keys) {
 }
 
 /**
- * Every vicinity_curve event of one confirmed transaction, the way indexers
+ * Every citycoin_curve event of one confirmed transaction, the way indexers
  * must accept them (4.21, T56, 14.1; CLI-2). `tx` is what getTransaction
  * returns: `{ meta, transaction: { message } }` (or `{ meta, message }`), with
  * a legacy or v0 message, "json" or "jsonParsed" instructions, or web3.js
  * objects. Returns `[]` when the transaction failed (`meta.err` set): its
  * events describe nothing that happened. Otherwise, in order:
- *   * each event CPI: an inner instruction of vicinity_curve at stack height 2
+ *   * each event CPI: an inner instruction of citycoin_curve at stack height 2
  *     or more whose enclosing call (the nearest instruction one level up) is
- *     vicinity_curve, whose only account is the event authority PDA and whose
+ *     citycoin_curve, whose only account is the event authority PDA and whose
  *     data starts with EVENT_IX_TAG, as `{ name, data, source: 'cpi', index,
  *     stackHeight }` (`index`: the top-level instruction it ran under);
- *   * each `emit!` event logged while vicinity_curve was running, as
+ *   * each `emit!` event logged while citycoin_curve was running, as
  *     `{ name, data, source: 'log' }` (never a money event: those are CPIs).
  * Throws when the metadata cannot prove where an event CPI came from (no
  * `meta`, or inner instructions without `stackHeight`).

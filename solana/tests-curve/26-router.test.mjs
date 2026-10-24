@@ -1,4 +1,4 @@
-// G02, G03 and R02b (VICINITY-CURVE-DESIGN.md 12.5, 14.3, 4.0) with a test-only
+// G02, G03 and R02b (CITYCOIN-CURVE-DESIGN.md 12.5, 14.3, 4.0) with a test-only
 // mock router program (tests-curve/router, built by `npm run curve:router`, or
 // here on first use when cargo-build-sbf is on the PATH; never deployed).
 //   * G02: the router CPIs buy and sell with `user` the transaction's signer and
@@ -46,7 +46,7 @@ async function world() {
 }
 const u64 = (n) => { const b = Buffer.alloc(8); b.writeBigUInt64LE(BigInt(n)); return b; };
 const pda = (tag) => S.findPda([Buffer.from('router'), Buffer.from(tag)], ROUTER_ID);
-/** The router's `forward` (0) or `forward as PDA` (1) around one vicinity_curve instruction. */
+/** The router's `forward` (0) or `forward as PDA` (1) around one citycoin_curve instruction. */
 function routed(inner, as) {
   const head = as ? Buffer.concat([Buffer.from([1, as.bump]), Buffer.from(as.tag)]) : Buffer.from([0]);
   return {

@@ -1,5 +1,5 @@
-# A test-only mock router for the vicinity_curve litesvm suites (G02, G03,
-# R02b of VICINITY-CURVE-DESIGN.md 12.5). Never deployed. Its own workspace, so
+# A test-only mock router for the citycoin_curve litesvm suites (G02, G03,
+# R02b of CITYCOIN-CURVE-DESIGN.md 12.5). Never deployed. Its own workspace, so
 # the program workspace (solana/Cargo.toml) does not build or lint it;
 # `npm run curve:router` builds it into target/curve-router/deploy.
 [package]

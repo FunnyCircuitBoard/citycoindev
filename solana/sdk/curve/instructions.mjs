@@ -1,5 +1,5 @@
-// Instruction builders for all 26 vicinity_curve instructions, with the exact
-// fixed account lists of VICINITY-CURVE-DESIGN.md section 4 written out below
+// Instruction builders for all 26 citycoin_curve instructions, with the exact
+// fixed account lists of CITYCOIN-CURVE-DESIGN.md section 4 written out below
 // (no IDL lookup at run time; sdk/curve/instructions.test.mjs checks every list,
 // flag, discriminator and argument encoding against the committed IDL and
 // Anchor's own encoder).

@@ -1,7 +1,7 @@
-# vicinity_curve tests (in process, no validator)
+# citycoin_curve tests (in process, no validator)
 
 ```
-npm run vcurve:sbf           # builds target/vcurve-builds/{production,devnet,halt-all}/vicinity_curve.so
+npm run vcurve:sbf           # builds target/vcurve-builds/{production,devnet,halt-all}/citycoin_curve.so
 npm run launchpad:fixtures   # once: the Metaplex dump (also used by tests-launchpad)
 npm run test:vcurve          # every *.test.mjs here
 ```
@@ -10,7 +10,7 @@ npm run test:vcurve          # every *.test.mjs here
 litesvm with default config #0: `init_launchpad` (the test deployer is the
 upgrade authority), `add_launch_config`, `approve_launch` (the old program's
 `Launchpad` is a crafted 171-byte account with launches paused), `launch`, the
-worked examples E1 to E3 of VICINITY-CURVE-DESIGN.md 5.14 to the lamport and
+worked examples E1 to E3 of CITYCOIN-CURVE-DESIGN.md 5.14 to the lamport and
 raw unit, a pool buy, a buyback and its no-op, `withdraw_platform_fees`,
 `claim_founder_fees`, `forward_holders_fees` with a top-level `SyncNative`
 (crafted `vicinity_rewards` CityConfig and WSOL vault), the opted-in payout

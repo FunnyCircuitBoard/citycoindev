@@ -1,5 +1,5 @@
-// Client regressions of review round 1 (VICINITY-CURVE-DESIGN.md 14.1, 4.21, T56,
-// 4.15, T55; VICINITY-CURVE-NOTES.md 44 to 46), against the real program and the
+// Client regressions of review round 1 (CITYCOIN-CURVE-DESIGN.md 14.1, 4.21, T56,
+// 4.15, T55; CITYCOIN-CURVE-NOTES.md 44 to 46), against the real program and the
 // mainnet vicinity_rewards in litesvm with the checker on:
 //
 //   * CLI-1: "pay with any token" (buyWithSwap) used to build the buy leg with
@@ -144,9 +144,9 @@ test('CLI-3 lamports sent to the city\'s rewards config and vault addresses: ini
   await w.send([w.ix.proposeAdmin({ admin: w.admin.address, newAdmin: next.address })], [w.admin], 'propose_admin');
   await w.send([w.ix.acceptAdmin({ newAdmin: next.address })], [next], 'accept_admin');
   await assert.rejects(() => S.initRewardsForCoin({ ...base, authority: next.address }),
-    (x) => x.code === 'AuthorityNotAdmin' && x.fixable === true && x.problems.includes('authority is not the vicinity_curve admin') && /propose_authority/.test(x.message) && !/O26/.test(x.message));
+    (x) => x.code === 'AuthorityNotAdmin' && x.fixable === true && x.problems.includes('authority is not the citycoin_curve admin') && /propose_authority/.test(x.message) && !/O26/.test(x.message));
   await w.send([w.rewardsIx('propose_authority', { new_authority: new PublicKey(next.address) }, { authority: w.admin.address, config })], [w.admin], 'rewards propose_authority');
-  await assert.rejects(() => S.initRewardsForCoin({ ...base, authority: next.address }), (x) => x.code === 'AuthorityNotAdmin' && x.problems.includes('authority is not the vicinity_curve admin'));
+  await assert.rejects(() => S.initRewardsForCoin({ ...base, authority: next.address }), (x) => x.code === 'AuthorityNotAdmin' && x.problems.includes('authority is not the citycoin_curve admin'));
   await w.send([w.rewardsIx('accept_authority', {}, { new_authority: next.address, config })], [next], 'rewards accept_authority');
   w.admin = next;
   assert.equal((await S.initRewardsForCoin({ ...base, authority: next.address })).already, true);

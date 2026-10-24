@@ -10,7 +10,7 @@
 //
 // Every refusal goes through World.send, whose failed-transaction check
 // asserts that no account of the message moved (but the fee payer's fee) and
-// no vicinity_curve account changed; `refuse` below also compares the bytes and
+// no citycoin_curve account changed; `refuse` below also compares the bytes and
 // lamports of the accounts each attack aims at.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -218,7 +218,7 @@ test('X30, X39: nobody can close, freeze, delegate, re-authorise, mint into or b
   await refuse(w, watch, tx([T.setAuthority(h.mint, attacker.address, 1, attacker.address)], 'take the freeze authority'), /cannot freeze|0x10\b/i);
   await refuse(w, watch, tx([T.freeze(uAta, h.mint, attacker.address)], 'freeze a holder'), /cannot freeze|0x10\b/i);
   await refuse(w, watch, tx([T.freeze(h.vault, h.mint, attacker.address)], 'freeze the vault'), /cannot freeze|0x10\b/i);
-  // the Coin: owned by vicinity_curve; a system transfer out of it needs a signature nobody can give, and no instruction closes it
+  // the Coin: owned by citycoin_curve; a system transfer out of it needs a signature nobody can give, and no instruction closes it
   const coinIx = sys.transfer(h.coin, attacker.address, 1n);
   const e = await expectFail(() => w.send([{ ...coinIx, accounts: [{ address: h.coin, role: R.W }, coinIx.accounts[1]] }], [attacker], 'system transfer out of the Coin'));
   assert.ok(/MissingRequiredSignature|signature|from must not carry data|Transfer: `from` must not carry data|InvalidAccountData|instruction requires/i.test(`${e.logs.join('\n')}\n${e.errText}`), e.message);

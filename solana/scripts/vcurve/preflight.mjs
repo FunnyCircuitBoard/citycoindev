@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// The deploy checklist of VICINITY-CURVE-DESIGN.md 8.4 and 8.5, read from the
+// The deploy checklist of CITYCOIN-CURVE-DESIGN.md 8.4 and 8.5, read from the
 // chain (reviews OPS-1 and OPS-4: 8.4 said "the deploy checklist checks each
 // on chain", but no checklist existed). Read-only: it fetches accounts and
 // prints what is not ready; it never signs anything.
 //
 // Checked (each a problem unless noted):
-//   * vicinity_curve: the Launchpad exists, its admin is the vault with no
+//   * citycoin_curve: the Launchpad exists, its admin is the vault with no
 //     admin transfer pending, the program's upgrade authority is the vault, a
 //     guardian is set, is not the admin, the vault or the proposed admin (its
 //     halt must not wait for the admin's time lock; review R5-CONS-1), and is
@@ -80,7 +80,7 @@
 //   node scripts/vcurve/preflight.mjs --rpc <url> --vault <squads vault>
 //     --guardian-multisig <squads multisig> [--vault-multisig <squads multisig>]
 //     [--approver-multisig <squads multisig>]
-//     [--cluster mainnet|devnet] [--program-id <vicinity_curve id>]
+//     [--cluster mainnet|devnet] [--program-id <citycoin_curve id>]
 //     [--before-legacy-close] [--proposed-guardian <key>]
 //     [--proposed-payout-authority <key>] [--proposed-payout-destination <key>]
 //     [--proposed-launch-approver <key>]
@@ -202,7 +202,7 @@ export function checklistAddresses({ programId = CURVE_PROGRAM_ID, cluster = 'ma
   };
 }
 
-/** Every founder vicinity_curve's accounts name: `[{ founder, what }]` for each Coin and each pending Approval. */
+/** Every founder citycoin_curve's accounts name: `[{ founder, what }]` for each Coin and each pending Approval. */
 export function foundersOf(curveAccounts, { programId = CURVE_PROGRAM_ID } = {}) {
   const out = [];
   for (const a of curveAccounts) {
@@ -218,7 +218,7 @@ const ROLES = Object.freeze({ guardian: 'the guardian', payoutAuthority: 'the pa
  * The problems of a proposed role key, before the set_guardian or set_payout_config proposal that names it is signed
  * (8.4's operating rule; reviews SPEC-1, R5-DIFF-2, R5-CONS-2), or the set_launch_approver proposal (4.24, 8.4).
  * `role` is 'guardian', 'payoutAuthority', 'payoutDestination' or 'launchApprover'; `lp` the decoded Launchpad (with any other proposed key of the same proposal applied);
- * `curveAccounts` vicinity_curve's accounts. The program refuses a founder as guardian or payout key only at approve_launch,
+ * `curveAccounts` citycoin_curve's accounts. The program refuses a founder as guardian or payout key only at approve_launch,
  * launch and transfer_founder, and cannot list the coins when these settings change; it refuses FEE_RECIPIENT and the
  * keys a role must stay apart from itself, which this repeats so that nothing is proposed that would fail or mislead.
  * Returns `{ problems, warnings }`.
@@ -338,7 +338,7 @@ export function checkSquadsRoles({ guardian, approver, vault, guardianMultisig =
     if (approverSet && vaultMs.members.some((m) => m.key === approver)) bad('APPROVER_IS_VAULT_MEMBER', `the launch approver ${approver} is a member key of the vault's multisig (8.4, O32)`);
     if (vaultMs.timeLock === 0) warnings.push({ code: 'VAULT_TIME_LOCK_UNSET', message: 'the vault\'s multisig has no time lock: O11 sets 48 hours from the first coin launch, unless the owner chose its alternative' });
     feeRecipientMember(vaultMs, vaultMultisig, 'FEE_RECIPIENT_IS_VAULT_MEMBER', 'the vault\'s multisig',
-      `a stolen FEE_RECIPIENT key would be ${vaultMs.threshold <= 1 ? 'enough' : `one of the ${vaultMs.threshold} signatures needed`} to act as the admin and the upgrade authority of every program the vault holds (vicinity_curve, vicinity_rewards, the old vicinity_launchpad), so the key that receives the platform's income would also be a key to every coin's reserves`);
+      `a stolen FEE_RECIPIENT key would be ${vaultMs.threshold <= 1 ? 'enough' : `one of the ${vaultMs.threshold} signatures needed`} to act as the admin and the upgrade authority of every program the vault holds (citycoin_curve, vicinity_rewards, the old vicinity_launchpad), so the key that receives the platform's income would also be a key to every coin's reserves`);
   }
   // the approver is never a vault of the guardian's or the vault's multisig (review R7-CONF-3): the program compares exact
   // keys only, so vault 1 of the guardian multisig would let any guardian member publish batches alone
@@ -398,7 +398,7 @@ export function checkSquadsRoles({ guardian, approver, vault, guardianMultisig =
 /**
  * The checklist on a snapshot: `accounts` maps each address of `checklistAddresses` to its account (or null), and the
  * Squads multisigs named by `guardianMultisig` and `vaultMultisig` to theirs; `legacyAccounts` are the old program's
- * accounts (getProgramAccounts) and `curveAccounts` vicinity_curve's; `proposed` = `{ guardian, payoutAuthority,
+ * accounts (getProgramAccounts) and `curveAccounts` citycoin_curve's; `proposed` = `{ guardian, payoutAuthority,
  * payoutDestination, launchApprover }` (any of them) checks the keys a proposal would set (checkProposedRoleKey, and
  * checkSquadsRoles with the proposed guardian and approver). Unknown options are refused, so a misspelt check is never
  * skipped silently. Returns `{ problems, warnings }`, each a list of `{ code, message }`.
@@ -413,12 +413,12 @@ export function checkDeployPreconditions(opts) {
   const problems = []; const warnings = [];
   const bad = (code, message) => problems.push({ code, message });
   const warn = (code, message) => warnings.push({ code, message });
-  // vicinity_curve
+  // citycoin_curve
   let lp = null;
-  try { lp = get('curveLaunchpad') && decodeLaunchpad(get('curveLaunchpad'), { programId }); } catch (e) { bad('CURVE_LAUNCHPAD', `vicinity_curve's Launchpad does not decode: ${e.message}`); }
-  if (!lp) bad('CURVE_LAUNCHPAD', 'vicinity_curve is not initialised (no Launchpad)');
+  try { lp = get('curveLaunchpad') && decodeLaunchpad(get('curveLaunchpad'), { programId }); } catch (e) { bad('CURVE_LAUNCHPAD', `citycoin_curve's Launchpad does not decode: ${e.message}`); }
+  if (!lp) bad('CURVE_LAUNCHPAD', 'citycoin_curve is not initialised (no Launchpad)');
   else {
-    if (lp.admin !== vault || lp.pendingAdmin !== ZERO) bad('CURVE_ADMIN', `vicinity_curve's admin is ${lp.admin} (pending ${lp.pendingAdmin}), not the vault ${vault} with nothing pending`);
+    if (lp.admin !== vault || lp.pendingAdmin !== ZERO) bad('CURVE_ADMIN', `citycoin_curve's admin is ${lp.admin} (pending ${lp.pendingAdmin}), not the vault ${vault} with nothing pending`);
     if (lp.guardian === ZERO) bad('GUARDIAN_UNSET', 'no guardian is set (8.4)');
     else {
       if ([lp.payoutAuthority, lp.payoutDestination].includes(lp.guardian)) bad('GUARDIAN_PAYOUT', 'the guardian is the payout key or the payout wallet');
@@ -442,7 +442,7 @@ export function checkDeployPreconditions(opts) {
     if (c.enabled) bad('CONFIG_BUYBACK_THROUGHPUT', `${text}; disable it (set_launch_config_enabled false) unless the owner has decided O36 for it`);
     else warn('CONFIG_BUYBACK_THROUGHPUT', `${text}; it is disabled, but coins launched under it keep its split`);
   }
-  if (upgradeAuthorityOf(get('curveProgramData')) !== vault) bad('CURVE_UPGRADE_AUTHORITY', `vicinity_curve's upgrade authority is ${upgradeAuthorityOf(get('curveProgramData'))}, not the vault`);
+  if (upgradeAuthorityOf(get('curveProgramData')) !== vault) bad('CURVE_UPGRADE_AUTHORITY', `citycoin_curve's upgrade authority is ${upgradeAuthorityOf(get('curveProgramData'))}, not the vault`);
   let config0 = null;
   try { config0 = get('curveConfig0') && decodeLaunchConfig(get('curveConfig0'), { programId }); } catch { config0 = null; }
   if (!config0) bad('CONFIG0', 'config #0 is not added');

@@ -1,14 +1,14 @@
-// In-process test harness for vicinity_curve (no validator, no ports), modelled
+// In-process test harness for citycoin_curve (no validator, no ports), modelled
 // on tests-launchpad/helpers.mjs.
 //
 // One `World` = one LiteSVM instance with:
-//   * vicinity_curve: target/deploy/vicinity_curve.so (the production build of
+//   * citycoin_curve: target/deploy/citycoin_curve.so (the production build of
 //     `anchor build`; VCURVE_SO overrides), loaded through the upgradeable loader
 //     with `deployer` as upgrade authority, so init_launchpad is tested for real;
 //   * vicinity_rewards and the old vicinity_launchpad as deployed on mainnet: the
 //     committed release binaries (release/mainnet-2026-10-10, SHA-256 checked
 //     against its SHA256SUMS) at their mainnet addresses, which the production
-//     build of vicinity_curve compiles in (3.2; NOTES entry 27);
+//     build of citycoin_curve compiles in (3.2; NOTES entry 27);
 //   * the pinned Metaplex Token Metadata mainnet dump
 //     (scripts/launchpad/fetch-fixtures.sh, SHA-256 checked here too) and, for the
 //     old program's approvals and launches, the pinned Meteora DBC dump; the pinned
@@ -58,8 +58,8 @@ const DBC_PROGRAM_ID = 'dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN';
 const RELEASE = join(SOL, 'release', 'mainnet-2026-10-10');
 const FIXTURES = process.env.LAUNCHPAD_PROGRAMS_DIR || join(SOL, 'tests-launchpad', 'fixtures', 'programs');
 export const PATHS = Object.freeze({
-  curve: process.env.VCURVE_SO || join(SOL, 'target', 'deploy', 'vicinity_curve.so'),
-  curveHaltAll: process.env.VCURVE_HALT_ALL_SO || join(SOL, 'target', 'vcurve-builds', 'halt-all', 'vicinity_curve.so'),
+  curve: process.env.VCURVE_SO || join(SOL, 'target', 'deploy', 'citycoin_curve.so'),
+  curveHaltAll: process.env.VCURVE_HALT_ALL_SO || join(SOL, 'target', 'vcurve-builds', 'halt-all', 'citycoin_curve.so'),
   rewards: join(RELEASE, 'vicinity_rewards.so'),
   legacy: join(RELEASE, 'vicinity_launchpad.so'),
   metaplex: process.env.VCURVE_METAPLEX_SO || join(FIXTURES, 'mpl_token_metadata.so'),
@@ -291,16 +291,16 @@ export class World {
     pkb(authority).copy(data, 13);
     this.svm.setAccount({ ...acc, address: address(pd), data: new Uint8Array(data) });
   }
-  /** Deploy another build of vicinity_curve over the live state (H02, H03): an upgrade, so the checker's record of the program bytes follows. */
+  /** Deploy another build of citycoin_curve over the live state (H02, H03): an upgrade, so the checker's record of the program bytes follows. */
   loadCurve(path) {
     this.svm.addProgramFromFile(address(this.programId), path);
     this.haltAllLoaded = path === PATHS.curveHaltAll;
     this.recordPrograms();
   }
   /**
-   * I20 at run time: the program data of vicinity_curve and of the two programs it
+   * I20 at run time: the program data of citycoin_curve and of the two programs it
    * reads, as loaded; the checker compares them before and after every
-   * transaction. The vicinity_curve binary must carry the compiled ids of this
+   * transaction. The citycoin_curve binary must carry the compiled ids of this
    * World's cluster and none of the other cluster's.
    */
   recordPrograms() {
@@ -311,7 +311,7 @@ export class World {
       this.programBytes.set(id, Buffer.from(pd.data.subarray(PROGRAM_DATA_HEADER))); // the ELF after the ProgramData header
     }
     const problems = compiledIdsProblems(this.programBytes.get(this.programId), { programId: this.programId, cluster: this.cluster });
-    assert.deepEqual(problems, [], `I20: the loaded vicinity_curve binary does not carry the ${this.cluster} ids`);
+    assert.deepEqual(problems, [], `I20: the loaded citycoin_curve binary does not carry the ${this.cluster} ids`);
   }
   accountInfo(addr) {
     const a = this.svm.getAccount(address(String(addr)));

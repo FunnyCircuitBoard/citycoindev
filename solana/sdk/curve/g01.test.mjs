@@ -1,5 +1,5 @@
-// G01 (VICINITY-CURVE-DESIGN.md 12.5): the JavaScript port replays the golden
-// vectors the Rust crate exports (crates/vicinity-curve-math/reference/
+// G01 (CITYCOIN-CURVE-DESIGN.md 12.5): the JavaScript port replays the golden
+// vectors the Rust crate exports (crates/citycoin-curve-math/reference/
 // g01-vectors.json, written by tests/g01_vectors.rs) and must agree on every
 // quote, error, fee share, drip, buyback amount and state digest of more than
 // 10^4 trades, graduating buys, partial fills, pool trades and buyback runs.

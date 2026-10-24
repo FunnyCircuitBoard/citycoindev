@@ -1,4 +1,4 @@
-// Stage 2 smoke test of vicinity_curve in litesvm (VICINITY-CURVE-DESIGN.md
+// Stage 2 smoke test of citycoin_curve in litesvm (CITYCOIN-CURVE-DESIGN.md
 // 4.10 to 4.20, 5.14, 6.5, 8.3; NOTES entries 20 and 21). One coin's life on the
 // production build with default config #0: launch, the worked examples E1 to E3
 // to the lamport and raw unit, a pool buy, a buyback, every outflow (withdraw,
@@ -28,13 +28,13 @@ import anchorPkg from '@coral-xyz/anchor';
 
 const { BorshCoder, BN } = anchorPkg;
 const SOL = join(dirname(fileURLToPath(import.meta.url)), '..');
-const PROD = join(SOL, 'target', 'vcurve-builds', 'production', 'vicinity_curve.so');
-const HALT = join(SOL, 'target', 'vcurve-builds', 'halt-all', 'vicinity_curve.so');
+const PROD = join(SOL, 'target', 'vcurve-builds', 'production', 'citycoin_curve.so');
+const HALT = join(SOL, 'target', 'vcurve-builds', 'halt-all', 'citycoin_curve.so');
 const META = process.env.VCURVE_METAPLEX_SO || join(SOL, 'tests-launchpad', 'fixtures', 'programs', 'mpl_token_metadata.so');
 for (const [p, how] of [[PROD, 'npm run vcurve:sbf'], [HALT, 'npm run vcurve:sbf'], [META, 'npm run launchpad:fixtures']]) {
   if (!existsSync(p)) throw new Error(`missing ${p}: run "${how}" first`);
 }
-const idl = JSON.parse(readFileSync(`${SOL}/sdk/idl/vicinity_curve.json`, 'utf8'));
+const idl = JSON.parse(readFileSync(`${SOL}/sdk/idl/citycoin_curve.json`, 'utf8'));
 const coder = new BorshCoder(idl);
 
 const PK = (s) => new web3.PublicKey(s);
@@ -142,7 +142,7 @@ async function fails(fn, code) {
 const warpSlots = (n) => { const c = svm.getClock(); c.slot += BigInt(n); c.unixTimestamp += BigInt(n); svm.setClock(c); };
 const warpSecs = (n) => { const c = svm.getClock(); c.unixTimestamp += BigInt(n); c.slot += 1n; svm.setClock(c); };
 
-test('vicinity_curve smoke: one coin, every outflow, guardian halt, halt-all over live state', async () => {
+test('citycoin_curve smoke: one coin, every outflow, guardian halt, halt-all over live state', async () => {
   // ---------------------------------------------------------------- setup
   const deployer = await signer();
   const admin = await signer();

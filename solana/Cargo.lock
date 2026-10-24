@@ -532,6 +532,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "citycoin-curve"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "citycoin-curve-math",
+ "mpl-token-metadata",
+ "serde_json",
+]
+
+[[package]]
+name = "citycoin-curve-math"
+version = "0.1.0"
+dependencies = [
+ "proptest",
+ "serde_json",
+]
+
+[[package]]
 name = "cmov"
 version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2962,25 +2981,6 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
-
-[[package]]
-name = "vicinity-curve"
-version = "0.1.0"
-dependencies = [
- "anchor-lang",
- "anchor-spl",
- "mpl-token-metadata",
- "serde_json",
- "vicinity-curve-math",
-]
-
-[[package]]
-name = "vicinity-curve-math"
-version = "0.1.0"
-dependencies = [
- "proptest",
- "serde_json",
-]
 
 [[package]]
 name = "vicinity-launchpad"

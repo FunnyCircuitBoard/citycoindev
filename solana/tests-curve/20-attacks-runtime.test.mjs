@@ -48,7 +48,7 @@ test('X56 event spoofing: a forged money event is refused alone and sinks a real
   // riding along a real buy: the whole transaction reverts, the real buy included
   await refuse(w, watch, () => w.send([w.ix.buy({ user: u.address, coin: h.coin, solIn: LAMPORTS, minTokensOut: 0n }), forged([{ address: ea, role: S.Role.R }])], [u], 'real buy + forged event'),
     /ConstraintSigner|signer|MissingRequiredSignature|PrivilegeEscalation/i);
-  // the SDK's decoder (what indexers run) accepts a money event only from vicinity_curve with the event authority as its one account
+  // the SDK's decoder (what indexers run) accepts a money event only from citycoin_curve with the event authority as its one account
   assert.equal(S.decodeEventCpi({ programId: w.programId, accounts: [u.address], data: fake }, { programId: w.programId }), null, 'not with another account');
   assert.equal(S.decodeEventCpi({ programId: S.CLUSTERS.mainnet.rewardsProgram, accounts: [ea], data: fake }, { programId: w.programId }), null, 'not from another program');
   const real = (await w.buy(u, h, LAMPORTS)).res.top.find((t) => t.name === 'buy').inner.find((i) => i.program === w.programId);

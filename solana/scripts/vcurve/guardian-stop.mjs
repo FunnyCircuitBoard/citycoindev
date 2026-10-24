@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// A guardian member's stop through the guardian's Squads v4 multisig, in one transaction (VICINITY-CURVE-DESIGN.md 4.4,
+// A guardian member's stop through the guardian's Squads v4 multisig, in one transaction (CITYCOIN-CURVE-DESIGN.md 4.4,
 // 4.26, 8.1, 8.4 step 5, O35; NOTES 87; review R7-1).
 //
 // The guardian is a vault of a controlled 1-of-3 Squads multisig with no time lock (O35). A vault call goes through four
@@ -146,7 +146,7 @@ export const squadsProposalCancel = ({ multisig, member, transactionIndex }) =>
   ix(SQUADS.programId, [[multisig, 0], [member, 3], [squadsProposalPda(multisig, transactionIndex), 1], [SYSTEM, 0]], [...SQUADS_IX.proposal_cancel_v2, 0]);
 
 /**
- * The guardian's stop as vicinity_curve instructions signed by the guardian vault: `set_pause(launches = true)` and/or
+ * The guardian's stop as citycoin_curve instructions signed by the guardian vault: `set_pause(launches = true)` and/or
  * `set_pause(buys = true)` first (one call), then `clear_launch_batch(halt = true)` (4.4, 4.26, 8.4 step 5).
  */
 export function guardianStopInner({ guardian, clear = true, pauseLaunches = false, haltBuys = false, programId = CURVE_PROGRAM_ID, cluster = 'mainnet' }) {
@@ -378,7 +378,7 @@ async function main(argv) {
   if (s.failed.length) console.log(`warning RPC_FAILED: ${names(s.failed)} failed or did not answer: the stop goes ahead through the RPC that answers, and counts only when both show it (review R8-OPS-2)`);
   // each RPC's view is checked on its own; whatever its data throws is that view's problem (review R9-TOOLS-1)
   const pres = s.answered.map((v) => {
-    if (!v.launchpad) return ['vicinity_curve\'s Launchpad was not found'];
+    if (!v.launchpad) return ['citycoin_curve\'s Launchpad was not found'];
     try { return stopPreconditions({ multisig: o.multisig, multisigAccount: v.multisigAccount, member, launchpad: v.launchpad, vaultIndex: o.vaultIndex }); } catch (e) { return [`the preconditions could not be checked: ${short(e)}`]; }
   });
   if (pres.every((p) => p.length)) { for (const p of pres[0]) console.log(`PROBLEM: ${p}`); return 1; }

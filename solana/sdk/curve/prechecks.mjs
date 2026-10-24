@@ -1,4 +1,4 @@
-// Client-side pre-checks of VICINITY-CURVE-DESIGN.md 14.3 (T58): the two
+// Client-side pre-checks of CITYCOIN-CURVE-DESIGN.md 14.3 (T58): the two
 // runtime conditions that make a correct buy, sell or claim fail on chain,
 // checked before a transaction is built so the caller gets a clear error
 // instead of a failed transaction.

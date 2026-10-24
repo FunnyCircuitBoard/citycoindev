@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Mutation tests of the batch launch approval's rules (VICINITY-CURVE-NOTES.md entry 77).
+"""Mutation tests of the batch launch approval's rules (CITYCOIN-CURVE-NOTES.md entry 77).
 
 Each mutant removes or weakens one rule of 4.23 to 4.27, 8.3 or 8.6 in the program source (an exact,
 unique string replacement), is built with cargo-build-sbf into its own out dir (the source is restored
@@ -20,7 +20,7 @@ import time
 SOL = sys.argv[1]
 OUT = sys.argv[2]
 ONLY = set(sys.argv[3:])
-P = 'programs/vicinity-curve/src/'
+P = 'programs/citycoin-curve/src/'
 LFB = P + 'instructions/launch_from_batch.rs'
 PUB = P + 'instructions/publish_launch_batch.rs'
 SLA = P + 'instructions/set_launch_approver.rs'
@@ -122,7 +122,7 @@ for m in MUTANTS:
     os.makedirs(out, exist_ok=True)
     saved = patch(changes)
     try:
-        cmd = ['cargo', 'build-sbf', '--manifest-path', 'programs/vicinity-curve/Cargo.toml', '--sbf-out-dir', out]
+        cmd = ['cargo', 'build-sbf', '--manifest-path', 'programs/citycoin-curve/Cargo.toml', '--sbf-out-dir', out]
         if feature:
             cmd += ['--features', feature]
         code, log, secs = run(cmd)
@@ -132,7 +132,7 @@ for m in MUTANTS:
         results.append({'mutant': name, 'result': 'BUILD FAILED', 'log': log[-2000:]})
         print(json.dumps(results[-1]), flush=True)
         continue
-    so = os.path.join(out, 'vicinity_curve.so')
+    so = os.path.join(out, 'citycoin_curve.so')
     env = dict(os.environ)
     env['VCURVE_SO' if not feature else 'VCURVE_HALT_ALL_SO'] = so
     if os.environ.get('MUTANT_CHECKS_OFF') == '1':

@@ -1,14 +1,14 @@
-# vicinity_curve lifecycle suites (litesvm, in process)
+# citycoin_curve lifecycle suites (litesvm, in process)
 
 ```
-anchor build                 # target/deploy/vicinity_curve.so (the production build)
-npm run vcurve:sbf           # target/vcurve-builds/halt-all/vicinity_curve.so (H02, H03)
+anchor build                 # target/deploy/citycoin_curve.so (the production build)
+npm run vcurve:sbf           # target/vcurve-builds/halt-all/citycoin_curve.so (H02, H03)
 npm run launchpad:fixtures   # once: the pinned Metaplex and Meteora DBC mainnet dumps
 npm run test:curve           # every *.test.mjs here
 ```
 
 `helpers.mjs` builds a `World`: one LiteSVM with the production build of
-`vicinity_curve` (upgradeable, the test deployer as upgrade authority), the
+`citycoin_curve` (upgradeable, the test deployer as upgrade authority), the
 committed mainnet binaries of `vicinity_rewards` and the old
 `vicinity_launchpad` (`release/mainnet-2026-10-10`, SHA-256 checked) at their
 mainnet addresses, the pinned Metaplex dump (and Meteora DBC for the old
@@ -17,10 +17,10 @@ and a fixed clock. `VCURVE_SO` and `VCURVE_HALT_ALL_SO` point at other builds.
 
 Every transaction goes through `World.send`. After every successful
 transaction `invariants.mjs` checks every invariant of
-`VICINITY-CURVE-DESIGN.md` section 9 (I1 to I25, except I18, which the property tests
+`CITYCOIN-CURVE-DESIGN.md` section 9 (I1 to I25, except I18, which the property tests
 and `25-no-free-value` cover): SOL by the lamport difference
 of every account in the message, explained by the fee, the system and native
-token instructions that executed, the money events of `vicinity_curve` and
+token instructions that executed, the money events of `citycoin_curve` and
 Anchor's closes; tokens from the token instructions that executed; each coin's
 state by replaying the transaction's events through the SDK's math port
 (`sdk/curve/math.mjs`) and comparing every field, which is also the parity of

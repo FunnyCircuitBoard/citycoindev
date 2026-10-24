@@ -1,5 +1,5 @@
-// F03 (VICINITY-CURVE-DESIGN.md 12.5): config fuzz over the whole V1 to V11
-// space. Every golden config of the reference model (crates/vicinity-curve-math/
+// F03 (CITYCOIN-CURVE-DESIGN.md 12.5): config fuzz over the whole V1 to V11
+// space. Every golden config of the reference model (crates/citycoin-curve-math/
 // reference/vectors.json, 1,500 cases written by the Python model of Appendix A,
 // hitting every rule) that fits the instruction's u16 and u64 arguments, and a
 // seeded set of configs built around valid curves found by 5.9's search (each
@@ -16,7 +16,7 @@ import { join } from 'node:path';
 import { World, S, SOL, TxError, LAMPORTS } from './helpers.mjs';
 import { makeRng } from './fuzz.mjs';
 
-const VECTORS = JSON.parse(readFileSync(join(SOL, 'crates', 'vicinity-curve-math', 'reference', 'vectors.json'), 'utf8'),
+const VECTORS = JSON.parse(readFileSync(join(SOL, 'crates', 'citycoin-curve-math', 'reference', 'vectors.json'), 'utf8'),
   (k, v, ctx) => (typeof v === 'number' && /^-?\d+$/.test(ctx?.source ?? '') ? BigInt(ctx.source) : v));
 const fromVector = (c) => ({
   liquidityBps: BigInt(c.bps[0]), platformBps: BigInt(c.bps[1]), founderBps: BigInt(c.bps[2]), holdersBps: BigInt(c.bps[3]), buybackBps: BigInt(c.bps[4]),

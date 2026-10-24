@@ -17,7 +17,7 @@ id.json
 *.key
 !sdk/idl/vicinity_rewards.json
 !sdk/idl/vicinity_launchpad.json
-!sdk/idl/vicinity_curve.json
+!sdk/idl/citycoin_curve.json
 
 # Local tooling noise
 *.log

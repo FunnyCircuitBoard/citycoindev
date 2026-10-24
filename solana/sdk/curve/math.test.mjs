@@ -1,7 +1,7 @@
 // Parity of the BigInt math port (math.mjs) with the Rust math crate: it
-// replays the crate's golden vectors (crates/vicinity-curve-math/reference/vectors.json,
+// replays the crate's golden vectors (crates/citycoin-curve-math/reference/vectors.json,
 // written by reference/generate_vectors.py from the verbatim reference model of
-// VICINITY-CURVE-DESIGN.md Appendix A and replayed by tests/differential.rs) and
+// CITYCOIN-CURVE-DESIGN.md Appendix A and replayed by tests/differential.rs) and
 // requires exact equality of every quote, every error and all 26 state figures
 // after every operation; then the worked examples E1 to E10 of 5.14 and the
 // margins of 5.13. The parity against the program's real results is in
@@ -14,7 +14,7 @@ import { dirname, join } from 'node:path';
 import * as M from './math.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const VECTORS = join(here, '..', '..', 'crates', 'vicinity-curve-math', 'reference', 'vectors.json');
+const VECTORS = join(here, '..', '..', 'crates', 'citycoin-curve-math', 'reference', 'vectors.json');
 // Integers in the file reach u128: parse every integer token as BigInt.
 const V = JSON.parse(readFileSync(VECTORS, 'utf8'), (k, v, ctx) => (typeof v === 'number' && /^-?\d+$/.test(ctx?.source ?? '') ? BigInt(ctx.source) : v));
 

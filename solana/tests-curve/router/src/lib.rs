@@ -1,5 +1,5 @@
-//! Test-only mock router for the `vicinity_curve` litesvm suites
-//! (VICINITY-CURVE-DESIGN.md 12.5: G02, G03, R02b). Never deployed.
+//! Test-only mock router for the `citycoin_curve` litesvm suites
+//! (CITYCOIN-CURVE-DESIGN.md 12.5: G02, G03, R02b). Never deployed.
 //!
 //! Instructions (first byte):
 //!

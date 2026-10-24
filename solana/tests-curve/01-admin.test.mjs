@@ -1,4 +1,4 @@
-// L01, L02 and the settings instructions (VICINITY-CURVE-DESIGN.md 4.1 to 4.5,
+// L01, L02 and the settings instructions (CITYCOIN-CURVE-DESIGN.md 4.1 to 4.5,
 // 8.2): init_launchpad only by the upgrade authority, once; the two-step admin
 // with the payout-key separation rule at both steps; set_guardian;
 // set_payout_config. The invariant checker runs after every transaction.

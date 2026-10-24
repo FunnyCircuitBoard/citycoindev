@@ -1,14 +1,14 @@
-// Compiled constants of vicinity_curve (VICINITY-CURVE-DESIGN.md 3.2), the
+// Compiled constants of citycoin_curve (CITYCOIN-CURVE-DESIGN.md 3.2), the
 // fixed layout facts of its accounts (3.4 to 3.9) and the Anchor
 // discriminators of its instructions, accounts and events. Plain values, no
 // network access; sdk/curve/constants.test.mjs keeps every one of them equal
-// to the committed IDL (sdk/idl/vicinity_curve.json) and to the math crate.
+// to the committed IDL (sdk/idl/citycoin_curve.json) and to the math crate.
 //
 // Amounts are BigInt. Addresses are base58 strings.
 
 /**
- * The vicinity_curve program id of this build: the localnet and devnet
- * throwaway key (VICINITY-CURVE-NOTES.md entry 7). Mainnet replaces it with the
+ * The citycoin_curve program id of this build: the localnet and devnet
+ * throwaway key (CITYCOIN-CURVE-NOTES.md entry 7). Mainnet replaces it with the
  * owner's key (the program's declare_id!, the math crate's PROGRAM_ID, Anchor.toml
  * and the IDL); every SDK function takes `programId` to follow.
  */

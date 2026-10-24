@@ -1,4 +1,4 @@
-// I18 no free value on chain (VICINITY-CURVE-DESIGN.md 9, I18; the math crate's
+// I18 no free value on chain (CITYCOIN-CURVE-DESIGN.md 9, I18; the math crate's
 // tests/no_free_value.rs states the properties and why the literal wording, coins
 // valued at the final spot price, is not one). Random sequences in litesvm with
 // the invariant checker after every transaction:

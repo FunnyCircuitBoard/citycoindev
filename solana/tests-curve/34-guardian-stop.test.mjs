@@ -1,5 +1,5 @@
 // The guardian's stop through its Squads v4 multisig, against the real Squads v4 program (the pinned mainnet dump,
-// SQDS4ep65..., immutable on mainnet) and the real vicinity_curve build, in litesvm (VICINITY-CURVE-DESIGN.md 4.4, 4.26,
+// SQDS4ep65..., immutable on mainnet) and the real citycoin_curve build, in litesvm (CITYCOIN-CURVE-DESIGN.md 4.4, 4.26,
 // 8.1, 8.4 step 5, O35; NOTES 87, 88). Review round 7:
 //   * R7-1: with a threshold of 1 any member can cancel an approved proposal (proposal_cancel_v2). A thief holding the
 //     approver key and one member key cancels the clear and the pause the other members approve in one transaction and

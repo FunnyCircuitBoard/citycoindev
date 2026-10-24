@@ -1,4 +1,4 @@
-// The SDK against the program's committed IDL (sdk/idl/vicinity_curve.json) and
+// The SDK against the program's committed IDL (sdk/idl/citycoin_curve.json) and
 // Anchor's own Borsh coder: every constant, discriminator and error code; the
 // fixed account list of each of the 26 builders (names, order, signer and
 // writable flags, the PDAs and fixed addresses they fill in); the argument
@@ -18,7 +18,7 @@ import * as S from './index.mjs';
 const { BorshCoder, BN } = anchorPkg;
 const here = dirname(fileURLToPath(import.meta.url));
 const SOL = join(here, '..', '..');
-const idl = JSON.parse(readFileSync(join(SOL, 'sdk', 'idl', 'vicinity_curve.json'), 'utf8'));
+const idl = JSON.parse(readFileSync(join(SOL, 'sdk', 'idl', 'citycoin_curve.json'), 'utf8'));
 const coder = new BorshCoder(idl);
 const sha8 = (s) => [...createHash('sha256').update(s).digest().subarray(0, 8)];
 const key = () => web3.Keypair.generate().publicKey;
@@ -103,7 +103,7 @@ test('program id, cluster ids, constants and discriminators equal the IDL and th
   assert.deepEqual([S.errorName(6058), S.errorName(6065), S.errorName(6070), S.errorName(6071)], ['LaunchApproverNotSet', 'BatchSuperseded', 'InvalidProof', 'ApprovalPending']);
   assert.equal(S.ERROR_NAMES.length, 72);
   // the math crate's PROGRAM_ID and CurveCoin discriminator (decode_coin)
-  const rs = readFileSync(join(SOL, 'crates', 'vicinity-curve-math', 'src', 'constants.rs'), 'utf8');
+  const rs = readFileSync(join(SOL, 'crates', 'citycoin-curve-math', 'src', 'constants.rs'), 'utf8');
   const grab = (name) => {
     const m = new RegExp(`pub const ${name}: \\[u8; \\d+\\] = \\[([^\\]]*)\\]`).exec(rs);
     return m[1].split(',').map((x) => x.trim()).filter(Boolean).map(Number);
@@ -394,7 +394,7 @@ test('event decoders equal Anchor encoding for all 26 events; event CPIs need th
     // the same bytes decoded by Anchor
     const viaAnchor = coder.events.decode(bytes.toString('base64'));
     assert.equal(viaAnchor.name, name);
-    // event CPI: only from vicinity_curve with the event authority as its single account
+    // event CPI: only from citycoin_curve with the event authority as its single account
     const cpiData = Buffer.concat([Buffer.from(S.EVENT_IX_TAG), bytes]);
     const ea = S.curvePdas().eventAuthority();
     assert.equal(S.decodeEventCpi({ programId: S.CURVE_PROGRAM_ID, accounts: [ea], data: cpiData }).name, name);
@@ -405,7 +405,7 @@ test('event decoders equal Anchor encoding for all 26 events; event CPIs need th
   // the nine money and launch events, and the batch approval's change of approver, publication and clear (review R6-RT-3)
   assert.equal(S.CPI_EVENTS.length, 12);
   for (const n of ['LaunchApproverChanged', 'LaunchBatchPublished', 'LaunchBatchCleared']) assert.ok(S.CPI_EVENTS.includes(n), n);
-  // emit! logs: only from vicinity_curve's own frames
+  // emit! logs: only from citycoin_curve's own frames
   const pc = Buffer.concat([Buffer.from(S.EVENT_DISCRIMINATORS.ApprovalRevoked), coder.types.encode('ApprovalRevoked', { city_id: new BN(9), by: key() })]).toString('base64');
   const logs = [`Program ${S.CURVE_PROGRAM_ID} invoke [1]`, `Program data: ${pc}`, `Program ${S.ADDRESSES.token} invoke [2]`, `Program data: ${pc}`,
     `Program ${S.ADDRESSES.token} success`, `Program ${S.CURVE_PROGRAM_ID} success`];

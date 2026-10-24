@@ -1,7 +1,7 @@
-// decodeTransactionEvents (VICINITY-CURVE-DESIGN.md 4.21, 14.1, T56; NOTES 45, CLI-2)
+// decodeTransactionEvents (CITYCOIN-CURVE-DESIGN.md 4.21, 14.1, T56; NOTES 45, CLI-2)
 // over the shapes an RPC's getTransaction returns: a failed transaction yields
 // nothing; an event CPI counts only at stack height 2 or more, called by
-// vicinity_curve itself, with the event authority as its only account; money
+// citycoin_curve itself, with the event authority as its only account; money
 // events never come from logs. tests-curve checks the same decoder against
 // every transaction of the litesvm suites (successful and failed).
 import test from 'node:test';
@@ -28,7 +28,7 @@ function b58(bytes) {
   return s;
 }
 
-/** A v0 transaction: [vicinity_curve withdraw] (index 0) and [router] (index 1), keys = static + loaded. */
+/** A v0 transaction: [citycoin_curve withdraw] (index 0) and [router] (index 1), keys = static + loaded. */
 function tx({ err = null, inner, logs = [], encode = (d) => b58(d) } = {}) {
   const staticKeys = [key(), PROGRAM, ROUTER, EA];
   const loaded = { writable: [key()], readonly: [] };
@@ -46,7 +46,7 @@ function tx({ err = null, inner, logs = [], encode = (d) => b58(d) } = {}) {
 }
 const eventCpi = (data = withdrawn(7, 1_000), stackHeight = 2) => ({ program: PROGRAM, accounts: [EA], data, stackHeight });
 
-test('a successful transaction: the event CPI of a top-level vicinity_curve instruction, and emit! logs', () => {
+test('a successful transaction: the event CPI of a top-level citycoin_curve instruction, and emit! logs', () => {
   const t = tx({ inner: [{ index: 0, instructions: [eventCpi()] }], logs: [`Program ${PROGRAM} invoke [1]`, configEnabledLog(), `Program ${PROGRAM} success`] });
   const out = S.decodeTransactionEvents(t);
   assert.deepEqual(out.map((e) => [e.name, e.source]), [['PlatformFeesWithdrawn', 'cpi'], ['ConfigEnabled', 'log']]);
@@ -71,18 +71,18 @@ test('CLI-2: a failed transaction yields nothing, although its metadata carries 
   assert.equal(S.decodeTransactionEvents(noErr).length, 2);
 });
 
-test('the enclosing call must be vicinity_curve: a router calling the program is fine (depth 3), anything else is not an event', () => {
-  // the router (index 1) CPIs vicinity_curve (height 2), which emits (height 3): accepted
+test('the enclosing call must be citycoin_curve: a router calling the program is fine (depth 3), anything else is not an event', () => {
+  // the router (index 1) CPIs citycoin_curve (height 2), which emits (height 3): accepted
   const routed = tx({ inner: [{ index: 1, instructions: [{ program: PROGRAM, accounts: [], data: Buffer.from(S.INSTRUCTION_DISCRIMINATORS.buy), stackHeight: 2 }, eventCpi(withdrawn(8, 5), 3)] }] });
   assert.deepEqual(S.decodeTransactionEvents(routed).map((e) => [e.name, e.stackHeight, e.index]), [['PlatformFeesWithdrawn', 3, 1]]);
   // the same instruction directly under the router (height 2, parent = the router): refused
   assert.deepEqual(S.decodeTransactionEvents(tx({ inner: [{ index: 1, instructions: [eventCpi(withdrawn(8, 5), 2)] }] })), []);
-  // under a program the router called, not under vicinity_curve: refused
+  // under a program the router called, not under citycoin_curve: refused
   const other = key();
   const t = tx({ inner: [{ index: 1, instructions: [{ program: PROGRAM, accounts: [], data: Buffer.from([1]), stackHeight: 2 }, { program: ROUTER, accounts: [], data: Buffer.from([2]), stackHeight: 3 }, eventCpi(withdrawn(8, 5), 4)] }] });
   assert.deepEqual(S.decodeTransactionEvents(t), []);
   void other;
-  // a sibling after a deeper call still has vicinity_curve as its caller
+  // a sibling after a deeper call still has citycoin_curve as its caller
   const sib = tx({ inner: [{ index: 0, instructions: [{ program: S.ADDRESSES.system, accounts: [], data: Buffer.from([2, 0, 0, 0]), stackHeight: 2 }, { program: S.ADDRESSES.token, accounts: [], data: Buffer.from([3]), stackHeight: 3 }, eventCpi(withdrawn(9, 9), 2)] }] });
   assert.equal(S.decodeTransactionEvents(sib).length, 1);
 });

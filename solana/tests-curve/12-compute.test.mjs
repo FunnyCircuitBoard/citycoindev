@@ -4,7 +4,7 @@
 // launch, the settings instructions, the batch launch approval's five
 // instructions), each asserted against its 11.1 test
 // budget; and the sizes of the website's transactions. The figures are printed
-// (and written to target/vcurve-measurements.json) for VICINITY-CURVE-NOTES.md.
+// (and written to target/vcurve-measurements.json) for CITYCOIN-CURVE-NOTES.md.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { writeFileSync, mkdirSync } from 'node:fs';
@@ -94,7 +94,7 @@ test('C01/C02 compute units per instruction against the 11.1 budgets, and the we
   assert.equal(S.launchBatchArgs(bt, 801n).proof.length, 9, 'a full 9-hash proof (512 leaves)');
   record('launch_from_batch (512 leaves, 9-hash proof)', lb.res, BUDGET.launch_from_batch);
   record('clear_launch_batch', await w.send([w.ix.clearLaunchBatch({ authority: w.guardian.address, halt: true })], [w.guardian], 'clear_launch_batch (halt)'), BUDGET.settings);
-  const out = { toolchain: 'production build of `anchor build` (target/deploy/vicinity_curve.so)', rows, webBuySize, webSellSize };
+  const out = { toolchain: 'production build of `anchor build` (target/deploy/citycoin_curve.so)', rows, webBuySize, webSellSize };
   mkdirSync(join(SOL, 'target'), { recursive: true });
   writeFileSync(join(SOL, 'target', 'vcurve-measurements.json'), JSON.stringify(out, null, 2));
   console.log(`C01/C02 measurements\n${rows.map((r) => `${r.what.padEnd(66)} ${String(r.cu).padStart(7)} CU  (tx ${r.txCu} CU, ${r.size} bytes; budget ${r.budget ?? '-'})`).join('\n')}\nwebsite buy transaction ${webBuySize} bytes, website sell transaction ${webSellSize} bytes`);
@@ -109,7 +109,7 @@ test('TL-INFO-1 the launch of a high-bump city (1000, name A, symbol C0) stays w
   const cu = h.res.ixCu[0].cu;
   assert.ok(cu <= BUDGET.launch, `launch ${cu} CU within the 230,000 budget`);
   // 11.1 states the range measured over 600 city ids; this city is the worst known one under the localnet id
-  const spec = readFileSync(join(SOL, 'VICINITY-CURVE-DESIGN.md'), 'utf8');
+  const spec = readFileSync(join(SOL, 'CITYCOIN-CURVE-DESIGN.md'), 'utf8');
   const m = /`launch` ([\d,]+) to ([\d,]+) CU over ([\d,]+) city ids/.exec(spec);
   assert.ok(m, '11.1 states the measured launch range over many city ids');
   const [lo, hi] = [m[1], m[2]].map((x) => Number(x.replaceAll(',', '')));

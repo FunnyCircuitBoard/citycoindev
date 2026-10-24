@@ -1,5 +1,5 @@
-// Every address vicinity_curve uses, derived exactly as the program derives it
-// (VICINITY-CURVE-DESIGN.md 3.2, 3.3, 3.10, 4.8, 4.10, 4.15, 14.1). Addresses
+// Every address citycoin_curve uses, derived exactly as the program derives it
+// (CITYCOIN-CURVE-DESIGN.md 3.2, 3.3, 3.10, 4.8, 4.10, 4.15, 14.1). Addresses
 // are returned as base58 strings; inputs may be base58 strings, @solana/kit
 // addresses or web3.js PublicKeys.
 import web3 from '@solana/web3.js';
@@ -40,7 +40,7 @@ export function clusterIds(cluster = 'mainnet') {
 }
 
 /**
- * The PDAs of one deployment. `programId` is the vicinity_curve id (the
+ * The PDAs of one deployment. `programId` is the citycoin_curve id (the
  * throwaway localnet/devnet key by default); `cluster` picks the compiled ids
  * of vicinity_rewards and the old vicinity_launchpad.
  */

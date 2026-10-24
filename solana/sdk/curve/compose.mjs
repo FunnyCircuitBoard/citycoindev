@@ -1,5 +1,5 @@
 // The buy and sell legs of a client transaction, and "pay with any token"
-// (VICINITY-CURVE-DESIGN.md 14.1, 14.3, 5.15, 12.5 G03): a swap to native SOL
+// (CITYCOIN-CURVE-DESIGN.md 14.1, 14.3, 5.15, 12.5 G03): a swap to native SOL
 // followed by our buy in the same transaction. The limits that protect the user:
 //   * the swap leg: the buy's `sol_in` never exceeds what the swap is
 //     guaranteed to deliver, or a swap that under-delivers makes the buy spend

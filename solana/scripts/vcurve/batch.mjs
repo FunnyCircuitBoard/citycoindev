@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// The owner's batch verifier, his confirmation and the monitor's check (VICINITY-CURVE-DESIGN.md 8.4 steps 2, 3 and 5,
+// The owner's batch verifier, his confirmation and the monitor's check (CITYCOIN-CURVE-DESIGN.md 8.4 steps 2, 3 and 5,
 // 8.6, 14.1; NOTES 76, 78 to 80, 83 to 86, 91 to 94, 96). It reads the chain and the list files and prints; it never
 // holds or asks for a key and never signs. Its only writes are the owner's own archive and its key (below).
 //
@@ -46,9 +46,9 @@
 //     its number, root and leaf count (and, for an archive entry the owner exported, its window and approver), a window
 //     the program would have accepted, published by the current approver; with `--rpc` twice both RPCs must agree
 //     (review R8-DIFF-4); with one it prints `warning ONE_RPC` (review R10-RPC-1).
-// The archive (`--archive <dir>`, default $VICINITY_BATCH_ARCHIVE or ~/.vicinity-curve/launch-batches; `--no-archive` for
+// The archive (`--archive <dir>`, default $CITYCOIN_BATCH_ARCHIVE or ~/.citycoin-curve/launch-batches; `--no-archive` for
 // none) keeps `<program id>/pending/`, `signed/` and `refused/`; each entry carries an HMAC under this computer's key,
-// `~/.vicinity-curve/archive.key` (32 random bytes created on first use, never inside an archive folder, so a folder
+// `~/.citycoin-curve/archive.key` (32 random bytes created on first use, never inside an archive folder, so a folder
 // handed over with its own key proves nothing; review R8-DIFF-5), so a file copied in from elsewhere is ignored. Every
 // run prints the archive folder and the key's fingerprint, and warns when the folder is not the one used last.
 //
@@ -192,7 +192,7 @@ export const PAGE_WINDOW_SLACK_SECS = 600n;
 const endedWhy = (r, launchpad) => (r.cleared ? 'cleared' : r.publisher !== launchpad.launchApprover ? 'a former approver\'s' : 'expired');
 
 // ---------------------------------------------------------------- the owner's archive (reviews R7-BA-1, R7-3)
-export const ARCHIVE_KINDS = Object.freeze({ pending: 'vicinity_curve launch batch: verified, not yet confirmed', signed: 'vicinity_curve launch batch: signed and confirmed on chain' });
+export const ARCHIVE_KINDS = Object.freeze({ pending: 'citycoin_curve launch batch: verified, not yet confirmed', signed: 'citycoin_curve launch batch: signed and confirmed on chain' });
 /**
  * An archive entry (without its MAC): the list file and the record it was prepared for or stored as (number, root,
  * leaf count, window, publisher), plus `extra` (when it was prepared, the message hash, when it was confirmed...).
@@ -302,7 +302,7 @@ export function verifyListFile({
   const lpAcc = accounts[A.launchpad]; const lbAcc = accounts[A.launchBatch];
   const launchpad = lpAcc ? decodeLaunchpad(lpAcc, { programId }) : null;
   const launchBatch = lbAcc ? decodeLaunchBatch(lbAcc, { programId }) : null;
-  if (!launchpad) bad('NO_LAUNCHPAD', 'vicinity_curve is not initialised');
+  if (!launchpad) bad('NO_LAUNCHPAD', 'citycoin_curve is not initialised');
   if (!launchBatch) bad('NO_LAUNCH_BATCH', 'LaunchBatch does not exist (init_launch_batch, 8.4)');
   if (launchpad && launchpad.launchApprover === ZERO) bad('NO_APPROVER', 'no launch approver is set');
   if (launchpad && approver && launchpad.launchApprover !== ZERO && String(approver) !== launchpad.launchApprover) bad('NOT_APPROVER', `${approver} is not the launch approver ${launchpad.launchApprover}`);
@@ -665,16 +665,16 @@ export function checkStoredBatch({ file, accounts, programId = CURVE_PROGRAM_ID,
 }
 
 // ---------------------------------------------------------------- the archive on disk (reviews R7-BA-1, R8-DIFF-5)
-/** The archive directory: `--archive`, else $VICINITY_BATCH_ARCHIVE, else ~/.vicinity-curve/launch-batches; null with `--no-archive`. */
-export const archiveDir = (o, env = process.env) => (o.noArchive ? null : (o.archive ?? env.VICINITY_BATCH_ARCHIVE ?? join(homedir(), '.vicinity-curve', 'launch-batches')));
+/** The archive directory: `--archive`, else $CITYCOIN_BATCH_ARCHIVE, else ~/.citycoin-curve/launch-batches; null with `--no-archive`. */
+export const archiveDir = (o, env = process.env) => (o.noArchive ? null : (o.archive ?? env.CITYCOIN_BATCH_ARCHIVE ?? join(homedir(), '.citycoin-curve', 'launch-batches')));
 /**
- * This computer's archive MAC key: `~/.vicinity-curve/archive.key`, never inside an archive folder, so an archive
- * folder someone hands over (`--archive`, $VICINITY_BATCH_ARCHIVE) with entries MAC'd under its own key proves nothing
+ * This computer's archive MAC key: `~/.citycoin-curve/archive.key`, never inside an archive folder, so an archive
+ * folder someone hands over (`--archive`, $CITYCOIN_BATCH_ARCHIVE) with entries MAC'd under its own key proves nothing
  * (review R8-DIFF-5).
  */
-export const archiveKeyPath = () => join(homedir(), '.vicinity-curve', 'archive.key');
+export const archiveKeyPath = () => join(homedir(), '.citycoin-curve', 'archive.key');
 /** Where the archive folder used last is noted (review R8-DIFF-5). */
-export const lastArchivePath = () => join(homedir(), '.vicinity-curve', 'last-archive');
+export const lastArchivePath = () => join(homedir(), '.citycoin-curve', 'last-archive');
 /** A key file that is not exactly 32 bytes of hex: the archive cannot be trusted (review R8-DIFF-5). */
 export class ArchiveKeyError extends Error {}
 /**

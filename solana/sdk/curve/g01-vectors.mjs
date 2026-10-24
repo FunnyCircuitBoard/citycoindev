@@ -1,6 +1,6 @@
 // Reading the G01 golden vectors exported by the Rust crate
-// (crates/vicinity-curve-math/reference/g01-vectors.json, written by
-// crates/vicinity-curve-math/tests/g01_vectors.rs): the line format, the state
+// (crates/citycoin-curve-math/reference/g01-vectors.json, written by
+// crates/citycoin-curve-math/tests/g01_vectors.rs): the line format, the state
 // digest and the payout bookkeeping, shared by sdk/curve/g01.test.mjs (the
 // JavaScript port) and tests-curve/22-g01-onchain.test.mjs (the program).
 // Test support only; not exported by index.mjs.
@@ -9,7 +9,7 @@ import { dirname, join } from 'node:path';
 import * as S from './index.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
-export const G01_PATH = join(here, '..', '..', 'crates', 'vicinity-curve-math', 'reference', 'g01-vectors.json');
+export const G01_PATH = join(here, '..', '..', 'crates', 'citycoin-curve-math', 'reference', 'g01-vectors.json');
 
 /** FNV-1a 64 (16 hex digits) of the 24 state fields as decimal numbers joined by commas (tests/g01_vectors.rs). */
 export function stateDigest(st) {

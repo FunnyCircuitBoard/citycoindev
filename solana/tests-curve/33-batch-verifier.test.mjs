@@ -1,4 +1,4 @@
-// The owner's batch verifier, his confirmation and the monitor's check (scripts/vcurve/batch.mjs; VICINITY-CURVE-DESIGN.md
+// The owner's batch verifier, his confirmation and the monitor's check (scripts/vcurve/batch.mjs; CITYCOIN-CURVE-DESIGN.md
 // 8.4 steps 2 and 3, 8.6, 14.1; NOTES 76, 79, 80, 83 to 86), against the real program in litesvm: a clean list gives the
 // unsigned publication, which the approver signs and the program accepts, and the monitor finds the stored batch equal to
 // the list; a list naming a city with a coin, a pending approval, a locked ticker, a founder holding a role, a disabled
@@ -220,7 +220,7 @@ test('R6-DIFF-1, R6-RT-1 (review round 6) the day\'s changes are computed only a
 });
 
 /**
- * The real CLI as the owner runs it, with a scratch HOME (its archive key lives in ~/.vicinity-curve, review R8-DIFF-5)
+ * The real CLI as the owner runs it, with a scratch HOME (its archive key lives in ~/.citycoin-curve, review R8-DIFF-5)
  * and its default archive pointed at a scratch folder; returns `{ code, out }`.
  */
 function cli(args, env) {
@@ -235,7 +235,7 @@ function cli(args, env) {
 /** A scratch folder for one test: lists, archive; removed at the end. */
 function scratch() {
   const dir = mkdtempSync(join(tmpdir(), 'vcurve-r7-'));
-  const env = { HOME: join(dir, 'home'), VICINITY_BATCH_ARCHIVE: join(dir, 'default-archive') };
+  const env = { HOME: join(dir, 'home'), CITYCOIN_BATCH_ARCHIVE: join(dir, 'default-archive') };
   return { dir, env, archive: join(dir, 'archive'), put: (name, o) => { const f = join(dir, name); writeFileSync(f, typeof o === 'string' ? o : text(o)); return f; }, done: () => rmSync(dir, { recursive: true, force: true }) };
 }
 /** The window `verify` printed (its default window from the chain clock it read). */
@@ -311,7 +311,7 @@ test('R6-DIFF-1, R6-DIFF-2, MK-1 (review rounds 6 and 7) the real CLI: a forged 
     // and through the exported function: no transaction
     const rv = verifyListFile({ file: lost, accounts: snapshot(w, coerced.entries), approvals: [], approver: approver.address, now: w.now(), programId: w.programId, archive: [signedFor(w, F1)] });
     assert.deepEqual([codes(rv.problems), rv.publish], [['BAD_FILE'], null]);
-    assert.ok(!existsSync(env.VICINITY_BATCH_ARCHIVE), 'no run wrote to the default archive');
+    assert.ok(!existsSync(env.CITYCOIN_BATCH_ARCHIVE), 'no run wrote to the default archive');
   } finally {
     await rpc.close();
     sc.done();
@@ -708,7 +708,7 @@ test('R8-OPS-1 (review round 8) the correction of a batch in force, [clear_launc
     w.warpTo(w.launchBatch().latest.validFrom);
     await w.launchFromBatch({ batch: S.parseLaunchBatchFile(L2), cityId: A.cityId, founder: A.founder, label: 'A launches from the corrected batch' });
     await expectFail(() => w.launchFromBatch({ batch: S.parseLaunchBatchFile(F1), cityId: BAD.cityId, founder: BAD.founder, label: 'BAD, at L2\'s valid_from' }), 'BatchCleared', 'BatchSuperseded');
-    assert.ok(!existsSync(sc.env.VICINITY_BATCH_ARCHIVE), 'no run wrote to the default archive');
+    assert.ok(!existsSync(sc.env.CITYCOIN_BATCH_ARCHIVE), 'no run wrote to the default archive');
   } finally {
     await rpc.close();
     sc.done();
@@ -896,7 +896,7 @@ test('R8-DIFF-4 (review round 8) check reads every --rpc and stops when they dis
   await w.finish();
 });
 
-test('R8-DIFF-5 (review round 8) the archive\'s MAC key lives in ~/.vicinity-curve, never in an archive folder: a folder handed over with its own key and entries proves nothing; a key that is not 32 bytes is refused; every run names the folder and the key, and warns when the folder is not the one used last', async () => {
+test('R8-DIFF-5 (review round 8) the archive\'s MAC key lives in ~/.citycoin-curve, never in an archive folder: a folder handed over with its own key and entries proves nothing; a key that is not 32 bytes is refused; every run names the folder and the key, and warns when the folder is not the one used last', async () => {
   const w = await World.create();
   const approver = await w.initBatchPath();
   const fs = []; for (let i = 0; i < 3; i++) fs.push(await w.signer(20n));
@@ -919,22 +919,22 @@ test('R8-DIFF-5 (review round 8) the archive\'s MAC key lives in ~/.vicinity-cur
     assert.equal(own.code, 1, own.out); // the owner's own (empty) archive: a first use, which needs --previous
     let c;
     for (const how of [['--archive', handed], []]) {
-      mkdirSync(join(sc.env.HOME, '.vicinity-curve'), { recursive: true });
-      writeFileSync(join(sc.env.HOME, '.vicinity-curve', 'last-archive'), join(sc.dir, 'own')); // the owner's own folder was used last
-      c = await run(next, how, { ...sc.env, VICINITY_BATCH_ARCHIVE: handed });
+      mkdirSync(join(sc.env.HOME, '.citycoin-curve'), { recursive: true });
+      writeFileSync(join(sc.env.HOME, '.citycoin-curve', 'last-archive'), join(sc.dir, 'own')); // the owner's own folder was used last
+      c = await run(next, how, { ...sc.env, CITYCOIN_BATCH_ARCHIVE: handed });
       assert.equal(c.code, 1, c.out);
       assert.match(c.out, /warning ARCHIVE_MOVED: this archive folder is not the one this computer used last/);
       assert.match(c.out, /warning ARCHIVE_IGNORED: signed\/1-[0-9a-f]{64}\.json: not written with this computer's archive key/);
       assert.match(c.out, /PROBLEM NO_PREVIOUS/);
       assert.doesNotMatch(c.out, /changes against the stored batch 1 \(its list from the archive\)/);
     }
-    assert.match(own.out, new RegExp(`^archive ${join(sc.dir, 'own')} \\(key ${join(sc.env.HOME, '.vicinity-curve', 'archive.key')}, not created yet`, 'm'));
+    assert.match(own.out, new RegExp(`^archive ${join(sc.dir, 'own')} \\(key ${join(sc.env.HOME, '.citycoin-curve', 'archive.key')}, not created yet`, 'm'));
     // the function: the handed folder's entries count only under its own key, never under this computer's
     assert.equal(readArchive(handed, String(w.programId), { keyPath: join(handed, 'archive.key') }).signed.length, 1);
     assert.equal(readArchive(handed, String(w.programId), { keyPath: join(sc.dir, 'mine.key') }).signed.length, 0);
     // a key file that is not 32 bytes of hex: before round 8 an empty or odd key decoded to 0 or 1 bytes, and an entry
     // MAC'd under it was a baseline. Now the run stops
-    const keyFile = join(sc.env.HOME, '.vicinity-curve', 'archive.key');
+    const keyFile = join(sc.env.HOME, '.citycoin-curve', 'archive.key');
     const emptyMac = (entry) => createHmac('sha256', Buffer.alloc(0)).update(JSON.stringify(entry)).digest('hex');
     const forged = archiveEntry({ kind: 'signed', file: S.launchBatchFile(thief), record: w.launchBatch().latest });
     const bad = join(sc.dir, 'bad');
@@ -953,7 +953,7 @@ test('R8-DIFF-5 (review round 8) the archive\'s MAC key lives in ~/.vicinity-cur
     const k1 = archiveKey({ create: true, path: keyFile });
     assert.equal(k1.length, 32);
     assert.ok(archiveKey({ create: true, path: keyFile }).equals(k1), 'an existing key is never replaced');
-    assert.deepEqual(readdirSync(join(sc.env.HOME, '.vicinity-curve')).sort(), ['archive.key', 'last-archive'], 'no temporary file is left');
+    assert.deepEqual(readdirSync(join(sc.env.HOME, '.citycoin-curve')).sort(), ['archive.key', 'last-archive'], 'no temporary file is left');
     c = await run(next, ['--archive', bad]);
     assert.match(c.out, /^archive \S+ \(key \S+, fingerprint [0-9a-f]{16}\)$/m);
     assert.match(c.out, /warning ARCHIVE_IGNORED: signed\/x\.json/);
@@ -1371,7 +1371,7 @@ test('R10-RPC-1 (review round 10, hardened; rejected as a defect, one RPC being 
     c = await cli(['confirm', '2', R, '--rpc', honest.url, '--rpc', honest2.url, '--one-rpc-ok', ...at], sc.env);
     assert.equal(c.code, 2, c.out);
     assert.deepEqual([oneRpcWarning('confirm').code, oneRpcWarning('check').message.includes('--one-rpc-ok')], ['ONE_RPC', false]);
-    assert.ok(!existsSync(sc.env.VICINITY_BATCH_ARCHIVE), 'no run wrote to the default archive');
+    assert.ok(!existsSync(sc.env.CITYCOIN_BATCH_ARCHIVE), 'no run wrote to the default archive');
   } finally {
     await honest.close(); await honest2.close(); await liar.close();
     sc.done();

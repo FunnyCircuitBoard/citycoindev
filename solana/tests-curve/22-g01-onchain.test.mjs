@@ -1,5 +1,5 @@
-// G01 on chain (VICINITY-CURVE-DESIGN.md 12.5): the program replays the golden
-// vectors exported by the Rust crate (crates/vicinity-curve-math/reference/
+// G01 on chain (CITYCOIN-CURVE-DESIGN.md 12.5): the program replays the golden
+// vectors exported by the Rust crate (crates/citycoin-curve-math/reference/
 // g01-vectors.json; sdk/curve/g01.test.mjs replays them through the
 // JavaScript port). Every coin life of the file is launched on its config at
 // its slot, and every operation is sent as the transaction it describes: buys

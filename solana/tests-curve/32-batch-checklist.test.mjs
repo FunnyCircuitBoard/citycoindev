@@ -1,4 +1,4 @@
-// The deploy checklist and the launch approver (VICINITY-CURVE-DESIGN.md 4.24, 8.4, 8.6; NOTES 76): before a
+// The deploy checklist and the launch approver (CITYCOIN-CURVE-DESIGN.md 4.24, 8.4, 8.6; NOTES 76): before a
 // set_launch_approver proposal is signed, `scripts/vcurve/preflight.mjs --proposed-launch-approver` checks the key
 // against every coin's and pending approval's founder (the program refuses the approver as a founder only from then on
 // and cannot list the coins when the key is set) and against every seat the program keeps it apart from; a proposed

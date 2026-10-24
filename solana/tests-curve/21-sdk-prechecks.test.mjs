@@ -1,4 +1,4 @@
-// The SDK's pre-checks (VICINITY-CURVE-DESIGN.md 14.3, T58) and its
+// The SDK's pre-checks (CITYCOIN-CURVE-DESIGN.md 14.3, T58) and its
 // initRewardsForCoin (4.15, 12.5 R03 last clause, 14.1, T70) against the real
 // programs: every prediction the SDK makes from account snapshots is what the
 // chain then does.
@@ -138,7 +138,7 @@ test('R03 last clause: initRewardsForCoin simulates the real init_city and propo
     [{ rewardModel: 'Creator', founderBps: 10_000 }, 'model is not Holders'],
     [{ rewardModel: 'Split', founderBps: 5_000 }, 'model is not Holders'],
     [{ rewardMint: otherMint }, 'reward mint is not WSOL'],
-    [{ authority: stranger.address, simulate: simulator(stranger) }, 'authority is not the vicinity_curve admin'],
+    [{ authority: stranger.address, simulate: simulator(stranger) }, 'authority is not the citycoin_curve admin'],
   ]) {
     await assert.rejects(() => S.initRewardsForCoin({ ...base, ...o }), (e) => e instanceof S.RewardsConfigError && e.problems.some((p) => p.includes(problem)), problem);
     assert.equal(w.exists(config), false, 'nothing was created');
@@ -184,8 +184,8 @@ test('initRewardsForCoin reads the admin from the Launchpad: after an admin chan
     return r.ok ? { ok: true, account: r.account } : { ok: false, error: r.error };
   };
   const base = { getAccount: async (k) => w.accountInfo(k), payer: w.payer.address, registryAdmin: w.admin.address, coin: w.coinView(h) };
-  // the rewards registry admin is still the old key; the root publisher must be the vicinity_curve admin
-  await assert.rejects(() => S.initRewardsForCoin({ ...base, simulate: sim(w.admin), authority: w.admin.address }), /authority is not the vicinity_curve admin/);
+  // the rewards registry admin is still the old key; the root publisher must be the citycoin_curve admin
+  await assert.rejects(() => S.initRewardsForCoin({ ...base, simulate: sim(w.admin), authority: w.admin.address }), /authority is not the citycoin_curve admin/);
   const r = await S.initRewardsForCoin({ ...base, simulate: sim(next), authority: next.address });
   assert.equal(r.view.authority, next.address);
   await w.finish();

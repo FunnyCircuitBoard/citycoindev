@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The three vicinity_curve SBF builds (VICINITY-CURVE-DESIGN.md 3.1, 8.3, C03,
+# The three citycoin_curve SBF builds (CITYCOIN-CURVE-DESIGN.md 3.1, 8.3, C03,
 # C04): production (default features: `no-idl`, mainnet ids), devnet (the
 # compiled devnet ids of 3.2) and halt-all (the pre-audited emergency build:
 # the nine handlers that move lamports or tokens, launch_from_batch among them,
@@ -14,7 +14,7 @@
 # Usage (from solana/): npm run vcurve:sbf
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-MANIFEST=programs/vicinity-curve/Cargo.toml
+MANIFEST=programs/citycoin-curve/Cargo.toml
 sha256() { if command -v sha256sum >/dev/null; then sha256sum "$1"; else shasum -a 256 "$1"; fi | cut -d' ' -f1; }
 status=0
 summary=""
@@ -27,13 +27,13 @@ for variant in production devnet halt-all; do
   features=()
   if [ "$variant" != production ]; then features=(--features "$variant"); fi
   # A new mtime makes cargo recompile the crate, so its warnings are printed.
-  touch programs/vicinity-curve/src/lib.rs
+  touch programs/citycoin-curve/src/lib.rs
   cargo build-sbf --manifest-path "$MANIFEST" --sbf-out-dir "$out" ${features[@]+"${features[@]}"} 2>&1 | tee "$log"
   # CI sets CARGO_TERM_COLOR=always, which puts colour codes between "Compiling"
   # and the crate name: search a copy of the log with the codes removed.
   plain="target/vcurve-builds/$variant.plain.log"
   sed 's/\x1b\[[0-9;]*m//g' "$log" > "$plain"
-  if ! grep -q "Compiling vicinity-curve " "$plain"; then
+  if ! grep -q "Compiling citycoin-curve " "$plain"; then
     echo "FAIL: the $variant build did not recompile the program crate" >&2
     status=1
   fi
@@ -41,8 +41,8 @@ for variant in production devnet halt-all; do
     echo "FAIL: stack offset warning in the $variant build (C04)" >&2
     status=1
   fi
-  so="$out/vicinity_curve.so"
+  so="$out/citycoin_curve.so"
   summary+=$(printf '%-10s %8d bytes  sha256 %s' "$variant" "$(wc -c < "$so" | tr -d ' ')" "$(sha256 "$so")")$'\n'
 done
-printf '\nvicinity_curve builds with %s(no stack warning: %s)\n%s' "$toolchain" "$([ $status -eq 0 ] && echo yes || echo NO)" "$summary"
+printf '\ncitycoin_curve builds with %s(no stack warning: %s)\n%s' "$toolchain" "$([ $status -eq 0 ] && echo yes || echo NO)" "$summary"
 exit $status

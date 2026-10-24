@@ -135,12 +135,12 @@ test('initRewardsForCoin proposes only a config forward_holders_fees accepts; it
   await refused({ rewardModel: 'Split', founderBps: 2_500 }, 'founder_bps is not 0');
   await refused({ rewardModel: 'Holders', founderBps: 1 }, 'founder_bps is not 0');
   await refused({ rewardMint: key() }, 'reward mint is not WSOL');
-  await refused({ authority: key() }, 'authority is not the vicinity_curve admin');
+  await refused({ authority: key() }, 'authority is not the citycoin_curve admin');
   // the admin by default comes from the Launchpad account
   const lpData = Buffer.alloc(S.ACCOUNT_LEN.Launchpad); Buffer.from(S.ACCOUNT_DISCRIMINATORS.Launchpad).copy(lpData, 0); new web3.PublicKey(admin).toBuffer().copy(lpData, 8);
   chain.set(S.curvePdas({}).launchpad(), { owner: S.CURVE_PROGRAM_ID, lamports: 1n, data: lpData });
   assert.equal((await S.initRewardsForCoin({ ...base, admin: undefined })).instructions.length, 1);
-  await assert.rejects(() => S.initRewardsForCoin({ ...base, admin: undefined, authority: key() }), /authority is not the vicinity_curve admin/);
+  await assert.rejects(() => S.initRewardsForCoin({ ...base, admin: undefined, authority: key() }), /authority is not the citycoin_curve admin/);
   // a failed simulation is refused
   await assert.rejects(() => S.initRewardsForCoin({ ...base, simulate: async () => ({ ok: false, error: 'custom program error: 0x1782' }) }), (e) => e.code === 'SimulationFailed');
   // an existing config: a correct one needs nothing, a wrong one can never be fixed
@@ -846,7 +846,7 @@ test('SDK4-6 the README\'s direct buy runs as written (its slippage from buySlip
     const leg = S.buyLeg({ solIn: 1_000_000_000n, coinAccount: coin, slippageBps: policy.defaultSlippageBps });
     assert.ok(leg.minTokensOut >= 1n);
   }
-  const spec = readFileSync(join(here, '..', '..', 'VICINITY-CURVE-DESIGN.md'), 'utf8');
+  const spec = readFileSync(join(here, '..', '..', 'CITYCOIN-CURVE-DESIGN.md'), 'utf8');
   const s74 = spec.slice(spec.indexOf('### 7.4 Ordinary sandwiches'), spec.indexOf('### 7.5 '));
   assert.doesNotMatch(s74, /2% to 2\.5%/);
   assert.match(s74, /1\.3% of the market's SOL depth/);

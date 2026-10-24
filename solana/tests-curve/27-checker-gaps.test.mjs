@@ -1,5 +1,5 @@
 // The invariant checker's newer rules, tested against the checker itself
-// (VICINITY-CURVE-DESIGN.md 9: I5, I6, I14, I20, I21). Each rule runs after
+// (CITYCOIN-CURVE-DESIGN.md 9: I5, I6, I14, I20, I21). Each rule runs after
 // every transaction of every suite; here each one is shown to refuse what it
 // must: a real transaction's decoded instructions replayed with one
 // destination or one CPI changed (I14), a buy that the program allows but no
@@ -7,7 +7,7 @@
 // without an upgrade and binaries of the wrong cluster (I20). I5 and I6 are
 // exercised in multi-instruction transactions: a graduation followed by pool
 // trades and a buyback in the same transaction. Two tests are the regressions
-// of the long F01/F02 run (VICINITY-CURVE-NOTES.md 34, 41); the last one is the
+// of the long F01/F02 run (CITYCOIN-CURVE-NOTES.md 34, 41); the last one is the
 // failed-transaction check's fee rule (NOTES 47, L2). SM-2 (review round 4): the
 // checker holds every call to the flags as they stood at that call, and what
 // approve_launch and opt_in_payout wrote to their rules. R5-REG-1 (review round 5):
@@ -26,7 +26,7 @@ import { checkDestinations, compiledIdsProblems, PROGRAM_DATA_HEADER, checkFaile
 function edited(tx, i, j, edit) {
   const top = tx.top.map((t) => ({ ...t, accounts: [...t.accounts], inner: t.inner.map((ii) => ({ ...ii, accounts: [...ii.accounts], data: Buffer.from(ii.data) })) }));
   if (j === null) top[i].inner.push(edit(null)); else top[i].inner[j] = edit(top[i].inner[j]);
-  // the calls of vicinity_curve the checker iterates (here all top level)
+  // the calls of citycoin_curve the checker iterates (here all top level)
   const calls = top.filter((t) => t.name).map((t) => ({ ...t, depth: 1, top: t }));
   return { ...tx, top, calls };
 }
@@ -140,7 +140,7 @@ test('I20 at run time: program code edited without an upgrade fails the checker;
   const prod = readFileSync(PATHS.curve);
   assert.deepEqual(compiledIdsProblems(prod, { programId: w.programId, cluster: 'mainnet' }), []);
   assert.ok(compiledIdsProblems(prod, { programId: w.programId, cluster: 'devnet' }).length >= 2);
-  const devnet = join(SOL, 'target', 'vcurve-builds', 'devnet', 'vicinity_curve.so');
+  const devnet = join(SOL, 'target', 'vcurve-builds', 'devnet', 'citycoin_curve.so');
   if (existsSync(devnet)) {
     assert.deepEqual(compiledIdsProblems(readFileSync(devnet), { programId: w.programId, cluster: 'devnet' }), []);
     assert.ok(compiledIdsProblems(readFileSync(devnet), { programId: w.programId, cluster: 'mainnet' }).length >= 2, 'the devnet build is refused as a mainnet build');

@@ -1,5 +1,5 @@
-// The invariant checker and money-flow tracer of the vicinity_curve litesvm
-// suites (VICINITY-CURVE-DESIGN.md section 9, L13, 12 intro). World.send runs
+// The invariant checker and money-flow tracer of the citycoin_curve litesvm
+// suites (CITYCOIN-CURVE-DESIGN.md section 9, L13, 12 intro). World.send runs
 // `checkTransaction` after EVERY successful transaction of every test and
 // `checkFailedTransaction` after every failed one; `probeLiveness` (I22) runs at
 // the end of every test and wherever a test asks for it.
@@ -8,10 +8,10 @@
 //   * SOL by the lamport difference of every account in the message (direct
 //     lamport moves leave no inner instruction, RT-5): every change must be
 //     explained by the fee, the system instructions that actually executed, the
-//     native-token transfers that executed, the money events of vicinity_curve
+//     native-token transfers that executed, the money events of citycoin_curve
 //     (whose destinations are the fixed ones of 6.4) and Anchor's closes of an
 //     Approval or a PayoutOptIn to their pinned receivers (I13, I14, I21).
-//   * destinations (I14): every inner instruction of a vicinity_curve
+//   * destinations (I14): every inner instruction of a citycoin_curve
 //     instruction goes to System, SPL Token, Metaplex (in `launch` only) or the
 //     program's own event CPI; every system transfer, account creation,
 //     allocation and assignment inside one is pinned: a creation (or Anchor's
@@ -34,7 +34,7 @@
 //     phase, in event order (several instructions of one transaction included),
 //     from the events' own after-figures; I5's vault == P explicitly at the end
 //     of the instruction that graduates a coin.
-//   * I20 at run time: the program bytes of vicinity_curve (and of the two
+//   * I20 at run time: the program bytes of citycoin_curve (and of the two
 //     programs it reads) are those the World loaded, before and after every
 //     transaction, successful or not; the World checks at every load that the
 //     binary carries the compiled ids of its cluster and none of the other's.
@@ -56,7 +56,7 @@
 //     Approval for the city at that moment, and the new Coin holding exactly the
 //     leaf's founder, config terms, symbol, name and meta_hash.
 // Per failed transaction: no account of the message changed except the fee
-// payer's fee, and no vicinity_curve account changed at all.
+// payer's fee, and no citycoin_curve account changed at all.
 import assert from 'node:assert/strict';
 import { address, getCompiledTransactionMessageDecoder } from '@solana/kit';
 import web3 from '@solana/web3.js';
@@ -87,7 +87,7 @@ export function priorityFeeOf(messageBytes) {
 /** Metaplex Token Metadata's own fee, charged to the payer of `launch` into the metadata account (3.10, O17). */
 export const METAPLEX_CREATE_FEE = 10_000_000n;
 /**
- * I14: what each vicinity_curve instruction may create, by the names of its
+ * I14: what each citycoin_curve instruction may create, by the names of its
  * account table (4.1 to 4.20), and which of its accounts pays. An instruction
  * not listed here makes no system instruction at all, except `buy` (its one
  * transfer of `charged` from `user` to the Coin).
@@ -154,7 +154,7 @@ export function readMetadata(data) {
 }
 
 /**
- * Every vicinity_curve account, decoded, plus each coin's vault and mint (the state the checker compares).
+ * Every citycoin_curve account, decoded, plus each coin's vault and mint (the state the checker compares).
  * With `keys` (the accounts a transaction loads), the vault and mint are read only for the coins the
  * transaction can touch: no other account can change.
  */
@@ -174,7 +174,7 @@ export function snapshot(w, keys) {
     else if (type === 'PayoutOptIn') optIns.set(acc.address, { ...S.decodePayoutOptIn(acc, { programId }), address: acc.address, lamports: acc.lamports });
     else if (type === 'Launchpad') launchpad = { ...S.decodeLaunchpad(acc, { programId }), address: acc.address };
     else if (type === 'LaunchBatch') launchBatch = { ...S.decodeLaunchBatch(acc, { programId }), address: acc.address, raw: acc.data };
-    else assert.fail(`unknown account ${acc.address} owned by vicinity_curve (${acc.data.length} bytes)`);
+    else assert.fail(`unknown account ${acc.address} owned by citycoin_curve (${acc.data.length} bytes)`);
   }
   for (const c of coins.values()) {
     // the same criterion as checkTransaction's: the Coin, its vault, its mint or its metadata loaded
@@ -190,7 +190,7 @@ export function snapshot(w, keys) {
 /** Decode a sent transaction: keys, signers, top-level instructions with their inner instructions, log segments and events. */
 /**
  * Decode a sent transaction: keys, signers, top-level instructions with their inner instructions, log
- * segments and events, and every call of vicinity_curve, top level or by CPI from another program (a
+ * segments and events, and every call of citycoin_curve, top level or by CPI from another program (a
  * router, G02). Each call carries its own inner instructions (those deeper than it, until the stack
  * returns to its level), its depth and its events; each inner instruction knows the innermost call it
  * belongs to. `steps` lists, in execution order, the indices the checker steps a vault through.
@@ -227,25 +227,25 @@ export function decodeTransaction(w, { messageBytes, inner, logs, lookupAddresse
     const name = program === w.programId ? nameOf(data) : null;
     const seg = segments[i] ?? [];
     const t = { index: i, program, accounts, data, name, inner: innerIxs, events: [], calls: [], logs: seg, cu: computeOf(seg, program), depth: 1 };
-    // the calls of vicinity_curve within this instruction: itself, or CPIs into it (not its own event CPIs)
+    // the calls of citycoin_curve within this instruction: itself, or CPIs into it (not its own event CPIs)
     const mine = [];
     if (program === w.programId) mine.push({ ...t, inner: innerIxs, top: t });
     else steps.push(i);
     innerIxs.forEach((ii, j) => {
       if (ii.program !== w.programId || isEventCpi(ii)) return;
       const callName = nameOf(ii.data);
-      assert.ok(callName, `a CPI into vicinity_curve with an unknown instruction (${ii.data.subarray(0, 8).toString('hex')})`);
+      assert.ok(callName, `a CPI into citycoin_curve with an unknown instruction (${ii.data.subarray(0, 8).toString('hex')})`);
       let end = j + 1;
       while (end < innerIxs.length && innerIxs[end].stackHeight > ii.stackHeight) end++;
       mine.push({ index: i + (mine.length + 1) / 1000, program: ii.program, accounts: ii.accounts, data: ii.data, name: callName, inner: innerIxs.slice(j + 1, end), depth: ii.stackHeight, logs: seg, cu: null, top: t, viaCpi: true, innerAt: j });
     });
     // each inner instruction belongs to the innermost call that contains it
     for (const c of mine) for (const ii of c.inner) if (!ii.call || ii.call.depth < c.depth) ii.call = c;
-    // the log lines of each call of vicinity_curve made by CPI (a guardian's Squads vault transaction, review R7-1):
+    // the log lines of each call of citycoin_curve made by CPI (a guardian's Squads vault transaction, review R7-1):
     // the `Program data:` lines logged while that call itself ran, the calls in the order they ran
     const cpiLogs = cpiCallLogs(seg, w.programId);
     const viaCpi = mine.filter((c) => c.viaCpi);
-    if (viaCpi.length) assert.equal(cpiLogs.length, viaCpi.length, 'one log frame for each CPI into vicinity_curve');
+    if (viaCpi.length) assert.equal(cpiLogs.length, viaCpi.length, 'one log frame for each CPI into citycoin_curve');
     for (const c of mine) {
       c.events = eventsOf(c);
       const lines = c.viaCpi ? [`Program ${w.programId} invoke [1]`, ...cpiLogs[viaCpi.indexOf(c)], `Program ${w.programId} success`] : seg;
@@ -255,7 +255,7 @@ export function decodeTransaction(w, { messageBytes, inner, logs, lookupAddresse
       calls.push(c); steps.push(c.index); t.calls.push(c); t.events.push(...c.events);
     }
     for (const ii of innerIxs) {
-      if (ii.program === w.programId && isEventCpi(ii)) assert.ok(ii.call, 'an event CPI outside any call of vicinity_curve');
+      if (ii.program === w.programId && isEventCpi(ii)) assert.ok(ii.call, 'an event CPI outside any call of citycoin_curve');
     }
     return t;
   });
@@ -319,10 +319,10 @@ export function checkFailedTransaction(w, { pre, post, preAccounts, postAccounts
       assert.ok(Buffer.from(b?.data ?? []).equals(Buffer.from(a.data ?? [])), `${label} (failed): data of ${k} changed`);
     }
   }
-  assert.equal(post.accounts.size, pre.accounts.size, `${label} (failed): vicinity_curve accounts appeared or vanished`);
+  assert.equal(post.accounts.size, pre.accounts.size, `${label} (failed): citycoin_curve accounts appeared or vanished`);
   for (const [k, a] of pre.accounts) {
     const b = post.accounts.get(k);
-    assert.ok(b && b.lamports === a.lamports && b.data.equals(a.data), `${label} (failed): vicinity_curve account ${k} changed`);
+    assert.ok(b && b.lamports === a.lamports && b.data.equals(a.data), `${label} (failed): citycoin_curve account ${k} changed`);
   }
 }
 
@@ -341,7 +341,7 @@ export function checkProgramBytes(w, label) {
   }
 }
 /**
- * The compiled ids a vicinity_curve binary carries (3.2): the ids stored as
+ * The compiled ids a citycoin_curve binary carries (3.2): the ids stored as
  * plain bytes in its read-only data (the program's own, vicinity_rewards',
  * the old program's and Metaplex's) must be those of `cluster`, and none of
  * the other cluster's. FEE_RECIPIENT, LEGACY_LAUNCHPAD and REWARDS_REGISTRY
@@ -375,7 +375,7 @@ export function roleKeysOf(w, pre, post) {
 
 // ---------------------------------------------------------------- I14: destinations of every system instruction
 /**
- * Every inner instruction of a vicinity_curve instruction goes to System, SPL
+ * Every inner instruction of a citycoin_curve instruction goes to System, SPL
  * Token, Metaplex (only `launch`, only its CreateMetadataAccountsV3) or the
  * program's own event CPI; inside Metaplex only System. Every system
  * instruction is pinned to the accounts that instruction creates (CREATES),
@@ -504,7 +504,7 @@ export function checkTransaction(w, ctx) {
       }
     }
   }
-  // money events of vicinity_curve: the debit helper's direct lamport moves (6.5)
+  // money events of citycoin_curve: the debit helper's direct lamport moves (6.5)
   const coinOfEvent = (e) => { const c = coinByCity.get(e.data.city_id); assert.ok(c, `${label}: ${e.name} for unknown city ${e.data.city_id}`); return c; };
   const moneyOut = new Map(); // coin -> lamports out by events
   const buysIn = new Map(); // coin -> lamports charged by buys
@@ -552,13 +552,13 @@ export function checkTransaction(w, ctx) {
     let to;
     if (pre.approvals.has(k)) to = pre.approvals.get(k).rentPayer;
     else if (pre.optIns.has(k)) to = pre.optIns.get(k).founder;
-    else assert.fail(`${label}: vicinity_curve account ${k} closed (only an Approval or a PayoutOptIn may close)`);
+    else assert.fail(`${label}: citycoin_curve account ${k} closed (only an Approval or a PayoutOptIn may close)`);
     moves(k, to, a.lamports, 'close');
   }
   // compare with what really happened. Other programs under no test here (the old vicinity_launchpad,
   // vicinity_rewards, Meteora DBC, Metaplex called directly) may move lamports directly among the accounts
   // of their own top-level instructions (their closes, for example): there the residual must sum to zero
-  // and never touch an account of vicinity_curve.
+  // and never touch an account of citycoin_curve.
   const PLAIN = new Set([w.programId, S.ADDRESSES.system, S.ADDRESSES.token, S.ADDRESSES.associatedToken, S.ADDRESSES.computeBudget]);
   const foreign = new Set();
   for (const t of tx.top) if (!PLAIN.has(t.program)) for (const a of t.accounts) foreign.add(a);
@@ -1036,7 +1036,7 @@ function checkCoin(w, { c, b, label, rentMin, graduatedInTx }) {
 }
 
 // The admin instructions of the old vicinity_launchpad and of vicinity_rewards' registry that move a seat
-// vicinity_curve reads (their committed IDLs, sdk/idl/: Anchor's `sha256("global:<name>")[..8]`, the same for both
+// citycoin_curve reads (their committed IDLs, sdk/idl/: Anchor's `sha256("global:<name>")[..8]`, the same for both
 // programs), and the old program's set_pause(launches: Option<bool>, payouts: Option<bool>).
 const SEAT_IX = Object.freeze({
   propose_admin: Buffer.from([121, 214, 199, 212, 87, 39, 117, 234]).toString('hex'),
@@ -1058,7 +1058,7 @@ function seatAccounts(w, accounts) {
   };
 }
 /**
- * The seats vicinity_curve reads, as they stood at each of its calls (review R5-REG-1, as SM-2 does for the flags):
+ * The seats citycoin_curve reads, as they stood at each of its calls (review R5-REG-1, as SM-2 does for the flags):
  * this program's admin, pending admin, guardian and payout keys, the old program's admin, pending admin and launch
  * pause, and the registry's admin and pending admin, from the accounts before the transaction, with every earlier
  * propose_admin, accept_admin, set_guardian, set_payout_config and old set_pause of the same transaction applied in
@@ -1399,7 +1399,7 @@ function checkGlobal(w, { pre, post, tx, label, preAccounts, postAccounts }) {
  * config forward_holders_fees succeeds; once the interval has passed and the
  * bucket is not empty buyback_burn burns, or curve_sol == f(S - 1), or the run
  * would buy less than one raw coin at the current price (dust that waits for
- * the bucket to grow, VICINITY-CURVE-NOTES.md 41); expired approvals can be
+ * the bucket to grow, CITYCOIN-CURVE-NOTES.md 41); expired approvals can be
  * revoked by anyone. Skips buys and buybacks while buys are
  * halted, and everything while the halt-all build is loaded.
  */

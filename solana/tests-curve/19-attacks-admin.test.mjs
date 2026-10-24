@@ -214,7 +214,7 @@ test('X44, X45 a stolen admin key: hostile configs are refused (V1 to V11), live
 });
 
 // ---------------------------------------------------------------- X46
-test('X46 a malicious upgrade (closest shape): a stranger can neither upgrade vicinity_curve nor take its upgrade authority; the upgrade path exists only for the upgrade authority', async () => {
+test('X46 a malicious upgrade (closest shape): a stranger can neither upgrade citycoin_curve nor take its upgrade authority; the upgrade path exists only for the upgrade authority', async () => {
   const w = await World.create();
   const h = await w.launchCoin({ cityId: 1960n, symbol: 'UPGR' });
   const stranger = await w.signer(10n);
@@ -391,7 +391,7 @@ test('X52, X53 a stolen founder key reaches only founder_pending; a lost one lea
   await w.send([w.ix.optInPayout({ founder: thief2.address, coin: h.coin, expectedDestination: wallet.address, refHash: ref(9) })], [thief2], 'thief opts in');
   await w.buy(u, h, 5n * LAMPORTS);
   const tt = w.lamportsOf(thief2.address);
-  await w.payout(h, { destination: wallet.address, label: 'payout goes to the Vicinity wallet' });
+  await w.payout(h, { destination: wallet.address, label: 'payout goes to the Citycoin.dev wallet' });
   assert.equal(w.lamportsOf(thief2.address), tt);
   // X53: the key is lost now (nobody signs for thief2): the share accrues and nobody else can take it
   await w.send([w.ix.revokePayoutOptIn({ by: thief2.address, coin: h.coin, optInFounder: thief2.address })], [thief2], 'last act before the key is lost');

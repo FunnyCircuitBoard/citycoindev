@@ -1,5 +1,5 @@
 // Writes sdk/fixtures/launch-batch.json: the launch-batch test vectors shared by the SDK (sdk/curve/batch.test.mjs) and
-// the program's unit test U13 (programs/vicinity-curve/src/batch.rs), VICINITY-CURVE-DESIGN.md 3.12 and 12.1.
+// the program's unit test U13 (programs/citycoin-curve/src/batch.rs), CITYCOIN-CURVE-DESIGN.md 3.12 and 12.1.
 //
 //   * workedExample: 3.12's three cities under batch 7, with every preimage, leaf, the root and each proof;
 //   * trees: for n = 1 to 70 and 512, the entries of the rule below under batch 3 of the localnet program id: the root,
@@ -57,7 +57,7 @@ export function launchBatchFixture() {
       proofsDigest: toHex(sha(proofBytes)), samples,
     });
   }
-  return { about: 'VICINITY-CURVE-DESIGN.md 3.12 launch leaves (written by sdk/curve/gen-launch-batch-fixture.mjs)', programId, batchSeq: 3, workedExample, trees };
+  return { about: 'CITYCOIN-CURVE-DESIGN.md 3.12 launch leaves (written by sdk/curve/gen-launch-batch-fixture.mjs)', programId, batchSeq: 3, workedExample, trees };
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

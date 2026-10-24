@@ -11,7 +11,7 @@
 // quotes.
 //
 // Every refusal goes through World.send (the failed-transaction check: nothing
-// moved but the fee payer's fee, no vicinity_curve byte changed); `refuse` also
+// moved but the fee payer's fee, no citycoin_curve byte changed); `refuse` also
 // compares the attacked accounts, and the victims below never pay the fee, so
 // their balances must be exactly unchanged.
 import test from 'node:test';

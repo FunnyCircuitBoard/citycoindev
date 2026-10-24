@@ -1,4 +1,4 @@
-// The batch launch approval in the SDK (VICINITY-CURVE-DESIGN.md 3.12, 4.25, 4.27, 8.6, 14.1; U13, P12): the worked
+// The batch launch approval in the SDK (CITYCOIN-CURVE-DESIGN.md 3.12, 4.25, 4.27, 8.6, 14.1; U13, P12): the worked
 // example of 3.12 byte for byte, the shared fixture (sdk/fixtures/launch-batch.json, which the program's unit test U13
 // reproduces), the ports of check_name and check_symbol, buildLaunchBatch's refusals and ordering, proofs and their
 // verification with the depth bound, the list file and the day's changes, the in-force rule of 8.6 over its table, and

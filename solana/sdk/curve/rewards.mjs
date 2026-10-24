@@ -1,10 +1,10 @@
-// The city's vicinity_rewards config for a vicinity_curve coin, proposed only
-// after it has been checked (VICINITY-CURVE-DESIGN.md 4.15, 12.5 R03, 14.1,
+// The city's vicinity_rewards config for a citycoin_curve coin, proposed only
+// after it has been checked (CITYCOIN-CURVE-DESIGN.md 4.15, 12.5 R03, 14.1,
 // T70).
 //
 // `forward_holders_fees` pays the holders' share only into a rewards config
 // that pays holders only (model Holders, founder share 0, reward mint WSOL,
-// the derived vault) and whose root publisher is the vicinity_curve admin with
+// the derived vault) and whose root publisher is the citycoin_curve admin with
 // no transfer pending. vicinity_rewards writes a config's economics only in
 // `init_city` and has no close instruction, so a config made with the wrong
 // values makes forwarding fail for that coin forever (only an upgrade could
@@ -109,7 +109,7 @@ export function cityConfigProblems(account, { mint, admin, cluster = 'mainnet' }
 }
 
 /** The problems an existing config's authority can fix (propose_authority / accept_authority, 4.15); every other problem is in the economics, written once by init_city. */
-export const FIXABLE_CONFIG_PROBLEMS = Object.freeze(['authority is not the vicinity_curve admin', 'an authority transfer is pending']);
+export const FIXABLE_CONFIG_PROBLEMS = Object.freeze(['authority is not the citycoin_curve admin', 'an authority transfer is pending']);
 
 /**
  * Build, simulate and check the city's rewards config for a launched coin
@@ -128,7 +128,7 @@ export const FIXABLE_CONFIG_PROBLEMS = Object.freeze(['authority is not the vici
  *   * `NotACityConfig`: the address holds an account that is neither a
  *     vicinity_rewards account nor an empty System account;
  *   * `WouldBeWrong`, `SimulationFailed`, `NoLaunchpad`.
- * `admin` defaults to the vicinity_curve Launchpad's admin, read through
+ * `admin` defaults to the citycoin_curve Launchpad's admin, read through
  * `getAccount`.
  */
 export async function initRewardsForCoin({
@@ -141,7 +141,7 @@ export async function initRewardsForCoin({
   if (!curveAdmin) {
     const P = curvePdas({ programId, cluster });
     const lp = await getAccount(P.launchpad());
-    if (!lp) throw new RewardsConfigError('NoLaunchpad', 'the vicinity_curve Launchpad does not exist');
+    if (!lp) throw new RewardsConfigError('NoLaunchpad', 'the citycoin_curve Launchpad does not exist');
     curveAdmin = decodeLaunchpad(lp, { programId: P.programId }).admin;
   }
   const { config, vault, program: rewardsProgram } = rewardsCityAccounts({ mint, cluster });
@@ -151,7 +151,7 @@ export async function initRewardsForCoin({
   if (existing && owner === rewardsProgram) {
     const { view, problems } = cityConfigProblems(existing, { mint, admin: curveAdmin, cluster });
     if (problems.length && problems.every((p) => FIXABLE_CONFIG_PROBLEMS.includes(p))) {
-      const e = new RewardsConfigError('AuthorityNotAdmin', `the city's rewards config ${config} has the right economics, but forward_holders_fees refuses it until its authority is the vicinity_curve admin ${curveAdmin} with no transfer pending: the current authority ${view.authority} proposes the admin (propose_authority; or proposes zero to cancel a pending transfer) and the admin accepts (accept_authority); the holders' share waits in holders_pending until then (4.15)`, problems);
+      const e = new RewardsConfigError('AuthorityNotAdmin', `the city's rewards config ${config} has the right economics, but forward_holders_fees refuses it until its authority is the citycoin_curve admin ${curveAdmin} with no transfer pending: the current authority ${view.authority} proposes the admin (propose_authority; or proposes zero to cancel a pending transfer) and the admin accepts (accept_authority); the holders' share waits in holders_pending until then (4.15)`, problems);
       e.fixable = true; e.view = view;
       throw e;
     }

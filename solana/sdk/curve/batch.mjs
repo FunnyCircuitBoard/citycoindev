@@ -1,4 +1,4 @@
-// The batch launch approval on the client side (VICINITY-CURVE-DESIGN.md 3.11, 3.12, 4.23 to 4.27, 8.4, 8.6, 14.1):
+// The batch launch approval on the client side (CITYCOIN-CURVE-DESIGN.md 3.11, 3.12, 4.23 to 4.27, 8.4, 8.6, 14.1):
 // the launch leaf byte for byte, the sorted-pair tree (vicinity_rewards' node hash and odd-node promotion,
 // sdk/merkle.mjs), proofs and their verification, the checks the program will run on each entry, the canonical list
 // file and the day's changes, which stored batch is in force, and the owner's unsigned `publish_launch_batch`.
@@ -11,7 +11,7 @@
 //                   || founder || config_id u16 LE || meta_hash || name_len u8 || name || symbol_len u8 || symbol )
 //   node = SHA-256( 0x01 || min(a, b) || max(a, b) )
 //
-// The program's twin is programs/vicinity-curve/src/batch.rs; sdk/fixtures/launch-batch.json (written by
+// The program's twin is programs/citycoin-curve/src/batch.rs; sdk/fixtures/launch-batch.json (written by
 // sdk/curve/gen-launch-batch-fixture.mjs) is checked by both.
 import { bytesEqual, fromHex, hashNode, sha256, toHex } from '../merkle.mjs';
 import {

@@ -1,4 +1,4 @@
-// F01 and F02 at full scale (VICINITY-CURVE-DESIGN.md 12.5): seeded random
+// F01 and F02 at full scale (CITYCOIN-CURVE-DESIGN.md 12.5): seeded random
 // sequences over all 26 instructions, valid and invalid, with the invariant
 // checker after every transaction, a model of every coin run side by side
 // (each Coin and LaunchBatch byte-equal to the model after every transaction), every

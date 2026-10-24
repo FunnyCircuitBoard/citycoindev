@@ -1,4 +1,4 @@
-// BigInt port of the math crate `vicinity-curve-math` (VICINITY-CURVE-DESIGN.md
+// BigInt port of the math crate `citycoin-curve-math` (CITYCOIN-CURVE-DESIGN.md
 // sections 5, 5.13, 5.16 and 7.1): the same functions, the same rounding, the
 // same checks in the same order and the same errors, so that a quote made here
 // equals the program's result to the lamport and raw unit.
@@ -7,7 +7,7 @@
 // would leave u128, or a result that would leave u64, throws
 // MathError('Overflow') exactly where the crate returns `MathError::Overflow`.
 // sdk/curve/math.test.mjs replays the crate's golden vectors
-// (crates/vicinity-curve-math/reference/vectors.json, generated from the
+// (crates/citycoin-curve-math/reference/vectors.json, generated from the
 // reference model of Appendix A) and tests/curve suites compare every quote
 // with the program's real results.
 //

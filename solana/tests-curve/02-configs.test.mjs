@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { World, S, SOL, expectFail, metaHash, DAY } from './helpers.mjs';
 
-const VECTORS = JSON.parse(readFileSync(join(SOL, 'crates', 'vicinity-curve-math', 'reference', 'vectors.json'), 'utf8'),
+const VECTORS = JSON.parse(readFileSync(join(SOL, 'crates', 'citycoin-curve-math', 'reference', 'vectors.json'), 'utf8'),
   (k, v, ctx) => (typeof v === 'number' && /^-?\d+$/.test(ctx?.source ?? '') ? BigInt(ctx.source) : v));
 const fromVector = (c) => ({
   liquidityBps: c.bps[0], platformBps: c.bps[1], founderBps: c.bps[2], holdersBps: c.bps[3], buybackBps: c.bps[4],

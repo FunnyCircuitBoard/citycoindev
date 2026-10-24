@@ -1,4 +1,4 @@
-// F01 and F02 at full scale (VICINITY-CURVE-DESIGN.md 12.5): random sequences
+// F01 and F02 at full scale (CITYCOIN-CURVE-DESIGN.md 12.5): random sequences
 // over every one of the 26 instructions in litesvm, valid and invalid, with
 // the invariant checker after every transaction and a reference model of
 // every coin, and of the LaunchBatch account, run side by side.
@@ -898,7 +898,7 @@ export class Fuzz {
       bases.push(() => ({ kind: 'batch_launch', signer: f, ixs: [w.ix.launchFromBatch({ ...a, founder: f.address, payer: f.address })] }));
     }
     const base = r.pick(bases)();
-    const ixIndex = base.ixs.length - 1 - (base.kind === 'forward' ? 1 : 0); // the vicinity_curve instruction (forward is followed by SyncNative)
+    const ixIndex = base.ixs.length - 1 - (base.kind === 'forward' ? 1 : 0); // the citycoin_curve instruction (forward is followed by SyncNative)
     const ix = base.ixs[ixIndex];
     const name = Object.entries(S.INSTRUCTION_DISCRIMINATORS).find(([, d]) => d.every((x, i) => ix.data[i] === x))[0];
     const table = S.ACCOUNT_TABLES[name];

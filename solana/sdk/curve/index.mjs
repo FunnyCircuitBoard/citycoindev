@@ -1,4 +1,4 @@
-// vicinity_curve client SDK (VICINITY-CURVE-DESIGN.md 14.1): constants, PDAs,
+// citycoin_curve client SDK (CITYCOIN-CURVE-DESIGN.md 14.1): constants, PDAs,
 // fixed-offset account decoders, instruction builders with the fixed account
 // lists of section 4, event decoders and a BigInt port of the math crate.
 // Plain ESM, no Anchor at run time; see README.md in this directory.

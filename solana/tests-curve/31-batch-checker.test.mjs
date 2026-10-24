@@ -1,4 +1,4 @@
-// CK1 (VICINITY-CURVE-DESIGN.md 12.5, I23 to I25): the per-transaction checker of the batch launch approval, tested
+// CK1 (CITYCOIN-CURVE-DESIGN.md 12.5, I23 to I25): the per-transaction checker of the batch launch approval, tested
 // against the checker itself, as 27-checker-gaps does for the other rules. Real transactions (a batch launch, a
 // publication, a clear, a buy) are replayed through checkTransaction with one fact doctored: a launch after a clear,
 // under a superseded root, before or after its window, with a proof against another root, while the path is halted,

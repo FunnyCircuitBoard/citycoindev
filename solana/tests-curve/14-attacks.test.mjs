@@ -34,7 +34,7 @@ test('X01, X02, X04, X05, F02: every non-signer slot of every money instruction,
   const fakeCoin = (await w.signer(0n)).address;
   const real = w.accountInfo(a.coin);
   w.setRaw(fakeCoin, real.data, S.CLUSTERS.mainnet.legacyProgram, real.lamports);
-  const fakeCurveOwned = (await w.signer(0n)).address; // the same bytes owned by vicinity_curve at a non-PDA address cannot exist: Anchor would still re-derive the seeds
+  const fakeCurveOwned = (await w.signer(0n)).address; // the same bytes owned by citycoin_curve at a non-PDA address cannot exist: Anchor would still re-derive the seeds
   w.setRaw(fakeCurveOwned, real.data, S.CLUSTERS.mainnet.rewardsProgram, real.lamports);
   const randomKey = (await w.signer(0n)).address;
   const R = w.P.rewardsAccounts(b.mint);

@@ -1,5 +1,5 @@
-// Governance regressions of review round 1 (VICINITY-CURVE-DESIGN.md 8.1, 8.4, 8.5;
-// VICINITY-CURVE-NOTES.md 42 and 43):
+// Governance regressions of review round 1 (CITYCOIN-CURVE-DESIGN.md 8.1, 8.4, 8.5;
+// CITYCOIN-CURVE-NOTES.md 42 and 43):
 //
 //   * GOV-1: R1 in the other direction rests on the old vicinity_launchpad staying
 //     paused (O19), so whoever administers the old program must be the same multisig
@@ -41,7 +41,7 @@ const { PublicKey } = web3;
 const ZERO = S.ADDRESSES.system;
 const FEE = String(S.ADDRESSES.feeRecipient);
 
-test('GOV-1 the old program\'s admin must be the vicinity_curve admin with no transfer pending, at every approval and every launch', async () => {
+test('GOV-1 the old program\'s admin must be the citycoin_curve admin with no transfer pending, at every approval and every launch', async () => {
   const w = await World.create({ dbcProgram: true, legacy: 'none' });
   w.svm.withSigverify(false);
   // mainnet as recorded in release/mainnet-2026-10-10/BUILD.md: the old program's admin is 13qRam, which is also FEE_RECIPIENT
@@ -247,7 +247,7 @@ test('R2-DIFF-1 init_launchpad refuses FEE_RECIPIENT as the upgrade authority (l
 // ---------------------------------------------------------------- review round 4
 const pkb = (a) => new PublicKey(String(a)).toBuffer();
 
-test('OPS-1 the rewards registry\'s admin must be the vicinity_curve admin with no transfer pending, at every approval and every launch; a hot registry admin can no longer squat a coin\'s rewards config', async () => {
+test('OPS-1 the rewards registry\'s admin must be the citycoin_curve admin with no transfer pending, at every approval and every launch; a hot registry admin can no longer squat a coin\'s rewards config', async () => {
   const w = await World.create({ rewards: false });
   w.svm.withSigverify(false);
   // mainnet as recorded in release/mainnet-2026-10-10/BUILD.md: the registry admin is 13qRam, which is also FEE_RECIPIENT

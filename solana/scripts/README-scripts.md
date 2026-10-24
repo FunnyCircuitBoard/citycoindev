@@ -93,23 +93,23 @@ snapshot file, call `fund_epoch`) is specified in `PROGRAM-SPEC.md` section 6
 and belongs to the Worker; `sdk/merkle.mjs` and `sdk/client.ts` are the pieces it
 will reuse.
 
-## `vcurve/`: the vicinity_curve IDL and builds (VICINITY-CURVE-DESIGN.md 8.4, C03, C04)
+## `vcurve/`: the citycoin_curve IDL and builds (CITYCOIN-CURVE-DESIGN.md 8.4, C03, C04)
 
 ```sh
 cd solana
-npm run vcurve:idl          # regenerate sdk/idl/vicinity_curve.json from the source
+npm run vcurve:idl          # regenerate sdk/idl/citycoin_curve.json from the source
 npm run vcurve:idl:check    # fail if the committed IDL differs from the source
 npm run vcurve:sbf          # production, devnet and halt-all SBF builds
 ```
 
-The deployed `vicinity_curve` binary has no IDL instructions (`no-idl` is a
+The deployed `citycoin_curve` binary has no IDL instructions (`no-idl` is a
 default feature), so its client IDL is generated with Anchor's `idl-build`
 feature and committed; CI diffs it against `anchor build`'s output.
 `vcurve:sbf` builds the three variants into `target/vcurve-builds/<variant>/`
 (never over `target/deploy`), recompiling the program crate each time so that
 every cargo-build-sbf warning is printed, fails on any "Stack offset ...
 exceeded" warning and prints each binary's size and SHA-256. CI runs it after
-every push. Sizes and the toolchain are recorded in `VICINITY-CURVE-NOTES.md`.
+every push. Sizes and the toolchain are recorded in `CITYCOIN-CURVE-NOTES.md`.
 
 `vcurve/preflight.mjs` is the deploy checklist of 8.4 and 8.5: it reads each
 precondition from the chain and exits 1 while any is not met. It needs
@@ -156,7 +156,7 @@ whether it exists and its owner, so a trade between the two reads stops nothing
 (R8-NEW-1). `verify` prints the
 day's changes only against lists the owner signed and confirmed (reviews
 R6-DIFF-1, R6-RT-1, R7-BA-1, R7-3): its archive (`--archive <dir>`, default
-`$VICINITY_BATCH_ARCHIVE` or `~/.vicinity-curve/launch-batches`) keeps each
+`$CITYCOIN_BATCH_ARCHIVE` or `~/.citycoin-curve/launch-batches`) keeps each
 verified list in `pending/` with the window of its transaction, and `confirm`
 moves it to `signed/` only when the chain holds exactly that publication; a live
 stored batch that is not a confirmed list is a problem. On a first use, with an
@@ -183,7 +183,7 @@ discriminator and decoded arguments, whatever bytes follow them: the program
 ignores them, so a thief's republication with bytes appended is found, named
 (`warning TX_EXTRA_DATA`) and, being another message hash, is the stolen-key
 alarm (`NOT_YOUR_TRANSACTION`); `verify --tx` refuses a page transaction whose
-publication is not exactly 68 bytes (`TX_PUBLISH_DATA`; review R9-CHECK-1). The archive's MAC key is `~/.vicinity-curve/archive.key`, never a
+publication is not exactly 68 bytes (`TX_PUBLISH_DATA`; review R9-CHECK-1). The archive's MAC key is `~/.citycoin-curve/archive.key`, never a
 file inside an archive folder, and must be 32 bytes; every run names the
 folder and the key's fingerprint and warns when the folder is not the one used
 last (review R8-DIFF-5). An approver that is not a wallet key is refused

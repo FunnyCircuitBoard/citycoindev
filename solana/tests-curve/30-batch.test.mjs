@@ -1,4 +1,4 @@
-// The batch launch approval in litesvm (VICINITY-CURVE-DESIGN.md 3.11, 3.12, 4.23 to 4.27, 8.6; L14, X66 to X76,
+// The batch launch approval in litesvm (CITYCOIN-CURVE-DESIGN.md 3.11, 3.12, 4.23 to 4.27, 8.6; L14, X66 to X76,
 // C01, C02): the launch approver kept apart from every role both ways; publications refused outside 4.25's rules and
 // accepted at each bound; three cities launched from one batch with their first buys; the daily sequence of 8.6 with no
 // gap, a pending batch replaced and a superseded one refused; clears by each key, halts and rotation; every launch
@@ -683,12 +683,12 @@ test('R6-RT-3 (review round 6) a publication, a clear and a change of approver p
   const memos = (n) => Array.from({ length: n }, () => ({ programAddress: MEMO, accounts: [], data: new Uint8Array([0x7a]) }));
   const truncated = (logs) => logs.some((l) => /log truncated/i.test(l));
   const names = (r) => r.events.map((e) => e.name);
-  // a publication with 50 memos ahead of it: the log is truncated before vicinity_curve runs, the event survives
+  // a publication with 50 memos ahead of it: the log is truncated before citycoin_curve runs, the event survives
   const b = S.buildLaunchBatch(w.batchEntries([{ cityId: 9501n, founder: f, symbol: 'PAD' }]), { programId: w.programId, batchSeq: 1n });
   const win = S.defaultPublishWindow(w.now());
   let r = await w.send([...memos(50), w.ix.publishLaunchBatch({ approver: approver.address, seq: 1n, root: b.root, leafCount: 1, ...win })], [approver], 'padded publish_launch_batch', { feePayer: approver });
   assert.ok(truncated(r.logs), 'the log was truncated');
-  assert.ok(!r.logs.some((l) => l.startsWith(`Program ${w.programId} invoke`)), 'not even the invoke line of vicinity_curve is logged');
+  assert.ok(!r.logs.some((l) => l.startsWith(`Program ${w.programId} invoke`)), 'not even the invoke line of citycoin_curve is logged');
   assert.deepEqual(names(r), ['LaunchBatchPublished']);
   assert.equal(r.events[0].source ?? 'cpi', 'cpi');
   assert.equal(Buffer.from(r.events[0].data.root).toString('hex'), Buffer.from(b.root).toString('hex'));
@@ -768,7 +768,7 @@ test('R10-FRESH-1 (review round 10) bytes after the arguments change nothing: ap
 });
 
 test('R10-FRESH-1 (review round 10) every #[instruction(..)] of an account struct lists exactly the leading parameters of its handler, in order and with their types, so that both read the same bytes of the instruction data; a reordered or retyped attribute is refused', () => {
-  const src = join(SOL, 'programs', 'vicinity-curve', 'src');
+  const src = join(SOL, 'programs', 'citycoin-curve', 'src');
   const params = (s) => s.split(',').map((p) => p.trim()).filter(Boolean).map((p) => p.replace(/\s+/g, ' '));
   /** [struct, its #[instruction] parameters] of every account struct that has one. */
   const attributes = (files) => files.flatMap((text) => [...text.matchAll(/#\[instruction\(([^\]]*)\)\]\s*(?:#\[[^\]]*\]\s*)*pub struct (\w+)/g)].map((m) => [m[2], params(m[1])]));

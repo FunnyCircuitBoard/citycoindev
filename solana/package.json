@@ -2,7 +2,7 @@
   "name": "vicinity-rewards-solana",
   "private": true,
   "version": "0.1.0",
-  "description": "Vicinity on Solana: the vicinity_rewards, vicinity_launchpad and vicinity_curve programs, their SDK (Merkle, PDAs, instruction builders, curve quotes), tests and scripts.",
+  "description": "Vicinity on Solana: the vicinity_rewards, vicinity_launchpad and citycoin_curve programs, their SDK (Merkle, PDAs, instruction builders, curve quotes), tests and scripts.",
   "license": "MIT",
   "engines": {
     "node": ">=22.12"

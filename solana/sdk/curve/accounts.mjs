@@ -1,8 +1,8 @@
-// Fixed-offset decoders of the seven vicinity_curve accounts (VICINITY-CURVE-DESIGN.md
+// Fixed-offset decoders of the seven citycoin_curve accounts (CITYCOIN-CURVE-DESIGN.md
 // 3.4 to 3.9, 3.11) and of the vicinity_rewards CityConfig fields the program reads
 // (4.15). No Anchor, no IDL: every field is read at its offset.
 //
-// Every decoder checks the account's owner (the vicinity_curve program id) as
+// Every decoder checks the account's owner (the citycoin_curve program id) as
 // well as its length and discriminator: `Launchpad`, `Approval` and
 // `PayoutOptIn` share their discriminators with the old vicinity_launchpad's
 // accounts, so bytes alone do not identify them (3.7, SEC-8). `CurveCoin`
@@ -193,7 +193,7 @@ const DECODERS = {
   Launchpad: decodeLaunchpad, LaunchConfig: decodeLaunchConfig, Approval: decodeApproval, CurveCoin: decodeCurveCoin,
   TickerLock: decodeTickerLock, PayoutOptIn: decodePayoutOptIn, LaunchBatch: decodeLaunchBatch,
 };
-/** The account type of a vicinity_curve account by owner and discriminator, or null. */
+/** The account type of a citycoin_curve account by owner and discriminator, or null. */
 export function accountType(account, { programId = CURVE_PROGRAM_ID } = {}) {
   if (!account || ownerOf(account) !== String(programId)) return null;
   const d = account.data instanceof Uint8Array ? account.data : new Uint8Array(account.data);
@@ -202,7 +202,7 @@ export function accountType(account, { programId = CURVE_PROGRAM_ID } = {}) {
   }
   return null;
 }
-/** Decode any vicinity_curve account: `{ type, ...fields }`. */
+/** Decode any citycoin_curve account: `{ type, ...fields }`. */
 export function decodeAny(account, opts) {
   const type = accountType(account, opts);
   if (!type) throw new DecodeError('UnknownAccount');
@@ -239,7 +239,7 @@ export function rewardsConfigProblems(view, { mint, vault, admin }) {
   if (view.founderBps !== 0) out.push('founder_bps is not 0');
   if (view.rewardMint !== ADDRESSES.nativeMint) out.push('reward mint is not WSOL');
   if (view.vault !== String(vault)) out.push('vault is not the derived vault');
-  if (view.authority !== String(admin)) out.push('authority is not the vicinity_curve admin');
+  if (view.authority !== String(admin)) out.push('authority is not the citycoin_curve admin');
   if (view.pendingAuthority !== zero) out.push('an authority transfer is pending');
   return out;
 }
