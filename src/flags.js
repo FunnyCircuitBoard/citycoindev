@@ -175,3 +175,20 @@ export const walletOnlyOn = (env) => String((env && env.WALLET_ONLY) ?? "").trim
  * legacyLink: read it there, never alone). Exactly "on" (trimmed, any letter case); anything else, unset included, is the site exactly as before.
  */
 export const legacyLinkOn = (env) => String((env && env.LEGACY_LINK) ?? "").trim().toLowerCase() === "on";
+
+/**
+ * LEGACY_SEATS=frozen (Citycoin.dev master v5, stage S16; master section 15 "Keep historical records readable, but do not let historical rules
+ * authorize new actions", section 07 BR-05 and section 17 WP-00; docs/citycoin-master/schema-and-api.md section 3.9) freezes the legacy founder
+ * seats, squads, endorsements, objections and country-manager elections: every one of their writers answers 410 seats_frozen, the scheduled job
+ * skips its seats and elections steps, the balance samples stop updating the founder hold streaks, and a founder seat alone no longer moderates.
+ * The records stay readable and nobody loses a seat or a term. Read it through src/v5policy.js legacySeats(env), never alone: that is where the
+ * v5 configuration check is applied (a "frozen" whose own inputs are refused is held frozen; MAIN_TOKEN_V5 counting freezes too). Exactly
+ * "frozen" (trimmed, any letter case) sets it; unset, blank and "on" are the site exactly as before; any other value is held frozen there
+ * (stage S16 review fix SEC-S16-3).
+ */
+export const legacySeatsFrozenOn = (env) => String((env && env.LEGACY_SEATS) ?? "").trim().toLowerCase() === "frozen";
+/**
+ * LEGACY_SEATS as written (trimmed, lower case): "" (unset or blank), "on", "frozen", or anything else, which src/v5policy.js legacySeats holds
+ * frozen (review fix SEC-S16-3 of stage S16: a typo never reopens the legacy writers). Read it there, never alone.
+ */
+export const legacySeatsValue = (env) => String((env && env.LEGACY_SEATS) ?? "").trim().toLowerCase();

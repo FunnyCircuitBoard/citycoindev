@@ -24,7 +24,7 @@ import { communityById } from "./community.js";
 import { displayTicker } from "./tickers.js";
 import { latestBalances } from "./ledger.js";
 import { coinV2ReadyOn, dashboardV2On, feedV2On, notifyOn, profilesOn, v2On, walletSendOn } from "./flags.js";
-import { IDENTITY_POLICY, mainTokenV5, walletOnly, walletOnlyHeld } from "./v5policy.js";
+import { IDENTITY_POLICY, legacySeatsFrozen, mainTokenV5, walletOnly, walletOnlyHeld } from "./v5policy.js";
 import { legacyNotice } from "./legacy.js";
 import { unreadCount } from "./notify.js";
 import { countsOf } from "./profile-core.js";
@@ -45,7 +45,9 @@ const HOLDING_BADGES = new Set(["holder", "founder_ready", "whale", "top100", "t
 
 // `unit`: what the holding badges are measured in, in words: "$VICINITY" (today), or "main tokens" with MAIN_TOKEN_V5 on (owner amendment
 // 01: they measure the configured main token, never $VICINITY). "Early member" stays history: joined before $VICINITY launched.
-export function badgesFor({ u, launched, amount, position, seat, manager, admin, checkins, posts, tenure, threshold, unit = "$VICINITY" }) {
+// `legacyFrozen` (the legacy seats frozen, stage S16; src/v5policy.js legacySeats): the seven-day "Founder-ready" badge is gone (nobody qualifies
+// or applies any more), and the founder and manager badges keep their names and their holders but describe a record, not today's seat rules.
+export function badgesFor({ u, launched, amount, position, seat, manager, admin, checkins, posts, tenure, threshold, unit = "$VICINITY", legacyFrozen = false }) {
   const pct = (v, of) => Math.max(0, Math.min(1, v / of));
   const T = threshold || POLICY.founder.ladder.base;
   const list = [
@@ -69,8 +71,15 @@ export function badgesFor({ u, launched, amount, position, seat, manager, admin,
     { id: "streak", icon: "🔥", name: "On the streets", detail: "Checked in on 3 different days.", earned: checkins >= 3, progress: pct(checkins, 3) },
   ];
   if (admin) list.unshift({ id: "admin", icon: "⚙️", name: "Admin", detail: "Runs Vicinity, within the published rules.", earned: true });
-  return list;
+  if (!legacyFrozen) return list;
+  // (and the wallet badge no longer promises a founder path: the dashboards built with the freeze show none)
+  const recorded = { city_founder: "A founder seat on record.", country_manager: "A country manager term on record.",
+    wallet: "A Solana wallet linked to your account with one free signature. It unlocks holdings, rank and badges." };
+  return list.filter((b) => b.id !== "founder_ready").map((b) => (recorded[b.id] ? { ...b, detail: recorded[b.id] } : b));
 }
+
+/** The founder path's answer while the legacy seats are frozen (stage S16): no qualification is worked out and nothing is offered. */
+const FROZEN_ELIGIBILITY = Object.freeze({ ok: false, error: "seats_frozen", whyNot: null, threshold: null, tenure: null, homeReadyAt: null, cooldownUntil: null, challenging: null });
 
 
 /**
@@ -119,14 +128,16 @@ async function liveStatus(env, s, fetchImpl, now) {
   const ban = await activeBan(db, u.id, u.home_country, now);
   const appealed = ban && ban.action_id ? await db.prepare("SELECT id FROM appeals WHERE action_id = ?").bind(ban.action_id).first() : null;
 
-  // the founder path
-  const elig = await eligibility(env, u, now, fetchImpl);
+  // the founder path. Frozen (LEGACY_SEATS=frozen or MAIN_TOKEN_V5 counting, stage S16): no seven-day qualification, ladder threshold, cooldown or
+  // challenge is worked out or offered (the apply routes answer 410); the member's seat and open application stay, as recorded
+  const frozen = legacySeatsFrozen(env);
+  const elig = frozen ? FROZEN_ELIGIBILITY : await eligibility(env, u, now, fetchImpl);
   const app = await db.prepare("SELECT a.id, a.window_id, a.city_id, a.created_at, w.closes_at FROM applications a JOIN windows w ON w.id = a.window_id WHERE a.user_id = ? AND a.withdrawn = 0 AND w.status = 'open'").bind(u.id).first();
   const founder = {
     threshold: elig.threshold, tenure: elig.tenure, amount, eligible: elig.ok, why: elig.ok ? null : elig.error, whyNot: elig.whyNot || null,
     // a qualified local may challenge a Seed Steward during probation (needs 10 local endorsements to force an election)
     challenging: elig.ok && elig.challenging ? { seatId: elig.challenging } : null,
-    homeReadyAt: elig.homeReadyAt, cooldownUntil: elig.cooldownUntil || (await cooldownUntil(db, u.id, now)),
+    homeReadyAt: elig.homeReadyAt, cooldownUntil: frozen ? null : elig.cooldownUntil || (await cooldownUntil(db, u.id, now)),
     application: app ? { id: app.id, windowId: app.window_id, cityId: app.city_id, since: app.created_at, closesAt: app.closes_at } : null,
     seat: seat ? { id: seat.id, cityId: seat.city_id, city: seat.city_name, country: seat.country, status: seat.status, since: seat.activated_at || seat.created_at,
       appealUntil: seat.appeal_until, graceUntil: seat.grace_until, probationUntil: seat.probation_until, threshold: seat.threshold, policy: seat.policy } : null,
@@ -158,17 +169,20 @@ async function liveStatus(env, s, fetchImpl, now) {
   const act = await db.prepare(
     `SELECT COUNT(*) AS posts, COUNT(DISTINCT CASE WHEN kind = 'checkin' THEN substr(created_at, 1, 10) END) AS days FROM posts WHERE user_id = ? AND hidden = 0${alive}`,
   ).bind(u.id).first();
-  const badges = badgesFor({ u, launched, amount, position, seat, manager: isManager, admin, checkins: act?.days || 0, posts: act?.posts || 0, tenure: elig.tenure, threshold: elig.threshold, unit: mainTokenV5(env) ? "main tokens" : "$VICINITY" });
+  const badges = badgesFor({ u, launched, amount, position, seat, manager: isManager, admin, checkins: act?.days || 0, posts: act?.posts || 0, tenure: elig.tenure, threshold: elig.threshold, unit: mainTokenV5(env) ? "main tokens" : "$VICINITY", legacyFrozen: frozen });
   const earned = badges.filter((b) => b.earned).map((b) => b.id);
   let lost = [];
   try { lost = JSON.parse(u.badges || "[]").filter((id) => HOLDING_BADGES.has(id) && !earned.includes(id)); } catch {}
   if (team) lost = lost.filter((id) => id !== "top10" && id !== "top100"); // not ranked, so not a top holder: nothing was sold
+  if (frozen) lost = lost.filter((id) => id !== "founder_ready"); // retired with the legacy seats, not lost by selling
   if (JSON.stringify(earned) !== (u.badges || "")) await db.prepare("UPDATE users SET badges = ? WHERE id = ?").bind(JSON.stringify(earned), u.id).run();
 
   // progress towards founding your home city
   const days = elig.tenure ? Math.floor(elig.tenure.days) : 0;
-  const steps = [
-    { id: "account", label: u.wallet ? "Account verified, wallet linked" : "Link a wallet", done: Boolean(u.wallet) },
+  const account = { id: "account", label: u.wallet ? "Account verified, wallet linked" : "Link a wallet", done: Boolean(u.wallet) };
+  // frozen (stage S16): only the steps that are not legacy seat rules (no seven-day wait, no stake ladder, no claim, steward or confirmation)
+  const steps = frozen ? [account, { id: "home", label: u.home_city ? `Home: ${u.home_name}` : "Set your home community", done: Boolean(u.home_city) }] : [
+    account,
     { id: "home", label: u.home_city ? `Home: ${u.home_name} (${POLICY.founder.localDays} days before applying)` : "Set your home community",
       done: Boolean(u.home_city) && Date.parse(elig.homeReadyAt || iso(now + DAY)) <= now, detail: u.home_city && elig.homeReadyAt && Date.parse(elig.homeReadyAt) > now ? `ready ${elig.homeReadyAt.slice(0, 10)}` : null },
     // a seated founder qualified when they claimed, under the bar they claimed with (the ladder may have moved since)
@@ -218,7 +232,10 @@ export async function handleMe(request, env, fetchImpl = fetch, now = Date.now()
   // Send from the Wallet tab (WALLET_SEND=on) says so too: walletSend (the page then fetches public/wallet-send.js and shows the Send button).
   const v2Flag = { ...(v2 ? { signupFlow: "v2" } : {}), ...(dv2 ? { dashboardV2: true } : {}), ...(feedV2On(env) ? { feedV2: true } : {}), ...(walletSendOn(env) ? { walletSend: true } : {}),
     // the ready-made city coin (COIN_V2_READY=on): the page then fetches public/coin-ready.js (src/coinready.js has the routes)
-    ...(coinV2ReadyOn(env) ? { coinV2Ready: true } : {}), ...(only ? { walletOnly: true } : {}), ...(legacy ? { legacyLink: legacy } : {}) };
+    ...(coinV2ReadyOn(env) ? { coinV2Ready: true } : {}), ...(only ? { walletOnly: true } : {}), ...(legacy ? { legacyLink: legacy } : {}),
+    // the legacy seats frozen (stage S16, src/v5policy.js legacySeats), so a page can leave out the founder path, the endorsements, the squads
+    // and the elections. With the switch off: no key
+    ...(legacySeatsFrozen(env) ? { legacySeats: "frozen" } : {}) };
   const flag = pf ? { ...v2Flag, profilesFlag: true } : v2Flag;
   if (!s) return json({ signedIn: false, providers: prov, ...flag });
   if (!s.user) {

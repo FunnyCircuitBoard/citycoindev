@@ -94,7 +94,7 @@
  * SNAPSHOT_CUTOFF, ATTEST_KEY, JUPITER_API_BASE/KEY, RPC_TIMEOUT_MS (optional); the swap and launchpad cluster settings in src/cluster.js.
  */
 import { activeMint, checkOfficial, mainCacheTag, marketLink, officialFor, teamFor, teamWalletLabel, tokenMint, withMint } from "./official.js";
-import { handleAdmin } from "./admin.js";
+import { ADMIN_LEGACY_WRITERS, handleAdmin } from "./admin.js";
 import { SHOW_STALE_MS, getHolding, getTokenFacts, getTopHolders, holderSnapshot, isTeamLock, isTeamWallet, rankOf, rankWithAmount } from "./chain.js";
 import { base58Encode, buildMessage, isSolanaAddress, statementFor } from "./solana.js";
 import { SECURITY_HEADERS, json } from "./http.js";
@@ -110,7 +110,7 @@ import { handleHandoffClaim, handleHandoffComplete, handleHandoffInfo, handleHan
 import { handleDelete, handleMedia, handleNewPost, handlePosts, handleReport, handleVote } from "./social.js";
 import { handleMute, handleMutes } from "./mutes.js";
 import { handleNotices, handleNoticesPrefs, handleNoticesRead } from "./notify.js";
-import { handleApply, handleDecideObjection, handleEndorse, handleObject, handleResign, handleResult, handleSeats, handleSquadApply, handleSquadCreate, handleSquadGet, handleSquadJoin, handleSquadLeave, handleWithdraw, seatsFrozen } from "./seats.js";
+import { LEGACY_SEATS_STATUS, handleApply, handleDecideObjection, handleEndorse, handleObject, handleResign, handleResult, handleSeats, handleSquadApply, handleSquadCreate, handleSquadGet, handleSquadJoin, handleSquadLeave, handleWithdraw, legacySeatsFrozen, seatsFrozen } from "./seats.js";
 import { handleElectionResult, handleElectionVote } from "./elections.js";
 import { handleAppeal, handleAudit, handleBanDecision, handleDecideAppeal, handleHide, handleModQueue, handleMyTowns, handleProposeBan,
   handleTownDecision, handleTownRequest, handleUnhide } from "./moderation.js";
@@ -251,9 +251,15 @@ async function holdersResponse(env, mint, offset, fetchImpl) {
   }
 }
 
+/**
+ * The Stake Ladder's smallest founder amount, as the rank answers carry it ({ founderMin }), or nothing while the legacy seats are frozen
+ * (stage S16: the ladder is no rule any more and the pages built with the freeze do not show it). With the switch off: exactly as before.
+ */
+const ladderMin = (env) => (legacySeatsFrozen(env) ? {} : { founderMin: founderAmount(0) });
+
 /** Where does a wallet stand? Read-only; the address is not stored. */
 async function rankResponse(env, mint, address, fetchImpl) {
-  const founderMin = founderAmount(0);
+  const ladder = ladderMin(env);
   try {
     const snap = await holderSnapshot(env, mint, fetchImpl, 60_000, { staleMs: SHOW_STALE_MS }); // a shown rank: like /api/holders
     let mine = rankOf(snap, address);
@@ -262,13 +268,13 @@ async function rankResponse(env, mint, address, fetchImpl) {
       // cheap call), so someone who just bought sees what they hold; the others' amounts are the list's, as of updatedAt
       try { mine = rankWithAmount(snap, address, await getHolding(env, address, mint, fetchImpl)); } catch { /* the list's own amount */ }
     }
-    return json({ launched: true, full: true, address, ...mine, supply: snap.facts.supply, founderMin, updatedAt: snap.at, ...(snap.stale ? { stale: true } : {}) });
+    return json({ launched: true, full: true, address, ...mine, supply: snap.facts.supply, ...ladder, updatedAt: snap.at, ...(snap.stale ? { stale: true } : {}) });
   } catch { /* fall back to the balance alone */ }
   try {
     const amount = await getHolding(env, address, mint, fetchImpl);
     // a team wallet's label rides along (the rank check names "Team wallet (FOMO)" from it, list or no list)
     const facts = teamFor(env, mint), team = isTeamWallet(address, facts);
-    return json({ launched: true, full: false, address, amount, rank: null, total: null, team, ...(team ? { label: teamWalletLabel(address) } : {}), ...(isTeamLock(address, facts) ? { lock: true } : {}), founderMin, updatedAt: new Date().toISOString() });
+    return json({ launched: true, full: false, address, amount, rank: null, total: null, team, ...(team ? { label: teamWalletLabel(address) } : {}), ...(isTeamLock(address, facts) ? { lock: true } : {}), ...ladder, updatedAt: new Date().toISOString() });
   } catch {
     return json({ launched: true, error: "chain_unavailable" }, 503);
   }
@@ -489,7 +495,12 @@ export async function handleApi(request, env = {}, fetchImpl = fetch, ctx = null
   }
 
   // paths with an id in them
-  if (path.startsWith("/api/admin/")) return db(() => handleAdmin(request, env, Date.now(), fetchImpl));
+  if (path.startsWith("/api/admin/")) {
+    // the admin routes that write the legacy seat tables answer 410 while the legacy seats are frozen (stage S16, src/admin.js
+    // ADMIN_LEGACY_WRITERS), before the schema step or any read; any other method falls through to their usual 405
+    if (method === "POST" && ADMIN_LEGACY_WRITERS.includes(path.slice("/api/admin/".length))) { const frozen = seatsFrozen(env); if (frozen) return frozen; }
+    return db(() => handleAdmin(request, env, Date.now(), fetchImpl));
+  }
   // the city-coin reviews (COIN_V2_REVIEW=on with COIN_V2_READY=on, src/coinreview.js): with the switch off every such path is an unknown
   // path (404) for every method
   if (path.startsWith("/api/coins/review/")) return coinV2ReviewOn(env) ? handleReview(request, env, path.slice("/api/coins/review/".length), fetchImpl) : json({ error: "not_found" }, 404);
@@ -519,6 +530,9 @@ export async function handleApi(request, env = {}, fetchImpl = fetch, ctx = null
       if (blocked) return blocked;
       const out = { policy: POLICY, snapshotCutoff: snapshotCutoff(env), launched: Boolean(tokenMint(env)),
         balanceHistory: env.DB ? await ledgerStatus(env, Date.now()) : { running: false } };
+      // the legacy seats frozen (stage S16, src/seats.js LEGACY_SEATS_STATUS): the seat, squad, steward and election rules of `policy` are history,
+      // and the answer says so; otherwise no such key, exactly today's answer
+      if (legacySeatsFrozen(env)) out.legacySeats = LEGACY_SEATS_STATUS;
       // the v5 policy (PUBLIC_V5=on with the configuration accepted, src/v5policy.js); otherwise exactly today's answer
       if (publicV5(env)) out.master = await publicMaster(env, v5Options(env, fetchImpl));
       return json(out);
@@ -575,9 +589,10 @@ export async function handleApi(request, env = {}, fetchImpl = fetch, ctx = null
       const address = url.searchParams.get("address");
       if (!isSolanaAddress(address)) return json({ error: "bad_address" }, 400);
       const mint = tokenMint(env);
-      if (!mint) return json({ launched: false, address, founderMin: founderAmount(0) });
-      // the attempt is counted only when the 30-second cache has no answer: looking at the same wallet again is free
-      return cached(`rank-${mint}-${address}`, 30, async () => (await publicLimit(env, request, "rank")) || rankResponse(env, mint, address, fetchImpl));
+      if (!mint) return json({ launched: false, address, ...ladderMin(env) });
+      // the attempt is counted only when the 30-second cache has no answer: looking at the same wallet again is free (frozen, its own key:
+      // the answer has no founderMin, stage S16)
+      return cached(`rank-${mint}-${address}${legacySeatsFrozen(env) ? "-frozen" : ""}`, 30, async () => (await publicLimit(env, request, "rank")) || rankResponse(env, mint, address, fetchImpl));
     }
     case "/api/message": {
       // Helper so the browser builds exactly the same text the server expects.
@@ -617,11 +632,13 @@ export async function handleApi(request, env = {}, fetchImpl = fetch, ctx = null
       if (!env.DB) return json({ launched: Boolean(tokenMint(env)), seats: [], windows: [] });
       // the map polls this every 30 seconds from every open tab: one answer per 30 seconds per server (the key names the main token's mode:
       // "seats" exactly while MAIN_TOKEN_V5 does not count, src/official.js mainCacheTag)
-      return cached("seats" + mainCacheTag(env), 30, async () => {
+      // (the legacy seats frozen, stage S16: no founderAmount, the ladder is no rule any more; its own cache key. Off: exactly as before)
+      const frozen = legacySeatsFrozen(env);
+      return cached("seats" + mainCacheTag(env) + (frozen ? "-frozen" : ""), 30, async () => {
         await ensureSchema(env.DB);
         const res = await handleSeats(env);
         const body = await res.json();
-        return json({ ...body, launched: Boolean(tokenMint(env)), founderAmount: founderAmount(0) });
+        return json({ ...body, launched: Boolean(tokenMint(env)), ...(frozen ? {} : { founderAmount: founderAmount(0) }) });
       });
     }
     case "/api/seats/apply":
@@ -686,7 +703,9 @@ export async function handleApi(request, env = {}, fetchImpl = fetch, ctx = null
       if (blocked) return blocked;
       const cc = url.searchParams.get("country") || "";
       if (!/^[A-Z]{2}$/.test(cc)) return json({ error: "bad_country" }, 400);
-      const rule = "Elected for 90 days by the country's verified locals (votes 50%, service 30%, capped holdings 20%). Until then, the admin covers it.";
+      // the legacy elections frozen (stage S16): no election opens, so the election rule is not described as the current one
+      const rule = legacySeatsFrozen(env) ? "No new country manager election opens. A term already under way runs until its end date. Until a country has a manager, the admin covers it."
+        : "Elected for 90 days by the country's verified locals (votes 50%, service 30%, capped holdings 20%). Until then, the admin covers it.";
       if (!env.DB) return json({ country: cc, manager: null, rule });
       await ensureSchema(env.DB);
       const mgr = await managerOf(env, cc);

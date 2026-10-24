@@ -43,6 +43,7 @@ import { portfolioOf } from "./portfolio.js";
 import { displayTicker } from "./tickers.js";
 import { handleClearBio } from "./moderation.js";
 import { feedV2On } from "./flags.js";
+import { legacySeatsFrozen } from "./v5policy.js";
 import { cleanText } from "./text.js";
 import { MAX_BLOCKS, MAX_FOLLOWING, PAGE, SEARCH_MAX, SHOWN, cleanBio, countsOf, countsStatement, findMember, memberById, parseHandle, within } from "./profile-core.js";
 
@@ -86,7 +87,8 @@ async function standing(env, m, { launched, position, amount, now }) {
   try { const s = JSON.parse(m.badges || "[]"); if (Array.isArray(s)) stored = s; } catch {}
   // Founder-ready needs the balance history, which is only worked out on the member's own dashboard: the last answer
   // they got there counts, and only while they still hold something.
-  const badges = badgesFor({ u: m, launched, amount, position, seat, manager: isManager, admin, checkins: act?.days || 0, posts: act?.posts || 0, tenure: null })
+  // (the legacy seats frozen, stage S16: no Founder-ready badge at all, src/me.js badgesFor)
+  const badges = badgesFor({ u: m, launched, amount, position, seat, manager: isManager, admin, checkins: act?.days || 0, posts: act?.posts || 0, tenure: null, legacyFrozen: legacySeatsFrozen(env) })
     .map((b) => ({ id: b.id, icon: b.icon, name: b.name, earned: b.id === "founder_ready" ? stored.includes("founder_ready") && amount > 0 : Boolean(b.earned) }));
   return { level, badges };
 }

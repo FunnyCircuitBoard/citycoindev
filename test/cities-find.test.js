@@ -205,7 +205,7 @@ test("the facts: never a number that makes the site look empty; the strong ones 
   assert.deepEqual(factsPage({ width: 900, screen: 1440, n: { ...LIVE, "cs-members": 99 } }), ["cities", "countries", "official"], "99 members: still hidden");
   // the page wires it: the official boundaries counted from the overview, the status pill only about founder applications
   assert.match(js, /if \(a\.kind === "r"\) officialCount\+\+;/);
-  assert.match(js, /\$\("#cs-status"\)\.hidden = !open; \/\/ about founder applications, never about coins/);
+  assert.match(js, /const status = \$\("#cs-status"\); if \(status\) status\.hidden = !open \|\| seatsFrozen\(\); \/\/ about founder applications, never about coins/); // (never while the legacy seats are frozen, stage S16)
   assert.doesNotMatch(js, /cs-open|still open|"At launch"/);
 });
 

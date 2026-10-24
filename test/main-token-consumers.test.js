@@ -20,7 +20,7 @@ import { allowListedCoins } from "../src/pricehistory.js";
 import { getBlob, putBlob } from "../src/blobs.js";
 import { ensureSchema } from "../src/store.js";
 import { _resetPolicyCheck } from "../src/v5policy.js";
-import { ACCEPTED, pagesBuiltWithSwitch } from "./helpers/mainswitch.js";
+import { ACCEPTED, pagesAsCommitted, pagesBuiltWithSwitch } from "./helpers/mainswitch.js";
 
 pagesBuiltWithSwitch();
 
@@ -138,11 +138,19 @@ test("unset or refused MAIN_TOKEN_MINT, or a refused v5 configuration, under the
     { ...BASE, ...ACCEPTED, BRAND: "citycoin", MAIN_TOKEN_MINT: FAKE_MINT }, // not the label set the pages were built with
   ];
   for (const extra of cases) {
+    // the same settings without MAIN_TOKEN_V5: since stage S16 a LEGACY_SEATS=frozen in them freezes the legacy seats on its own (also when its
+    // environment is missing: held frozen), which /api/policy states; with the seats not frozen that is today's site exactly
+    const { MAIN_TOKEN_V5: _unused, ...without } = extra;
+    W.useClock("2026-10-24T12:00:00Z");
+    const baseEnv = W.newWorld(without); holders();
+    const expected = await answers(baseEnv);
+    if (String(extra.LEGACY_SEATS || "").toLowerCase() !== "frozen") assert.deepEqual(expected, today, JSON.stringify(without));
+    else assert.equal(expected["/api/policy"].body.legacySeats.state, "frozen");
     W.useClock("2026-10-24T12:00:00Z");
     const env = W.newWorld(extra); holders();
-    assert.deepEqual(await answers(env), today, JSON.stringify(extra));
-    const offJob = await runJobs(W.newWorld(BASE), Date.now(), net().fetchImpl, () => 0);
-    assert.deepEqual(await runJobs(env, Date.now(), net().fetchImpl, () => 0), offJob, `${JSON.stringify(extra)}: the job is today's too`);
+    assert.deepEqual(await answers(env), expected, JSON.stringify(extra));
+    const offJob = await runJobs(W.newWorld(without), Date.now(), net().fetchImpl, () => 0);
+    assert.deepEqual(await runJobs(env, Date.now(), net().fetchImpl, () => 0), offJob, `${JSON.stringify(extra)}: the job is the switch-off job too`);
   }
 });
 
@@ -253,10 +261,13 @@ test("the scheduled job's steps use tokenMint: the sample, the holder counts and
   assert.deepEqual((await env.DB.prepare("SELECT mint FROM coin_stats").all()).results.map((r) => r.mint), [FAKE_MINT]);
   assert.deepEqual((await allowListedCoins(env)).map((c) => [c.mint, c.launchedAt]), [[FAKE_MINT, null]]);
   assert.deepEqual(errors.filter((e) => /deployment config/.test(e)), [], "a valid configuration reports nothing");
-  // with the switch off the same run is today's: the $VICINITY day and its streaks
+  // with the switch off the same run is today's: the $VICINITY day and its streaks (today's pages: built without the switch or the legacy seat
+  // freeze it brings, stage S16)
+  pagesAsCommitted();
   const off = W.newWorld(BASE); holders();
   const o = net();
   await runJobs(off, Date.now(), o.fetchImpl, () => 0);
+  pagesBuiltWithSwitch();
   assert.ok(o.seen.every((m) => m === LEGACY));
   assert.ok((await off.DB.prepare("SELECT key FROM blobs WHERE key = 'day:2026-10-24'").first()));
   assert.ok((await off.DB.prepare("SELECT COUNT(*) AS n FROM streaks").first()).n > 0);
@@ -277,7 +288,8 @@ test("the job start runs the configuration check: a named problem is logged once
     "and why the switch does nothing, once");
   for (const r of refused) assert.equal(r.sample.sampled, true, "the legacy sampler runs as today");
   _resetDeploymentCheck(); _resetPolicyCheck(); errors = [];
-  assert.deepEqual(await run({}), refused, "the same runs as with the switch off");
+  // (ACCEPTED sets LEGACY_SEATS=frozen, which since stage S16 freezes the seats and elections steps on its own)
+  assert.deepEqual(await run({ DEPLOYMENT_ENV: "test", LEGACY_SEATS: "frozen" }), refused, "the same runs as with the main-token switch off");
   assert.deepEqual(errors.filter((e) => /deployment config|main token switch/.test(e)), [], "switch off: nothing");
 });
 
@@ -291,7 +303,9 @@ test("the balance history under the switch: the new token's own days, no $VICINI
   assert.equal(await latestBalances(env, Date.now()), null, "a $VICINITY day is never read as the new token's");
   await env.DB.prepare("INSERT INTO streaks (wallet, level, above_since) VALUES (?, ?, ?)").bind(H1, 100000, "2026-09-01T00:00:00.000Z").run();
   assert.equal((await tenure(env, H1, 100000, Date.now())).qualified, false, "a $VICINITY hold streak never counts for the new token");
+  pagesAsCommitted(); // (switch off: today's pages, without the legacy seat freeze the switch's pages carry, stage S16)
   assert.equal((await tenure({ ...BASE, DB: env.DB }, H1, 100000, Date.now())).qualified, true, "switch off: the streak counts as before");
+  pagesBuiltWithSwitch();
   await putBlob(env.DB, `mday:${FAKE_MINT}:2026-08-01`, { n: 1 });
   await putBlob(env.DB, `mday:${FAKE_MINT}:2026-10-20`, { n: 1 });
   await pruneLedger(env, Date.now());

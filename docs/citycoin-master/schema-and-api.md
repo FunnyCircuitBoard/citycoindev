@@ -1009,6 +1009,12 @@ triggers refuse a DELETE and any update that lowers `fencing` or changes the hol
 | `coin_requests`, `coin_screenings`, `coin_ready`, `coin_legacy_designs` | read-only once `METADATA_V5` is on | migration source, history |
 | `email_codes`, `signups` provider fields, `users.password_hash`, `user_logins` | purged or frozen after the legacy link window (R1 WU-9) | Terms receipts and identifiers stay |
 
+As built in stage S16 (local branch `cc/s16`, not merged; implementation-report.md S16 row): while `LEGACY_SEATS=frozen` counts or is held, no
+route writes the first ten tables above, with no exception. Every seat, squad, endorsement, objection, resign and election writer and the test
+lab's seed and reset answer 410; the job's seats and elections steps are skipped; a founder or manager action below the seat's amount is refused
+without a grace period or a release (`src/seats.js` `stillFounder`); "Remove it" writes none of them; the balance samples update no streak. The
+rows are history only: they no longer block an account action (an unlink, `src/walletlink.js`).
+
 ### 3.10 Order, checks and census
 
 1. Validate a backup and dry-run every migration on a copy of the production database; compare before and after counts and

@@ -44,6 +44,10 @@
   let challengeId = null;
   /** Is WALLET_ONLY counting? /api/me's answer (site.js); null while it has not answered yet (then walletOnlyLate waits for it). */
   const walletOnlyNow = () => { const m = window.V.me(); return m ? m.walletOnly === true : null; };
+  // the legacy seats frozen (/api/me says legacySeats "frozen"; Citycoin.dev master v5 stage S16): the seat decision, objection decision, election
+  // opening and test-lab seed answer 410, so their buttons give way to one line; the lists stay (history). Without the key: as before
+  const seatsFrozenNow = () => { const m = window.V.me(); return Boolean(m && m.legacySeats === "frozen"); };
+  const CLOSED = "Founder seats, squads and elections are closed for changes.";
   // (a failed /api/me answer reads as today's sign-in, never as an error of its own; review finding PAR-04)
   const walletOnlyLate = async () => { try { return ((await window.V.ready) || {}).walletOnly === true; } catch { return false; } };
   /** The text the wallet signs while WALLET_ONLY counts: an "admin" challenge (two minutes, once). null when it could not be had. */
@@ -541,12 +545,15 @@
     // the numbers the server keeps itself
     M.members.set(int(ov.users), { from: "Accounts on vicinity.city" });
     M.coins.set(int(ov.launchedCityCoins), { from: "City coins with a recorded contract" });
-    M.elections.set(int(ov.openElections), { from: "Country votes open now" });
+    // (the legacy seats frozen, stage S16 review fix S16-R4: an open election is on record only, nobody can vote in it)
+    M.elections.set(int(ov.openElections), { from: seatsFrozenNow() ? "Elections on record, closed for changes" : "Country votes open now" });
     A.reports.set(int(ov.pendingReports), { from: "Posts with open reports", action: go("Review", "moderation", "reports") }).hot(ov.pendingReports > 0);
     // coin pictures a founder uploaded that no admin has looked at yet (the badge shows meanwhile); an old server's answer has no count
     if (ov.pendingLogos == null) A.pictures.none("Not counted by this server yet", { action: go("Review", "moderation", "logos") });
     else A.pictures.set(int(ov.pendingLogos), { from: "Coin pictures waiting for a check", action: go("Review", "moderation", "logos") }).hot(ov.pendingLogos > 0);
-    A.objections.set(int(ov.pendingObjections), { from: "Open objections to a founder seat", action: go("Review", "moderation", "objections") }).hot(ov.pendingObjections > 0);
+    // (frozen: an open objection is on record only and cannot be decided, so it waits on nobody and does not light up)
+    if (seatsFrozenNow()) A.objections.set(int(ov.pendingObjections), { from: "Objections on record, closed for changes", action: go("Open", "moderation", "objections") });
+    else A.objections.set(int(ov.pendingObjections), { from: "Open objections to a founder seat", action: go("Review", "moderation", "objections") }).hot(ov.pendingObjections > 0);
     if (A.coinReviews) {
       if (ov.pendingCoinReviews == null) A.coinReviews.none("Not counted by this server yet", { action: go("Review", "moderation", "coinreviews") });
       else A.coinReviews.set(int(ov.pendingCoinReviews), { from: "Coin change requests and descriptions waiting for a reviewer", action: go("Review", "moderation", "coinreviews") }).hot(ov.pendingCoinReviews > 0);
@@ -840,7 +847,9 @@
 
   /* ---------- tab: moderation (founder claims, reported posts, seat objections, ban appeals) ---------- */
   async function tabModeration(p, opt = {}) {
-    p.append(intro("Everything that waits on a moderator, in one place. Every decision asks first, is logged, and claims and objections need an admin."));
+    // (frozen: no claim or objection can be decided, so the intro does not say they need an admin; stage S16 review fix S16-R4)
+    p.append(intro(seatsFrozenNow() ? "Everything that waits on a moderator, in one place. Every decision asks first and is logged."
+      : "Everything that waits on a moderator, in one place. Every decision asks first, is logged, and claims and objections need an admin."));
     const queues = [];
     // Claims: admins and the owner only, as before (deciding one needs an admin)
     if (can(2)) queues.push({ id: "claims", label: "Claims", load: () => api("/api/admin/claims"), list: (d) => d.claims, draw: claimsTable, fail: "Couldn't load claims." });
@@ -897,6 +906,7 @@
       td(tr, `${a.city_name} (${a.country})`); td(tr, a.handle || walletOf(a.wallet));
       td(tr, (a.pitch || "—").slice(0, 80), "adm-text"); td(tr, a.total == null ? "—" : Number(a.total).toFixed(2), "num");
       const act = actTd(tr);
+      if (seatsFrozenNow()) { act.append(el("span", "muted", CLOSED)); return; }
       act.append(btn("Approve", async () => { if (sure("Approve this claim?")) okMsg(await post("/api/admin/seats/decide", { id: a.id, decision: "approve" }), "Claim approved"); }));
       act.append(btn("Reject", async () => { if (sure("Reject this claim? The applicant is removed from the window.")) okMsg(await post("/api/admin/seats/decide", { id: a.id, decision: "reject" }), "Claim rejected"); }));
     });
@@ -1135,7 +1145,8 @@
       td(tr, `${x.city_name} (${x.country}) — ${x.seat_status}`); td(tr, x.handle || x.name || "—");
       td(tr, (x.reason || "").slice(0, 90), "adm-text"); td(tr, ago(x.created_at));
       const act = actTd(tr);
-      if (can(2)) {
+      if (seatsFrozenNow()) act.append(el("span", "muted", CLOSED));
+      else if (can(2)) {
         act.append(btn("Uphold", async () => { if (sure("Uphold this objection? The founder seat is revoked at once.")) okMsg(await post("/api/admin/objections/decide", { id: x.id, uphold: true }), "Objection upheld"); }));
         act.append(btn("Dismiss", async () => { if (sure("Dismiss this objection?")) okMsg(await post("/api/admin/objections/decide", { id: x.id, uphold: false }), "Objection dismissed"); }));
       } else act.append(el("span", "muted", "admin only"));
@@ -1207,7 +1218,8 @@
       ["Country", "Status", "Opens", "Closes", "Votes"],
       d.elections,
       (tr, e) => { td(tr, e.country); td(tr, e.status); td(tr, ago(e.opened_at)); td(tr, ago(e.closes_at)); td(tr, e.votes, "num"); }));
-    if (can(2)) {
+    if (seatsFrozenNow()) p.append(el("p", "muted small", CLOSED));
+    else if (can(2)) {
       p.append(h2("New election"));
       const row = el("div", "admin-row");
       const country = textInput("US"); const seats = textInput("3"); const days = textInput("14");
@@ -1309,19 +1321,24 @@
   async function tabTestlab(p) {
     p.append(intro("Seed clearly-marked test data (8 users, 3 seats, 5 posts, reports, an objection, an election), then wipe only that data. Real rows are never touched."));
     const row = el("div", "admin-row");
-    row.append(btn("Seed test data", async () => okMsg(await post("/api/admin/test/seed", {}), "Test data seeded"), false));
+    // (frozen: the seed and the reset both write the seat, objection and election tables, so both answer 410: one line instead of either control)
+    const frozen = seatsFrozenNow();
+    if (frozen) row.append(el("p", "muted small", `${CLOSED} The test lab seeds and wipes seats, an objection and an election, so seeding and reset are closed too.`));
+    else row.append(btn("Seed test data", async () => okMsg(await post("/api/admin/test/seed", {}), "Test data seeded"), false));
     p.append(row);
-    const dz = el("div", "card danger-zone");
-    dz.append(el("h3", null, "Reset"));
-    dz.append(el("p", "muted small", "Deletes ONLY rows seeded by the test lab. Type RESET to confirm."));
-    const zrow = el("div", "admin-row");
-    const confirm = textInput("RESET");
-    zrow.append(field("Confirmation", confirm), btn("Wipe test data", async () => {
-      if (confirm.value !== "RESET") return toast("Type RESET to confirm.");
-      okMsg(await post("/api/admin/test/reset", { confirm: "RESET" }), "Test data wiped");
-    }, false));
-    dz.append(zrow);
-    p.append(dz);
+    if (!frozen) {
+      const dz = el("div", "card danger-zone");
+      dz.append(el("h3", null, "Reset"));
+      dz.append(el("p", "muted small", "Deletes ONLY rows seeded by the test lab. Type RESET to confirm."));
+      const zrow = el("div", "admin-row");
+      const confirm = textInput("RESET");
+      zrow.append(field("Confirmation", confirm), btn("Wipe test data", async () => {
+        if (confirm.value !== "RESET") return toast("Type RESET to confirm.");
+        okMsg(await post("/api/admin/test/reset", { confirm: "RESET" }), "Test data wiped");
+      }, false));
+      dz.append(zrow);
+      p.append(dz);
+    }
     p.append(h2("Preview the site as…"));
     p.append(el("p", "muted small", "Sets a cookie so you can walk through the site as a visitor, holder, founder or country manager without extra wallets."));
     const prow = el("div", "admin-row");

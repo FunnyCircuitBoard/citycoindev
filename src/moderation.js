@@ -14,8 +14,8 @@ import { json, readJson } from "./http.js";
 import { access } from "./access.js";
 import { useAttestation } from "./attest.js";
 import { POLICY, HOUR, DAY, iso } from "./policy.js";
-import { adminWallets, canModerate, managerOf, powersOf } from "./roles.js";
-import { stillFounder } from "./seats.js";
+import { adminWallets, canModerate, managerOf, moderatesCity, powersOf } from "./roles.js";
+import { belowAmountFrozen, stillFounder } from "./seats.js";
 import { CITY_NAME_RE } from "./solana.js";
 import { cleanText } from "./text.js";
 import { COLS, FROM, present } from "./social.js";
@@ -32,8 +32,10 @@ async function moderator(request, env, now, fetchImpl) {
   const a = await access(request, env, now, { fresh: true });
   if (a.error) return a;
   const pw = await powersOf(env, a.u, fetchImpl, now);
-  if (!pw.admin && pw.founderCity && !(await stillFounder(env, pw.seat, now, fetchImpl))) {
-    return { error: json({ ok: false, error: "in_grace" }, 403) };
+  // (a founder who moderates nothing, while the legacy seats are frozen, is not asked to hold: each route below answers not_allowed for them)
+  // (frozen: a manager below the amount is refused without a grace period, review fix S16-R1 / SEC-S16-1: below_amount, nothing written)
+  if (!pw.admin && pw.founderCity && (pw.managerCountry || moderatesCity(pw)) && !(await stillFounder(env, pw.seat, now, fetchImpl))) {
+    return { error: belowAmountFrozen(env) || json({ ok: false, error: "in_grace" }, 403) };
   }
   return { u: a.u, pw };
 }
@@ -276,7 +278,8 @@ export async function handleModQueue(request, env, fetchImpl = fetch, now = Date
   if (a.error) return a.error;
   const u = a.u, db = env.DB;
   const pw = await powersOf(env, u, fetchImpl, now);
-  if (!pw.admin && !pw.managerCountry && !pw.founderCity) return json({ ok: true, moderator: false });
+  // (a founder seat alone moderates nothing while the legacy seats are frozen, stage S16: src/roles.js moderatesCity)
+  if (!pw.admin && !pw.managerCountry && !moderatesCity(pw)) return json({ ok: true, moderator: false });
   const [scope, args] = pw.admin ? ["1 = 1", []] : pw.managerCountry ? ["p.country = ?", [pw.managerCountry]] : ["p.scope = 'city' AND p.place = ?", [pw.founderCity]];
   // feed v2: a reported post its author deleted STAYS here, marked deleted (present): the moderators' evidence of a pattern, though it is in
   // no feed and its picture answers 404 (the column is read only once the migration ran; on today's database nothing changes)

@@ -29,7 +29,7 @@ import { access } from "./access.js";
 import { countRecent, noteEvent } from "./attest.js";
 import { DAY, POLICY, iso } from "./policy.js";
 import { powersOf } from "./roles.js";
-import { stillFounder } from "./seats.js";
+import { belowAmountFrozen, legacySeatsFrozen, stillFounder } from "./seats.js";
 import { activeMint, tokenMint } from "./official.js";
 import { mintInfo } from "./chain.js";
 import { isSolanaAddress } from "./solana.js";
@@ -92,13 +92,19 @@ function log(db, a) {
     .bind(a.actor, a.role, a.action, a.user ?? null, a.country, a.place, a.reason, a.note ?? null, a.at).run();
 }
 
-/** The active founder of their city, still holding (live), with a fresh wallet proof. */
+/**
+ * The active founder of their city, still holding (live), with a fresh wallet proof. While the legacy seats are frozen (stage S16, review fixes
+ * SEC-S16-4 and S16-R1 / SEC-S16-1) the seat's own wallet must also be the account's, as the ready-made coin and the coin review already ask
+ * (a seat stays on the account as recorded after an unlink or a "Remove it", backed by a wallet the account no longer has), and a balance
+ * below the amount is refused without a grace period (below_amount). With the switch off: exactly as before.
+ */
 async function founder(request, env, now, fetchImpl) {
   const a = await access(request, env, now, { fresh: true });
   if (a.error) return a;
   const pw = await powersOf(env, a.u, fetchImpl, now);
   if (!pw.founderCity) return { error: json({ ok: false, error: "not_founder" }, 403) };
-  if (!(await stillFounder(env, pw.seat, now, fetchImpl))) return { error: json({ ok: false, error: "in_grace" }, 403) };
+  if (legacySeatsFrozen(env) && (!a.u.wallet || a.u.wallet !== pw.seat.wallet)) return { error: json({ ok: false, error: a.u.wallet ? "wallet_mismatch" : "no_wallet" }, 403) };
+  if (!(await stillFounder(env, pw.seat, now, fetchImpl))) return { error: belowAmountFrozen(env) || json({ ok: false, error: "in_grace" }, 403) };
   return { u: a.u, seat: pw.seat };
 }
 async function admin(request, env, now, fetchImpl, { write = true, fresh = true } = {}) {

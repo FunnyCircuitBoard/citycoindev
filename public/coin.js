@@ -686,7 +686,11 @@
   }
 
   /* ----- about, sources ----- */
+  // the about text follows /api/me's legacySeats (stage S16) as soon as it is known, not only at the next refresh
+  let aboutData = null;
+  if (window.V.ready && typeof window.V.ready.then === "function") window.V.ready.then((m) => { if (m && m.legacySeats === "frozen" && aboutData) paintAbout(aboutData); }).catch(() => {});
   function paintAbout(d) {
+    aboutData = d;
     const c = d.coin, f = d.facts, p = $("#coin-about-text");
     if (c.kind === "vicinity") {
       const facts = [];
@@ -694,7 +698,9 @@
       if (f && f.mintingDisabled && f.freezingDisabled) facts.push("mint and freeze authority disabled (checked on the chain)");
       const team = offi && Array.isArray(offi.teamWallets) && isAddr(offi.teamWallets[0]) ? ` (team wallet ${mask(offi.teamWallets[0])})` : "";
       const when = Date.parse(str(c.launchedAt));
-      p.textContent = `$VICINITY is the key to the Vicinity map: hold it to found and back your city. One official token${facts.length ? `, ${facts.join(", ")}` : ""}. Launched on Raydium LaunchLab${Number.isFinite(when) ? ` on ${new Date(when).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}` : ""} by the Vicinity team${team}.`;
+      // (the legacy seats frozen, /api/me legacySeats "frozen", stage S16: holding no longer founds a city, so the sentence stops at the map)
+      const frozen = Boolean(window.V.me && window.V.me() && window.V.me().legacySeats === "frozen");
+      p.textContent = `$VICINITY is the key to the Vicinity map${frozen ? "." : ": hold it to found and back your city."} One official token${facts.length ? `, ${facts.join(", ")}` : ""}. Launched on Raydium LaunchLab${Number.isFinite(when) ? ` on ${new Date(when).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}` : ""} by the Vicinity team${team}.`;
     } else p.textContent = cityAbout(d);
     const links = $("#coin-about-links"), out = [];
     const a = (text, href, ext) => { const x = el("a", "chip-link coin-about__link", text); x.href = href; if (ext) newTab(x); return x; };

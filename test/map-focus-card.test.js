@@ -35,12 +35,13 @@ function page() {
     FOCUS_TAG: { open: ["tag tag--ok", "Open"], choosing: ["tag tag--gold", "Choosing"], founded: ["tag tag--no", "Founded"], mine: ["tag tag--warn", "Yours"] },
     STATUS_WORD: { open: "Open", choosing: "Choosing its founder", founded: "Founded", mine: "Yours" },
     setTimeout: (f, ms) => { timers.push({ f, at: now + ms }); return timers.length; }, clearTimeout: (i) => { if (timers[i - 1]) timers[i - 1].f = null; },
-    Date: { now: () => Date.parse("2026-10-06T12:00:00Z") + now },
+    Date: { now: () => Date.parse("2026-10-06T12:00:00Z") + now }, seatsFrozen: () => false, // (the legacy seats not frozen: today's card, stage S16)
   };
   vm.createContext(ctx);
   vm.runInContext(`
     let focusId = "2314302", focusSig = "", nearestGo = null, swapping = 0, sayTimer = 0, reduced = false, membersKnown = false;
     const statusOf = (c) => (windows.has(c.id) ? "choosing" : "open");
+    const statusWord = (st) => STATUS_WORD[st];
     const areaFacts = () => area;
     const areaNote = (a) => (a ? "Official boundary + nearest land · " + fmt(a.km2) + " km²" : "");
     ${RENDER}

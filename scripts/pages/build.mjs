@@ -21,17 +21,24 @@
 // wrangler.jsonc sends them through the Worker (its assets block's run_worker_first is true). The Worker counts MAIN_TOKEN_V5 only when the
 // deployed pages were built with it (src/v5policy.js mainTokenV5): the pages are static files it never sees. It counts HOST_REDIRECT only
 // when the pages reach it (src/v5policy.js hostRedirect), and the build stops when wrangler.jsonc sets HOST_REDIRECT=on without that.
+// The legacy seat freeze (stage S16, LEGACY_SEATS=frozen in wrangler.jsonc): the build replaces the copy that presents the old founder rules
+// as current (the seven-day hold, the Stake Ladder, the Seed Steward, squads, founder windows, endorsements, country-manager elections) with
+// neutral words, from scripts/pages/frozen-copy.mjs (exact whole-line passages and a page description each; a passage not found exactly once
+// stops the build). Not frozen, the sources are built as they are: today's pages, byte for byte (test/build-parity.test.js). The build records
+// the freeze in src/pages-built.js (legacySeats "frozen", only then), so the Worker holds the freeze when its own setting differs from what
+// the pages were built with (src/v5policy.js legacySeats).
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { SOCIAL_PROFILES, officialAddresses, socialProfiles } from "../../src/official.js";
 import { brandLabels, brandOf } from "../../src/brand.js";
 import { esc, escBrand, rewriteSocialLinks, socialList } from "../../src/footer-social.js";
-import { hostRedirectOn, legacyLinkOn, mainTokenV5On, walletOnlyOn } from "../../src/flags.js";
+import { hostRedirectOn, legacyLinkOn, legacySeatsFrozenOn, mainTokenV5On, walletOnlyOn } from "../../src/flags.js";
 import { deploymentAccepted } from "../../src/maintoken.js";
-import { legacyLinkUntil, policyConfig, walletOnlyRefusals } from "../../src/v5policy.js";
+import { LEGACY_SEATS_CODES, legacyLinkUntil, policyConfig, walletOnlyRefusals } from "../../src/v5policy.js";
 import { siteConfig } from "../../src/site-config.js";
 import { isSolanaAddress } from "../../src/solana.js";
 import { settingsFrom } from "../mainnet-preflight.mjs";
+import { FROZEN_COPY } from "./frozen-copy.mjs";
 
 const SRC = fileURLToPath(new URL("./src/", import.meta.url));
 const OUT = fileURLToPath(new URL("../../public/", import.meta.url));
@@ -207,6 +214,23 @@ const fill = (f, body) => body.replace(/<!--@([a-z-]+)-->/g, (_, name) => {
   return FILLS[name]();
 });
 
+/**
+ * The page copy while the legacy seats are frozen (stage S16, see the top of this file): `body` (a source without its settings line) with every
+ * [old, new] passage of scripts/pages/frozen-copy.mjs for `f` replaced, in order. A passage that is not in the source exactly once stops the
+ * build. `table` is for tests.
+ */
+export function frozenCopy(f, body, table = FROZEN_COPY) {
+  const t = Object.hasOwn(table, f) ? table[f] : null;
+  if (!t) return body;
+  let out = body;
+  t.replace.forEach(([old, next], i) => {
+    const at = out.indexOf(old);
+    if (at < 0 || out.indexOf(old, at + 1) >= 0) throw new Error(`${f}: frozen copy passage ${i + 1} is not in the source exactly once (edit scripts/pages/frozen-copy.mjs with the source)`);
+    out = out.slice(0, at) + next + out.slice(at + old.length);
+  });
+  return out;
+}
+
 /** The label set the pages are built with: BRAND from wrangler.jsonc (never from this shell). An unknown value stops the build. */
 export function pageBrand(vars = deployedVars()) {
   const b = brandOf(vars);
@@ -287,6 +311,20 @@ export function pageV5Config(vars = deployedVars()) {
   return { ok: true };
 }
 
+/**
+ * The legacy seat freeze the pages are built with (stage S16): { legacySeats: "frozen" } when wrangler.jsonc sets LEGACY_SEATS=frozen (trimmed,
+ * any letter case, as the Worker reads it), else { legacySeats: "on" }, today's pages. Frozen, the build stops unless the Worker would accept
+ * the switch's own inputs (LEGACY_SEATS_POLICY_REFUSED: DEPLOYMENT_ENV unset or unknown, src/v5policy.js LEGACY_SEATS_CODES); pageV5Config
+ * stops it on any other v5 error. A value outside the switch's set ("off", "true") is refused there by name (FLAG_VALUE_INVALID). Never from
+ * this shell.
+ */
+export function pageLegacySeats(vars = deployedVars()) {
+  if (!legacySeatsFrozenOn(vars)) return { legacySeats: "on" };
+  const own = policyConfig(vars).errors.filter((e) => LEGACY_SEATS_CODES.includes(e.code) || e.path === "deployment.flags.LEGACY_SEATS").map((e) => e.code);
+  if (own.length) throw new Error(`LEGACY_SEATS=frozen in wrangler.jsonc with a configuration the Worker refuses (LEGACY_SEATS_POLICY_REFUSED: ${[...new Set(own)].join(", ")}): the legacy seat freeze needs DEPLOYMENT_ENV`);
+  return { legacySeats: "frozen" };
+}
+
 export const PAGES_BUILT_FILE = fileURLToPath(new URL("../../src/pages-built.js", import.meta.url));
 /**
  * The text of src/pages-built.js for these settings: whether the pages carry MAIN_TOKEN_V5 (only once pageSocials accepts it, so never
@@ -298,17 +336,22 @@ export function pagesBuiltSource(vars = deployedVars(), assets = deployedAssets(
   pageSocials(vars); // refuses MAIN_TOKEN_V5 before the brand rollout
   const { pagesReachWorker } = pageRouting(vars, assets); // refuses HOST_REDIRECT=on while the pages bypass the Worker
   const built = { mainTokenV5: mainTokenV5On(vars), brand: pageBrand(vars).value, pagesReachWorker };
+  // the legacy seat freeze (stage S16): recorded only when the pages carry it, so the file of pages built without it is the same bytes as before
+  const frozen = pageLegacySeats(vars).legacySeats === "frozen";
   return [
     "// Written by scripts/pages/build.mjs from the settings of wrangler.jsonc; do not edit (test/build-parity.test.js checks it).",
     "// What the deployed pages in public/ were built with, and whether wrangler.jsonc sends them through the Worker (run_worker_first true).",
     "// src/v5policy.js counts MAIN_TOKEN_V5 only when mainTokenV5 is true here, and HOST_REDIRECT only when pagesReachWorker is true.",
-    `export const PAGES_BUILT = Object.freeze({ mainTokenV5: ${built.mainTokenV5}, brand: ${JSON.stringify(built.brand)}, pagesReachWorker: ${built.pagesReachWorker} });`,
+    ...(frozen ? ["// legacySeats \"frozen\": built with LEGACY_SEATS=frozen (no old founder copy); src/v5policy.js holds the freeze if the Worker's setting differs."] : []),
+    `export const PAGES_BUILT = Object.freeze({ mainTokenV5: ${built.mainTokenV5}, brand: ${JSON.stringify(built.brand)}, pagesReachWorker: ${built.pagesReachWorker}${frozen ? ', legacySeats: "frozen"' : ""} });`,
     "",
   ].join("\n");
 }
 
-function build(standalone, brand, socials) {
+function build(standalone, brand, socials, legacySeats) {
   const L = brandLabels(escBrand(brand));
+  if (legacySeats !== "on" && legacySeats !== "frozen") throw new Error(`legacySeats must be "on" or "frozen" (got ${JSON.stringify(legacySeats)})`);
+  const frozen = legacySeats === "frozen";
   const out = [];
   for (const f of readdirSync(SRC).filter((x) => x.endsWith(".html")).sort()) {
     const src = readFileSync(SRC + f, "utf8").replace(/\r\n/g, "\n");
@@ -316,7 +359,11 @@ function build(standalone, brand, socials) {
     if (!m) throw new Error(`${f}: first line must be <!--{settings}-->`);
     const settings = JSON.parse(m[1]);
     if (Boolean(settings.standalone) !== standalone) continue;
-    const html = layout(settings, fill(f, src.slice(m[0].length)), L, socials);
+    // the legacy seats frozen (stage S16): the page's frozen description and copy; otherwise the source as it is
+    const fz = frozen && Object.hasOwn(FROZEN_COPY, f) ? FROZEN_COPY[f] : null;
+    if (fz && fz.description) settings.description = fz.description;
+    const body = src.slice(m[0].length);
+    const html = layout(settings, fill(f, fz ? frozenCopy(f, body) : body), L, socials);
     // other configured lists (MAIN_TOKEN_V5 on): the page's other links to the former X account follow too (the dashboard's "Contact us on
     // X"), by the same function the Worker rewrites with, so a built page and a rewritten one are the same bytes; today's list: untouched
     out.push([f, socials === SOCIAL_PROFILES ? html : rewriteSocialLinks(html, socials, L)]);
@@ -324,16 +371,17 @@ function build(standalone, brand, socials) {
   return out;
 }
 
-/** The main pages: [output file, html]. `brand` (a label set of src/brand.js shape) and `socials` (profiles of src/official.js
- *  socialProfiles shape) are for tests; the defaults are pageBrand() and pageSocials(). */
-export const buildPages = ({ brand, socials } = {}) => build(false, brand ?? pageBrand(), socials ?? pageSocials());
+/** The main pages: [output file, html]. `brand` (a label set of src/brand.js shape), `socials` (profiles of src/official.js
+ *  socialProfiles shape) and `legacySeats` ("on" or "frozen") are for tests; the defaults are pageBrand(), pageSocials() and pageLegacySeats(). */
+export const buildPages = ({ brand, socials, legacySeats } = {}) => build(false, brand ?? pageBrand(), socials ?? pageSocials(), legacySeats ?? pageLegacySeats().legacySeats);
 /** Pages that carry "standalone": true (see the top of this file). */
-export const buildStandalonePages = ({ brand, socials } = {}) => build(true, brand ?? pageBrand(), socials ?? pageSocials());
+export const buildStandalonePages = ({ brand, socials, legacySeats } = {}) => build(true, brand ?? pageBrand(), socials ?? pageSocials(), legacySeats ?? pageLegacySeats().legacySeats);
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   pageRouting(); // stops before any page is written when wrangler.jsonc sets HOST_REDIRECT=on without the pages reaching the Worker
   pageLegacyLink(); // and when it sets LEGACY_LINK=on without a window the Worker would open (stage S14), or a past LEGACY_LINK_UNTIL
   pageV5Config(); // and on any v5 switch or input the Worker would refuse (review finding SEC-1)
+  pageLegacySeats(); // and on LEGACY_SEATS=frozen whose own inputs the Worker would refuse (stage S16)
   for (const [f, html] of [...buildPages(), ...buildStandalonePages()]) { writeFileSync(OUT + f, html); console.log("page ready:", f); }
   writeFileSync(PAGES_BUILT_FILE, pagesBuiltSource());
   console.log("ready: src/pages-built.js");

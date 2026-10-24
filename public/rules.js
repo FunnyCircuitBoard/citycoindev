@@ -40,7 +40,8 @@
       `stake = ${fmt(L.base)} × (population ÷ ${fmt(L.refPop)})^(1/3), clamped ${fmt(L.base)}–${fmt(L.max)}, rounded down to ${fmt(L.rung)}\n` +
       `rule of eight: 8× the people → 2× the stake\n` +
       [10_000, 80_000, 640_000, 5_120_000, 10_000_000].map(eg).join(" · ");
-    $("#founder-formula").textContent = `score = ${w.endorsement * 100}% × endorsement share + ${w.contribution * 100}% × contribution + ${w.stake * 100}% × holdings
+    const formula = $("#founder-formula"); // (guarded: the page built with the legacy seats frozen has no founder formula, stage S16)
+    if (formula) formula.textContent = `score = ${w.endorsement * 100}% × endorsement share + ${w.contribution * 100}% × contribution + ${w.stake * 100}% × holdings
 holdings count from the amount up to ${f.stakeCap}× the amount (more counts the same)
 ties: lowest sha256("vicinity-seat|window|wallet")`;
     $("#never-list").replaceChildren(...p.never.map((t) => el("li", null, t)));

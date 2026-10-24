@@ -390,7 +390,7 @@ test("map: on a phone the stats show with no tap: the city-in-focus card, announ
   }
   // the card follows the crosshair and says what the computer's hover card says
   const card = js.slice(js.indexOf("  function renderFocus() {"), js.indexOf("  /** Screen readers hear"));
-  for (const t of ["Founder amount ${amt}", "Official boundary + nearest land", "Includes ${n} listed place", "No founder yet", "applying · closes in", "You founded ${c.name}", "No community here", "Nearest: "]) assert.ok(card.includes(t), t);
+  for (const t of ["Founder amount ${amt}", "Official boundary + nearest land", "Includes ${n} listed place", "`No founder${frozen ? \"\" : \" yet\"}", "applying · closes in", "You founded ${c.name}", "No community here", "Nearest: "]) assert.ok(card.includes(t), t);
   assert.match(card, /tag\.className = `\$\{cls\} map-focus__status`; tag\.textContent = word; tag\.hidden = false;/, "the status pill shows (it is hidden only while no city is in focus)");
   assert.match(card, /setTimeout\(\(\) => \{ if \(turn !== swapping\) return; fill\(\);/, "a city that is no longer in focus never fills the card late");
   assert.match(js, /sayTimer = setTimeout\(\(\) => \{ const s = \$\("#mf-say"\);[^\n]*\}, 600\);/, "debounced to 600 ms");

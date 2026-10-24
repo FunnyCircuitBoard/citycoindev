@@ -19,7 +19,7 @@
  */
 import { DAY, POLICY, founderLevels, iso } from "./policy.js";
 import { tokenMint } from "./official.js";
-import { mainTokenV5 } from "./v5policy.js";
+import { legacySeatsFrozen, mainTokenV5 } from "./v5policy.js";
 import { getAllHolders, publishHolders } from "./chain.js";
 import { getBlob, putBlob, sha256hex } from "./blobs.js";
 import { ensureSchema } from "./store.js";
@@ -95,9 +95,10 @@ export async function takeSample(env, now, fetchImpl = fetch) {
   for (const [owner, label] of labels) acc.labels[owner] = label;
   // the streaks first, the sample's own records last: if the streaks fail (a database hiccup, a limit) nothing says this sample
   // happened, so the next run takes it again instead of waiting an hour with half the founder clocks never started
-  // the founder hold streaks are $VICINITY's history (frozen with the legacy seats): under MAIN_TOKEN_V5 a sample of the new token never
-  // starts, continues or ends one (tenure below answers "not qualified" then)
-  if (!v5) await updateStreaks(db, list, takenAt);
+  // the founder hold streaks are $VICINITY's history, frozen with the legacy seats (LEGACY_SEATS=frozen, or MAIN_TOKEN_V5 counting: src/v5policy.js
+  // legacySeats, stage S16): while frozen a sample never starts, continues or ends one (tenure below answers "not qualified" then). The sample
+  // itself is still taken: the Founding Supporters snapshot (src/snapshot.js) and the admin growth chart read the balance history
+  if (!legacySeatsFrozen(env)) await updateStreaks(db, list, takenAt);
   const hash = await sha256hex(JSON.stringify(list));
   if (v5) {
     // the main token's sample records live in its own day blob (the table is $VICINITY's history): one write, so the sample and its
@@ -157,11 +158,13 @@ async function seriesSamplesSince(env, now, since) {
 }
 
 /**
- * How long has this wallet held `level` tokens in every sample? { since, days, needed, qualified }. Under MAIN_TOKEN_V5 a hold streak
- * is $VICINITY's history and never counts for the new main token: the answer is "no streak" (fail closed: no legacy seat is won on it).
+ * How long has this wallet held `level` tokens in every sample? { since, days, needed, qualified }. While the legacy seats are frozen
+ * (LEGACY_SEATS=frozen, or MAIN_TOKEN_V5 counting, under which a hold streak is $VICINITY's history and never counts for the new main token;
+ * src/v5policy.js legacySeats) the streaks are no longer updated, so a row's start says nothing about today: the answer is "no streak" (fail
+ * closed: no legacy seat is won on it, and no frozen clock is shown as running).
  */
 export async function tenure(env, wallet, level, now) {
-  if (mainTokenV5(env)) return { since: null, days: 0, needed: POLICY.founder.qualifyingDays, qualified: false };
+  if (legacySeatsFrozen(env)) return { since: null, days: 0, needed: POLICY.founder.qualifyingDays, qualified: false };
   const r = await env.DB.prepare("SELECT above_since FROM streaks WHERE wallet = ? AND level = ?").bind(wallet, level).first();
   const since = r && r.above_since ? Date.parse(r.above_since) : null;
   const days = since ? Math.max(0, (now - since) / DAY) : 0;
