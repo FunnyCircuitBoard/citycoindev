@@ -27,6 +27,9 @@
 //     (GuardianIsAdmin, R5-CONS-1); the checklist checks a proposed guardian or payout key
 //     against every founder before the proposal is signed (R5-DIFF-2, R5-CONS-2) and
 //     accepts an immutable old program (R5-DIFF-3, R5-CONS-3).
+//   * SEC-R1 (review of the rename to citycoin_curve): the website's metadata route,
+//     which the checklist cannot read from the chain, is among what its last line asks
+//     the operator to confirm by hand.
 //
 // Keys for which the suite has no private key (FEE_RECIPIENT) sign with zeros in a
 // World whose signature checks are off (offlineKey).
@@ -35,7 +38,7 @@ import assert from 'node:assert/strict';
 import web3 from '@solana/web3.js';
 import { address } from '@solana/kit';
 import { World, S, expectFail, offlineKey, LAMPORTS, DAY } from './helpers.mjs';
-import { checkDeployPreconditions, checklistAddresses, parseArgs, programDataState, encodeSquadsMultisig, squadsVaultPda, SQUADS } from '../scripts/vcurve/preflight.mjs';
+import { checkDeployPreconditions, checklistAddresses, parseArgs, programDataState, encodeSquadsMultisig, squadsVaultPda, SQUADS, readyLine } from '../scripts/vcurve/preflight.mjs';
 
 const { PublicKey } = web3;
 const ZERO = S.ADDRESSES.system;
@@ -591,4 +594,14 @@ test('R5-DIFF-3, R5-CONS-3 an immutable old program meets the checklist (a warni
   const r = checkDeployPreconditions({ ...checklistSnapshot(w, (a) => ({ ...a, [rewardsPd]: { ...a[rewardsPd], data: rd } }), { squads: true }), vault: w.admin.address, programId: w.programId });
   assert.deepEqual(codes(r.problems), ['REWARDS_UPGRADE_AUTHORITY']);
   await w.finish();
+});
+
+test('SEC-R1 (review of the rename) the checklist\'s last line asks the operator to confirm by hand that the website serves the metadata route every launch writes into its coin\'s immutable Metaplex URI', () => {
+  for (const vaultMultisig of [undefined, 'x']) {
+    const line = readyLine({ vaultMultisig });
+    assert.ok(line.includes(`${S.METADATA_URI_PREFIX}<mint>.json`), line);
+    assert.equal(S.METADATA_URI_PREFIX, 'https://citycoin.dev/coin-meta/v1/');
+    assert.match(line, /the program metadata/);
+    assert.equal(/the vault's time lock and members/.test(line), !vaultMultisig);
+  }
 });

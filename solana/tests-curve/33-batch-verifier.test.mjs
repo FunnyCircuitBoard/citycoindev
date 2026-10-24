@@ -24,6 +24,8 @@
 // arguments (the program ignores them), so a thief's republication with a byte appended is the stolen-key alarm (R9-CHECK-1).
 // Review round 10, hardened though rejected as a defect (one RPC is allowed by design): confirm and check print warning
 // ONE_RPC whenever one --rpc is given, and confirm keeps nothing in signed/ on one RPC's word unless --one-rpc-ok (R10-RPC-1).
+// Review of the rename to citycoin_curve: the archive settings from before it ($VICINITY_BATCH_ARCHIVE, ~/.vicinity-curve/)
+// are never read, and every run that opens the archive says so with warning OLD_ARCHIVE (SEC-R2).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -38,6 +40,7 @@ import {
   verifyListFile, checkStoredBatch, batchAddresses, allAddresses, parseArgs, changeLines, recordLive, archiveEntry, confirmPublication,
   decodePageTransaction, checkPageTransaction, messageHash, holderCandidateEntries, rpcProvider, rpcUrlsProblem, writeArchiveEntry, readArchive,
   archiveKey, compareChainViews, CLOCK_SYSVAR, presenceOnlyAddresses, landedPublicationHashes, landedPublications, PUBLISH_DATA_LEN, oneRpcWarning,
+  oldArchiveWarning, archiveDir,
 } from '../scripts/vcurve/batch.mjs';
 
 const snapshot = (w, entries) => Object.fromEntries(allAddresses(batchAddresses(entries, { programId: w.programId })).map((k) => [k, w.accountInfo(k)]));
@@ -1377,4 +1380,22 @@ test('R10-RPC-1 (review round 10, hardened; rejected as a defect, one RPC being 
     sc.done();
   }
   await w.finish();
+});
+
+test('SEC-R2 (review of the rename) the archive settings from before the rename ($VICINITY_BATCH_ARCHIVE, ~/.vicinity-curve/) are named as ignored, never read', () => {
+  const sc = scratch();
+  try {
+    const home = sc.env.HOME; mkdirSync(home, { recursive: true });
+    assert.equal(oldArchiveWarning({}, home), null, 'neither present: no warning');
+    assert.equal(oldArchiveWarning({ CITYCOIN_BATCH_ARCHIVE: join(sc.dir, 'a') }, home), null);
+    const w1 = oldArchiveWarning({ VICINITY_BATCH_ARCHIVE: join(sc.dir, 'old') }, home);
+    assert.match(w1, /^\$VICINITY_BATCH_ARCHIVE \(.*old\): the archive settings from before the rename to citycoin_curve are ignored/);
+    assert.ok(w1.includes(join(home, '.citycoin-curve', 'archive.key')));
+    mkdirSync(join(home, '.vicinity-curve'));
+    const w2 = oldArchiveWarning({}, home);
+    assert.ok(w2.startsWith(`${join(home, '.vicinity-curve')}: `), w2);
+    // the tool still reads only the new settings
+    assert.equal(archiveDir({}, { VICINITY_BATCH_ARCHIVE: join(sc.dir, 'old') }).endsWith(join('.citycoin-curve', 'launch-batches')), true);
+    assert.equal(archiveDir({}, { VICINITY_BATCH_ARCHIVE: join(sc.dir, 'old'), CITYCOIN_BATCH_ARCHIVE: join(sc.dir, 'new') }), join(sc.dir, 'new'));
+  } finally { sc.done(); }
 });

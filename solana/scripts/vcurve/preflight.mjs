@@ -72,9 +72,11 @@
 //     multisig or any other program address, its config authority is none or
 //     the admin vault, and a threshold of 1 is a warning (review R8-DIFF-3).
 // Not checkable here: the published program metadata, that the approver key
-// shares no seed or device with a member key (8.4, O32), and, without
-// `--vault-multisig`, the vault's time lock and members; the operator confirms
-// them by hand.
+// shares no seed or device with a member key (8.4, O32), that citycoin.dev
+// serves `https://citycoin.dev/coin-meta/v1/<mint>.json` write-once before the
+// first launch (8.4, 3.10: every coin's Metaplex URI is fixed at launch, and
+// this checklist reads only the chain), and, without `--vault-multisig`, the
+// vault's time lock and members; the operator confirms them by hand.
 //
 // Usage (from solana/):
 //   node scripts/vcurve/preflight.mjs --rpc <url> --vault <squads vault>
@@ -90,7 +92,7 @@ import web3 from '@solana/web3.js';
 import {
   ADDRESSES, CLUSTERS, CURVE_PROGRAM_ID, DEFAULT_CONFIG, LEGACY_LAUNCHPAD_DISCRIMINATOR, LEGACY_LAUNCHPAD_LEN, LEGACY_LAUNCHES_PAUSED_AT,
   LEGACY_ADMIN_AT, LEGACY_PENDING_ADMIN_AT, curvePdas, findPda, decodeLaunchpad, decodeLaunchConfig, decodeCurveCoin,
-  decodeApproval, accountType, configParamsOf, buybackKeepUp,
+  decodeApproval, accountType, configParamsOf, buybackKeepUp, METADATA_URI_PREFIX,
 } from '../../sdk/curve/index.mjs';
 
 const { PublicKey } = web3;
@@ -562,6 +564,12 @@ export function parseArgs(argv) {
   return o;
 }
 
+// The last line when no problem was found: what the operator still confirms by hand (the header's
+// "Not checkable here"), among them the website's metadata route of 8.4 (review of the rename, SEC-R1).
+export function readyLine({ vaultMultisig } = {}) {
+  return `every checked precondition holds (confirm by hand: the program metadata, that the approver key shares no seed or device with any Squads member key, that the website serves ${METADATA_URI_PREFIX}<mint>.json before the first launch (8.4, 3.10)${vaultMultisig ? '' : ', and the vault\'s time lock and members (or pass --vault-multisig)'})`;
+}
+
 async function main(argv) {
   const o = parseArgs(argv);
   if (o.error) { console.error(`${o.error}\n${USAGE}`); return 2; }
@@ -573,7 +581,7 @@ async function main(argv) {
   for (const w of warnings) console.log(`warning ${w.code}: ${w.message}`);
   for (const p of problems) console.log(`NOT READY ${p.code}: ${p.message}`);
   console.log(problems.length ? `${problems.length} problem(s): not ready`
-    : `every checked precondition holds (confirm by hand: the program metadata, that the approver key shares no seed or device with any Squads member key${o.vaultMultisig ? '' : ', and the vault\'s time lock and members (or pass --vault-multisig)'})`);
+    : readyLine({ vaultMultisig: o.vaultMultisig }));
   return problems.length ? 1 : 0;
 }
 

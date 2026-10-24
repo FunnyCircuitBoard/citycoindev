@@ -50,7 +50,8 @@
 // none) keeps `<program id>/pending/`, `signed/` and `refused/`; each entry carries an HMAC under this computer's key,
 // `~/.citycoin-curve/archive.key` (32 random bytes created on first use, never inside an archive folder, so a folder
 // handed over with its own key proves nothing; review R8-DIFF-5), so a file copied in from elsewhere is ignored. Every
-// run prints the archive folder and the key's fingerprint, and warns when the folder is not the one used last.
+// run prints the archive folder and the key's fingerprint, and warns when the folder is not the one used last, and
+// when the settings from before the rename ($VICINITY_BATCH_ARCHIVE, ~/.vicinity-curve/) are present (OLD_ARCHIVE).
 //
 // Usage (from solana/):
 //   node scripts/vcurve/batch.mjs verify <list file> --rpc <url> [--rpc <url of another provider>] --approver <key>
@@ -675,6 +676,18 @@ export const archiveDir = (o, env = process.env) => (o.noArchive ? null : (o.arc
 export const archiveKeyPath = () => join(homedir(), '.citycoin-curve', 'archive.key');
 /** Where the archive folder used last is noted (review R8-DIFF-5). */
 export const lastArchivePath = () => join(homedir(), '.citycoin-curve', 'last-archive');
+/**
+ * The archive's settings from before the program's rename to citycoin_curve ($VICINITY_BATCH_ARCHIVE,
+ * ~/.vicinity-curve/), which this tool no longer reads: the warning that says so, or null when neither is present.
+ * Entries written there name the old program in their kind, so they would not count here even if moved (review of
+ * the rename, SEC-R2; NOTES 107).
+ */
+export function oldArchiveWarning(env = process.env, home = homedir()) {
+  const old = [];
+  if (env.VICINITY_BATCH_ARCHIVE) old.push(`$VICINITY_BATCH_ARCHIVE (${env.VICINITY_BATCH_ARCHIVE})`);
+  if (existsSync(join(home, '.vicinity-curve'))) old.push(join(home, '.vicinity-curve'));
+  return old.length ? `${old.join(' and ')}: the archive settings from before the rename to citycoin_curve are ignored; this tool uses --archive, $CITYCOIN_BATCH_ARCHIVE or ${join(home, '.citycoin-curve', 'launch-batches')}, with its key in ${join(home, '.citycoin-curve', 'archive.key')}` : null;
+}
 /** A key file that is not exactly 32 bytes of hex: the archive cannot be trusted (review R8-DIFF-5). */
 export class ArchiveKeyError extends Error {}
 /**
@@ -949,6 +962,8 @@ function openArchive(dir, programId) {
     lines.push(`warning ARCHIVE_MOVED: this archive folder is not the one this computer used last (${where.last}): a folder someone handed you, or one named in the environment, is not your archive; only lists this computer's key wrote count (review R8-DIFF-5)`);
   }
   for (const x of arch.ignored) lines.push(`warning ARCHIVE_IGNORED: ${x.name}: ${x.why}`);
+  const old = oldArchiveWarning();
+  if (old) lines.push(`warning OLD_ARCHIVE: ${old}`);
   return { arch, lines };
 }
 
