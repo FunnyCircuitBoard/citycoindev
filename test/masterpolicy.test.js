@@ -161,10 +161,11 @@ test("the values are exactly the master's (restated independently)", () => {
   assert.deepEqual([P.metadata.image.max_bytes, P.metadata.image.max_width_px, P.metadata.image.max_height_px], [10_000_000, 4096, 4096]);
   assert.equal(P.metadata.open_requests_per_city, 1);
   assert.deepEqual(P.metadata.launch_frozen_states, ["submitted", "under_review", "approved_publishing"]);
-  // §37 and §04 release gates
+  // §37 and §04 release gates; the §04 legacy redirect window is 0: the owner decided on 24 Oct 2026 that the old hosts are not
+  // redirected (amendments: owner-decision-2026-10-24-domains; docs/citycoin-master/domain-cutover.md section 0)
   const g = P.release_gates;
   assert.deepEqual([g.shadow_operation_hours, g.initial_city_count_min, g.initial_city_count_max, g.initial_path, g.observation_hours_before_expanding, g.legacy_redirect_min_months],
-    [48, 1, 3, "audited_sol_path", 72, 12]);
+    [48, 1, 3, "audited_sol_path", 72, 0]);
 });
 
 test("the SOL curve integers are self-consistent: supply = curve + pool + burn, and the curve reaches 85 SOL exactly", () => {
@@ -356,7 +357,10 @@ test("validatePolicy: a complete production configuration passes, and assertVali
 /* ------------------------------------------------------------------ amendment 01: new main token and official links */
 
 test("amendment 01: the main token is configured centrally and empty, and $VICINITY is a legacy token only", () => {
-  assert.deepEqual(MASTER_POLICY.amendments.map((a) => [a.id, a.date, a.values_supplied]), [["amendment-01", "2026-10-24", false]]);
+  assert.deepEqual(MASTER_POLICY.amendments.map((a) => [a.id, a.date, a.values_supplied]),
+    [["amendment-01", "2026-10-24", false], ["owner-decision-2026-10-24-domains", "2026-10-24", undefined]]);
+  // values_supplied means all three values: the owner supplied only the X address (24 Oct 2026, Worker settings only); the policy keeps null
+  assert.match(MASTER_POLICY.amendments[0].values_supplied_note, /^false: not all three values are supplied\. OFFICIAL_X_URL was supplied/);
   const m = P.main_token;
   assert.deepEqual([m.mint, m.config_key, m.source, m.replacement_authorized], [null, "MAIN_TOKEN_MINT", "owner-supplied, verified on chain before use", true]);
   assert.deepEqual(m.required_checks, ["mint_account_exists", "owner_program_is_classic_spl_token_or_a_documented_supported_program", "decimals", "total_supply",

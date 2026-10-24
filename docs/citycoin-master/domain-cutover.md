@@ -1,14 +1,82 @@
 # Domain cutover: vicinity.city to citycoin.dev
 
-Master change order v5, section 04 (BR-02) and section 05 (BR-03). Started in stage S03 (host-safe routing and redirects, local branch
-`cc/s03`, not merged); stage S04 (session and challenge host binding, the same local branch, not merged) added section 1.2 and section 6;
-the S03/S04 review fixes (same branch) added section 1.3 and the S06 rules in section 2; finished in S56. Each later stage adds its part.
+Master change order v5, section 04 (BR-02) and section 05 (BR-03). Started in stage S03 (host-safe routing and redirects); stage S04
+(session and challenge host binding) added section 1.2 and section 6; the S03/S04 review fixes added section 1.3 and the S06 rules in
+section 2. All three were merged in PR #97 (`2608bd9`) with their switches off. On 24 October 2026 the owner decided that the old names
+are not forwarded (section 0): stage S56 (the redirects) is dropped, and the cutover now finishes in S55. Each later stage adds its part.
 
 **Status on 24 October 2026: nothing here is applied.** No DNS record, Cloudflare setting, route, custom domain or switch was changed.
 citycoin.dev is registered on the same Cloudflare nameservers as vicinity.city and is **not attached** to the Worker: the Worker's routes
 are `vicinity.city` and `www.vicinity.city` only (wrangler.jsonc `routes`). Nothing in the code assumes it is attached.
 
+## 0. The owner's decision on the old names (24 October 2026)
+
+In writing, in the working conversation of 24 October 2026: "i dont want any domain forward from vicinty. leve that blank both.
+vicinity.city and vicinitycity.com i wil need them for other purpose."
+
+So: **no 308, 301 or 302 forwarding from `vicinity.city`, `www.vicinity.city`, `vicinitycity.com` or `www.vicinitycity.com` to
+citycoin.dev.** After the move both names are left blank: not served by this Worker and not redirected, for the owner's other use. This
+replaces master section 04's redirect of the old hosts and its rule to keep their routes for at least 12 months after it; `policy.json`
+records the decision (`amendments`, and `release_gates.legacy_redirect_min_months` 0).
+
+What it changes in this plan:
+
+- **Stage S56 is dropped.** `HOST_REDIRECT` is never set and `"run_worker_first": true` is no longer needed (section 2, item 1). The S03
+  code (`src/hostroute.js` behind `HOST_REDIRECT`, merged, off) stays as it is: it is no longer wanted for the old hosts, and its removal
+  belongs to a later cleanup stage (S65). Nothing is deleted now.
+- **The S04 host binding stays useful** while both hosts serve, from S06 (citycoin.dev attached) to S55 (vicinity.city removed).
+- **vicinity.city keeps serving until citycoin.dev serves the site.** Removing it earlier would leave the site offline in between.
+- **The order is section 3:** citycoin.dev is attached and checked while vicinity.city serves; then one configuration pull request
+  makes citycoin.dev canonical and removes the vicinity.city routes, with no redirect, after the legacy launch path is closed; the
+  vicinitycity.com forward is the owner's own step, at any time.
+
+Facts checked on 24 October 2026 (read-only):
+
+- `vicinity.city` and `www.vicinity.city` are this Worker's custom domains (wrangler.jsonc `routes`) and serve the live site.
+- `vicinitycity.com` and `www.vicinitycity.com` use the same Cloudflare nameserver pair (`pearl`, `tim`). Both answer `302` with
+  `location: https://vicinity.city/` for every path and method tried (HEAD of `/` and `/some/path?x=1`, a POST), with
+  `cache-control: no-store` and the countdown Worker's own headers (its `content-security-policy` ending in `form-action 'none'`,
+  `x-frame-options: DENY`, `strict-transport-security: max-age=31536000`). That answer comes from the countdown Worker
+  `vicinity-countdown` of this repository: countdown/src/index.js sends every request on that domain to `https://vicinity.city/`
+  with 302 and no-store since the countdown ended on 3 October 2026, and countdown/wrangler.jsonc says both names are attached to that
+  Worker in Cloudflare and lists no routes on purpose (a deploy leaves the attachment as it is). It is not this Worker
+  (wrangler.jsonc `routes` names only the two vicinity.city hosts). A zone redirect rule would answer before any Worker and without
+  these headers, so none applies to these requests; the zone's rules themselves were not listed (no dashboard access from here).
+- `vicinitycity.net` and `www.vicinitycity.net` are not routed to this Worker and answer 403 from Cloudflare. The owner's decision
+  does not name them, and with S56 dropped nothing in this plan forwards them either. They are still in the link checker's list of
+  official websites (`src/official.js` `websites`) and in `src/site-config.js` `LEGACY_FORWARD_HOSTS`. Their use is the owner's call
+  (open).
+- The deployed legacy launchpad (`AkMP9q…A1Ai`) compiles `METADATA_URI_PREFIX = "https://vicinity.city/coin-meta/"` into every coin it
+  launches (rebrand-inventory.md P02). It has launched 0 coins (`/official-coins.csv` is empty), and its launches are open on chain
+  (`launches_paused = 0`, implementation-report.md section 2).
+
+What stops answering once vicinity.city is removed (section 3, step 4), for the owner to know before that step:
+
+1. **Coin metadata.** A coin launched through the legacy launchpad would name a dead address for good. So the legacy launch path is
+   closed first: the website's legacy launch flow switched off (`LEGACY_LAUNCH=off`; the switch is stage S23's, not built yet) and the on-chain pause
+   `set_pause(launches = true)`, which needs the signature of the legacy admin `13qRam…sRiN` (stage S58, external E3).
+2. **`/brand/vicinity-512.png` on vicinity.city.** The Meteora DBC partner-metadata account `2be9mDcn…si11` names this address on chain
+   (rebrand-inventory.md C04). After step 4 it gets no answer from this site; the file itself stays and is served on citycoin.dev.
+   Whether DBC lets the fee-claimer wallet update that record was not verified. The policy keeps this file under
+   `release_gates.legacy_immutable_metadata` (exact bytes served as long as existing assets depend on them), and the owner's decision
+   does not name it. So step 4 waits until either the record names an address on citycoin.dev, or the owner accepts in writing that
+   this address goes dark and that acceptance is recorded as an owner decision in `policy.json` `amendments` and its mirror
+   `src/masterpolicy.js` (section 4, "Before step 4").
+3. **`/official-coins.csv` and the read-only API on vicinity.city** (rebrand-inventory.md C09, C10). A tracker that registered the
+   vicinity.city address (whether any did was not verified) must use citycoin.dev's.
+4. **Every old link and bookmark** (posts of `@VicinityCitySOL`, listings that name `https://vicinity.city`, the Google sign-in
+   callback registered for vicinity.city) gets no answer from this site. A member signs in again on citycoin.dev with the same wallet
+   (section 6). Visitors learn the new address only from what the site and the official accounts tell them before step 4.
+5. **Mail.** The sender is on vicinity.city (wrangler.jsonc `EMAIL_FROM`, rebrand-inventory.md U03). It moves to citycoin.dev once
+   the mail provider verifies it, or mail notices stop (in-app only), before the owner puts vicinity.city to another use.
+6. **The link checker** calls `vicinity.city`, `vicinitycity.com` and `vicinitycity.net` official (`src/official.js` `websites`,
+   rebrand-inventory.md C03). They come off that list, and citycoin.dev goes on, before the owner puts either name to its other use;
+   otherwise the checker would vouch for a site that is no longer this one. That is a code change; its pull request is not written.
+
 ## 1. What stage S03 built (dark)
+
+**Not to be switched on (section 0).** The old hosts are not redirected, so `HOST_REDIRECT` stays unset in every step. The code below is
+merged and off, and stays until a later cleanup stage removes it; this section is the record of what is deployed.
 
 One switch, `HOST_REDIRECT`, read like every other switch (exactly `on`, trimmed, any letter case). The Worker applies it only through
 `src/v5policy.js` `hostRedirect`, which counts it only while **every** precondition holds:
@@ -94,7 +162,7 @@ which is vicinity.city) is signed out on `http://localhost:8787` (its key is `lo
 
 | What | While the binding counts |
 |---|---|
-| A host outside the allowlist (`evil.example`, `citycoin.dev.evil.example`, a trailing dot, an IP, `www.citycoin.dev`, a host attached but not listed) | For every request that reaches the Worker: `421 {"error":"wrong_host","origin":…}`, no `Location`, no cookie, before any route and before the `http://` and old-name 301s (so no address is built from its `Host`). With today's `run_worker_first` list only `/api/*`, `/coin-meta/*` and `/official-coins.csv` reach the Worker: **an attached host's pages are served straight from the static assets (200) and only those paths answer 421**, a half-working site. Never attach a host the allowlist does not list (section 2). Once `run_worker_first` is `true` (S56) the asset fallback answers 421 too. |
+| A host outside the allowlist (`evil.example`, `citycoin.dev.evil.example`, a trailing dot, an IP, `www.citycoin.dev`, a host attached but not listed) | For every request that reaches the Worker: `421 {"error":"wrong_host","origin":…}`, no `Location`, no cookie, before any route and before the `http://` and old-name 301s (so no address is built from its `Host`). With today's `run_worker_first` list only `/api/*`, `/coin-meta/*` and `/official-coins.csv` reach the Worker: **an attached host's pages are served straight from the static assets (200) and only those paths answer 421**, a half-working site. Never attach a host the allowlist does not list (section 2). Only with `run_worker_first` set to `true` would the asset fallback answer 421 too; no stage plans that any more (S56 is dropped, section 0). |
 | A session (the `vs` cookie) | A new session records the host it is made on (`sessions.host`: the allowlist entry, or the local host's name), in the same D1 transaction as its row, by every way a session is made (wallet sign-in, pairing, Google, the e-mail code, a password log-in or reset, the new sign-up's finish, the wallet app's carry claim, a pending transfer proof). `getSession` refuses a row of another host: a cookie copied by hand to another host is signed out there (`/api/me` says `signedIn: false`, a sensitive action answers `401 sign_in`). Signing out, or signing in, there deletes only a session of that host: a copied cookie never ends the session on the host that made it (`src/hostbind.js` `sessionDelete`). A row made before the binding counted (host NULL) belongs to `vicinity.city`. |
 | The cookie itself | Unchanged: `vs=<token>; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=…`, host-only (no `Domain` attribute), today's name; it is never shared across domains. (The design gives it the `__Host-` prefix under `WALLET_ONLY`; as built on `cc/s09` the session cookie `vs` and the sign-up cookie `vsu` keep their names even under the switch, a recorded deviation: review finding SEC-9, `implementation-report.md` section 11, "Gate for the S15 switch-on".) |
 | The wallet challenge (`GET /api/message`) and every signed text (`/api/auth/wallet`, `/api/auth/reprove`, `/api/verify`, the wallet link and its carry claim) | The text names the allowlist entry (lower case, no port), and `src/signed.js` accepts a text only on the host it names: a signature made for vicinity.city is refused on citycoin.dev (`wrong_site`) and the other way round. That binding exists today (the text must name the request's host); S04 keeps it, takes the host from the allowlist, and tests it. A text is still single use (`replayed`). |
@@ -128,90 +196,131 @@ change today's answers, which is the owner's call; Cloudflare routes none of the
 `https://citycoin.dev/api/auth/google/callback` (external E12; master section 05 keeps Google out of the new dashboard login path, so add it
 only if the legacy window needs it). Without it Google refuses the trip (`redirect_uri_mismatch`): it fails safely and signs nobody in.
 
-## 2. The Cloudflare settings the switch needs (not changed in S03)
+## 2. The Cloudflare settings (none changed yet)
 
-1. **Every page must reach the Worker.** Today `wrangler.jsonc` has `"run_worker_first": ["/api/*", "/coin-meta/*", "/official-coins.csv"]`
-   with `not_found_handling: "404-page"`: every page and file (the 404 page and `/brand/vicinity-512.png` included) is served straight
-   from the static assets on every routed host, and the Worker never sees it. The Worker therefore cannot redirect an old host's page, and
-   switching `HOST_REDIRECT` on alone would leave a half-moved site (pages still loading on vicinity.city while their writes answered 421).
-   The setting needed is `"run_worker_first": true` in the `assets` block of `wrangler.jsonc` (exactly the boolean, or a list that holds
-   `"/*"` and no `!` pattern; any other form keeps the switch refused silently), deployed together with `HOST_REDIRECT=on` (or before it).
-   It is a deploy setting, not a dashboard one. Consequences to accept in that pull request:
-   - every page view becomes a Worker request (wrangler.jsonc's own comment on `run_worker_first` notes the cost);
-   - the pages of the canonical host then come through the Worker's asset fallback (`src/index.js`: `env.ASSETS.fetch`, then the security
-     headers of `src/http.js`). The fallback keeps the asset's own `Content-Security-Policy` when the binding applied `public/_headers`
-     (it adds `font-src 'self'`); without it the page gets `src/http.js`'s policy, which has no `font-src` (equivalent through
-     `default-src 'self'`). Local workerd applied `_headers` (`Cache-Control: public, max-age=31536000, immutable` on `/fonts/*`); verify
-     on the preview environment (S05) before production that the answers keep every header `public/_headers` gives today, since local
-     workerd is not proof for production.
-   Zone Redirect Rules on the vicinity.city zone could move old-host pages without making them Worker requests, but they keep or drop the
-   whole query string (they cannot drop only the hand-off keys), and the Worker would still refuse the switch, so its 421 for writes on the
-   old hosts would not apply. They are not the supported path.
-2. **Attach citycoin.dev** (stage S06): add `citycoin.dev` as a custom domain of the Worker (wrangler.jsonc `routes`), let Cloudflare issue
-   the certificate, and add it to `SITE_ORIGINS` (`https://citycoin.dev https://vicinity.city`; `SITE_ORIGIN` stays unset until S55).
-   Rules for that pull request:
+1. **`run_worker_first` stays the list.** It was to become `true` only so that the Worker could redirect old-host pages under
+   `HOST_REDIRECT` (S56). With S56 dropped (section 0) no stage needs it: `wrangler.jsonc` keeps
+   `"run_worker_first": ["/api/*", "/coin-meta/*", "/official-coins.csv"]` with `not_found_handling: "404-page"`, so every page and
+   file is served straight from the static assets on each routed host, citycoin.dev included, as on vicinity.city today, and page views
+   are not Worker requests. The page build still refuses `HOST_REDIRECT=on` without `run_worker_first: true` (`src/pages-built.js`
+   `pagesReachWorker`), which keeps the dropped switch from being turned on by mistake. No zone Redirect Rule is made on the vicinity.city
+   zone either: the owner wants no forward from it.
+2. **Attach citycoin.dev** (stage S06): the owner first gives the GitHub deploy token (`CLOUDFLARE_API_TOKEN`,
+   .github/workflows/deploy.yml) the citycoin.dev zone (external E1). Then the S06 configuration pull request adds `citycoin.dev` as a
+   custom domain of the Worker (wrangler.jsonc `routes`), Cloudflare issues the certificate, and the same pull request adds it to
+   `SITE_ORIGINS` (`https://citycoin.dev https://vicinity.city`; `SITE_ORIGIN` stays unset until S55, so vicinity.city stays canonical
+   and keeps serving). Rules for that pull request:
    - **`SITE_ORIGINS` lists citycoin.dev in the same deploy that attaches it, or an earlier one; never after.** Attaching first gives a
      half-working site: its pages load from the static assets while every `/api/*` answers 421 (section 1.3), until the setting is
      deployed. Add the custom domain through the pull request's `routes`, not in the dashboard ahead of it.
    - **Do not list `www.citycoin.dev` in `SITE_ORIGINS`.** Listed, it becomes an origin of its own: its own sessions, its own challenge
      text and a Google return address `https://www.citycoin.dev/api/auth/google/callback` that is not registered. Unlisted but attached, its
-     pages load from the assets and its `/api/*` answers 421. Either leave it unattached until S56, or attach it with a zone Single Redirect
-     (Rules, Redirect Rules) from `www.citycoin.dev` to `https://citycoin.dev`, keeping the path and the query string (there are no legacy
-     hand-off links on www.citycoin.dev, so a whole-query redirect is safe); the redirect runs before the Worker, which then never sees www.
-     Master section 04's "canonicalize www.citycoin.dev to the apex" is met by that redirect; under `HOST_REDIRECT` (S56) the Worker's
-     general rule would also move it, but only if www is listed, so keep the zone redirect instead.
+     pages load from the assets and its `/api/*` answers 421. So **www.citycoin.dev answers with the apex or is left unattached**: attach
+     it only together with a zone Single Redirect (Rules, Redirect Rules) from `www.citycoin.dev` to `https://citycoin.dev`, keeping the
+     path and the query string (there are no legacy hand-off links on www.citycoin.dev, so a whole-query redirect is safe); the redirect
+     runs before the Worker, which then never sees www. That meets master section 04's "canonicalize www.citycoin.dev to the apex". If the
+     rule cannot be made in the same change, www.citycoin.dev stays unattached (today it does not resolve) and is added later the same
+     way. This redirect stays inside the new domain; the owner's decision concerns the vicinity names only. With S56 dropped, no stage
+     serves www from the Worker.
    - **No preview or staging host under citycoin.dev** (for example `preview.citycoin.dev`) until the session cookie carries the `__Host-`
      prefix (not built yet: as built on `cc/s09`, `vs` and `vsu` keep their names under `WALLET_ONLY`, review finding SEC-9): until then such
      a host, running other code, could set a `Domain=citycoin.dev` `vs` or `vsu` cookie and log a visitor into the setter's own account or
      continue the setter's sign-up. The same holds for any host under vicinity.city. Use a separate domain for previews (S05).
    - Set `DEPLOYMENT_ENV=production` with it (the v5 check wants an environment for any changed switch anyway): it also turns off the local
      development exemption (section 1.2) on the production Worker.
-   Until then no request for citycoin.dev reaches the Worker, and `HOST_REDIRECT` must stay off: a 308 to an unattached host would break
-   every old link.
-3. **Plain http.** No zone change is needed: with every request reaching the Worker, an `http://` page answers 308 to the canonical origin
-   and an immutable file 308 to `https://` on its own host. `.dev` is on the HSTS preload list, so browsers never ask citycoin.dev over http.
-4. **Keep the vicinity.city routes** for at least 12 months after `HOST_REDIRECT=on` (master section 04), with a named renewal and
-   monitoring responsibility (recorded in S56). The immutable files keep serving for as long as anything names them (inventory C04, C05).
-5. **vicinitycity.net** is not routed to the Worker today (wrangler.jsonc comment on `routes`). If it is re-attached, it is a legacy host
-   and follows the same rules.
+   Until then no request for citycoin.dev reaches the Worker. `HOST_REDIRECT` stays unset in every step (section 0).
+3. **Plain http.** No zone change is needed: `.dev` is on the HSTS preload list, so browsers never ask citycoin.dev over http.
+4. **Remove the vicinity.city routes** (stage S55, section 3 step 4): the `vicinity.city` and `www.vicinity.city` entries leave
+   wrangler.jsonc `routes` in the configuration pull request that makes citycoin.dev canonical, with no redirect (section 0). They are not
+   kept for 12 months: the owner's decision replaces master section 04's rule. Preconditions: citycoin.dev serves the site and passed the
+   checks of section 4, and the legacy launch path is closed (section 0, item 1). After the deploy Cloudflare no longer sends either name
+   to this Worker, and the names are the owner's to use as he decides. Nothing from them is redirected.
+5. **vicinitycity.net** is not routed to the Worker today (wrangler.jsonc comment on `routes`; it answers 403 from Cloudflare). This plan
+   does not attach it, and the owner's decision does not name it (open, section 0).
+6. **vicinitycity.com and www.vicinitycity.com** are not this Worker's: they are custom domains of the countdown Worker
+   `vicinity-countdown` (section 0), which answers every request with a 302 to `https://vicinity.city/`. That forward ends when the two
+   names are detached from `vicinity-countdown` in the Cloudflare dashboard (Workers & Pages, vicinity-countdown, Settings, Domains &
+   Routes), which the owner, or someone with Cloudflare access, does. A deploy from this repository does not detach them
+   (countdown/wrangler.jsonc lists no routes on purpose). It can be done at any time: it does not touch the site. Afterwards the
+   countdown deploy workflow (.github/workflows/deploy-countdown.yml) would fail at its last step, which checks
+   `https://vicinitycity.com/teaser.js`, on the next push that changes `countdown/`; that workflow, the `countdown/` folder, and the
+   Worker and its D1 database `vicinity-countdown` (it holds the countdown's "Rep your city" answers) are for a later cleanup, at the
+   owner's word. No forward from vicinitycity.com to citycoin.dev is added (rebrand-inventory.md U11 is dropped).
 
-## 3. Order of the cutover (each a configuration pull request; none is part of S03)
+## 3. Order of the cutover (owner decision of 24 October 2026; none of it is applied)
 
-1. S04 (built on local branch `cc/s03`, not merged): sessions, hand-offs, hand-off links, QR codes and wallet challenges bound to their
-   host (the allowlist entry, never the request), counting from the S06 configuration on (section 1.2).
-2. S05: the preview environment, where the run of step 5 is rehearsed first.
-3. S06: attach citycoin.dev and list it in `SITE_ORIGINS` in the same pull request (section 2, item 2: never www, no preview host under
-   citycoin.dev), with `DEPLOYMENT_ENV=production`, `HOST_REDIRECT` off.
-4. S55: `SITE_ORIGIN=https://citycoin.dev` and the rest of the website cutover, `HOST_REDIRECT` off.
-5. S56: `HOST_REDIRECT=on`, `"run_worker_first": true` (exactly the boolean) and `DEPLOYMENT_ENV=production` (if S06 did not set it) in
-   one pull request. The page build refuses `HOST_REDIRECT=on` without `run_worker_first: true` or with a configuration the Worker refuses.
+Already merged with nothing switched on: S03 (section 1, not to be switched on) and S04 (sessions, hand-offs, hand-off links, QR codes
+and wallet challenges bound to their host, counting from step 2 on, section 1.2). S05, the preview environment, is where steps 2 and 4
+are rehearsed first.
 
-## 4. Checks before and after step 5 (to run then; not run in S03)
+1. **The owner gives the GitHub deploy token the citycoin.dev zone** (`CLOUDFLARE_API_TOKEN`, external E1). Nothing on the site changes.
+2. **S06, a configuration pull request, attaches citycoin.dev** to this Worker and lists it in `SITE_ORIGINS` in the same pull request
+   (section 2, item 2), with `DEPLOYMENT_ENV=production`. www.citycoin.dev answers with the apex through the zone redirect, or stays
+   unattached; never listed. vicinity.city keeps serving and stays canonical (`SITE_ORIGIN` unset). `HOST_REDIRECT` stays unset.
+3. **Checks on citycoin.dev** while both hosts serve (section 4, "After step 2").
+4. **S55, a configuration pull request, makes citycoin.dev the canonical origin and removes the vicinity.city routes**:
+   `SITE_ORIGIN=https://citycoin.dev`, `SITE_ORIGINS=https://citycoin.dev`, and the `vicinity.city` and `www.vicinity.city` entries
+   removed from wrangler.jsonc `routes`, with no redirect (section 2, item 4). Only after the legacy launch path is closed (section 0,
+   item 1: stage S58), the checks of step 3 pass and every item of section 4, "Before step 4", holds. The label switches of S55 may
+   go in the same pull request or follow it (implementation-report.md, stage S55).
+5. **The owner removes the vicinitycity.com forward** (section 2, item 6): any time, before or after the other steps; it is independent
+   of the site.
 
-- Byte hashes of the immutable files on `https://vicinity.city` and `https://citycoin.dev`, before and after: `/brand/vicinity-512.png`,
-  `/official-coins.csv`, and every `/coin-meta/<mint>.json`, `/coin-meta/<mint>.png` and `/coin-meta/art/<sha>.png` a coin names.
-- `curl -sI https://vicinity.city/launchpad?tab=new` answers 308 with `location: https://citycoin.dev/launchpad?tab=new`.
-- `curl -sI "https://vicinity.city/connect?link=x&mode=login"` answers 308 to `https://citycoin.dev/connect?mode=login`.
-- `curl -s -X POST https://vicinity.city/api/feedback` answers 421 `{"error":"wrong_host","origin":"https://citycoin.dev"}` with no
-  `location`.
-- `curl -sI "https://vicinity.city/api/auth/google/callback?code=x&state=y"` answers 302 with `location:
-  https://citycoin.dev/connect?error=login_expired`.
-- A member signed in on vicinity.city before step 5 can still sign out there (the account menu's Log out: `POST /api/auth/logout` answers
-  200 and clears `vs`).
-- `curl -sI https://vicinity.city/api/health` answers 200 (read-only API in place). An unknown host cannot reach the Worker through
-  Cloudflare (it has no route); the Worker would answer it 421.
-- The synthetic probes of S54 stay green through the observation period (external E15).
+## 4. Checks (to run at each step; none run yet)
+
+**After step 2** (both hosts serve):
+
+- `curl -sI https://citycoin.dev/` answers 200 over a certificate Cloudflare issued for citycoin.dev; the main pages and
+  `/api/health` answer 200.
+- Byte hashes of the files a legacy coin or listing may name are equal on `https://vicinity.city` and `https://citycoin.dev`:
+  `/brand/vicinity-512.png`, `/official-coins.csv`, and every `/coin-meta/<mint>.json`, `/coin-meta/<mint>.png` and
+  `/coin-meta/art/<sha>.png` a coin names (none today).
+- The host binding counts (section 1.2): a wallet sign-in works on citycoin.dev; a `vs` cookie copied by hand from vicinity.city reads
+  signed out there (`/api/me` says `signedIn: false`); a POST with `Origin: https://vicinity.city` sent to citycoin.dev answers 403.
+- www.citycoin.dev: with the zone redirect, `curl -sI "https://www.citycoin.dev/launchpad?tab=new"` answers a redirect to
+  `https://citycoin.dev/launchpad?tab=new`; without it the name does not resolve.
+- vicinity.city answers exactly as before: the same pages, APIs and redirects as a snapshot taken before the deploy.
+- The synthetic probes of S54 are green on both hosts.
+
+**Before step 4:**
+
+- The legacy launch path is closed: a read-only RPC read of the legacy launchpad PDA shows `launches_paused = 1` (signed by
+  `13qRam…sRiN`, external E3), and the website builds no legacy launch (`LEGACY_LAUNCH=off`, S58).
+- No coin names vicinity.city: `/official-coins.csv` is empty and the legacy launchpad has launched no coin. Any such coin stops step 4
+  until the owner decides (policy `release_gates.legacy_immutable_metadata`: exact bytes served as long as existing assets depend on
+  them).
+- The on-chain partner record `2be9mDcn…si11` (section 0, item 2): a read-only RPC read shows that it names an address on
+  citycoin.dev, or the owner has accepted in writing that `https://vicinity.city/brand/vicinity-512.png` goes dark and that
+  acceptance is recorded as an owner decision in `policy.json` `amendments` and `src/masterpolicy.js` (kept identical), for this one
+  file on the old host. Without one of the two, step 4 waits (policy `release_gates.legacy_immutable_metadata`).
+- The post-deploy check checks citycoin.dev: `scripts/check-live.mjs` (default base `https://vicinity.city`, run after every deploy
+  by `.github/workflows/deploy.yml`) takes its base from `SITE_ORIGIN` (rebrand-inventory.md U10, stage S54). Otherwise the S55
+  deploy removes the vicinity.city routes and then fails its own live check, leaving a failed run with the site already changed.
+- Items 3 to 6 of section 0 are known to the owner; the mail sender and the link checker's list (items 5 and 6) are settled.
+
+**After step 4:**
+
+- citycoin.dev answers as after step 2, and its pages and links name `https://citycoin.dev` as the canonical origin.
+- `curl -sI https://vicinity.city/` and `curl -sI https://www.vicinity.city/` get no answer from this Worker and no `location` that
+  points at citycoin.dev.
+- The synthetic probes stay green on citycoin.dev through the observation period (external E15).
+
+**After step 5:** `curl -sI https://vicinitycity.com/` and `curl -sI https://www.vicinitycity.com/` no longer answer 302 to
+`https://vicinity.city/`, and nothing forwards them to citycoin.dev.
 
 ## 5. Rollback
 
-Set `HOST_REDIRECT` to `off` (change the value; do not delete the line, `keep_vars` would keep a dashboard value) and deploy: every answer is
-today's again at once. Browsers keep a 308 they already followed for at most one hour (`max-age=3600`). `run_worker_first: true` may stay
-or go back to the list; with the switch off it changes no answer the Worker gives, only which requests are Worker requests.
+`HOST_REDIRECT` is never set (section 0), so it has nothing to roll back.
+
+Step 4 rolls back by putting the two vicinity.city routes back in wrangler.jsonc and `SITE_ORIGIN` and `SITE_ORIGINS` back to their step 2
+values, then deploying; members' vicinity.city sessions are then still valid until they expire (section 6). This works only while the owner
+has not yet put vicinity.city to its other use. Once he has, there is no way back to vicinity.city, only fixes on citycoin.dev.
 
 The host binding (section 1.2) rolls back with `SITE_ORIGINS`: set it back to `https://vicinity.city` (or blank both settings) and deploy.
 Every session, pairing, hand-off and sign-up row is then found by its token alone again, on any host, as today; the `host` columns stay,
 nullable and unread. citycoin.dev then answers 421 on every Worker path (section 1.3: never served unbound) while its pages still load from
-the assets, so detach citycoin.dev in the same rollback. A member's citycoin.dev session row stays until it expires.
+the assets, so detach citycoin.dev in the same rollback. A member's citycoin.dev session row stays until it expires. This rollback applies
+only between steps 2 and 4, while vicinity.city still serves.
 
 ## 6. Sessions during the window
 
@@ -220,9 +329,9 @@ the assets, so detach citycoin.dev in the same rollback. A member's citycoin.dev
   is vicinity.city), with the same session, dashboard and roles. Browsers never send a vicinity.city cookie to citycoin.dev, so there the
   member signs in again with the same wallet and reaches the same account (`users.wallet`); no location check is asked (master section 05).
   A cookie carried by hand between the hosts is signed out on the other one. A Google- or e-mail-only member uses the legacy window (S14).
-- **With `HOST_REDIRECT` on** (S56): the vicinity.city session keeps answering the read-only API there; a write from an old tab is refused
-  with 421 and changes no row (section 1.1), except sign-out, which is served there so the old session can always be ended; a sign-in
-  trip that comes back to vicinity.city lands on citycoin.dev's sign-in page; pages move to citycoin.dev, where the member signs in.
+- **After step 4** (S55): vicinity.city no longer reaches this Worker, so a vicinity.city session can no longer be used or signed out
+  there; nothing redirects an old tab or a sign-in trip that comes back to vicinity.city. The member signs in on citycoin.dev with the
+  same wallet. The vicinity.city session rows end by themselves (the table below) and the scheduled job deletes them.
 
 **Expiry and retirement of what exists today** (master section 05: "Document the safe expiry/retirement of old sessions, handoff tokens and
 signing keys"). Nothing is deleted by S04; every row below ends by itself, and the scheduled job (`src/jobs.js`) deletes expired rows:
