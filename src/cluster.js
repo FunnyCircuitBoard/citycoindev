@@ -102,3 +102,13 @@ export function jupiterConfig(env = {}) {
 export const swapCluster = () => ({ cluster: "mainnet", chain: "solana:mainnet" });
 /** Solscan link for a signature on a cluster. */
 export const solscanTx = (sig, cluster = "mainnet") => `https://solscan.io/tx/${sig}${cluster === "mainnet" ? "" : `?cluster=${cluster}`}`;
+/**
+ * The Solana cluster the wallet challenges name (Citycoin.dev master v5, stage S09; master sections 05 BR-03 and 18 WP-02: a challenge is bound
+ * to the chain). It comes from this deployment's configuration: an explicitly set LAUNCHPAD_CLUSTER ("mainnet" or "devnet", the network of this
+ * deployment's own programs, wrangler.jsonc), else "mainnet", the network of the main token and of the swap (swapCluster above). A challenge
+ * records the cluster it was issued for and is refused if the configuration names another one when it comes back (src/challenge.js).
+ */
+export const identityCluster = (env = {}) => {
+  const raw = str(env && env.LAUNCHPAD_CLUSTER).toLowerCase();
+  return raw === "mainnet" || raw === "devnet" ? raw : swapCluster().cluster;
+};

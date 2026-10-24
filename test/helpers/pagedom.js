@@ -134,7 +134,10 @@ export class El extends Target {
       this.childNodes.push(x);
     }
   }
-  prepend(...nodes) { const rest = this.childNodes; this.childNodes = []; this.append(...nodes); for (const n of rest) this.childNodes.push(n); }
+  prepend(...nodes) {
+    const moving = new Set(nodes); // (a child moved to the front leaves its old place, as in a browser)
+    const rest = this.childNodes.filter((n) => !moving.has(n)); this.childNodes = []; this.append(...nodes); for (const n of rest) this.childNodes.push(n);
+  }
   replaceChildren(...nodes) { for (const n of this.childNodes) n.parentNode = null; this.childNodes = []; this.append(...nodes); }
   remove() { if (this.parentNode) { this.parentNode.childNodes.splice(this.parentNode.childNodes.indexOf(this), 1); this.parentNode = null; } }
   /** Puts `node` right after this element (moving it from wherever it was). */
@@ -144,6 +147,21 @@ export class El extends Target {
     node.remove();
     node.parentNode = p;
     p.childNodes.splice(p.childNodes.indexOf(this) + 1, 0, node);
+  }
+  /** Puts `node` where this element is, and takes this element out (the browser's replaceWith, for one node). */
+  replaceWith(node) {
+    const p = this.parentNode;
+    if (!p) return;
+    p.insertBefore(typeof node === "string" ? new Text(node) : node, this);
+    this.remove();
+  }
+  /** Puts `node` right before `ref`, a child of this element (at the end without one), as the browser's insertBefore does. */
+  insertBefore(node, ref) {
+    if (!ref) { this.append(node); return node; }
+    if (node.parentNode) node.remove();
+    node.parentNode = this;
+    this.childNodes.splice(this.childNodes.indexOf(ref), 0, node);
+    return node;
   }
   matches(selector) { return selectorList(selector)(this); }
   closest(selector) { const test = selectorList(selector); for (let x = this; x && x instanceof El && !(x instanceof Doc); x = x.parentNode) if (test(x)) return x; return null; }
@@ -183,6 +201,8 @@ export class Doc extends El {
   get hidden() { return false; }
   getElementById(id) { return this.descendants().find((e) => e.id === id) || null; }
   createElement(tag) { return new El(this, tag); }
+  /** An SVG element: here only an element with that tag (no drawing). */
+  createElementNS(ns, tag) { return new El(this, tag); }
   /** What a browser lets the keyboard land on. */
   canFocus(e) {
     if (!(e instanceof El) || e === this || !(e.native || e.hasAttribute("tabindex")) || e.disabled || !e.getClientRects().length) return false;

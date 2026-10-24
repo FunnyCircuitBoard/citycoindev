@@ -20,6 +20,7 @@ import { CITY_NAME_RE } from "./solana.js";
 import { cleanText } from "./text.js";
 import { COLS, FROM, present } from "./social.js";
 import { profilesOn } from "./flags.js";
+import { walletOnly } from "./v5policy.js";
 import { ensureProfilesSchema, feedApplied } from "./store.js";
 import { findMember, parseHandle } from "./profile-core.js";
 import { notify, postReason } from "./notify.js";
@@ -297,7 +298,7 @@ export async function handleModQueue(request, env, fetchImpl = fetch, now = Date
     .filter((o) => o.user_id !== u.id).map((o) => ({ id: o.id, city: o.city_name, country: o.country, founder: o.handle || o.name, seatStatus: o.status, reason: o.reason, at: o.created_at })) : [];
   const towns = pw.admin || pw.managerCountry ? (await db.prepare(`SELECT r.*, us.handle, us.name AS by_name FROM town_requests r JOIN users us ON us.id = r.user_id
     WHERE r.status IN ('waiting', 'recommended', 'not_recommended') AND (? = 1 OR r.country = ?) ORDER BY r.id LIMIT 100`).bind(pw.admin ? 1 : 0, pw.managerCountry || "").all()).results
-    .map((r) => ({ id: r.id, name: r.name, country: r.country, near: r.inside ? `inside ${r.near_name}` : r.near_name ? `about ${r.near_km} km from ${r.near_name}` : null, status: r.status, by: r.handle || r.by_name, at: r.created_at })) : [];
+    .map((r) => ({ id: r.id, name: r.name, country: r.country, near: nearWords(r), status: r.status, by: r.handle || r.by_name, at: r.created_at })) : [];
   const posts = await present(env, reported, u, pw, fetchImpl, now);
   for (const p of posts) p.pendingBy = pendingBy.has(p.id) ? (pendingBy.get(p.id) === u.id ? "you" : "another moderator") : null;
   const bios = profilesOn(env) ? await reportedBios(env, pw) : null; // no new key (and no new SQL) while the switch is off
@@ -318,7 +319,16 @@ export async function handleAudit(env, url) {
 
 /* ---------------- "add my town" ---------------- */
 
-/** POST /api/towns { name, attestation } — standing in the town. Stores the nearest community, never coordinates. */
+/** Where a town request was made, in words: inside a city, about N km from one, or (a request without a location, stage S13: near_km NULL)
+ *  the member's registered city, not location-checked. Rows with a location always have near_km (0 inside), so their words are as before. */
+const nearWords = (r) => (r.inside ? `inside ${r.near_name}` : !r.near_name ? null : r.near_km == null ? `registered in ${r.near_name}, not location-checked` : `about ${r.near_km} km from ${r.near_name}`);
+
+/**
+ * POST /api/towns { name, attestation } — standing in the town. Stores the nearest community, never coordinates.
+ * While WALLET_ONLY counts (Citycoin.dev master v5, stage S13; master section 19: no hidden location requirement): no attestation is asked;
+ * the request carries the member's registered country and city (near_km NULL: reviewers see "not location-checked"); an account without a
+ * city gets 409 no_home.
+ */
 export async function handleTownRequest(request, env, now = Date.now()) {
   const a = await access(request, env, now);
   if (a.error) return a.error;
@@ -329,6 +339,12 @@ export async function handleTownRequest(request, env, now = Date.now()) {
   if (!CITY_NAME_RE.test(name)) return json({ ok: false, error: "bad_name" }, 400);
   if (await db.prepare("SELECT id FROM town_requests WHERE user_id = ? AND status IN ('waiting', 'recommended', 'not_recommended')").bind(u.id).first()) {
     return json({ ok: false, error: "one_at_a_time" }, 409);
+  }
+  if (walletOnly(env)) {
+    if (!u.home_city) return json({ ok: false, error: "no_home" }, 409);
+    const r = await db.prepare("INSERT INTO town_requests (user_id, name, country, near_id, near_name, near_km, inside, created_at) VALUES (?, ?, ?, ?, ?, NULL, 0, ?)")
+      .bind(u.id, name, u.home_country, u.home_city, u.home_name, iso(now)).run();
+    return json({ ok: true, request: { id: r.meta.last_row_id, name, country: u.home_country, near: nearWords({ inside: 0, near_name: u.home_name, near_km: null }), status: "waiting" } });
   }
   const at = await useAttestation(env, body.attestation, { userId: u.id, purpose: "request", now });
   if (!at.ok) return json({ ok: false, error: at.error }, 400);

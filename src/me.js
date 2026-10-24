@@ -4,7 +4,8 @@
  *   GET  /api/me          → who you are, your live position, roles, badges, your founder path,
  *                           your city's seat / application window, your country's manager / election
  *   GET  /api/me?lite=1   → just who you are (for the header on every page)
- *   POST /api/home        → set your home community from a location attestation (never the location)
+ *   POST /api/home        → set your home community from a location attestation (never the location); while WALLET_ONLY counts (Citycoin.dev
+ *                           master v5, stage S13) only for an account that never had a city, once
  *   POST /api/me/google/remove → take off the Google sign-in the member added, and log out the other browsers (v2; adding it: src/auth.js handleGoogleAdd)
  */
 import { json, readJson } from "./http.js";
@@ -18,12 +19,13 @@ import { DAY, HOUR, POLICY, iso } from "./policy.js";
 import { VOTE_WEIGHT, activeBan, adminWallets, amountsFor, liveSeatOfUser, managerOf } from "./roles.js";
 import { cityPicture, cooldownUntil, eligibility, squadPicture } from "./seats.js";
 import { countryPicture } from "./elections.js";
-import { ensureNotifySchema, ensureProfilesSchema, ensureSchema, feedApplied } from "./store.js";
+import { ensureNotifySchema, ensureProfilesSchema, ensureRegisterSchema, ensureSchema, feedApplied } from "./store.js";
 import { communityById } from "./community.js";
 import { displayTicker } from "./tickers.js";
 import { latestBalances } from "./ledger.js";
 import { coinV2ReadyOn, dashboardV2On, feedV2On, notifyOn, profilesOn, v2On, walletSendOn } from "./flags.js";
-import { mainTokenV5 } from "./v5policy.js";
+import { IDENTITY_POLICY, mainTokenV5, walletOnly, walletOnlyHeld } from "./v5policy.js";
+import { legacyNotice } from "./legacy.js";
 import { unreadCount } from "./notify.js";
 import { countsOf } from "./profile-core.js";
 import { googleAdded, removeGoogle } from "./logins.js";
@@ -199,7 +201,14 @@ async function liveStatus(env, s, fetchImpl, now) {
 
 export async function handleMe(request, env, fetchImpl = fetch, now = Date.now()) {
   const s = await getSession(env, request, now);
-  const prov = providers(env);
+  // wallet-only sign-in (WALLET_ONLY counting, src/v5policy.js walletOnly; stage S10): the wallet is the only way in, and the page is told so
+  // (walletOnly: true). Set on but refused (walletOnlyHeld, review finding SEC-1): the same words, so no page offers today's logins (the sign-in
+  // routes answer 503 until the configuration is fixed). With the switch off: today's providers and no new key.
+  const only = walletOnly(env) || walletOnlyHeld(env);
+  const prov = only ? { wallet: true } : providers(env);
+  // the legacy link window (stage S14, src/legacy.js; only while it exists): { open, until }, so the connect page can tell a member whose account
+  // was made with Google or an e-mail address how (and until when) to link a wallet, or that the window has closed
+  const legacy = walletOnly(env) ? legacyNotice(env, now) : null;
   // The new sign-up (SIGNUP_FLOW=v2) says so in every answer, and tells a signed-in person whether they have a password.
   // Member profiles (PROFILES=on) say so too: profilesFlag, and for a signed-in member their bio (and, in the full answer,
   // their follower counts). The tabbed dashboard (DASHBOARD_V2=on) only says so: dashboardV2, and the page fetches its own code.
@@ -209,7 +218,7 @@ export async function handleMe(request, env, fetchImpl = fetch, now = Date.now()
   // Send from the Wallet tab (WALLET_SEND=on) says so too: walletSend (the page then fetches public/wallet-send.js and shows the Send button).
   const v2Flag = { ...(v2 ? { signupFlow: "v2" } : {}), ...(dv2 ? { dashboardV2: true } : {}), ...(feedV2On(env) ? { feedV2: true } : {}), ...(walletSendOn(env) ? { walletSend: true } : {}),
     // the ready-made city coin (COIN_V2_READY=on): the page then fetches public/coin-ready.js (src/coinready.js has the routes)
-    ...(coinV2ReadyOn(env) ? { coinV2Ready: true } : {}) };
+    ...(coinV2ReadyOn(env) ? { coinV2Ready: true } : {}), ...(only ? { walletOnly: true } : {}), ...(legacy ? { legacyLink: legacy } : {}) };
   const flag = pf ? { ...v2Flag, profilesFlag: true } : v2Flag;
   if (!s) return json({ signedIn: false, providers: prov, ...flag });
   if (!s.user) {
@@ -426,6 +435,7 @@ export async function handleHome(request, env, now = Date.now()) {
   const a = await access(request, env, now);
   if (a.error) return a.error;
   if (linkLocked(a.s, now)) return lockedAnswer(a.u);
+  if (walletOnly(env)) return homeOnce(request, env, a, now); // location once (stage S13)
   const u = a.u, db = env.DB;
   const body = await readJson(request);
   if (!body) return json({ ok: false, error: "bad_json" }, 400);
@@ -448,6 +458,38 @@ export async function handleHome(request, env, now = Date.now()) {
   }
   if (!home) return json({ ok: false, error: "unknown_city" }, 400);
   await db.prepare("UPDATE users SET home_city = ?, home_name = ?, home_country = ?, home_at = ? WHERE id = ?").bind(home.id, home.name, home.country, iso(now), u.id).run();
+  return json({ ok: true, home, joinedNearby: !att.city });
+}
+
+/**
+ * POST /api/home while WALLET_ONLY counts (Citycoin.dev master v5, stage S13; master section 19 "Permanent assignment": "city/country mapping
+ * is fixed at registration. No self-service relocation or repeated GPS refresh", and "If a legacy wallet has never had any verified location,
+ * completing its initial registration is allowed to request location once"). Only an account that never had a city (409 location_fixed
+ * otherwise, before any attestation is used), with a home attestation (POST /api/locate, purpose home, in the normal browser), once: the
+ * write itself holds only while home_city is still empty (two tabs racing: one wins, the other gets location_fixed). It records what a
+ * registration records: the city, its country, when it was verified, the policy version and how ('inside' or 'nearest'), never a coordinate.
+ */
+async function homeOnce(request, env, a, now) {
+  const u = a.u, db = env.DB;
+  if (u.home_city) return json({ ok: false, error: "location_fixed" }, 409);
+  const body = await readJson(request);
+  if (!body) return json({ ok: false, error: "bad_json" }, 400);
+  try { await ensureRegisterSchema(db); } // users.loc_verified_at, loc_policy, loc_method
+  catch (e) { console.error("location columns unavailable", String((e && e.message) || e).slice(0, 80)); return json({ ok: false, error: "unavailable" }, 503); }
+  const at = await useAttestation(env, body.attestation, { userId: u.id, purpose: "home", now });
+  if (!at.ok) return json({ ok: false, error: at.error }, 400);
+  const att = at.att;
+  let home = null;
+  if (att.city) home = { id: att.city, name: att.cityName, country: att.country };
+  else {
+    const pick = body.choice != null && (att.nearby || []).find((c) => c.id === String(body.choice));
+    if (!pick) return json({ ok: false, error: "choose_nearby", nearby: att.nearby || [] }, 400);
+    home = await communityById(env, att.country, pick.id);
+  }
+  if (!home) return json({ ok: false, error: "unknown_city" }, 400);
+  const r = await db.prepare(`UPDATE users SET home_city = ?, home_name = ?, home_country = ?, home_at = ?, loc_verified_at = ?, loc_policy = ?, loc_method = ?
+      WHERE id = ? AND home_city IS NULL`).bind(home.id, home.name, home.country, iso(now), att.iat || iso(now), IDENTITY_POLICY.policyVersion, att.city ? "inside" : "nearest", u.id).run();
+  if (!r.meta.changes) return json({ ok: false, error: "location_fixed" }, 409);
   return json({ ok: true, home, joinedNearby: !att.city });
 }
 

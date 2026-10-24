@@ -156,6 +156,29 @@ the Worker's settings describe, at the first request of an isolate (src/index.js
 - **Site origins.** An origin `src/site-config.js` refuses (it takes bare https origins only) is refused by the check too, by the same
   name, even where `validatePolicy` alone would accept it (an `http://localhost` origin in test or preview), so an accepted configuration
   is one the Worker really runs with.
+- **`WALLET_ONLY` as built (stages S09 to S14, local branch `cc/s09`, after the S09-S14 review; `src/v5policy.js` `walletOnly`,
+  `walletOnlyHeld`).** The exception to the rule above: `WALLET_ONLY` counts while its OWN inputs are accepted (`WALLET_ONLY_CODES`:
+  `DEPLOYMENT_ENV` named, `SITE_ORIGIN` and `SITE_ORIGINS` present, well formed and accepted by `src/site-config.js`). An error in any other
+  input (an `OFFICIAL_X_URL` typo, a refused `MAIN_TOKEN_MINT`, a malformed `LEGACY_LINK_UNTIL`) turns off only its own feature: it can never
+  switch wallet-only sign-in off and bring today's Google, e-mail and password logins back (review finding SEC-1). Set on but refused by
+  its own inputs, the Worker FAILS CLOSED (`walletOnlyHeld`): only wallet-bound sessions count, the Google, e-mail, password, tiny-transfer
+  and unlink routes and every `/api/me/wallet/*` path answer the unknown-path 404, `/api/auth/challenge`, `/api/auth/wallet`,
+  `/api/auth/reprove`, `/api/pair`, `/api/pair/status`, `/api/pair/finish` and every `/api/signup/*` path answer
+  `503 {ok: false, error: "unavailable"}`, and `/api/me` says `walletOnly: true` with the wallet as the only provider. Only `WALLET_ONLY`
+  unset or `off` is today's site. Whatever the switch says, a restricted legacy session (`sessions.proof = 'legacy_link'`) and a session of
+  an account the window closed (`users.legacy_state = 'closed_unresolved'`) are never sessions. The page build stops on any v5 setting of
+  `wrangler.jsonc` the check refuses, and on a `WALLET_ONLY=on` that would be held (`scripts/pages/build.mjs` `pageV5Config`).
+- **`LEGACY_LINK` as built (stage S14, local branch `cc/s09`; `src/v5policy.js` `legacyLink`).** The window counts only while
+  `WALLET_ONLY` counts and `LEGACY_LINK` is on; a missing or malformed `LEGACY_LINK_UNTIL` refuses the window alone
+  (`MISSING_LEGACY_LINK_UNTIL`, `LEGACY_LINK_UNTIL_INVALID`: wallet-only sign-in keeps counting). `LEGACY_LINK_UNTIL` is read as an ISO 8601
+  date or time (`YYYY-MM-DD`, or a time with `Z` or an offset); a bare date is 00:00 UTC of that day. The state is `open` while
+  `LEGACY_LINK` is on and the instant is ahead, `closed` while `LEGACY_LINK` is on and the instant has passed, and `off` otherwise (a
+  `LEGACY_LINK_UNTIL` alone is no window, open or closed: review finding SEC-4). Each reason `LEGACY_LINK=on` opens no window is logged once
+  per isolate as `legacy link switch refused <code>`: `LEGACY_LINK_WALLET_ONLY_OFF`, `LEGACY_LINK_POLICY_REFUSED`, `LEGACY_LINK_UNTIL_PASSED`.
+  The page build (`scripts/pages/build.mjs` `pageLegacyLink`) stops when `wrangler.jsonc` sets `LEGACY_LINK=on` with any of them, and on
+  any `LEGACY_LINK_UNTIL` in the past whatever `LEGACY_LINK` says. The scheduled job closes accounts (`closed_unresolved`) only once a
+  window was recorded open (the settings row `legacy_window_open` holds the end of the window last seen open, written by the job and by a
+  legacy login while the window is open) and that recorded end has passed; a later window opens a `closed_unresolved` account again.
 
 ### 2.3 Names chosen where the reconciliation files differed
 
@@ -327,6 +350,45 @@ Rules:
     never merged (§07, §18).
   - `city_assignments`: one `legacy_backfill` row per user with a wallet and a city, `assigned_at = signup_completed_at`.
 - **Retention.** `auth_challenges` rows are deleted by the existing 10-minute cleanup step (src/jobs.js:64-76) once expired.
+- **Built in stages S09 and S10** (local branch `cc/s09`, not merged; `src/store.js` `IDENTITY_MIGRATION` id `2026-10-24-identity-challenges`
+  and `IDENTITY_SESSION_MIGRATION` id `2026-10-24-identity-sessions-auth`, created only while `WALLET_ONLY` counts): `auth_challenges` as
+  above, with the purposes `login`, `register`, `reprove`, `admin` (the admin console's sign-in and fresh proofs) and the reserved
+  `legacy_link`; `ref` is a pairing's id (a phone approving a computer's sign-in), the session that asked for a re-proof, or the sign-up of a
+  `register` challenge; `used_by` is a hash naming the session or pairing the use made, with 128 random bits. `sessions.auth` is written
+  `'wallet'` by every wallet-only session. While the switch counts, `getSession` counts a session only when it belongs to an account, a
+  wallet proved it, it carries that account's current wallet and `auth` is `'wallet'` or NULL; nothing is deleted for it. The rest of this
+  section's statement list (`users` columns and backfills, the partial unique index, the trigger, `city_assignments`, `handoffs.bind`) is
+  not built yet (S08, S11, S13). The use statement adds `cluster = ?` to the conditions above.
+- **Built in stages S11 and S13** (local branch `cc/s09`, not merged; `src/store.js` `IDENTITY_REGISTER_MIGRATION` id
+  `2026-10-24-identity-register`, created by `ensureRegisterSchema` only while `WALLET_ONLY` counts, after `ensureIdentitySchema` and the
+  onboarding rebuild of `users`). It adds `users.signup_completed_at`, `loc_verified_at`, `loc_policy` and `loc_method` and the trigger
+  `users_signup_completed_once` (word for word as above). Three columns this section does not list are also added: `signups.display_name` (the
+  optional display name, checked like a username, used as the handle), `pairs.signup_id` and `pairs.bind` (the register pairing's sign-up and
+  city snapshot; `bind` is overwritten with a one-use marker by the batch that uses it), and `handoffs.bind` as above
+  (`{city, name, country}`). The registration batch (`src/register-core.js` `register`) is the rule above. Its gate is the challenge use, with
+  "the sign-up is still alive, with the current Terms and the city the challenge named" added to its own `WHERE`, plus the hand-off (`result`
+  'opened' → 'registered', by its opener) or the pairing. Then `INSERT INTO users (...) SELECT ... FROM signups s WHERE ... ON CONFLICT(wallet)
+  DO NOTHING` with provider `'wallet'` and provider id the wallet, `wallet_via` `'register'`, `loc_verified_at` the sign-up's `loc_at`,
+  `loc_policy` `'citycoin-master-v5'` (the policy's `policy_version`) and `loc_method` `'inside'` or `'nearest'`. Then the session for
+  `users WHERE wallet = ?`, and the clean-up. The partial unique index is not added: the column `UNIQUE` on `users.wallet`, kept by the
+  onboarding rebuild, is the conflict target and the guard. The backfill rules, `legacy_state` and `city_assignments` are not built (S08 or
+  S15). `POST /api/home` (S13) writes the city, `loc_verified_at` (the attestation's issue time), `loc_policy` and `loc_method` only
+  `WHERE home_city IS NULL`.
+- **Built in stage S14** (local branch `cc/s09`, not merged; `src/store.js` `LEGACY_MIGRATION` id `2026-10-24-identity-legacy`, created by
+  `ensureLegacySchema` only while the legacy link window exists, open or closed). It adds `users.legacy_state` (the `ALTER` above) and writes
+  the census once, under the same record: `wallet_linked` for an account with a wallet, `legacy_unlinked` for a `google` or `email` account
+  without one, NULL for `testlab` accounts and for accounts made later (a wallet registration is never a legacy case). The location-once
+  prompt and the quarantine of ambiguous rows are not built (S08). A restricted session is a `sessions` row with `auth = 'legacy_link'`, no
+  wallet, no proof and a 15-minute expiry, host-bound like every session. A `legacy_link` challenge's `ref` is `l:<session id>` (the
+  restricted session that asked) or `lp:<pairing id>` (a link pairing a phone approves). Its text is "Link this wallet to my existing
+  <product> account @<account>[ on my other device (check number NN)]", plus the free-signature sentence. A link is one batch: the challenge
+  is used (or the approved pairing is the gate), then `UPDATE users SET wallet, wallet_at, wallet_via ('legacy' or 'legacy_pair'), wallet_app
+  NULL, legacy_state 'linked_in_window' WHERE id = ? AND wallet IS NULL AND provider IN ('google','email') AND legacy_state is
+  legacy_unlinked AND no account has this wallet`, then the restricted session is deleted (and the pairing, for a pairing), each only if the
+  link happened. The scheduled job, while the window exists: an account recorded `legacy_unlinked` that has a wallet becomes `wallet_linked`.
+  While the window is open, a `google` or `email` account without a wallet and without a state becomes `legacy_unlinked`. Once it has
+  closed, every such account still without a wallet becomes `closed_unresolved`; its rows are kept, and nothing opens it. The rest of the
+  backfill above (`signup_completed_at`, `loc_*`, `city_assignments`) stays S08.
 
 ### 3.2 Founder selection, snapshots, receipts and the FounderRecord mirror (§16, §20, §21)
 
@@ -963,7 +1025,8 @@ triggers refuse a DELETE and any update that lowers `fencing` or changes the hol
 
 - **Auth levels.**
   - `public`: no session.
-  - `session`: a wallet-bound session cookie. Under `WALLET_ONLY` the cookie is host-only `__Host-` prefixed. Since stage S04 the
+  - `session`: a wallet-bound session cookie. Under `WALLET_ONLY` the cookie is host-only `__Host-` prefixed (design; as built the cookie
+    keeps its name `vs`, host-only with no Domain attribute: a recorded deviation, review finding SEC-9, see the S15 gate). Since stage S04 the
     session row carries `host` once `SITE_ORIGINS` lists a second host, and is refused on any other host (section 3.1). Today's cookie is
     `vs` (src/session.js:6), host-only (no `Domain`), `Secure`, `HttpOnly`, `SameSite=Lax`, unchanged by S04.
   - `fresh`: a session whose wallet was proven within the policy window (today 30 minutes: src/policy.js:90, src/auth.js:240-244).
@@ -993,6 +1056,21 @@ triggers refuse a DELETE and any update that lowers `fencing` or changes the hol
 |---|---|---|---|---|
 | `POST /api/auth/challenge` | public (`login`, `register`); session (`reprove`); legacy session (`legacy_link`) | `{purpose, address, ref?}` | `{challengeId, message, expiresAt}`; the message names origin, cluster, wallet, nonce, purpose, `Expiration Time` and says it is free and not a transaction | `bad_address`, `bad_purpose`, `location_required` (register before location), `slow_down` |
 | `POST /api/auth/wallet` (changed) | public | `{challengeId, address, signature}` | `{ok, user:{id, handle, city, country}, next}` and the session cookie | `challenge_unknown`, `challenge_expired` (410), `challenge_used` (409), `wrong_purpose`, `wrong_wallet`, `wrong_site`, `signature_mismatch`, `no_account` (404: go to registration in a normal browser; no location is asked here) |
+
+**As built in stages S09 and S10** (local branch `cc/s09`, not merged; the rows above stay the design). `POST /api/auth/challenge`
+`{purpose, address, pair?}` (only while `WALLET_ONLY` counts; otherwise the unknown-path 404 for every method) answers `{ok, challengeId,
+message, statement, purpose, expiresAt}`; purposes `login` (with `pair`, the code a computer shows: the text carries that pairing's check
+number and only that live login pairing can take the answer, else `410 pair_expired`), `admin` (anyone; the role is checked when the answer
+comes back), `reprove` (`401 sign_in`, `403 wrong_wallet`) and `register` (`409 location_required` until the sign-up's city is resolved;
+the registration that uses it is S11); `legacy_link` answers `bad_purpose` until S14 (as built below); also `403 wrong_origin`, `429 slow_down` (60 per 10
+minutes per connection), `503 unavailable`. The answer to a challenge carries the text back, because the row keeps only its hash:
+`POST /api/auth/wallet {challengeId, address, message, signature, pair?, inApp?}` answers `{ok, wallet, next}` and the session cookie (today's
+`vs` name), `{ok, paired}` for a pairing, or `challenge_required` (today's signed message), `challenge_unknown`, `bad_message` (not the text
+issued, or a pairing's text without its pairing), `bad_signature`, `wrong_purpose`, `wrong_site`, `wrong_cluster`, `wrong_wallet` (403),
+`challenge_used` (409), `challenge_expired` (410), `signature_mismatch` (401), `forbidden` (403, an `admin` challenge for a wallet with no
+role), `no_account` (404), `unavailable` (503: the database could not say; never accepted). `POST /api/auth/reprove` takes the same body
+with a `reprove` or `admin` challenge issued for that session (`403 wrong_session`). `GET /api/me` adds `walletOnly: true` and reports
+`providers: {wallet: true}`; the `user`, `registration` and `roles` keys of the design are not built yet.
 | `POST /api/auth/logout` (kept) | session | none | `{ok}`, cookie cleared | none |
 | `POST /api/signup/start`, `/location`, `/location/choice`, `/terms` (kept) | public (signup cookie) | as today | as today | as today; location stays in the normal browser |
 | `POST /api/signup/wallet` (new) | public (signup cookie) **(idem)** | `{challengeId, address, signature, displayName?}` | `{ok, user, existing:false}` or `{ok, user, existing:true}` when the wallet already had an account (its city is unchanged) | `location_required`, `signup_expired` (410: restart registration), challenge errors, `handle_taken` |
@@ -1000,6 +1078,112 @@ triggers refuse a DELETE and any update that lowers `fencing` or changes the hol
 | `POST /api/signup/handoff/info`, `/claim`, `/status` (new) | public | `{code, ...}` in the body, never in a URL | city and country label only; `claim` registers like `/api/signup/wallet` | `code_unknown`, `code_used`, `code_expired` (410), `contested` |
 | `GET /api/me` (changed) | session | none | adds `walletOnly`, `registration {city, country, verifiedAt, method}`, `roles {founderCity?, managerCountry?}` read from `founder_records` and `country_managers` | `sign_in` |
 | `POST /api/home` (changed) | fresh | `{attestation}` | `{ok, city}` | `location_fixed` (409) when a city is already set |
+
+**As built in stages S11 and S13** (local branch `cc/s09`, not merged; `src/register.js`, `src/register-core.js`; only while `WALLET_ONLY`
+counts, whatever `SIGNUP_FLOW` says; otherwise every path below is today's). Registration:
+- `POST /api/signup/start`, `GET /api/signup/state`, `POST /api/signup/location`, `/location/choice` and `/terms` are today's handlers. Their
+  `state` is `{terms, location, name, next}`, and `next` runs `location` → `terms` → `wallet`.
+- `POST /api/signup/name {displayName}` → `{ok, state}`. `"" | null` clears it. Errors: `bad_username`, `username_reserved`, `username_taken`,
+  `username_similar`, `slow_down`.
+- The challenge is `POST /api/auth/challenge {purpose: "register", address}` for this browser's sign-up, `409 location_required` or
+  `409 terms_required` until both are done; or `{..., handoff, opener}` for an opened register hand-off; or `{..., pair}` for a register
+  pairing (`410 pair_expired`), whose text adds " on my other device (check number NN)".
+- `POST /api/signup/wallet {challengeId, address, message, signature, inApp?, app?}` → `{ok, existing, wallet, user: {id, handle, city}, next}`
+  and the session cookie (the `vsu` cookie cleared). Errors: `401 no_signup` (restart), `409 location_required` or `terms_required`,
+  `403 wrong_signup` (a challenge of another sign-up, city, hand-off or pairing), `403 location_unverified`, `409 username_taken`,
+  `409 wallet_conflict`, `410 signup_expired`, `429 slow_down`, `503 unavailable`, and every challenge error of S09.
+- `POST /api/signup/handoff {app?}` → `{ok, code, pin, ref, url: <origin>/connect#register=<code>, expiresAt, relay?, openBy?}`, or
+  `409 handoff_relay`.
+- `POST /api/signup/handoff/info {code, opener?}` → `{ok, pin, community: {name, country}, terms, expiresAt, relay, opener}` and the
+  `__Host-vlo` cookie.
+- `POST /api/signup/handoff/claim {code, opener?, challengeId, address, message, signature, app?}` → as `/wallet`.
+- `POST /api/signup/handoff/status {ref}` → `{ok, status: waiting | opened | registered | contested | refused | expired}`.
+- The hand-off errors are `410 code_expired` (unknown, used, replaced, contested or out of time: one answer), `403 code_network`,
+  `403 contested`, `403 not_opened`, `410 signup_expired` and `409 location_changed`.
+- `POST /api/pair {purpose: "register"}` → `{ok, code, pin, purpose: "register", url: <origin>/connect#pair=<code>, expiresAt}` (five
+  minutes; `401 no_signup`, `409 location_required` or `terms_required`, `409 already_signed_in`). The phone answers at `POST /api/auth/wallet
+  {..., pair}` → `{ok, paired}`. The computer finishes at `POST /api/pair/finish {code}` → `{ok, status: "done", existing, wallet, user, next}`,
+  or `{ok: false, status: "waiting"}`, or `410 {status: "expired"}` for another browser. `GET /api/pair?code=` says `purpose: "register"`.
+
+Every other `/api/signup/*` path answers `404 {error: "not_found"}` before any method check.
+
+Location once (S13): `POST /api/home` (`409 location_fixed` before the body is read for an account with a city), `POST /api/locate` and
+`/api/locate/handoff` (purpose `home` only: `400 bad_request`; `409 location_fixed`; the hand-off lives five minutes). `POST /api/posts` refuses
+the kind `checkin` (`400 bad_kind`). `POST /api/towns {name}` needs no attestation (`409 no_home` without a city) and answers `near: "registered
+in <city>, not location-checked"`. `POST /api/seats/apply` and `/api/seats/squad/apply` take no attestation. `GET /api/me` is unchanged by
+these stages: the `registration` key of the design is not built.
+
+**As built in stage S12** (local branch `cc/s09`, not merged; the connect page and the clients). One server change, only while `WALLET_ONLY`
+counts: a login pairing (`POST /api/pair`, no purpose) answers `url: <origin>/connect#pair=<code>` and lives five minutes
+(`identity.handoff_seconds`), and `POST /api/pair/status {code}` answers what `GET /api/pair?code=` answers (`{status, pin, purpose}`, or
+`{status: "expired"}`; `403 wrong_origin`, `400 bad_json`, `405` for any other method). With the switch off or refused, `/api/pair/status` is
+the unknown-path 404 for every method and the login pairing is today's (`?pair=`, ten minutes). The pages read the switch only through
+`GET /api/me` `walletOnly: true`, so no page build changes with it:
+- `/connect` loads `public/wallet-only.js` and `public/wallet-only.css` (never fetched otherwise). Sign in: `POST /api/auth/challenge
+  {purpose: "login", address}`, then `POST /api/auth/wallet {challengeId, address, message, signature}`; `no_account` shows the no-account
+  screen. Register: `/api/signup/start`, `/location`, `/terms`, `/name` (only when the display name changes), then `POST /api/auth/challenge {purpose: "register", address}` and
+  `/api/signup/wallet`; or `/api/signup/handoff` (`/connect#register=<code>`, then `/info`, the challenge with `handoff` and `opener`, and
+  `/claim`; the starting browser polls `/status {ref}`); or `POST /api/pair {purpose: "register"}` polled with `POST /api/pair/status`. A
+  challenge older than 100 seconds is asked again before signing. No code is put in a URL a server sees.
+- `/admin` signs in and re-proves with `{purpose: "admin"}` challenges; `/dashboard` re-proves with `{purpose: "reprove"}`.
+- A wallet that showed the signed-in address and then reports another (Wallet Standard `standard:events` "change", or the legacy
+  `accountChanged`) makes the page call `POST /api/auth/logout`, clear its local state and open `/connect?mode=login`. Logout disconnects the
+  page's wallet adapters as well.
+
+**As built in stage S14** (local branch `cc/s09`, not merged; `src/legacy.js`). Only while the window exists: open or closed in
+`src/v5policy.js` `legacyLink`, which needs `WALLET_ONLY` to count. Otherwise every path below answers what S10 answers. Window open:
+- `GET /api/auth/google/start?legacy=1` goes to Google (today's callback address). `GET /api/auth/google/callback` of that trip (the OAuth
+  cookie's marker) always returns to `/connect?mode=legacy`: with `legacy=signed_in` and the restricted session's cookie, or with
+  `error=<code>` (`login_unavailable`, `login_cancelled`, `login_expired`, `login_failed`, `no_account` with `login=google`, `use_wallet`,
+  `window_closed`).
+- `POST /api/auth/email/start {email, legacy: true}` → `{ok: true}` for every well-formed address. The 6-digit code is filed under its own
+  name and mailed only to the login address of an e-mail account (`400 bad_email`, `503 email_unavailable`, `429 slow_down`: 20 an hour
+  per connection, 5 per address).
+- `POST /api/auth/email/verify {email, code, legacy: true}` → `{ok, legacy: true, account, expiresAt, next: "/connect?mode=legacy"}` and
+  the restricted session's cookie. Errors: `400 bad_code`, `400 code_wrong` (with `left`), `400 code_expired`, `429 too_many`,
+  `404 no_account` (`login: "email"`), `409 use_wallet`, `410 window_closed`, `429 slow_down`.
+- The forms without `legacy` (and every other method) keep the S10 404. A restricted session is signed out for every other route.
+- `POST /api/auth/challenge {purpose: "legacy_link", address}` for the restricted session (`401 legacy_sign_in` without one), or
+  `{purpose: "legacy_link", address, pair}` for a phone approving a link pairing (`410 pair_expired`), → `{ok, challengeId, message,
+  statement, purpose, expiresAt}`. A wallet that already has an account is refused at once: `409 wallet_taken`. `400 bad_request` with
+  `handoff`.
+- `POST /api/me/wallet/link {challengeId, address, message, signature}` → `{ok, linked: true, wallet, next: "/connect?mode=login"}`, with
+  the restricted session's cookie cleared. Errors: `401 legacy_sign_in`, `403 wrong_session` (a challenge another session asked for),
+  `409 wallet_taken`, `409 link_done`, `410 window_closed`, `429 slow_down` (10 an hour per account, 30 per connection), `405` for another
+  method, `503 unavailable`, and every challenge error of S09 (`signature_mismatch`, `wrong_wallet`, `wrong_purpose`, `challenge_used`,
+  `challenge_expired`...).
+- `POST /api/pair {purpose: "link"}` for the restricted session → `{ok, code, pin, purpose: "link", url: <origin>/connect#pair=<code>,
+  expiresAt}` (five minutes; `401 legacy_sign_in`). The phone approves at `POST /api/auth/wallet {..., pair}` with a `legacy_link`
+  challenge (a `login` challenge cannot approve a link pairing, and a `legacy_link` one cannot approve a login pairing). The computer
+  finishes at `POST /api/pair/finish {code}` → `{ok, status: "done", linked: true, wallet, next}`, `{ok: false, status: "waiting"}`, or
+  `410 {status: "expired"}` for any session but that account's restricted one.
+- `GET /api/me` adds `legacyLink: {open, until}` (also while closed, with `open: false`).
+Window closed: every legacy form above, `/api/me/wallet/link` and the link pairing's start answer
+`410 {ok: false, error: "window_closed", until}`, and a restricted session counts for nothing. The connect page says the window closed only
+on `/connect?mode=legacy`, never on Sign in or the no-account screen (review finding F8). While `WALLET_ONLY` counts, every other
+`/api/me/wallet/*` path (`/carry`, `/carry/info`, `/carry/claim`, `/carry/status`, `/disown`) answers the unknown-path 404 for every
+method, window or not. Without a window, `/api/me/wallet/link` does too.
+
+**Changed by the S09-S14 review** (local branch `cc/s09`; every change below is behind `WALLET_ONLY`, except the signature check, which
+applies to every signed message):
+- Signatures (review finding SEC-2, `src/solana.js` `verifySignature`, `isWalletKey`): a public key or a signature's R that is not a canonical
+  curve point, or that has small order (the System Program address `11111111111111111111111111111111` is one), and an S at or above the group
+  order, are refused before WebCrypto is asked (WebCrypto alone accepts R = small-order, S = 0 for a small-order key on any message).
+  `POST /api/auth/challenge` answers `400 bad_address` for such an address. No honest wallet is affected.
+- Register pairing (SEC-3): `POST /api/auth/challenge {purpose: "register", pair}` answers `409 use_sign_in` for a wallet that already has an
+  account, and `POST /api/pair/finish` of a register pairing answers `409 use_sign_in` (no session, nothing made) when the approving wallet
+  has an account by then. `existing: true` stays for the signer's own browser only (`/api/signup/wallet`, the hand-off claim).
+- Login pairing (SEC-5): `POST /api/pair {}` also sets the host-only HttpOnly cookie `__Host-vpr` (five minutes) and stores its SHA-256 in
+  `pairs.requester` (migration `2026-10-24-identity-pair-requester`, one nullable column, created only while the switch counts);
+  `POST /api/pair/finish` of a login pairing answers `410 {status: "expired"}` to any browser without that nonce, and clears it when done.
+- `GET /api/pair?code=` answers `405 method_not_allowed` (SEC-10): a pairing code never travels in a URL; the status is `POST /api/pair/status`.
+- The location-once link is `<origin>/locate#code=<code>` (SEC-6); `/locate` takes the code out of the address bar before any request.
+  With the switch off, `?code=` as today.
+- The registration's location step keeps the three nearest choices as ids and names only, never their distances (SEC-7):
+  `signups.loc_choices` = `[{id, name}]`, and the answers carry no `km`. Today's v2 sign-up is unchanged.
+- The register hand-off's first opener is told `403 contested` once a second browser opened the code (F7); anyone else keeps the one answer
+  `410 code_expired`.
+- The legacy census labels no account a wallet registration made (`provider = 'wallet'` keeps `legacy_state` NULL; F9).
 
 ### 4.2 Selection status (§20, §21, §33; switch `SELECTION_V5`, shown in shadow with a "provisional" label)
 
@@ -1169,18 +1353,18 @@ Route list at `4aa408e`: src/index.js:6-63 (header) and the route switch that st
 | `GET /api/message` (login, link) | change | `WALLET_ONLY` | replaced by `POST /api/auth/challenge` for login and link; codes leave the URL |
 | `POST /api/auth/wallet`, `/api/auth/reprove` | change | `WALLET_ONLY` | challenge-based, host-bound sessions |
 | `POST /api/auth/transfer`, `/api/auth/transfer/check` | retire (404) | `WALLET_ONLY` | the tiny-transfer proof is a payment, not a signature |
-| `/api/auth/google/*`, `/api/auth/email/*`, `/api/auth/password/*`, `/api/me/password`, `/api/me/google/*`, `/api/signup/email*`, `/api/signup/account/reset`, old `/api/signup/finish` | retire (404) | `WALLET_ONLY` (restricted legacy forms only during `LEGACY_LINK`) | identifiers and Terms receipts stay as data (§05) |
-| `/api/signup/location/handoff*` (location inside a wallet app) | retire | `WALLET_ONLY` | registration location stays in the normal browser (§19) |
+| `/api/auth/google/*`, `/api/auth/email/*`, `/api/auth/password/*`, `/api/me/password`, `/api/me/google/*`, `/api/signup/email*`, `/api/signup/account/reset`, old `/api/signup/finish` | retire (404) | `WALLET_ONLY` (restricted legacy forms only during `LEGACY_LINK`) | identifiers and Terms receipts stay as data (§05); the legacy forms (Google start with `?legacy=1` and its callback, e-mail start and verify with `legacy: true`) built in S14, 410 after the window |
+| `/api/signup/location/handoff*` (location inside a wallet app) | retire | `WALLET_ONLY` | registration location stays in the normal browser (§19); built in S11 (404) |
 | `/api/signup/start`, `/state`, `/terms`, `/location`, `/location/choice` | stay | none | reused by wallet-only registration |
 | `POST /api/pair`, `/api/pair/finish` | change | `WALLET_ONLY` | codes in POST bodies; 5 minutes; purpose `register` added |
-| `/api/me/wallet/link`, `/carry*` | change | `LEGACY_LINK` | only inside the legacy window, for legacy sessions |
+| `/api/me/wallet/link`, `/carry*` | change | `LEGACY_LINK` | only inside the legacy window, for legacy sessions. Built in S14: `POST /api/me/wallet/link` for the restricted session while the window is open, 410 after it, 404 without one; `/carry*` and `/disown` answer 404 while `WALLET_ONLY` counts (a phone links through a link pairing instead) |
 | `POST /api/me/wallet/unlink` | retire | `WALLET_ONLY` | one wallet is the account |
 | `GET /api/me`, `/api/me/*` profile routes | change / stay | `WALLET_ONLY` | new keys; roles from `founder_records` and `country_managers` |
-| `POST /api/home`, `/api/locate`, `/api/locate/handoff/*` | change | `WALLET_ONLY` | only for an account that was never located; purpose `home` only |
+| `POST /api/home`, `/api/locate`, `/api/locate/handoff/*` | change | `WALLET_ONLY` | only for an account that was never located; purpose `home` only (built in S13) |
 | `GET /api/seats`, `/api/claims`, `/api/seats/results/:id`, `/api/elections/results/:id`, `/api/moderator` | stay as history | `LEGACY_SEATS=frozen` | marked `historical: true`; never an input to roles |
 | `/api/seats/apply`, `/withdraw`, `/endorse`, `/object`, `/resign`, `/objections/decide`, `/squad/*`, `POST /api/elections/vote` | retire (410 `rule_retired`) | `LEGACY_SEATS=frozen` | replaced by automatic selection and owner-reviewed managers |
 | `GET /api/members`, `/api/audit`, `/api/posts*`, `/api/mod*`, `/api/appeals*`, `/api/feedback`, `/api/notices*`, `/api/profile*`, `/api/follow*`, `/api/block`, `/api/mutes` | stay | none | founders no longer moderate their city by default (R2) |
-| `POST /api/towns` | change | `WALLET_ONLY` | no GPS; uses the registered city and country |
+| `POST /api/towns` | change | `WALLET_ONLY` | no GPS; uses the registered city and country (built in S13) |
 | `GET /api/snapshots*`, `POST /api/snapshots/cancel` | stay as history | none | Founding Supporters snapshot is dormant; not a selection input |
 | `GET /api/coins`, `/api/prices` | stay | none | legacy design list (0 rows today) |
 | `POST /api/coins/design`, `/api/coins/mint`, `/api/coins/mint/decide`, `/api/coins/ready/use` | retire (409 or 404) | `METADATA_V5` | no direct founder metadata edit (§25, M01) |

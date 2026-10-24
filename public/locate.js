@@ -1,9 +1,13 @@
 // /locate?code=…: the phone's normal browser reads GPS for a check that was started in a wallet app's browser
 // (which often can't share it). The code comes from /api/locate/handoff; src/handoff.js has the rules.
+// While WALLET_ONLY counts the link is /locate#code=… instead: the code is read from the fragment and taken out of the address bar before any
+// request, so it never reaches a server log, the history or a Referer (review finding SEC-6). A ?code= link is read as always.
 (() => {
   "use strict";
   const { $, $$, api, getLocation } = window.V;
-  const code = new URLSearchParams(location.search).get("code");
+  const fromHash = new URLSearchParams(String(location.hash || "").slice(1)).get("code");
+  if (fromHash) { try { history.replaceState(null, "", location.pathname + location.search); } catch {} }
+  const code = fromHash || new URLSearchParams(location.search).get("code");
   const WHAT = { home: "set your home community", apply: "apply to found your city", checkin: "check in", request: "send your town request", signup: "check where you are for your new account" };
   const ERR = {
     location_unverified: "We couldn't confirm your location. Turn on precise location, use your normal mobile or home internet (no VPN) on the same phone as your wallet app, and try again.",

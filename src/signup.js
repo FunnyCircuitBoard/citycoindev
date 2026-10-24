@@ -20,6 +20,12 @@
  * Only finishCore (src/signup-finish.js) ever creates an account, and only from rows in the database (the Terms, the
  * community and the identity of this sign-up), never from anything the page says. Nothing here logs an address, a code, a
  * password or a coordinate.
+ *
+ * Wallet-only registration (Citycoin.dev master v5, stage S11; only while WALLET_ONLY counts, src/v5policy.js walletOnly): src/register.js
+ * routes /api/signup/* instead of routeV2 below, whatever SIGNUP_FLOW says, and reuses five of these handlers as they are (start, state,
+ * location, location choice, Terms: exported for it); their answers then carry the registration's own state (registerState: location, then
+ * Terms, then the wallet). Everything else here (the account step, the old finish, the location hand-off into a wallet app) is not routed
+ * then, and a sign-up location hand-off answers expired. With the switch off: exactly as before.
  */
 import { json, randomToken, readJson, sha256 } from "./http.js";
 import { cleanEmail, consumeEmailCode, getSession, linkIdentity, sendEmailCode, validEmail } from "./auth.js";
@@ -30,6 +36,7 @@ import { check, clientKey, limitKey } from "./limits.js";
 import { checkPassword, hashPassword } from "./password.js";
 import { HOUR, POLICY, iso } from "./policy.js";
 import { v2On } from "./flags.js";
+import { walletOnly } from "./v5policy.js";
 import { TERMS_VERSION, asText, endSignup, findHandoff, getSignup, guardV2, netOf, nextStep, startSignup, touchSignup } from "./signup-core.js";
 import { finishCore, sameLocationNetwork } from "./signup-finish.js";
 import { ensureHostSchema } from "./store.js";
@@ -75,11 +82,24 @@ export function signupState(row) {
 }
 
 /**
+ * The wallet-only registration's state (WALLET_ONLY counting; stage S11): the same location and Terms ticks, the optional display name, and
+ * the first step still open: "location" (in the normal browser, first), then "terms", then "wallet" (the account is made by the wallet's
+ * register signature: src/register-core.js). Never coordinates, a code or a hash.
+ */
+export function registerState(row) {
+  const s = signupState(row);
+  const next = !row.loc_city ? "location" : row.terms_version !== TERMS_VERSION ? "terms" : "wallet";
+  return { terms: s.terms, location: s.location, name: row.display_name || null, next };
+}
+/** The state a handler answers with: the registration's while WALLET_ONLY counts, today's otherwise. */
+const stateFor = (env, row) => (walletOnly(env) ? registerState(row) : signupState(row));
+
+/**
  * Who is asking, for the routes that change a sign-up: { row, session, reply } or { error }. A person who is already
  * signed in gets 409 already_signed_in (the page treats it as success); a missing or expired sign-up gets 401 no_signup
  * (the page calls start again). The sign-up gets another hour, and `reply` puts the refreshed cookie on a good answer.
  */
-async function needSignup(request, env, now) {
+export async function needSignup(request, env, now) {
   const session = await getSession(env, request, now);
   if (session && session.user) return { error: json({ ok: false, error: "already_signed_in" }, 409) };
   const row = await getSignup(env, request, now);
@@ -89,52 +109,58 @@ async function needSignup(request, env, now) {
   return { row, session, reply };
 }
 
-const reload = (env, id) => env.DB.prepare("SELECT * FROM signups WHERE id = ?").bind(id).first();
+export const reload = (env, id) => env.DB.prepare("SELECT * FROM signups WHERE id = ?").bind(id).first();
 const slowDown = () => json({ ok: false, error: "slow_down" }, 429);
 const badJson = () => json({ ok: false, error: "bad_json" }, 400);
 const communityOut = (row) => ({ id: row.loc_city, name: row.loc_name, country: row.loc_country });
 
 /** Count one try on each counter (atomically, before the work). Returns a 429 Response when any is over its maximum, else null. */
-async function limited(env, now, specs) {
+export async function limited(env, now, specs) {
   const r = await check(env, specs, now);
   return r.ok ? null : slowDown();
 }
-const perHour = async (env, kind, value, max) => ({ key: await limitKey(env, kind, value), windowMs: HOUR, max });
+export const perHour = async (env, kind, value, max) => ({ key: await limitKey(env, kind, value), windowMs: HOUR, max });
 
 /* ---------------- start, state ---------------- */
 
-async function handleStart(request, env, x) {
+export async function handleStart(request, env, x) {
   const session = await getSession(env, request, x.now);
   if (session && session.user) return json({ ok: false, error: "already_signed_in" }, 409);
   const row = await getSignup(env, request, x.now);
-  if (row) return json({ ok: true, state: signupState(row) }, 200, { "Set-Cookie": await touchSignup(env, row, request, x.now) });
+  if (row) return json({ ok: true, state: stateFor(env, row) }, 200, { "Set-Cookie": await touchSignup(env, row, request, x.now) });
   // This connection first: one that is over its limit is refused right there and does NOT use up the site's allowance (else a single
   // connection sending thousands of tries would close sign-up for everybody). Only a start that got through counts on the site.
   const over = await limited(env, x.now, [await perHour(env, "sus", clientKey(request), LIMITS.start.ip)])
     || await limited(env, x.now, [{ key: "sus:site", windowMs: HOUR, max: siteStarts(env) }]);
   if (over) return over;
   const made = await startSignup(env, x.now, servedHost(env, request)); // (bound to this host while the host binding counts: src/hostbind.js)
-  return json({ ok: true, state: signupState({}) }, 200, { "Set-Cookie": made.cookie });
+  return json({ ok: true, state: stateFor(env, {}) }, 200, { "Set-Cookie": made.cookie });
 }
 
 /** No sign-up yet: nothing is done (the same answer /start gives for a fresh one). Creates nothing. */
-async function handleState(request, env, x) {
+export async function handleState(request, env, x) {
   const row = await getSignup(env, request, x.now);
-  return json({ ok: true, state: signupState(row || {}) });
+  return json({ ok: true, state: stateFor(env, row || {}) });
 }
 
 /* ---------------- 1. location ---------------- */
 
-/** Keep a checked location in the sign-up: only the community (or the three nearest to choose from), never the point. */
-function locationColumns(found, cc, net, now) {
+/**
+ * Keep a checked location in the sign-up: only the community (or the three nearest to choose from), never the point. `noDistance` (the
+ * wallet-only registration, review finding SEC-7): the three choices are kept as their ids and names only, nearest first, never their distances
+ * from the point (three distances to known places give the point back to within a few kilometres: master section 19 step 3, "We keep your
+ * city/country, not your raw GPS coordinates"); the page then names each choice with its country.
+ */
+function locationColumns(found, cc, net, now, noDistance = false) {
   const { city, nearby } = communityOf(found);
+  const kept = nearby && noDistance ? nearby.map((n) => ({ id: n.id, name: n.name })) : nearby;
   return {
     sql: "loc_city = ?, loc_name = ?, loc_country = ?, loc_choices = ?, loc_net = ?, loc_at = ?",
-    values: [city ? city.id : null, city ? city.name : null, cc, nearby ? JSON.stringify(nearby) : null, net, iso(now)],
+    values: [city ? city.id : null, city ? city.name : null, cc, kept ? JSON.stringify(kept) : null, net, iso(now)],
   };
 }
 
-async function handleLocation(request, env, x) {
+export async function handleLocation(request, env, x) {
   const c = await needSignup(request, env, x.now);
   if (c.error) return c.error;
   const body = await readJson(request);
@@ -149,7 +175,7 @@ async function handleLocation(request, env, x) {
   // From here on only the community is used. The coordinates are not kept anywhere.
   const { found, cc } = checked;
   if (!found.city && !found.nearby.length) return json({ ok: false, error: "location_unverified" }, 403);
-  const cols = locationColumns(found, cc, netOf(x.cf), x.now);
+  const cols = locationColumns(found, cc, netOf(x.cf), x.now, walletOnly(env));
   const r = await env.DB.prepare(`UPDATE signups SET ${cols.sql} WHERE id = ? AND expires_at > ?`).bind(...cols.values, c.row.id, iso(x.now)).run();
   if (!r.meta.changes) return json({ ok: false, error: "no_signup" }, 401);
   return c.reply(locationAnswer(await reload(env, c.row.id)));
@@ -161,7 +187,7 @@ function locationAnswer(row) {
   return { ok: true, choices: (parseChoices(row.loc_choices) || []).map((n) => ({ id: n.id, name: n.name, country: row.loc_country, km: n.km })) };
 }
 
-async function handleChoice(request, env, x) {
+export async function handleChoice(request, env, x) {
   const c = await needSignup(request, env, x.now);
   if (c.error) return c.error;
   const body = await readJson(request);
@@ -218,6 +244,8 @@ async function handleHandoffInfo(request, env, x) {
  */
 export async function handleSignupHandoffComplete(request, env, row, body, now = Date.now(), cf = request.cf) {
   if (!v2On(env)) return json({ ok: false, error: "expired" }, 410); // a link made under v2 is dead once the switch is off
+  // wallet-only (stage S11): registration's location is read in the normal browser only, never handed out of a wallet app (master section 19)
+  if (walletOnly(env)) return json({ ok: false, error: "expired" }, 410);
   if (row.result) return json({ ok: false, error: "already_done" }, 409);
   if (cf && row.net && netOf(cf) !== row.net) return json({ ok: false, error: "location_unverified" }, 403);
   const over = await limited(env, now, [
@@ -266,7 +294,7 @@ async function handleHandoffClaim(request, env, x) {
 
 /* ---------------- 2. terms and account ---------------- */
 
-async function handleTerms(request, env, x) {
+export async function handleTerms(request, env, x) {
   const c = await needSignup(request, env, x.now);
   if (c.error) return c.error;
   const body = await readJson(request);
@@ -274,7 +302,7 @@ async function handleTerms(request, env, x) {
   if (body.version !== TERMS_VERSION) return json({ ok: false, error: "bad_version" }, 400);
   await env.DB.prepare("UPDATE signups SET terms_version = ?, terms_at = CASE WHEN terms_version = ? THEN terms_at ELSE ? END WHERE id = ? AND expires_at > ?")
     .bind(TERMS_VERSION, TERMS_VERSION, iso(x.now), c.row.id, iso(x.now)).run();
-  return c.reply({ ok: true, state: signupState(await reload(env, c.row.id)) });
+  return c.reply({ ok: true, state: stateFor(env, await reload(env, c.row.id)) });
 }
 
 /** Forget the account step only (who the person is and the e-mail + password they typed), so they can pick another way. */

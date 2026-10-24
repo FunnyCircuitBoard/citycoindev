@@ -173,6 +173,11 @@ const ALLOWED_EDGES = {
   // add two that only refuse: CUTOVER_HOSTS (citycoin.dev and its www are refused until SITE_ORIGINS lists citycoin.dev) and localDevAllowed
   // (this computer's hosts are honoured outside production only); neither names nor stores anything (test/host-review.test.js).
   "src/hostbind.js>src/site-config.js": ["CUTOVER_HOSTS", "DEFAULT_SITE", "LOCAL_HOST", "acceptedHost", "localDevAllowed", "siteConfig"],
+  // stages S09 and S10, the server's wallet challenges (WALLET_ONLY only; rebrand-inventory.md L16: "New purpose-specific statements, for example
+  // 'Sign in to Citycoin.dev with this wallet.'"): the product's name in the words of a NEW statement, a label. It renames nothing pinned above:
+  // today's statements, the signed-message format and its single-use digest stay (the test above); a challenge's text lives two minutes and is
+  // stored only as a hash, checked against the text issued, never rebuilt from a label (test/identity-challenge.test.js)
+  "src/challenge.js>src/brand.js": ["brandOf"],
 };
 /** The relative modules a file imports (static import and export-from, and import()): [{ to, names }] (names null for a namespace or a call). */
 function importsOf(file) {

@@ -1284,3 +1284,161 @@ export function ensureHostSignupSchema(db) {
   }
   return hostSignupReady.get(db);
 }
+
+/**
+ * The wallet challenges and the session's sign-in kind (Citycoin.dev master v5, stages S09 and S10; docs/citycoin-master/schema-and-api.md
+ * section 3.1; src/challenge.js). Like the others, deliberately NOT in MIGRATIONS: it runs only while WALLET_ONLY counts (src/v5policy.js
+ * walletOnly), the first time a challenge is issued or checked, or a session is read or made then. With the switch unset no statement here
+ * ever touches the database. Additive and safe to repeat: a new table and its index (IF NOT EXISTS), and one nullable column (each ALTER on its
+ * own, "duplicate column" ignored: safe from two servers at once), then the record. No row is rewritten.
+ *   auth_challenges   one row per challenge a wallet is asked to sign: a 128-bit random id (the client's handle), the SHA-256 of its nonce
+ *                     (the nonce itself exists only inside the signed text), the purpose (login, register, reprove, admin; legacy_link is
+ *                     reserved for the legacy link window, stage S14), the allowlist host and the cluster it names, the wallet it is for,
+ *                     what it is bound to (`ref`: a pairing's id, or the session that asked for a re-proof), the SHA-256 of the exact text,
+ *                     when it was made and when it ends (120 seconds later: policy.identity.challenge_seconds), and when it was used and by
+ *                     what (`used_by`: a hash naming the session or pairing the use made). Used once: the use is a conditional UPDATE in the
+ *                     same D1 batch as the session it makes. The scheduled job deletes expired rows (src/jobs.js).
+ *   sessions.auth     how a session was made: 'wallet' (a wallet challenge), NULL (before the switch: Google, e-mail, password or a signed
+ *                     message of today's kind). While the switch counts a session never proven by a wallet is not a session (src/auth.js
+ *                     getSession); 'legacy_link' is reserved for the restricted legacy link sessions of stage S14.
+ */
+export const IDENTITY_MIGRATION = Object.freeze({
+  id: "2026-10-24-identity-challenges",
+  sql: `
+CREATE TABLE IF NOT EXISTS auth_challenges (
+  id           TEXT PRIMARY KEY,
+  nonce_hash   TEXT NOT NULL UNIQUE,
+  purpose      TEXT NOT NULL CHECK (purpose IN ('login', 'register', 'reprove', 'admin', 'legacy_link')),
+  host         TEXT NOT NULL,
+  cluster      TEXT NOT NULL,
+  wallet       TEXT NOT NULL,
+  ref          TEXT,
+  message_hash TEXT NOT NULL,
+  created_at   TEXT NOT NULL,
+  expires_at   TEXT NOT NULL,
+  used_at      TEXT,
+  used_by      TEXT
+);
+CREATE INDEX IF NOT EXISTS auth_challenges_expires ON auth_challenges (expires_at)
+`,
+});
+export const IDENTITY_SESSION_MIGRATION = Object.freeze({ id: "2026-10-24-identity-sessions-auth", columns: Object.freeze(["ALTER TABLE sessions ADD COLUMN auth TEXT"]) });
+const identityReady = new WeakMap();
+/** Create auth_challenges and sessions.auth once (above). Rejects on failure and forgets that it tried, so the next request retries; every
+ *  caller then refuses (a challenge that cannot be stored or checked is never accepted). */
+export function ensureIdentitySchema(db) {
+  if (!identityReady.has(db)) {
+    identityReady.set(db, (async () => {
+      await ensureSchema(db); // schema_migrations and sessions exist
+      const done = await db.prepare("SELECT id FROM schema_migrations WHERE id = ?").bind(IDENTITY_MIGRATION.id).first();
+      if (!done) {
+        for (const s of split(IDENTITY_MIGRATION.sql)) await db.prepare(s).run();
+        await db.prepare("INSERT OR IGNORE INTO schema_migrations (id, applied_at) VALUES (?, ?)").bind(IDENTITY_MIGRATION.id, new Date().toISOString()).run();
+      }
+      await columnsMigrate(db, IDENTITY_SESSION_MIGRATION);
+    })().catch((e) => { identityReady.delete(db); throw e; }));
+  }
+  return identityReady.get(db);
+}
+
+/**
+ * The browser that asked for a login pairing (review finding SEC-5; only while WALLET_ONLY counts, the first time a login pairing is made or
+ * finished then; with the switch unset no statement here ever runs). One nullable column, additive, safe to repeat:
+ *   pairs.requester  the SHA-256 of a random nonce held by the browser that showed the code (the host-only HttpOnly cookie __Host-vpr): only that
+ *                    browser can finish the pairing, so a person who sees the QR code or the link cannot take the session.
+ */
+export const IDENTITY_PAIR_MIGRATION = Object.freeze({ id: "2026-10-24-identity-pair-requester", columns: Object.freeze(["ALTER TABLE pairs ADD COLUMN requester TEXT"]) });
+const pairRequesterReady = new WeakMap();
+/** Add pairs.requester once (above), after the challenge schema. Rejects on failure and forgets that it tried; the caller answers 503. */
+export function ensurePairRequesterSchema(db) {
+  if (!pairRequesterReady.has(db)) {
+    pairRequesterReady.set(db, ensureIdentitySchema(db).then(() => columnsMigrate(db, IDENTITY_PAIR_MIGRATION)).catch((e) => { pairRequesterReady.delete(db); throw e; }));
+  }
+  return pairRequesterReady.get(db);
+}
+
+/**
+ * Wallet-only registration and location once (Citycoin.dev master v5, stages S11 and S13; docs/citycoin-master/schema-and-api.md section
+ * 3.1; src/register.js, src/register-core.js). Like the others, deliberately NOT in MIGRATIONS: it runs only while WALLET_ONLY counts
+ * (src/v5policy.js walletOnly), the first time a registration route, a register pairing or the location-once route needs it. With the switch
+ * unset no statement here ever touches the database. Additive and safe to repeat: plain nullable columns (each ALTER on its own, "duplicate
+ * column" ignored: safe from two servers at once) and one trigger (IF NOT EXISTS), then the record. No row is rewritten (the backfill of
+ * existing members is not part of this stage). It runs after the wallet challenges (ensureIdentitySchema) and after the onboarding rebuild of
+ * users (ensureOnboardSchema), which re-creates no trigger: the trigger below must come after it.
+ *   users.signup_completed_at  when the wallet's registration completed (the founder tie-break needs it later); set once, by the
+ *                              registration batch, and never changed again (the trigger)
+ *   users.loc_verified_at      when the browser's location was verified for this account (the sign-up's location step, or the one
+ *                              location of an account that never had a city)
+ *   users.loc_policy           the policy version it was verified under (IDENTITY_POLICY.policyVersion: "citycoin-master-v5")
+ *   users.loc_method           'inside' (the point was inside the city) or 'nearest' (one of the three nearest, in empty land): the
+ *                              privacy-safe evidence; never a coordinate
+ *   signups.display_name       the optional display name typed during registration (checked like a username), used as the handle
+ *   handoffs.bind              a register hand-off's snapshot of the city it was made for: JSON {city, name, country}, never coordinates
+ *   pairs.signup_id            the sign-up a register pairing belongs to (the computer that showed the code)
+ *   pairs.bind                 its city snapshot, like handoffs.bind; overwritten with a one-use marker by the batch that uses it
+ */
+export const IDENTITY_REGISTER_MIGRATION = Object.freeze({
+  id: "2026-10-24-identity-register",
+  columns: Object.freeze([
+    "ALTER TABLE users ADD COLUMN signup_completed_at TEXT",
+    "ALTER TABLE users ADD COLUMN loc_verified_at TEXT",
+    "ALTER TABLE users ADD COLUMN loc_policy TEXT",
+    "ALTER TABLE users ADD COLUMN loc_method TEXT",
+    "ALTER TABLE signups ADD COLUMN display_name TEXT",
+    "ALTER TABLE handoffs ADD COLUMN bind TEXT",
+    "ALTER TABLE pairs ADD COLUMN signup_id TEXT",
+    "ALTER TABLE pairs ADD COLUMN bind TEXT",
+    // one statement (the semicolon is inside BEGIN ... END): never split
+    "CREATE TRIGGER IF NOT EXISTS users_signup_completed_once BEFORE UPDATE OF signup_completed_at ON users WHEN OLD.signup_completed_at IS NOT NULL AND NEW.signup_completed_at IS NOT OLD.signup_completed_at BEGIN SELECT RAISE(ABORT, 'signup_completed_at_immutable'); END",
+  ]),
+});
+const registerReady = new WeakMap();
+/** Create the registration columns and the trigger once (above), after the challenge, sign-up and onboarding schemas. Rejects on failure and
+ *  forgets that it tried, so the next request retries; every caller then answers 503 and nothing else is affected. */
+export function ensureRegisterSchema(db) {
+  if (!registerReady.has(db)) {
+    registerReady.set(db, ensureIdentitySchema(db).then(() => ensureOnboardSchema(db)).then(() => columnsMigrate(db, IDENTITY_REGISTER_MIGRATION))
+      .catch((e) => { registerReady.delete(db); throw e; }));
+  }
+  return registerReady.get(db);
+}
+
+/**
+ * The legacy link window (Citycoin.dev master v5, stage S14; master section 05 BR-03 "mark unresolved ownership as a specific migration case";
+ * docs/citycoin-master/schema-and-api.md section 3.1; src/legacy.js). Like the others, deliberately NOT in MIGRATIONS: it runs only while the
+ * window exists (src/v5policy.js legacyLink: "open" or "closed", which needs WALLET_ONLY to count), the first time a legacy route or the
+ * scheduled job needs it. With the switches unset no statement here ever touches the database. Additive: one nullable column (the ALTER on
+ * its own, "duplicate column" ignored: safe from two servers at once), then, under the same record, the census of R1 section 9 written once
+ * into it, then the record. Nothing else of a row is changed.
+ *   users.legacy_state   the member's migration case (R1 section 9):
+ *                          'wallet_linked'      an account that had its wallet when the window first counted (M1, M2: signs in with it)
+ *                          'legacy_unlinked'    an account made with Google or an e-mail address and no wallet (M3: may link one in the window)
+ *                          'linked_in_window'   such an account that linked a wallet through the window (src/legacy.js)
+ *                          'closed_unresolved'  such an account still without a wallet when the window closed: its data is kept, nothing opens it
+ *                        NULL: a test-lab account, or an account a wallet registration made (provider 'wallet', before or after the
+ *                        census: never a legacy case; review finding F9).
+ */
+export const LEGACY_MIGRATION = Object.freeze({
+  id: "2026-10-24-identity-legacy",
+  column: "ALTER TABLE users ADD COLUMN legacy_state TEXT",
+  census: `UPDATE users SET legacy_state = CASE WHEN wallet IS NOT NULL THEN 'wallet_linked' ELSE 'legacy_unlinked' END
+    WHERE legacy_state IS NULL AND provider NOT IN ('testlab', 'wallet') AND (wallet IS NOT NULL OR provider IN ('google', 'email'))`,
+});
+const legacyReady = new WeakMap();
+/** Create users.legacy_state and write the census once (above), after the challenge and onboarding schemas (sessions.auth, users.wallet_at,
+ *  pairs.purpose). Rejects on failure and forgets that it tried, so the next request retries; every legacy route then answers 503. */
+export function ensureLegacySchema(db) {
+  if (!legacyReady.has(db)) {
+    legacyReady.set(db, (async () => {
+      await ensureIdentitySchema(db);
+      await ensureOnboardSchema(db);
+      const done = await db.prepare("SELECT id FROM schema_migrations WHERE id = ?").bind(LEGACY_MIGRATION.id).first();
+      if (done) return;
+      try { await db.prepare(LEGACY_MIGRATION.column).run(); }
+      catch (e) { if (!isDuplicateColumn(e)) throw e; }
+      await db.prepare(LEGACY_MIGRATION.census).run();
+      await db.prepare("INSERT OR IGNORE INTO schema_migrations (id, applied_at) VALUES (?, ?)").bind(LEGACY_MIGRATION.id, new Date().toISOString()).run();
+    })().catch((e) => { legacyReady.delete(db); throw e; }));
+  }
+  return legacyReady.get(db);
+}

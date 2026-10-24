@@ -54,7 +54,7 @@
 import { ensureSchema } from "./store.js";
 import { deploymentFromEnv, policyConfig } from "./v5policy.js";
 
-/** Groups named in CC5_ORDER whose statements belong to another stage: stage S09 (local branch cc/s09) adds cc5-identity, first. */
+/** Groups named in CC5_ORDER whose statements belong to another stage. cc5-identity stays reserved: stages S09 to S14 create their identity tables and columns with their own lazy migrations in src/store.js. */
 export const CC5_RESERVED = Object.freeze({
   "cc5-identity": "schema-and-api.md section 3.1, stage S09: runs first, after ONBOARD_MIGRATION (src/store.js); not built in stage S08",
 });

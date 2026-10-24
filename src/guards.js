@@ -30,6 +30,9 @@ export const PUBLIC_LIMITS = {
   // cookie the connection is counted (such a check answers "no proof" and costs nothing).
   transfer_check: { max: 90, windowMs: 10 * MIN, by: "session" },
   pair:           { max: 20, windowMs: 10 * MIN },  // POST /api/pair: one row each
+  // POST /api/auth/challenge (WALLET_ONLY only, src/challenge.js): one row each, alive two minutes. Every sign-in, re-proof and pairing
+  // approval asks for one, and phones share addresses on mobile networks: twice the transfer proof's allowance
+  challenge:      { max: 60, windowMs: 10 * MIN },
   rank:           { max: 60, windowMs: MIN },       // GET /api/rank: an RPC call when the snapshot is down (a cache hit is not counted)
   // GET /api/coin and /api/coin/chart (LAUNCHPAD_V2=on): outside sources and the database on an edge-cache miss (a hit is not counted)
   coin:           { max: 60, windowMs: MIN },

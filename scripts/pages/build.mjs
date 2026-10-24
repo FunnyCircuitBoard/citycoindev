@@ -26,9 +26,9 @@ import { fileURLToPath } from "node:url";
 import { SOCIAL_PROFILES, officialAddresses, socialProfiles } from "../../src/official.js";
 import { brandLabels, brandOf } from "../../src/brand.js";
 import { esc, escBrand, rewriteSocialLinks, socialList } from "../../src/footer-social.js";
-import { hostRedirectOn, mainTokenV5On } from "../../src/flags.js";
+import { hostRedirectOn, legacyLinkOn, mainTokenV5On, walletOnlyOn } from "../../src/flags.js";
 import { deploymentAccepted } from "../../src/maintoken.js";
-import { policyConfig } from "../../src/v5policy.js";
+import { legacyLinkUntil, policyConfig, walletOnlyRefusals } from "../../src/v5policy.js";
 import { siteConfig } from "../../src/site-config.js";
 import { isSolanaAddress } from "../../src/solana.js";
 import { settingsFrom } from "../mainnet-preflight.mjs";
@@ -253,6 +253,40 @@ export function pageRouting(vars = deployedVars(), assets = deployedAssets()) {
   return { pagesReachWorker };
 }
 
+/**
+ * The legacy link window (stage S14): LEGACY_LINK=on in wrangler.jsonc stops the build unless the Worker would open the window, that is unless the
+ * v5 configuration check accepts the settings (WALLET_ONLY=on with DEPLOYMENT_ENV, SITE_ORIGIN and SITE_ORIGINS; LEGACY_LINK_UNTIL present and an
+ * ISO date: LEGACY_LINK_WITHOUT_WALLET_ONLY, MISSING_LEGACY_LINK_UNTIL, LEGACY_LINK_UNTIL_INVALID...) and LEGACY_LINK_UNTIL is still ahead of
+ * `now` (LEGACY_LINK_UNTIL_PASSED: a date in the past never opens a window). The same rule as MAIN_TOKEN_V5 and HOST_REDIRECT: never deploy a
+ * switch that does not count. After the window, the configuration takes LEGACY_LINK off and may keep LEGACY_LINK_UNTIL: the Worker keeps
+ * answering 410 for the legacy routes (src/v5policy.js legacyLink "closed"), and this check has nothing to refuse. A LEGACY_LINK set only in the
+ * Cloudflare dashboard is refused at run time instead (src/v5policy.js legacyLinkRefusals, logged once per isolate).
+ */
+export function pageLegacyLink(vars = deployedVars(), now = Date.now()) {
+  // a LEGACY_LINK_UNTIL in the past stops the build whatever LEGACY_LINK says (review finding SEC-4: a mistyped year prepared ahead of the window
+  // must never reach the Worker). After a window, the configuration pull request removes LEGACY_LINK and LEGACY_LINK_UNTIL together.
+  const until = legacyLinkUntil(vars);
+  if (!legacyLinkOn(vars)) {
+    if (until !== null && until <= now) throw new Error("LEGACY_LINK_UNTIL in wrangler.jsonc is in the past (LEGACY_LINK_UNTIL_PASSED): a date that has passed never opens a window; remove it (after a window, remove LEGACY_LINK and LEGACY_LINK_UNTIL together) or set a date that is still ahead");
+    return { legacyLink: false };
+  }
+  const refused = [...policyConfig(vars).errors.map((e) => e.code), ...(until !== null && until <= now ? ["LEGACY_LINK_UNTIL_PASSED"] : [])];
+  if (refused.length) throw new Error(`LEGACY_LINK=on in wrangler.jsonc with a configuration the Worker refuses (${[...new Set(refused)].join(", ")}): the legacy link window needs WALLET_ONLY=on, DEPLOYMENT_ENV, SITE_ORIGIN and SITE_ORIGINS, and LEGACY_LINK_UNTIL as an ISO date that is still ahead`);
+  return { legacyLink: true, until: new Date(until).toISOString() };
+}
+
+/**
+ * Every v5 switch and input in wrangler.jsonc (review finding SEC-1): the build stops on any error the v5 configuration check names (an
+ * OFFICIAL_X_URL typo, a malformed MAIN_TOKEN_MINT, a missing DEPLOYMENT_ENV...), and on WALLET_ONLY=on that the Worker would refuse (it would fail
+ * closed: sign-in answering 503). With none of them set (today) there is nothing to check. Values set only in the Cloudflare dashboard are
+ * checked at run time instead (logged once per isolate) and must be confirmed by the deploy checklist.
+ */
+export function pageV5Config(vars = deployedVars()) {
+  const refused = [...policyConfig(vars).errors.map((e) => e.code), ...(walletOnlyOn(vars) ? walletOnlyRefusals(vars) : [])];
+  if (refused.length) throw new Error(`wrangler.jsonc has v5 settings the Worker refuses (${[...new Set(refused)].join(", ")}): fix them before the pages are built`);
+  return { ok: true };
+}
+
 export const PAGES_BUILT_FILE = fileURLToPath(new URL("../../src/pages-built.js", import.meta.url));
 /**
  * The text of src/pages-built.js for these settings: whether the pages carry MAIN_TOKEN_V5 (only once pageSocials accepts it, so never
@@ -298,6 +332,8 @@ export const buildStandalonePages = ({ brand, socials } = {}) => build(true, bra
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   pageRouting(); // stops before any page is written when wrangler.jsonc sets HOST_REDIRECT=on without the pages reaching the Worker
+  pageLegacyLink(); // and when it sets LEGACY_LINK=on without a window the Worker would open (stage S14), or a past LEGACY_LINK_UNTIL
+  pageV5Config(); // and on any v5 switch or input the Worker would refuse (review finding SEC-1)
   for (const [f, html] of [...buildPages(), ...buildStandalonePages()]) { writeFileSync(OUT + f, html); console.log("page ready:", f); }
   writeFileSync(PAGES_BUILT_FILE, pagesBuiltSource());
   console.log("ready: src/pages-built.js");

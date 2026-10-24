@@ -11,6 +11,11 @@
  * the result is deleted when claimed. The browser that completes it must come from the same internet connection
  * (same country and network operator) as the one that started it, so the link can't be handed to a friend in
  * another town to answer for you. The coordinates are never stored: only the attestation (a community) is.
+ *
+ * While WALLET_ONLY counts (Citycoin.dev master v5, stage S13): the hand-off exists only for the one location of an account that never had a
+ * city (purpose home; 400 bad_request for any other purpose, 409 location_fixed for a located account), and a code lives five minutes (policy
+ * identity.handoff_seconds); a code of another purpose made before the switch is dead (410 expired). The sign-up's own location hand-off is
+ * retired (src/signup.js: registration reads the location in the normal browser only).
  */
 import { json, randomToken, readJson, sameSite, sha256 } from "./http.js";
 import { getSession } from "./auth.js";
@@ -19,6 +24,7 @@ import { HOUR, POLICY, iso } from "./policy.js";
 import { handleSignupHandoffComplete } from "./signup.js";
 import { ensureHostSchema } from "./store.js";
 import { hostWrite, onThisHost, servedHost } from "./hostbind.js";
+import { IDENTITY_POLICY, walletOnly } from "./v5policy.js";
 
 const MINUTES = 10;
 /** Where the person's connection is, coarsely: country and network operator. null off Cloudflare (local tests). */
@@ -38,19 +44,25 @@ export async function handleHandoffStart(request, env, now = Date.now(), cf = re
   if (!s || !s.user) return json({ ok: false, error: "sign_in" }, 401);
   const body = await readJson(request);
   if (!body || !PURPOSES.includes(body.purpose)) return json({ ok: false, error: "bad_request" }, 400);
+  const once = walletOnly(env); // location once (stage S13): home only, for an account that never had a city, five minutes
+  if (once && body.purpose !== "home") return json({ ok: false, error: "bad_request" }, 400);
+  if (once && s.user.home_city) return json({ ok: false, error: "location_fixed" }, 409);
   if (await countRecent(env, s.user.id, "handoff", now - HOUR) >= 10) return json({ ok: false, error: "slow_down" }, 429);
   await noteEvent(env, s.user.id, "handoff", now);
+  const life = once ? IDENTITY_POLICY.handoffSeconds * 1000 : MINUTES * 60_000;
   const code = randomToken(18), id = await sha256(code), served = servedHost(env, request);
   if (served.bound) await ensureHostSchema(env.DB, "handoffs"); // handoffs.host (src/hostbind.js)
   const host = hostWrite(env.DB, "handoffs", id, served);
   await env.DB.batch([
     env.DB.prepare("DELETE FROM handoffs WHERE kind = 'locate' AND (user_id = ? OR expires_at < ?)").bind(s.user.id, iso(now)),
     env.DB.prepare("INSERT INTO handoffs (id, kind, user_id, purpose, net, created_at, expires_at) VALUES (?, 'locate', ?, ?, ?, ?, ?)")
-      .bind(id, s.user.id, body.purpose, netOf(cf), iso(now), iso(now + MINUTES * 60_000)),
+      .bind(id, s.user.id, body.purpose, netOf(cf), iso(now), iso(now + life)),
     ...(host ? [host] : []), // (while the host binding counts: the code is good on this host only)
   ]);
-  // the link the phone opens: the allowlist entry's origin (src/hostbind.js), never the request's own host text
-  return json({ ok: true, code, url: `${served.origin}/locate?code=${code}`, expiresAt: iso(now + MINUTES * 60_000) });
+  // the link the phone opens: the allowlist entry's origin (src/hostbind.js), never the request's own host text. While WALLET_ONLY counts the code
+  // rides in the fragment (/locate#code=), which no browser sends to a server or puts in a Referer, and public/locate.js takes it out of the
+  // address bar before any request (master section 19 step 4; R1-08; review finding SEC-6); otherwise today's ?code=
+  return json({ ok: true, code, url: `${served.origin}/locate${once ? "#" : "?"}code=${code}`, expiresAt: iso(now + life) });
 }
 
 /** POST /api/locate/handoff/info { code } → what the link is for (the page in the phone's browser; no sign-in). */
@@ -69,6 +81,7 @@ export async function handleHandoffComplete(request, env, now = Date.now(), cf =
   const row = body && await find(env, body.code, now, servedHost(env, request));
   if (!row) return json({ ok: false, error: "expired" }, 410);
   if (row.signup_id) return handleSignupHandoffComplete(request, env, row, body, now, cf); // a link made by the v2 sign-up (no account yet)
+  if (walletOnly(env) && row.purpose !== "home") return json({ ok: false, error: "expired" }, 410); // (location once, stage S13)
   if (row.result) return json({ ok: false, error: "already_done" }, 409);
   // Same connection as the wallet app that asked: the phone's own network (one generic answer when it differs).
   if (cf && row.net && netOf(cf) !== row.net) return json({ ok: false, error: "location_unverified" }, 403);

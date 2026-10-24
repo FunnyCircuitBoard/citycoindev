@@ -6,6 +6,7 @@ import { getSession, isFresh } from "./auth.js";
 import { ensureSchema } from "./store.js";
 import { DAY, POLICY, iso } from "./policy.js";
 import { activeBan } from "./roles.js";
+import { walletOnly } from "./v5policy.js";
 
 /**
  * { s, u } for a signed-in person, or { error: Response }.
@@ -26,13 +27,15 @@ export async function access(request, env, now = Date.now(), { write = true, fre
  * at `openedAt`? One person, one vote, and only real locals: an account and a home community set at
  * least 7 days before the vote opened, and at least one check-in there (being physically present).
  * Returns null if yes, or the reason why not.
+ * While WALLET_ONLY counts (Citycoin.dev master v5, stage S13; master section 19: no hidden location requirement in votes) the check-in clause
+ * is left out: a check-in needed a location, and no new one is posted then. The account, home and ban rules stay.
  */
 export async function voterProblem(env, u, { scope, place, openedAt, now = Date.now() }) {
   const since = Date.parse(openedAt) - POLICY.voters.minAccountDays * DAY;
   if (scope === "city" ? u.home_city !== place : u.home_country !== place) return "not_local";
   if (Date.parse(u.created_at) > since) return "account_too_new";
   if (!u.home_at || Date.parse(u.home_at) > Date.parse(openedAt) - POLICY.voters.minHomeDays * DAY) return "home_too_new";
-  if (POLICY.voters.needsCheckin) {
+  if (POLICY.voters.needsCheckin && !walletOnly(env)) {
     const c = await env.DB.prepare(`SELECT id FROM posts WHERE user_id = ? AND kind = 'checkin' AND hidden = 0 AND ${scope === "city" ? "place" : "country"} = ? LIMIT 1`)
       .bind(u.id, place).first();
     if (!c) return "needs_checkin";

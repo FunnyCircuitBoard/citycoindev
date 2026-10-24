@@ -15,6 +15,7 @@ import { MAX_LOCATION_ACCURACY_M, cleanLocation } from "./cities.js";
 import { networkCheck } from "./network.js";
 import { locate } from "./community.js";
 import { POLICY, HOUR, iso } from "./policy.js";
+import { walletOnly } from "./v5policy.js";
 
 export const PURPOSES = ["home", "apply", "checkin", "request"];
 let keyCache = null;
@@ -116,6 +117,9 @@ export async function makeAttestation(env, u, purpose, { found, cc }, now) {
 /**
  * POST /api/locate { location: { lat, lon, accuracy }, purpose, country? }
  * → { ok, city: { id, name, country } | null, nearby: [...] | null, attestation, expiresAt }
+ * While WALLET_ONLY counts (Citycoin.dev master v5, stage S13; master section 19: location is used once, to assign a new wallet's city, and
+ * never again for posting, founder, launch or manager applications): only the purpose home (400 bad_request for apply, checkin, request),
+ * and only for an account that never had a city (409 location_fixed), before anything is counted or read.
  */
 export async function handleLocate(request, env, now = Date.now(), cf = request.cf) {
   if (!sameSite(request, env)) return json({ ok: false, error: "wrong_origin" }, 403);
@@ -124,6 +128,10 @@ export async function handleLocate(request, env, now = Date.now(), cf = request.
   const body = await readJson(request);
   if (!body || !PURPOSES.includes(body.purpose)) return json({ ok: false, error: "bad_request" }, 400);
   const u = s.user;
+  if (walletOnly(env)) {
+    if (body.purpose !== "home") return json({ ok: false, error: "bad_request" }, 400);
+    if (u.home_city) return json({ ok: false, error: "location_fixed" }, 409);
+  }
   if (await countRecent(env, u.id, "locate", now - HOUR) >= POLICY.limits.locatePerHour) return json({ ok: false, error: "slow_down" }, 429);
   await noteEvent(env, u.id, "locate", now);
   const checked = await checkLocation(env, body.location, body, cf);

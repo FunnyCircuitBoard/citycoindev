@@ -1,5 +1,6 @@
 // The real /connect page in node: the built public/connect.html with site.js, wallets.js and connect.js (and signup.js, which
-// connect.js loads when /api/me says the sign-up is v2) running on the just-enough DOM of pagedom.js. The test plays the server
+// connect.js loads when /api/me says the sign-up is v2, and wallet-only.js, which it loads when /api/me says walletOnly) running on the
+// just-enough DOM of pagedom.js. The test plays the server
 // (`api`), the browser (its user agent and whether the tab is on screen), the clock (timers run only when the test moves it) and the
 // wallet (a Wallet Standard wallet whose connect / signMessage answer, refuse, or never answer). It checks what the page DOES:
 // which request, which words, and where they show. How it looks is checked in real Chromium (the end-to-end runs).
@@ -76,9 +77,11 @@ function spyTerms(gate, log) {
  *   net(path)        the network itself, asked before any request is answered: undefined = answer as usual, "offline" = the request fails
  *                    (fetch throws, as with no connection), a promise = the answer waits until it resolves (a slow phone network)
  *   noSignupJs       true: /signup.js does not load (its <script> fails)
+ *   hash             the address bar's fragment when the page opens, without "#" (a wallet-only link: "register=<code>", "pair=<code>")
+ *   clipboard        true: the browser has a clipboard; what the page copies is in `copied`
  */
 export async function openConnect({ ua = UA.desktop, search = "", api = async () => ({ ok: true }), me = {}, state = STATE.empty(), storage = {}, session: sessionStore = {},
-  agreed = "2026-10-01", geolocation, wallets = [], touchPoints, setup, net, noSignupJs = false } = {}) {
+  agreed = "2026-10-01", geolocation, wallets = [], touchPoints, setup, net, noSignupJs = false, hash = "", clipboard = false } = {}) {
   const doc = new Doc();
   doc.append(...parse(doc, read("connect.html")));
   // time: only what the test lets pass
@@ -87,13 +90,13 @@ export async function openConnect({ ua = UA.desktop, search = "", api = async ()
   const setTimeout_ = (fn, ms = 0) => { const id = ++seq; timers.push({ id, at: now + Math.max(0, Number(ms) || 0), fn }); return id; };
   const clearTimeout_ = (id) => { const i = timers.findIndex((t) => t.id === id); if (i >= 0) timers.splice(i, 1); };
   const replaced = [];
-  const calls = [], assigned = [];
+  const calls = [], assigned = [], copied = [], scripts = [];
   const local = new Map(Object.entries({ ...(agreed ? { vicinity_terms: agreed } : {}), ...storage }));
   const session = new Map(sessionStore === "throws" ? [] : sessionStore instanceof Map ? sessionStore : Object.entries(sessionStore));
   const store = (m) => ({ getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k) });
   const blocked = { getItem() { throw new Error("SecurityError"); }, setItem() { throw new Error("SecurityError"); }, removeItem() { throw new Error("SecurityError"); } };
   const loc = {
-    origin: "https://vicinity.test", protocol: "https:", host: "vicinity.test", pathname: "/connect", search: search ? `?${search}` : "", hash: "",
+    origin: "https://vicinity.test", protocol: "https:", host: "vicinity.test", pathname: "/connect", search: search ? `?${search}` : "", hash: hash ? `#${hash}` : "",
     get href() { return this.origin + this.pathname + this.search + this.hash; },
     assign: (u) => assigned.push(u), reload: () => assigned.push("reload"),
     replace: (u) => { assigned.push(u); replaced.push(u); }, // a navigation that leaves no history entry (Back skips it): in `assigned` too, and in `replaced`
@@ -105,7 +108,8 @@ export async function openConnect({ ua = UA.desktop, search = "", api = async ()
   Object.assign(win, {
     document: doc, location: loc,
     history: { state: null, replaceState: (st, title, url) => { const u = new URL(url, loc.origin); loc.pathname = u.pathname; loc.search = u.search; loc.hash = u.hash; addressBar.push(loc.href); } },
-    navigator: { userAgent: ua, maxTouchPoints: touchPoints ?? (/iPhone|Android/.test(ua) ? 5 : 0), ...(geolocation ? { geolocation } : {}) },
+    navigator: { userAgent: ua, maxTouchPoints: touchPoints ?? (/iPhone|Android/.test(ua) ? 5 : 0), ...(geolocation ? { geolocation } : {}),
+      ...(clipboard ? { clipboard: { writeText: async (t) => { copied.push(t); } } } : {}) },
     localStorage: store(local), sessionStorage: sessionStore === "throws" ? blocked : store(session),
     matchMedia: () => ({ matches: true, addEventListener() {} }), // reduced motion: nothing animates
     fetch: async (path, init = {}) => {
@@ -139,7 +143,10 @@ export async function openConnect({ ua = UA.desktop, search = "", api = async ()
   // connect.js loads /signup.js with a <script> it appends to <head>: run it here
   const head = doc.querySelector("head");
   head.append = (s) => {
+    scripts.push(s.src || s.href || s.tagName);
     if (s.src === "/signup.js" && !noSignupJs) { vm.runInContext(read("signup.js"), ctx, { filename: "public/signup.js" }); Promise.resolve().then(() => s.onload && s.onload()); }
+    else if (s.src === "/wallet-only.js") { vm.runInContext(read("wallet-only.js"), ctx, { filename: "public/wallet-only.js" }); Promise.resolve().then(() => s.onload && s.onload()); }
+    else if (s.tagName === "LINK") { /* a stylesheet (wallet-only.css): nothing to run */ }
     else Promise.resolve().then(() => s.onerror && s.onerror(new Error("not here")));
   };
   Object.defineProperty(doc, "head", { value: head });
@@ -174,7 +181,7 @@ export async function openConnect({ ua = UA.desktop, search = "", api = async ()
   const $ = (s) => doc.querySelector(s);
   const visible = (e) => Boolean(e && e.getClientRects().length);
   return {
-    doc, win, $, $$: (s) => doc.querySelectorAll(s), calls, assigned, replaced, addressBar, local, session, timers, flush, advance, register, terms,
+    doc, win, $, $$: (s) => doc.querySelectorAll(s), calls, assigned, replaced, addressBar, local, session, timers, flush, advance, register, terms, copied, scripts,
     get now() { return now; },
     /** The tab goes to the background (another app is in front) or comes back. */
     setHidden: async (h) => { hidden = h; if (!h) for (const l of doc.listeners.filter((x) => x.type === "visibilitychange")) l.fn.call(doc, newEvent("visibilitychange")); await flush(); },

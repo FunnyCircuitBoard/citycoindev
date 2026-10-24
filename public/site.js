@@ -417,7 +417,23 @@
     await api("/api/auth/logout", {});
     loggedOut = true;
     try { localStorage.removeItem("vicinity:dash-v2"); } catch {}
+    if (meLite && meLite.walletOnly === true) await walletOnlyOut(); // (WALLET_ONLY counting only: otherwise exactly as before)
     location.assign(next);
+  }
+  /**
+   * Wallet-only (WALLET_ONLY counting, /api/me says walletOnly; Citycoin.dev master v5 stage S12, section 18 WP-02 "Disconnect/logout clears
+   * the application session"): logging out also forgets this tab's half-done wallet flows and disconnects the wallet adapters of the page
+   * (wallets.js VW.disconnectAll; a wallet that does not answer within 1.5 s is left as it is). Nothing here runs with the switch off.
+   */
+  function clearWalletState() {
+    try { localStorage.removeItem("vicinity:dash-v2"); localStorage.removeItem("vicinity:wallet-seen"); } catch { /* storage off: nothing kept */ }
+    for (const k of ["vicinity-pair", "vicinity-link", "vicinity-carry", "vicinity-wo-carry", "vicinity-wo-register", "vicinity.swapWallet", "vl-started", "su-carry"]) {
+      try { sessionStorage.removeItem(k); } catch { /* storage off */ }
+    }
+  }
+  async function walletOnlyOut() {
+    clearWalletState();
+    if (window.VW && typeof window.VW.disconnectAll === "function") { try { await window.VW.disconnectAll(1500); } catch { /* a wallet that throws: the session is gone anyway */ } }
   }
   window.addEventListener("pageshow", (e) => { if (e && e.persisted && loggedOut) location.reload(); });
 
@@ -654,5 +670,5 @@
     get reduced() { return reducedNow(); }, // read when it is needed: the device setting can change while the page is open
     me: () => meLite, ready, official, opensAt: () => opensAt, launchOpen, siteMode: () => siteMode,
     setAccount: (u) => setAccount(u), // the dashboard keeps the account sheet's name and home in step with /api/me
-    logout };
+    logout, clearWalletState };
 })();

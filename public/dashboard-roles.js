@@ -276,10 +276,12 @@
         parts.push(el("p", "small muted", m.ready ? "Ready: your squad meets the bar." : { bad_size: `Needs ${m.min} to ${m.max} members (now ${m.members.length}).`, member_not_qualified: "Every member must have held their share for 7 days.",
           below_threshold: "Pooled holdings are below the bar." }[m.whyNot] || "Not ready yet."));
         const row = el("div", "role-tools");
-        row.append(tool(`Apply as a squad (checks your location)`, async (e) => {
+        // (wallet-only, WALLET_ONLY counting: an application asks for no location, master section 19 WP-03)
+        const noLocation = Boolean(ctx.walletOnly && ctx.walletOnly());
+        row.append(tool(noLocation ? "Apply as a squad" : `Apply as a squad (checks your location)`, async (e) => {
           const b = e.currentTarget; b.disabled = true; err.hidden = true;
           try {
-            const r = await ctx.sensitive(async () => api("/api/seats/squad/apply", { squadId: m.id, attestation: (await ctx.locateFor("apply")).attestation }));
+            const r = await ctx.sensitive(async () => api("/api/seats/squad/apply", noLocation ? { squadId: m.id } : { squadId: m.id, attestation: (await ctx.locateFor("apply")).attestation }));
             if (!r.ok) throw new Error(ctx.errText(SQUAD_ERR, r, "Couldn't apply. Please try again."));
             toast(r.steward ? `🌟 ${home.name}'s squad is Seed Steward` : "📨 Your squad applied"); ctx.refresh();
           } catch (x) { err.textContent = x.message; err.hidden = false; } finally { b.disabled = false; }

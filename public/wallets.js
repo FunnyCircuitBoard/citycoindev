@@ -38,6 +38,7 @@
   ];
 
   const found = new Map(); // name → adapter
+  const rawOf = new WeakMap(); // adapter → the Wallet Standard wallet behind it (its change events: the wallet-only watch below)
   const listeners = new Set();
   const changed = () => listeners.forEach((f) => { try { f(); } catch {} });
   const toBytes = (sig) => (sig instanceof Uint8Array ? sig : sig?.signature ? toBytes(sig.signature) : new Uint8Array(sig));
@@ -137,7 +138,7 @@
     for (const w of ws) {
       const ok = w && w.name && w.features && w.features["standard:connect"] && w.features["solana:signMessage"] &&
         (w.chains || []).some((c) => String(c).startsWith("solana:"));
-      if (ok && !found.has(w.name)) { found.set(w.name, standard(w)); changed(); }
+      if (ok && !found.has(w.name)) { const a = standard(w); rawOf.set(a, w); found.set(w.name, a); changed(); }
     }
     return () => {};
   }
@@ -207,9 +208,82 @@
   }
   /** Inside a wallet app's own browser? True when the user agent says so, or a phone browser already has a wallet on the page. */
   const inWalletApp = () => webView || (isMobile && found.size > 0);
+  /** The user agent itself says this is a wallet app's own browser (no guess from an injected wallet: a phone's Brave or Kiwi with a wallet of
+   *  its own is a normal browser that can share its location; review finding F5). The wallet-only registration gate reads this one. */
+  const walletAppByAgent = () => webView;
+
+  /** Every wallet of this page disconnects (logout while WALLET_ONLY counts, site.js); waits at most `ms` for them. */
+  async function disconnectAll(ms = 1500) {
+    const all = [...found.values()].map((a) => Promise.resolve().then(() => a.disconnect()).catch(() => {}));
+    await within(Promise.all(all), ms).catch(() => null);
+  }
+
+  /*
+   * Wallet-only (WALLET_ONLY counting: /api/me says walletOnly; Citycoin.dev master v5 stage S12, section 18 WP-02 "When the wallet switches,
+   * clear the old session/data and authenticate the new address"): while a member is signed in, a wallet of this page that showed the
+   * account's address and then reports ANOTHER one (the Wallet Standard "change" event, or an older wallet's "accountChanged") signs this
+   * browser out, clears what this tab kept and opens Sign in, where the new address proves itself. A wallet that goes quiet (locked, no
+   * account) or that never showed the account's address (another wallet connected for a purchase) changes nothing. With the switch off, or
+   * signed out, nothing is watched.
+   * A switch made while no page of this site watched (on a page without this file, or with the site closed: review finding F4) is caught when
+   * the next page with this file loads: each wallet's last address seen with this account is kept in this browser (SEEN_KEY: wallet name →
+   * address, public keys only, forgotten at logout by site.js clearWalletState), and a wallet that last showed the account's address and now
+   * reports another one signs out the same way.
+   */
+  const SEEN_KEY = "vicinity:wallet-seen";
+  const seenStore = () => { try { const v = JSON.parse(localStorage.getItem(SEEN_KEY) || "{}"); return v && typeof v === "object" ? v : {}; } catch { return {}; } };
+  const keepSeen = (name, addr) => { try { const v = seenStore(); if (v[name] !== addr) { v[name] = addr; localStorage.setItem(SEEN_KEY, JSON.stringify(v)); } } catch { /* storage off: the open page still watches */ } };
+  function watchSwitch(mine) {
+    const last = new Map(), hooked = new WeakSet();
+    let leaving = false;
+    async function switched() {
+      if (leaving) return;
+      leaving = true;
+      try { await window.V.api("/api/auth/logout", {}); } catch { /* the session ends on the server anyway when the page signs in again */ }
+      if (typeof window.V.clearWalletState === "function") window.V.clearWalletState();
+      location.assign("/connect?mode=login");
+    }
+    const seen = (name, addr) => {
+      const before = last.get(name);
+      if (addr) last.set(name, addr);
+      if (addr === mine) keepSeen(name, mine);
+      if (before === mine && addr && addr !== mine) switched();
+    };
+    /** What a wallet reports as this page hooks it: the account's address is remembered; another address after the account's is a switch. */
+    const first = (name, addr) => {
+      if (!addr) return;
+      last.set(name, addr);
+      if (addr === mine) keepSeen(name, mine);
+      else if (seenStore()[name] === mine) switched(); // it showed the account's address on an earlier page, and another one now
+    };
+    const keyOf = (pk) => { try { return pk ? String(pk.toBase58 ? pk.toBase58() : pk.toString()) : null; } catch { return null; } };
+    function hook(a) {
+      if (hooked.has(a)) return;
+      hooked.add(a);
+      const w = rawOf.get(a);
+      if (w) {
+        const acc = solanaAccount(w.accounts); if (acc) first(a.name, acc.address);
+        const ev = w.features && w.features["standard:events"];
+        if (ev && typeof ev.on === "function") {
+          try { ev.on("change", (props) => { if (props && "accounts" in props) { const now = solanaAccount(props.accounts); seen(a.name, now ? now.address : null); } }); } catch { /* a wallet without events */ }
+        }
+      } else if (a._p) {
+        const p = a._p;
+        const pk = keyOf(p.publicKey); if (pk) first(a.name, pk);
+        if (typeof p.on === "function") { try { p.on("accountChanged", (k) => seen(a.name, keyOf(k))); } catch { /* an older wallet without events */ } }
+      }
+    }
+    const hookAll = () => { for (const a of found.values()) hook(a); };
+    hookAll();
+    listeners.add(hookAll); // wallets that announce themselves later
+  }
+  if (window.V && window.V.ready && typeof window.V.ready.then === "function") {
+    // (.catch: a failed /api/me answer is no reason for an unhandled rejection; review finding PAR-04)
+    window.V.ready.then((me) => { if (me && me.walletOnly === true && me.signedIn && me.user && typeof me.user.wallet === "string" && me.user.wallet) watchSwitch(me.user.wallet); }).catch(() => {});
+  }
 
   window.VW = {
-    KNOWN, isMobile, isPhone, inWalletApp, safeIcon, mark,
+    KNOWN, isMobile, isPhone, inWalletApp, walletAppByAgent, safeIcon, mark, disconnectAll, SEEN_KEY,
     list: () => [...found.values()],
     onChange: (f) => { listeners.add(f); return () => listeners.delete(f); },
     knownFor: (name) => KNOWN.find((k) => k.match.test(name)) || null,

@@ -3,7 +3,7 @@
  * one failing step is logged and the others still run. Everything fails closed: without fresh
  * balance data nobody gains or loses a seat.
  */
-import { ensureSchema } from "./store.js";
+import { ensureIdentitySchema, ensureSchema } from "./store.js";
 import { maybeSample, pruneLedger } from "./ledger.js";
 import { advanceSeats } from "./seats.js";
 import { advanceElections } from "./elections.js";
@@ -19,7 +19,8 @@ import { registryStep } from "./coinreview.js";
 import { sweepLaunchedCoins } from "./lpcoins.js";
 import { DAY, HOUR, iso } from "./policy.js";
 import { checkDeploymentConfig } from "./maintoken.js";
-import { checkPolicyConfig } from "./v5policy.js";
+import { checkPolicyConfig, legacyLink, walletOnly } from "./v5policy.js";
+import { closeLegacyWindow } from "./legacy.js";
 
 /** How long one run may hold the lease: the cron fires every 10 minutes, a run takes seconds. A crashed run's lease simply expires. */
 export const JOB_LEASE_MS = 8 * 60_000;
@@ -56,6 +57,9 @@ async function runSteps(env, now, fetchImpl, rand) {
   await step("moderation", () => expireModeration(env, now));
   await step("snapshot", () => advanceSnapshots(env, now));
   await step("cleanup", () => cleanup(env, now));
+  // the legacy link window (stage S14, src/legacy.js): the census written once, and once LEGACY_LINK_UNTIL has passed every account still
+  // without a wallet marked closed_unresolved (its data stays). Only while the window exists: otherwise no step, and the run's answer is today's
+  if (legacyLink(env, now).state !== "off") await step("legacyLink", () => closeLegacyWindow(env, now));
   // the Feedback / Support messages: contact details go 30 days after "done", the row 180 days after (nothing when the table does not exist yet)
   await step("feedback", () => pruneFeedback(env.DB, now));
   // holder counts for the Launchpad list: only while its switch is on (with it off this run is exactly as it always was)
@@ -81,7 +85,13 @@ async function cleanup(env, now) {
     db.prepare("DELETE FROM email_codes WHERE expires_at < ? AND (window_start IS NULL OR window_start < ?)").bind(iso(now), iso(now - HOUR)),
   ]);
   // sign-up v2 leftovers and old attempt counters (profiles share the counters table). With both switches off no new statement runs at all: those tables may not exist yet
-  if (v2On(env) || profilesOn(env)) await cleanupSignups(env, now);
+  // (and while WALLET_ONLY counts: its registration uses the same sign-up rows and counters, whatever SIGNUP_FLOW says; stage S11)
+  if (v2On(env) || profilesOn(env) || walletOnly(env)) await cleanupSignups(env, now);
+  // expired wallet challenges (WALLET_ONLY counting only, src/challenge.js: each lives 120 seconds). With the switch off nothing runs here
+  if (walletOnly(env)) {
+    await ensureIdentitySchema(db);
+    await db.prepare("DELETE FROM auth_challenges WHERE expires_at < ?").bind(iso(now)).run();
+  }
   if (new Date(now).getUTCHours() === 3 && new Date(now).getUTCMinutes() < 10) await pruneLedger(env, now);
   return { ok: true };
 }
