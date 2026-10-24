@@ -263,6 +263,8 @@ test("drift guard: the files that read users.wallet are the ones this change rev
     "logos.js", // logos.js: the admin's picture list masks the founder's wallet (maskWallet(null) is null: a founder without a wallet is listed by handle)
     "walletsend.js", // walletsend.js: a member without a wallet is answered 400 no_wallet before anything is built (test/wallet-send.test.js)
     "coinready.js", // coinready.js: a founder without a wallet gets the no_wallet gate (GET) or 403 no_wallet / wallet_mismatch (POST) before anything is drawn or recorded
+    "register-core.js", // register-core.js (stage S11, WALLET_ONLY only): reads users by the wallet that just signed a register challenge (never NULL) and makes that account with it
+    "legacy.js", // legacy.js (stage S14, the legacy link window only): reads exactly the accounts whose wallet IS NULL (Google- or e-mail-only) and links one; a wallet already set answers use_wallet / link_done
     "coinreview.js"]); // coinreview.js: every founder POST answers 403 no_wallet / wallet_mismatch before reading a draft (test/coin-review.test.js); the admin side compares the admin's own (always set) wallet
   const dir = new URL("../src/", import.meta.url);
   const offenders = readdirSync(dir).filter((f) => f.endsWith(".js") && !reviewed.has(f)).filter((f) => {

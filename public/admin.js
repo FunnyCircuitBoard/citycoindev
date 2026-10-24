@@ -39,6 +39,18 @@
   let me = null, config = null, activeTab = "overview";
   let lpOn = false, lpProbe = null; // the City coins tab (public/admin-lp.js): only when the server has its settings (GET /api/admin/lp answers ok, with the cluster)
   let adapter = null, address = null, message = null;
+  // wallet-only sign-in (WALLET_ONLY counting: /api/me says walletOnly; Citycoin.dev master v5 stage S12): the console signs a server
+  // challenge of the purpose "admin" (src/auth.js handleChallenge), for the sign-in and for every fresh proof; otherwise today's message
+  let challengeId = null;
+  /** Is WALLET_ONLY counting? /api/me's answer (site.js); null while it has not answered yet (then walletOnlyLate waits for it). */
+  const walletOnlyNow = () => { const m = window.V.me(); return m ? m.walletOnly === true : null; };
+  // (a failed /api/me answer reads as today's sign-in, never as an error of its own; review finding PAR-04)
+  const walletOnlyLate = async () => { try { return ((await window.V.ready) || {}).walletOnly === true; } catch { return false; } };
+  /** The text the wallet signs while WALLET_ONLY counts: an "admin" challenge (two minutes, once). null when it could not be had. */
+  async function adminChallenge(addr) {
+    const c = await api("/api/auth/challenge", { purpose: "admin", address: addr });
+    return c && c.ok && c.message && c.challengeId ? c : null;
+  }
   // the Inbox: how many messages are new (the badge on its tab and the browser title), refreshed every 20 seconds while the page is open
   const INBOX_POLL_MS = 20_000;
   let inboxNew = 0, inboxTimer = null;
@@ -109,6 +121,14 @@
     try {
       address = await a.connect(); adapter = a;
       $("#admin-addr").textContent = `Wallet: ${short(address)} (${a.name})`;
+      if (walletOnlyNow() ?? await walletOnlyLate()) {
+        const c = await adminChallenge(address);
+        if (!c) return setErr("Couldn't prepare the message. Try again.");
+        message = c.message; challengeId = c.challengeId;
+        $("#admin-msg").textContent = message;
+        $("#admin-sign").hidden = false;
+        return;
+      }
       const d = await api(`/api/message?address=${encodeURIComponent(address)}&action=login`);
       if (!d.message) return setErr("Couldn't prepare the message. Try again.");
       message = d.message;
@@ -121,7 +141,14 @@
     setErr("");
     try {
       const sig = await adapter.signMessage(new TextEncoder().encode(message));
-      const r = await api("/api/auth/wallet", { address, message, signature: btoa(String.fromCharCode(...sig)) });
+      const body = { address, message, signature: btoa(String.fromCharCode(...sig)) };
+      if (challengeId) { body.challengeId = challengeId; challengeId = null; } // (wallet-only: a challenge is used once)
+      const r = await api("/api/auth/wallet", body);
+      if (!r.ok && body.challengeId) { // wallet-only: say why, and get a fresh challenge for the next try
+        setErr(r.error === "forbidden" ? "This wallet has no admin access. Ask the owner to grant it." : r.error === "no_account" ? "No account uses this wallet."
+          : r.error === "challenge_expired" || r.error === "challenge_used" ? "That message ran out. Pick the wallet again to get a new one." : "Sign-in failed. Please try again.");
+        $("#admin-sign").hidden = true; return;
+      }
       if (!r.ok) return setErr("Sign-in failed. Is this wallet linked to an account?");
       await loadMe();
     } catch (e) { setErr(cancelled(e) ? "Cancelled in your wallet." : "Couldn't sign. Try again."); }
@@ -142,10 +169,12 @@
           address = await list[0].connect(); adapter = list[0];
         }
         if (me && address !== me.wallet) { toast(`Connect the wallet ${short(me.wallet)}, then try again.`); return r; }
-        const d = await api(`/api/message?address=${encodeURIComponent(address)}&action=login`);
+        // wallet-only: the fresh proof is an "admin" challenge bound to this session (src/auth.js walletOnlyReprove)
+        const c = (walletOnlyNow() ?? await walletOnlyLate()) ? await adminChallenge(address) : null;
+        const d = c || await api(`/api/message?address=${encodeURIComponent(address)}&action=login`);
         if (!d.message) throw new Error("no message");
         const sig = await adapter.signMessage(new TextEncoder().encode(d.message));
-        const p = await api("/api/auth/reprove", { address, message: d.message, signature: btoa(String.fromCharCode(...sig)) });
+        const p = await api("/api/auth/reprove", { address, message: d.message, signature: btoa(String.fromCharCode(...sig)), ...(c ? { challengeId: c.challengeId } : {}) });
         if (!p.ok) { toast("Confirm in your wallet, then try again."); return r; }
         r = await call();
       } catch { toast("Confirm in your wallet, then try again."); }

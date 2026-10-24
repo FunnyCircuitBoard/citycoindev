@@ -41,10 +41,25 @@
  * the person is on, src/hostbind.js, never on the request's own text).
  * Host binding (stage S04, src/hostbind.js): once SITE_ORIGINS lists a second host, a session, a pairing and a sign-up are bound to the
  * host they were made on and are unknown on any other; with SITE_ORIGINS unset everything here is exactly as before.
+ * Wallet-only sign-in (Citycoin.dev master v5, stages S09 and S10; only while WALLET_ONLY counts, src/v5policy.js walletOnly; otherwise every
+ * line here is today's): a wallet signs a server challenge (POST /api/auth/challenge, handleChallenge; src/challenge.js), and /api/auth/wallet
+ * takes only a challenge of the purpose "login" (or "admin", the console's own, for a wallet that holds an admin role), used up in the same D1
+ * batch that makes the session. An unknown wallet gets 404 no_account and nothing is made; a proof by any wallet while signed in ends this
+ * browser's session first (another wallet never inherits it); /api/auth/reprove takes a "reprove" (or "admin") challenge bound to the session
+ * that asked for it. A session no wallet ever proved (Google, e-mail, password, a half-done v1 sign-in) is not a session then (getSession), and
+ * the Google, e-mail, password and tiny-transfer routes answer 404 (src/index.js). Logout is unchanged.
+ * Wallet-only registration (stage S11, the same switch; src/register.js, src/register-core.js): a "register" challenge is issued for this
+ * browser's sign-up once its city and Terms are done (ref "s:<sign-up>:<city>"), for a register hand-off code the wallet app's browser opened
+ * ({ handoff, opener }: "h:<hand-off>"), or for a register pairing a computer shows ({ pair }: "p:<pairing>", with its check number); a phone
+ * approves a register pairing with that challenge at /api/auth/wallet { pair }, and the computer finishes it at /api/pair/finish, which
+ * registers the wallet from the computer's own sign-up. A register pairing lives five minutes and exists only while the switch counts.
+ * The legacy link window (stage S14, src/legacy.js; only while src/v5policy.js legacyLink says "open"): a "legacy_link" challenge is issued for a
+ * restricted legacy session, or for a link pairing a phone approves (src/legacy.js legacyChallenge); POST /api/pair { purpose: "link" } is that
+ * session's pairing and POST /api/pair/finish its finish. Once the window closes they answer 410 window_closed.
  */
 import { b64url, clearCookie, cookie, getCookie, json, randomToken, readJson, redirect, sameSite, sha256 } from "./http.js";
 import { checkSigned } from "./signed.js";
-import { isSolanaAddress } from "./solana.js";
+import { isSolanaAddress, isWalletKey } from "./solana.js";
 import { emailConfigured, sendMail, verificationEmail } from "./mail.js";
 import { ensureHostSchema, ensureOnboardSchema, ensureSchema, ensureSignupSchema } from "./store.js";
 import { findTransfer } from "./chain.js";
@@ -55,17 +70,30 @@ import { v2On } from "./flags.js";
 import { check, clientKey, hits, limitKey, peek, refund } from "./limits.js";
 import { TERMS_VERSION, asText, endSignup, getSignup, recordIdentity } from "./signup-core.js";
 import { finishCore } from "./signup-finish.js";
-import { SESSION_COOKIE, SESSION_SECONDS } from "./session.js";
+import { LEGACY_PROOF, SESSION_COOKIE, SESSION_SECONDS } from "./session.js";
 import { accountName, linkLocked, linkNotice, linkWallet, lockedAnswer, maskName } from "./walletlink.js";
 import { addGoogle, findAccount, googleAdded, googleNotice } from "./logins.js";
 import { checkCurrentPassword } from "./pwlogin.js";
-import { hostWrite, onThisHost, servedHost, sessionDelete } from "./hostbind.js";
+import { NULL_HOST, hostWrite, onThisHost, servedHost, sessionDelete } from "./hostbind.js";
+import { walletOnly, walletOnlyHeld } from "./v5policy.js";
+import { adminWallets } from "./roles.js";
+import { ensureIdentitySchema, ensureHostSignupSchema } from "./store.js";
+import { ISSUED_PURPOSES, checkChallenge, consumeStatement, issueChallenge, usedByFor, usedClause } from "./challenge.js";
+import { ensurePairRequesterSchema, ensureRegisterSchema } from "./store.js";
+import { IDENTITY_POLICY } from "./v5policy.js";
+import { presented } from "./walletlink.js";
+import { bindOf, finishRegisterPairing, handoffRef, notReady, pairRef, readBind, signupRef, usableHandoff } from "./register-core.js";
+import { finishLegacyPairing, legacyChallenge, legacyPairRef, legacyPairStart } from "./legacy.js";
+import { legacyLink } from "./v5policy.js";
 
 export { SESSION_COOKIE, SESSION_SECONDS };
-const OAUTH_COOKIE = "vo";
+export const OAUTH_COOKIE = "vo";
 const OAUTH_SECONDS = 10 * 60;       // the trip to Google and back: the OAuth cookie lives 10 minutes
 export const PENDING_SECONDS = 30 * 60;     // wallet proven, Google / e-mail still to link: 30 minutes
 const PAIR_SECONDS = 10 * 60;        // "sign in with my phone" codes: 10 minutes
+/** wallet-only (review finding SEC-5): the browser that asked for a login pairing holds this nonce (host-only, HttpOnly); only it can finish. */
+export const PAIR_COOKIE = "__Host-vpr";
+const requesterHash = (nonce) => sha256(`vpr\n${nonce}`);
 
 const iso = (ms) => new Date(ms).toISOString();
 const cleanName = (s) => String(s || "").replace(/[\u0000-\u001f\u007f<>]/g, "").replace(/\s+/g, " ").trim().slice(0, 40);
@@ -139,6 +167,13 @@ export async function createSession(env, { wallet = null, userId = null, proof =
  * The signed-in session for this request: { id, wallet, user_id, proof, user } or null. While the host binding counts (src/hostbind.js), a
  * session made on another host is not this request's (a cookie copied to another host is signed out there); a session made before the
  * binding (host NULL) belongs to vicinity.city. Otherwise the session is found by its token alone, as always.
+ * While WALLET_ONLY counts (src/v5policy.js walletOnly; master sections 05 BR-03 and 18 WP-02), or is set on but refused (walletOnlyHeld: the
+ * Worker fails closed, review finding SEC-1), only a wallet-bound session is one: it belongs to an account, a wallet proved it (proven_at), it
+ * carries that account's wallet, and it was made by a wallet challenge or before the switch (sessions.auth 'wallet' or NULL). A pending row, or a
+ * session a Google, e-mail or password login made and no wallet ever proved, reads as signed out, and so does any session while the sign-in kind
+ * cannot be read (fails closed). Whatever the switch says, a restricted legacy link session (stage S14: sessions.proof LEGACY_PROOF) is never a
+ * session here, and neither is a session of an account the legacy window closed (users.legacy_state 'closed_unresolved': nothing opens it; the
+ * column exists only once the window ran, so with the switches unset neither rule reads anything new). Otherwise: exactly as before.
  */
 export async function getSession(env, request, now = Date.now()) {
   if (!env.DB) return null;
@@ -148,17 +183,30 @@ export async function getSession(env, request, now = Date.now()) {
   if (served.refused) return null;
   await ensureSchema(env.DB);
   if (served.bound) await ensureHostSchema(env.DB, "sessions"); // sessions.host only: a hand-off or pairing column never stops a sign-in
-  const row = await env.DB.prepare(served.bound ? "SELECT id, wallet, user_id, proof, created_at, expires_at, proven_at, host FROM sessions WHERE id = ?"
-    : "SELECT id, wallet, user_id, proof, created_at, expires_at, proven_at FROM sessions WHERE id = ?").bind(await sha256(token)).first();
+  const only = walletOnly(env) || walletOnlyHeld(env);
+  if (only) {
+    try { await ensureIdentitySchema(env.DB); } // sessions.auth
+    catch (e) { console.error("session kind unreadable: signed out", String((e && e.message) || e).slice(0, 80)); return null; }
+  }
+  const cols = `id, wallet, user_id, proof, created_at, expires_at, proven_at${served.bound ? ", host" : ""}${only ? ", auth" : ""}`;
+  const row = await env.DB.prepare(`SELECT ${cols} FROM sessions WHERE id = ?`).bind(await sha256(token)).first();
   if (!row || Date.parse(row.expires_at) <= now) return null;
+  if (row.proof === LEGACY_PROOF) return null; // a restricted legacy link session (src/legacy.js) never opens anything here
   let s = row;
   if (served.bound) {
     const { host, ...rest } = row;
     if (!onThisHost(served, host)) return null;
     s = rest;
   }
+  if (only) {
+    const { auth, ...rest } = s;
+    if (!rest.user_id || !rest.proven_at || !rest.wallet || (auth != null && auth !== "wallet")) return null;
+    s = rest;
+  }
   const user = s.user_id ? await env.DB.prepare("SELECT * FROM users WHERE id = ?").bind(s.user_id).first() : null;
   if (s.user_id && !user) return null;
+  if (user && user.legacy_state === "closed_unresolved") return null; // closed when the legacy window ended (src/legacy.js): no way in
+  if (only && user.wallet !== s.wallet) return null; // the account's own wallet, never a wallet it had before
   return { ...s, user };
 }
 export const dropSession = (env, id) => env.DB.prepare("DELETE FROM sessions WHERE id = ?").bind(id).run();
@@ -216,7 +264,8 @@ async function signInWallet(env, wallet, now, served) {
  * new wallet, this is the plain session cookie, exactly as before.
  */
 async function walletCookies(env, request, c, next) {
-  if (!v2On(env) || !next.startsWith("/dashboard")) return c;
+  // (wallet-only, stage S11: the same, whatever SIGNUP_FLOW says: a registration half done in this browser ends when its wallet signs in)
+  if (!(v2On(env) || walletOnly(env)) || !next.startsWith("/dashboard")) return c;
   const clear = await endSignup(env, request);
   return clear.length ? [c, ...clear] : c;
 }
@@ -241,6 +290,19 @@ async function walletCookies(env, request, c, next) {
  */
 export async function walletProven(env, request, wallet, now, session, { link = false, via = "page", here = false } = {}) {
   const served = servedHost(env, request);
+  if (walletOnly(env)) {
+    // wallet-only (stage S10): no proof links a wallet here (the legacy link window is stage S14); a login proof ends this browser's
+    // session first, then signs in an account that has this wallet, or answers no_account and makes nothing
+    if (link) return { status: 400, body: { ok: false, error: "bad_request" } };
+    try {
+      await ensureIdentitySchema(env.DB);
+      if (served.bound) await ensureHostSchema(env.DB, "sessions");
+    } catch (e) {
+      console.error("wallet-only tables unavailable", String((e && e.message) || e).slice(0, 80));
+      return unavailable();
+    }
+    return walletOnlySignIn(env, request, wallet, now, { here, served });
+  }
   if (!v2On(env)) {
     await dropCurrent(env, request);
     const { cookie: c, next } = await signInWallet(env, wallet, now, served);
@@ -265,6 +327,233 @@ export async function walletProven(env, request, wallet, now, session, { link = 
   return { status: 200, body: { ok: true, wallet, next: "/dashboard" }, cookies: await walletCookies(env, request, c, "/dashboard") };
 }
 const answer = (out) => json(out.body, out.status, out.cookies ? { "Set-Cookie": out.cookies } : {});
+/** The answer of a wallet-only step whose database failed: nothing is accepted (503). */
+const unavailable = () => ({ status: 503, body: { ok: false, error: "unavailable" } });
+
+/**
+ * Wallet-only sign-in (WALLET_ONLY counting; stage S10; master section 18 WP-02): one D1 batch that
+ *   1. uses up the challenge `row` (when the proof is a challenge: src/challenge.js consumeStatement),
+ *   2. ends this browser's current session, if it has one (on this host only, src/hostbind.js; whoever it belonged to: a proof by another
+ *      wallet never inherits it, and a proof by the same wallet replaces it),
+ *   3. makes a 30-day session for the account whose wallet this is (sessions.auth 'wallet'; the host while the host binding counts; made_by
+ *      'wallet' for a wallet app's own browser, which renews it while used: renewSession),
+ * steps 2 and 3 holding only when step 1 changed the row in this very batch. Answers { status, body, cookies }:
+ *   200 { ok, wallet, next: "/dashboard" } and the session cookie (a half-done v2 sign-up in this browser ends, as today)
+ *   404 no_account: no account has this wallet; nothing is made (the current session still ends: its cookie is cleared)
+ *   409 challenge_used: another request used the challenge first; nothing changes · 503 unavailable: the database failed; nothing is accepted
+ * The caller has run ensureIdentitySchema (and ensureHostSchema(db, "sessions") while the host binding counts).
+ */
+async function walletOnlySignIn(env, request, wallet, now, { row = null, here = false, served }) {
+  const db = env.DB;
+  const token = getCookie(request, SESSION_COOKIE);
+  const currentId = token && token.length <= 100 ? await sha256(token) : null;
+  const newToken = randomToken(32);
+  const id = await sha256(newToken);
+  const usedBy = row ? await usedByFor(`session:${id}`) : null;
+  const cond = row ? usedClause(row, usedBy) : { sql: "", args: [] };
+  let user;
+  try {
+    user = await db.prepare("SELECT id FROM users WHERE wallet = ?").bind(wallet).first();
+    if (user && here) await ensureOnboardSchema(db); // sessions.made_by
+  } catch (e) {
+    console.error("wallet sign-in lookup failed", String((e && e.message) || e).slice(0, 80));
+    return unavailable();
+  }
+  const stmts = [];
+  if (row) stmts.push(consumeStatement(db, row, usedBy, now));
+  if (currentId) {
+    stmts.push(served.bound
+      ? db.prepare(`DELETE FROM sessions WHERE id = ? AND COALESCE(host, ?) = ?${cond.sql}`).bind(currentId, NULL_HOST, served.key, ...cond.args)
+      : db.prepare(`DELETE FROM sessions WHERE id = ?${cond.sql}`).bind(currentId, ...cond.args));
+  }
+  if (user) {
+    const cols = ["id", "wallet", "user_id", "proof", "created_at", "expires_at", "proven_at", "auth"], vals = ["?", "wallet", "id", "NULL", "?", "?", "?", "'wallet'"];
+    const args = [id, iso(now), iso(now + SESSION_SECONDS * 1000), iso(now)];
+    if (here) { cols.push("made_by"); vals.push("'wallet'"); }
+    if (served.bound) { cols.push("host"); vals.push("?"); args.push(served.key); }
+    stmts.push(db.prepare(`INSERT INTO sessions (${cols.join(", ")}) SELECT ${vals.join(", ")} FROM users WHERE wallet = ?${cond.sql}`).bind(...args, wallet, ...cond.args));
+  }
+  let res = [];
+  try { if (stmts.length) res = await db.batch(stmts); }
+  catch (e) {
+    console.error("wallet sign-in not recorded", String((e && e.message) || e).slice(0, 80));
+    return unavailable();
+  }
+  if (row && !(res[0] && res[0].meta && res[0].meta.changes === 1)) return { status: 409, body: { ok: false, error: "challenge_used" } };
+  const made = user && res.length && res[res.length - 1].meta && res[res.length - 1].meta.changes === 1;
+  if (!made) return { status: 404, body: { ok: false, error: "no_account" }, ...(currentId ? { cookies: clearCookie(SESSION_COOKIE) } : {}) };
+  const c = cookie(SESSION_COOKIE, newToken, SESSION_SECONDS);
+  return { status: 200, body: { ok: true, wallet, next: "/dashboard" }, cookies: await walletCookies(env, request, c, "/dashboard") };
+}
+
+/** Does this wallet hold an admin role: the owner (ADMIN_WALLETS) or a grant in admin_roles? The same answer as src/admin.js adminRoleOf
+ *  being non-null (read here, not imported: src/admin.js imports this file), asked only when an "admin" challenge comes back. */
+async function hasAdminRole(env, wallet) {
+  if (adminWallets(env).includes(wallet)) return true;
+  const r = await env.DB.prepare("SELECT role FROM admin_roles WHERE wallet = ?").bind(wallet).first();
+  return Boolean(r && ["moderator", "admin", "owner"].includes(r.role));
+}
+
+/**
+ * POST /api/auth/challenge { purpose, address, pair? } (WALLET_ONLY counting only; src/index.js answers 404 otherwise) → { ok, challengeId,
+ * message, statement, purpose, expiresAt }: the exact text the wallet signs (src/challenge.js), valid 120 seconds, once.
+ *   login     anyone; with `pair` (the code a computer shows), a phone approving that pairing: the text carries its check number, and only
+ *             that live login pairing of this host, not yet approved, can take the answer (410 pair_expired otherwise)
+ *   admin     anyone (the console's sign-in; the role is checked when the answer comes back); signed in with this wallet, it is also the
+ *             console's fresh proof for this session
+ *   reprove   the signed-in member, for the account's own wallet (401 sign_in, 403 wrong_wallet), bound to this session
+ *   register  (stage S11) a browser whose sign-up (vsu cookie, this host) has its city resolved and the Terms accepted (409 location_required,
+ *             terms_required otherwise): the text names the city and country, bound to that sign-up and city; or, with `handoff` (and
+ *             `opener`), the wallet app's browser that opened that register hand-off code (src/register-core.js usableHandoff refusals): bound
+ *             to the code, naming its city; or, with `pair`, a phone approving a live register pairing (410 pair_expired otherwise): bound to
+ *             the pairing, naming its city and its check number (409 use_sign_in for a wallet that already has an account: a register pairing
+ *             never signs the other device in to it, review finding SEC-3). src/register.js and src/auth.js handlePairFinish use it.
+ *   legacy_link  (stage S14) only while the legacy link window is open (src/legacy.js legacyChallenge): this browser's restricted legacy session
+ *             (401 legacy_sign_in), or, with `pair`, a phone approving a live link pairing (410 pair_expired); the text names the account (and the
+ *             check number); 409 wallet_taken for a wallet that has an account. Window closed: 410 window_closed; no window: 400 bad_purpose.
+ * Errors: 400 bad_json, bad_purpose, bad_address (not a key that can sign: a small-order or non-canonical point is refused), bad_request (a `pair` for a purpose other than login, register or legacy_link, a `handoff` for
+ * any other purpose, or both); 403 wrong_origin; 503 unavailable.
+ */
+export async function handleChallenge(request, env, now = Date.now()) {
+  const blocked = await guard(request, env);
+  if (blocked) return blocked;
+  const body = await readJson(request);
+  if (!body) return json({ ok: false, error: "bad_json" }, 400);
+  const purpose = typeof body.purpose === "string" ? body.purpose : "";
+  if (!ISSUED_PURPOSES.includes(purpose) && purpose !== "legacy_link") return json({ ok: false, error: "bad_purpose" }, 400);
+  const address = body.address;
+  // (a key that can sign: a canonical curve point not of small order; review finding SEC-2)
+  if (!isWalletKey(address)) return json({ ok: false, error: "bad_address" }, 400);
+  const served = servedHost(env, request);
+  if (purpose === "legacy_link") { // the legacy link window (stage S14): src/legacy.js decides, and says why not
+    try {
+      const l = await legacyChallenge(env, request, body, address, served, now, findPair);
+      if (l.error) return l.error;
+      return json({ ok: true, ...(await issueChallenge(env, { purpose, address, served, ...l.opts }, now)) });
+    } catch (e) {
+      console.error("challenge not issued", String((e && e.message) || e).slice(0, 80));
+      return json({ ok: false, error: "unavailable" }, 503);
+    }
+  }
+  if (body.pair != null && purpose !== "login" && purpose !== "register") return json({ ok: false, error: "bad_request" }, 400);
+  if (body.handoff != null && (purpose !== "register" || body.pair != null)) return json({ ok: false, error: "bad_request" }, 400);
+  try {
+    const opts = { purpose, address, served };
+    if (purpose === "login" && body.pair != null) {
+      const p = await findPair(env, body.pair, now, served);
+      if (!p || p.wallet || p.purpose === "link" || p.purpose === "register") return json({ ok: false, error: "pair_expired" }, 410);
+      Object.assign(opts, { ref: p.id, pin: p.pin });
+    }
+    if (purpose === "reprove" || purpose === "admin") {
+      const s = await getSession(env, request, now);
+      if (purpose === "reprove" && (!s || !s.user)) return json({ ok: false, error: "sign_in" }, 401);
+      if (purpose === "reprove" && s.user.wallet !== address) return json({ ok: false, error: "wrong_wallet" }, 403);
+      if (s && s.user && s.user.wallet === address) opts.ref = s.id;
+    }
+    if (purpose === "register") {
+      await ensureRegisterSchema(env.DB); // the sign-up tables, handoffs.bind, pairs.signup_id and pairs.bind
+      if (served.bound) await ensureHostSignupSchema(env.DB);
+      if (body.pair != null) {
+        // a phone approving a computer's registration: the live register pairing, not yet approved, names the city and the check number
+        const p = await findPair(env, body.pair, now, served);
+        const bind = p && p.purpose === "register" && !p.wallet ? readBind(p.bind) : null;
+        if (!bind) return json({ ok: false, error: "pair_expired" }, 410);
+        // a wallet that already has an account never approves another device's registration: that would hand the computer that showed the
+        // code a session in the existing account under registration words (review finding SEC-3). It signs in instead.
+        if (await env.DB.prepare("SELECT id FROM users WHERE wallet = ?").bind(address).first()) return json({ ok: false, error: "use_sign_in" }, 409);
+        Object.assign(opts, { ref: pairRef(p.id), pin: p.pin, city: bind.name, country: bind.country });
+      } else if (body.handoff != null) {
+        // the wallet app's browser that opened a register hand-off code (src/register.js handoff/info)
+        const h = await usableHandoff(env, request, body.handoff, now, request.cf, "use", presented(request, body.opener));
+        if (h.error) return h.error;
+        Object.assign(opts, { ref: handoffRef(h.row.id), city: h.bind.name, country: h.bind.country });
+      } else {
+        const row = await getSignup(env, request, now);
+        const nr = notReady(row);
+        if (nr) return json({ ok: false, error: nr.error }, nr.status);
+        Object.assign(opts, { ref: signupRef(row.id, row.loc_city), city: row.loc_name, country: row.loc_country });
+      }
+    }
+    return json({ ok: true, ...(await issueChallenge(env, opts, now)) });
+  } catch (e) {
+    console.error("challenge not issued", String((e && e.message) || e).slice(0, 80));
+    return json({ ok: false, error: "unavailable" }, 503);
+  }
+}
+
+/**
+ * POST /api/auth/wallet while WALLET_ONLY counts: { challengeId, address, message, signature, pair?, inApp? }. A "login" challenge (or the
+ * console's "admin" one, for a wallet that holds an admin role: 403 forbidden otherwise, nothing used) signs in (walletOnlySignIn); with
+ * `pair`, a "login" challenge issued for that pairing approves it, in the same batch that uses the challenge up ({ ok, paired }). Today's
+ * signed messages are refused (400 challenge_required); every other refusal is src/challenge.js checkChallenge's.
+ */
+async function walletOnlyLogin(request, env, now, body) {
+  const served = servedHost(env, request);
+  if (body.challengeId == null) return json({ ok: false, error: "challenge_required" }, 400);
+  try {
+    await ensureIdentitySchema(env.DB);
+    if (served.bound) await ensureHostSchema(env.DB, "sessions");
+  } catch (e) { console.error("wallet-only tables unavailable", String((e && e.message) || e).slice(0, 80)); return json({ ok: false, error: "unavailable" }, 503); }
+  const pairing = body.pair != null;
+  // (a pairing is approved by a login challenge, or, for a register pairing, by a register challenge issued for it: stage S11; or, for a link
+  // pairing while the legacy link window is open, by a legacy_link challenge issued for it: stage S14)
+  const legacyOpen = pairing && legacyLink(env, now).state === "open";
+  const c = await checkChallenge(env, body, { served, purposes: pairing ? (legacyOpen ? ["login", "register", "legacy_link"] : ["login", "register"]) : ["login", "admin"], now });
+  if (c.error) return c.error;
+  const wallet = c.row.wallet;
+  if (pairing) {
+    if (typeof body.pair !== "string" || body.pair.length > 64) return json({ ok: false, error: "bad_pair" }, 400);
+    let p;
+    try { p = await findPair(env, body.pair, now, served); }
+    catch (e) { console.error("pairing lookup failed", String((e && e.message) || e).slice(0, 80)); return json({ ok: false, error: "unavailable" }, 503); }
+    if (!p || p.wallet || (p.purpose === "link" && c.row.purpose !== "legacy_link")) return json({ ok: false, error: "pair_expired" }, 410);
+    // a challenge issued for another pairing, or for none; a login challenge never approves a register or link pairing, nor the other way round
+    const forThis = c.row.purpose === "register" ? p.purpose === "register" && c.row.ref === pairRef(p.id)
+      : c.row.purpose === "legacy_link" ? p.purpose === "link" && c.row.ref === legacyPairRef(p.id)
+        : p.purpose !== "register" && p.purpose !== "link" && c.row.ref === p.id;
+    if (!forThis) return json({ ok: false, error: "bad_message" }, 400);
+    const usedBy = await usedByFor(`pair:${p.id}`), cond = usedClause(c.row, usedBy);
+    let res;
+    try {
+      res = await env.DB.batch([consumeStatement(env.DB, c.row, usedBy, now),
+        env.DB.prepare(`UPDATE pairs SET wallet = ? WHERE id = ? AND wallet IS NULL AND expires_at > ?${cond.sql}`).bind(wallet, p.id, iso(now), ...cond.args)]);
+    } catch (e) { console.error("pairing not approved", String((e && e.message) || e).slice(0, 80)); return json({ ok: false, error: "unavailable" }, 503); }
+    if (!res[0].meta.changes) return json({ ok: false, error: "challenge_used" }, 409);
+    if (!res[1].meta.changes) return json({ ok: false, error: "pair_expired" }, 410);
+    return json({ ok: true, paired: true });
+  }
+  // a phone's approval for another device (its text names that pairing's check number) never signs in the phone's own browser
+  if (c.row.purpose === "login" && c.row.ref) return json({ ok: false, error: "bad_message" }, 400);
+  if (c.row.purpose === "admin") {
+    let admin = false;
+    try { admin = await hasAdminRole(env, wallet); }
+    catch (e) { console.error("admin role unreadable", String((e && e.message) || e).slice(0, 80)); return json({ ok: false, error: "unavailable" }, 503); }
+    if (!admin) return json({ ok: false, error: "forbidden" }, 403);
+  }
+  return answer(await walletOnlySignIn(env, request, wallet, now, { row: c.row, here: body.inApp === true, served }));
+}
+
+/**
+ * POST /api/auth/reprove while WALLET_ONLY counts: { challengeId, address, message, signature }: a "reprove" challenge (or the console's
+ * "admin" one) issued for THIS session and its account's wallet, used up in the same batch that marks the session proven now.
+ */
+async function walletOnlyReprove(request, env, now, s, body) {
+  const served = servedHost(env, request);
+  if (body.challengeId == null) return json({ ok: false, error: "challenge_required" }, 400);
+  const c = await checkChallenge(env, body, { served, purposes: ["reprove", "admin"], now });
+  if (c.error) return c.error;
+  if (c.row.wallet !== s.user.wallet) return json({ ok: false, error: "wrong_wallet" }, 403);
+  if (c.row.ref !== s.id) return json({ ok: false, error: "wrong_session" }, 403); // asked for by another session (or by none)
+  const usedBy = await usedByFor(`reprove:${s.id}`), cond = usedClause(c.row, usedBy);
+  let res;
+  try {
+    res = await env.DB.batch([consumeStatement(env.DB, c.row, usedBy, now),
+      env.DB.prepare(`UPDATE sessions SET proven_at = ? WHERE id = ?${cond.sql}`).bind(iso(now), s.id, ...cond.args)]);
+  } catch (e) { console.error("re-proof not recorded", String((e && e.message) || e).slice(0, 80)); return json({ ok: false, error: "unavailable" }, 503); }
+  if (!res[0].meta.changes) return json({ ok: false, error: "challenge_used" }, 409);
+  if (!res[1].meta.changes) return json({ ok: false, error: "sign_in" }, 401);
+  return json({ ok: true, provenAt: iso(now) });
+}
 
 /**
  * Is this session fresh enough for a sensitive action (username, password, apply, endorse, vote, moderate)? The wallet was proven in
@@ -294,6 +583,7 @@ export async function handleReprove(request, env, now = Date.now()) {
   if (!s.user.wallet) return json({ ok: false, error: "no_wallet" }, 403); // nothing to re-prove: link a wallet from the dashboard first
   const body = await readJson(request);
   if (!body) return json({ ok: false, error: "bad_json" }, 400);
+  if (walletOnly(env)) return walletOnlyReprove(request, env, now, s, body); // a server challenge bound to this session (stage S10)
   const r = await checkSigned(body, request, now, ["login"], badSigned, env.DB, servedHost(env, request).host);
   if (r.error) return r.error;
   if (r.parsed.pin || r.parsed.address !== s.user.wallet) return json({ ok: false, error: "wrong_wallet" }, 403);
@@ -321,6 +611,7 @@ export async function handleWalletLogin(request, env, now = Date.now()) {
   if (blocked) return blocked;
   const body = await readJson(request);
   if (!body) return json({ ok: false, error: "bad_json" }, 400);
+  if (walletOnly(env)) return walletOnlyLogin(request, env, now, body); // a server challenge, used up with the session it makes (stage S10)
   const served = servedHost(env, request);
   // sessions.host (src/hostbind.js) before the signed text is used up: a migration that fails answers 500 and leaves the signature usable
   if (served.bound) await ensureHostSchema(env.DB, "sessions");
@@ -335,6 +626,8 @@ export async function handleWalletLogin(request, env, now = Date.now()) {
     const pair = await env.DB.prepare("SELECT * FROM pairs WHERE id = ?").bind(await sha256(body.pair)).first();
     // (a pairing made on another host, while the host binding counts, is unknown here: src/hostbind.js)
     if (!pair || pair.wallet || Date.parse(pair.expires_at) <= now || !onThisHost(served, pair.host)) return json({ ok: false, error: "pair_expired" }, 410);
+    // (a register pairing exists only while WALLET_ONLY counts, stage S11: one left over from a switch-off is never approved here)
+    if (pair.purpose === "register") return json({ ok: false, error: "pair_expired" }, 410);
     if (r.parsed.pin !== pair.pin) return json({ ok: false, error: "pin_mismatch" }, 400);
     if (pair.purpose === "link") {
       // a link pairing is approved with the link statement that names the account it is for: a login signature cannot approve it
@@ -366,7 +659,12 @@ export async function handlePairStart(request, env, now = Date.now()) {
   const blocked = await guard(request, env);
   if (blocked) return blocked;
   const body = (await readJson(request)) || {};
+  if (body.purpose === "register" && walletOnly(env)) return registerPairStart(request, env, now);
   let purpose = "login", userId = null;
+  if (body.purpose === "link" && walletOnly(env)) {
+    // while WALLET_ONLY counts a link pairing exists only in the legacy link window, for a restricted legacy session (stage S14, src/legacy.js)
+    return legacyPairStart(request, env, now, (o) => insertPair(request, env, now, o));
+  }
   if (body.purpose === "link") {
     if (!v2On(env)) return json({ ok: false, error: "bad_request" }, 400);
     const s = await getSession(env, request, now);
@@ -380,16 +678,80 @@ export async function handlePairStart(request, env, now = Date.now()) {
   const code = randomToken(18);
   const pin = String(10 + (crypto.getRandomValues(new Uint8Array(1))[0] % 90));
   const id = await sha256(code), served = servedHost(env, request);
+  // wallet-only (stage S12): a login pairing lives five minutes (policy identity.handoff_seconds) and its link carries the code in the
+  // fragment (never sent to a server, never in a Referer), like the register pairing; otherwise today's ten minutes and ?pair=
+  const only = walletOnly(env), life = only ? IDENTITY_POLICY.handoffSeconds : PAIR_SECONDS;
+  // wallet-only (review finding SEC-5): the pairing is bound to this browser (a nonce in a host-only HttpOnly cookie, its hash on the row), so
+  // only the browser that shows the code can finish it; whoever sees the QR code or the link cannot take the session
+  let nonce = null;
+  if (only) {
+    try { await ensurePairRequesterSchema(env.DB); }
+    catch (e) { console.error("pairing tables unavailable", String((e && e.message) || e).slice(0, 80)); return json({ ok: false, error: "unavailable" }, 503); }
+    nonce = randomToken(24);
+  }
   const insert = purpose === "link"
-    ? env.DB.prepare("INSERT INTO pairs (id, pin, created_at, expires_at, purpose, user_id) VALUES (?, ?, ?, ?, 'link', ?)").bind(id, pin, iso(now), iso(now + PAIR_SECONDS * 1000), userId)
-    : env.DB.prepare("INSERT INTO pairs (id, pin, created_at, expires_at) VALUES (?, ?, ?, ?)").bind(id, pin, iso(now), iso(now + PAIR_SECONDS * 1000));
+    ? env.DB.prepare("INSERT INTO pairs (id, pin, created_at, expires_at, purpose, user_id) VALUES (?, ?, ?, ?, 'link', ?)").bind(id, pin, iso(now), iso(now + life * 1000), userId)
+    : nonce ? env.DB.prepare("INSERT INTO pairs (id, pin, created_at, expires_at, requester) VALUES (?, ?, ?, ?, ?)").bind(id, pin, iso(now), iso(now + life * 1000), await requesterHash(nonce))
+      : env.DB.prepare("INSERT INTO pairs (id, pin, created_at, expires_at) VALUES (?, ?, ?, ?)").bind(id, pin, iso(now), iso(now + life * 1000));
   if (served.bound) { // the pairing is bound to this host (src/hostbind.js), in the same transaction as its row
     await ensureHostSchema(env.DB, "pairs");
     await env.DB.batch([insert, hostWrite(env.DB, "pairs", id, served)]);
   } else await insert.run();
   if (Math.random() < 0.05) await env.DB.prepare("DELETE FROM pairs WHERE expires_at < ?").bind(iso(now)).run();
   // the QR code's address: the allowlist entry's origin (src/hostbind.js), never the request's own host text
-  return json({ ok: true, code, pin, purpose, url: `${served.origin}/connect?pair=${code}`, expiresAt: iso(now + PAIR_SECONDS * 1000) });
+  return json({ ok: true, code, pin, purpose, url: `${served.origin}/connect${only ? "#" : "?"}pair=${code}`, expiresAt: iso(now + life * 1000) }, 200,
+    nonce ? { "Set-Cookie": cookie(PAIR_COOKIE, nonce, life) } : {});
+}
+
+/**
+ * A link pairing for the legacy link window (stage S14, src/legacy.js legacyPairStart): { purpose: "link", userId, life } → { code, pin, origin,
+ * expiresAt }, written with this host (src/hostbind.js) in the same transaction, the code in the link's fragment only.
+ */
+async function insertPair(request, env, now, { userId, life }) {
+  const code = randomToken(18), pin = String(10 + (crypto.getRandomValues(new Uint8Array(1))[0] % 90));
+  const id = await sha256(code), served = servedHost(env, request), until = iso(now + life * 1000);
+  await ensureOnboardSchema(env.DB); // pairs.purpose, pairs.user_id
+  if (served.bound) await ensureHostSchema(env.DB, "pairs");
+  const host = hostWrite(env.DB, "pairs", id, served);
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM pairs WHERE purpose = 'link' AND (user_id = ? OR expires_at < ?)").bind(userId, iso(now)), // one live link pairing per account
+    env.DB.prepare("INSERT INTO pairs (id, pin, created_at, expires_at, purpose, user_id) VALUES (?, ?, ?, ?, 'link', ?)").bind(id, pin, iso(now), until, userId),
+    ...(host ? [host] : []),
+  ]);
+  return { code, pin, origin: served.origin, expiresAt: until };
+}
+
+/**
+ * POST /api/pair { purpose: "register" } while WALLET_ONLY counts (stage S11): a computer whose registration is ready for the wallet (its own
+ * sign-up, the vsu cookie: city resolved, Terms accepted; 401 no_signup, 409 location_required, terms_required; 409 already_signed_in for a
+ * signed-in browser) shows a code for a phone's wallet: { ok, code, pin, purpose: "register", url: <origin>/connect#pair=<code>, expiresAt }.
+ * The pairing is bound to that sign-up and its city (pairs.signup_id, pairs.bind) and lives five minutes (policy identity.handoff_seconds);
+ * a new one replaces the sign-up's earlier ones. The phone signs a register challenge issued for it, the computer finishes it
+ * (handlePairFinish): the account is made there, from the computer's sign-up, on the computer's own connection.
+ */
+async function registerPairStart(request, env, now) {
+  const s = await getSession(env, request, now);
+  if (s && s.user) return json({ ok: false, error: "already_signed_in" }, 409);
+  const served = servedHost(env, request);
+  let row;
+  try {
+    await ensureRegisterSchema(env.DB);
+    if (served.bound) { await ensureHostSignupSchema(env.DB); await ensureHostSchema(env.DB, "pairs"); }
+    row = await getSignup(env, request, now);
+  } catch (e) { console.error("register pairing tables unavailable", String((e && e.message) || e).slice(0, 80)); return json({ ok: false, error: "unavailable" }, 503); }
+  if (!row) return json({ ok: false, error: "no_signup" }, 401);
+  const nr = notReady(row);
+  if (nr) return json({ ok: false, error: nr.error }, nr.status);
+  const code = randomToken(18), pin = String(10 + (crypto.getRandomValues(new Uint8Array(1))[0] % 90));
+  const id = await sha256(code), until = iso(now + IDENTITY_POLICY.handoffSeconds * 1000);
+  const host = hostWrite(env.DB, "pairs", id, served);
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM pairs WHERE purpose = 'register' AND (signup_id = ? OR expires_at < ?)").bind(row.id, iso(now)),
+    env.DB.prepare("INSERT INTO pairs (id, pin, created_at, expires_at, purpose, signup_id, bind) VALUES (?, ?, ?, ?, 'register', ?, ?)").bind(id, pin, iso(now), until, row.id, bindOf(row)),
+    ...(host ? [host] : []),
+  ]);
+  // the code travels in the fragment of the address the QR code shows (never sent to a server) and in POST bodies only
+  return json({ ok: true, code, pin, purpose: "register", url: `${served.origin}/connect#pair=${code}`, expiresAt: until });
 }
 
 async function findPair(env, code, now, served) {
@@ -407,9 +769,30 @@ async function findPair(env, code, now, served) {
 export async function handlePairStatus(request, env, now = Date.now()) {
   if (!env.DB) return json({ status: "expired" });
   await ensureSchema(env.DB);
-  const p = await findPair(env, new URL(request.url).searchParams.get("code"), now, servedHost(env, request));
+  return pairStatus(env, request, new URL(request.url).searchParams.get("code"), now);
+}
+
+/**
+ * POST /api/pair/status { code } while WALLET_ONLY counts (stage S12; src/index.js answers what an unknown path answers otherwise): the same
+ * answer as GET /api/pair?code=, with the code in the body, so the wallet-only pages never put a pairing code in a URL a server sees (master
+ * section 19 WP-03 step 4: the hand-off token is kept out of logs and referrers; R1-08). Same-site only (403 wrong_origin).
+ */
+export async function handlePairStatusPost(request, env, now = Date.now()) {
+  const blocked = await guard(request, env);
+  if (blocked) return blocked;
+  const body = await readJson(request);
+  if (!body) return json({ ok: false, error: "bad_json" }, 400);
+  if (!env.DB) return json({ status: "expired" });
+  await ensureSchema(env.DB);
+  return pairStatus(env, request, body.code, now);
+}
+
+/** What GET and POST /api/pair/status answer for a pairing code (the caller has run ensureSchema). */
+async function pairStatus(env, request, code, now) {
+  const p = await findPair(env, code, now, servedHost(env, request));
   if (!p) return json({ status: "expired" });
-  const out = { status: p.wallet ? "ready" : "waiting", pin: p.pin, purpose: p.purpose === "link" ? "link" : "login" };
+  // (a register pairing, stage S11, says so and nothing about its sign-up)
+  const out = { status: p.wallet ? "ready" : "waiting", pin: p.pin, purpose: p.purpose === "link" ? "link" : p.purpose === "register" ? "register" : "login" };
   if (p.purpose === "link" && p.user_id) {
     const o = await env.DB.prepare("SELECT handle, name, home_name, home_country FROM users WHERE id = ?").bind(p.user_id).first();
     if (o) Object.assign(out, { name: maskName(o.name || o.handle), handle: maskName(o.handle), community: o.home_name ? { name: o.home_name, country: o.home_country } : null, terms: TERMS_VERSION });
@@ -431,7 +814,18 @@ export async function handlePairFinish(request, env, now = Date.now(), ctx = nul
   const p = await findPair(env, body && body.code, now, servedHost(env, request));
   if (!p) return json({ ok: false, status: "expired" }, 410);
   let session;
-  if (v2On(env)) {
+  if (walletOnly(env)) {
+    // wallet-only: only a login pairing finishes (it signs this device in, ending whatever session it had: walletProven), or a register pairing
+    // (stage S11: the computer's own sign-up registers the wallet the phone approved, src/register-core.js finishRegisterPairing), or, while the
+    // legacy link window is open, a link pairing in the restricted session of its own account (stage S14, src/legacy.js finishLegacyPairing)
+    if (p.purpose === "link") return legacyLink(env, now).state === "open" ? finishLegacyPairing(request, env, p, now) : json({ ok: false, status: "expired" }, 410);
+    if (p.purpose === "register") return answer(await finishRegisterPairing(env, request, p, now, request.cf));
+    // a login pairing: only the browser that asked for it (its __Host-vpr nonce; review finding SEC-5). One answer otherwise, as for a dead code
+    const nonce = getCookie(request, PAIR_COOKIE);
+    if (!p.requester || typeof nonce !== "string" || nonce.length > 100 || p.requester !== await requesterHash(nonce)) return json({ ok: false, status: "expired" }, 410);
+  } else if (p.purpose === "register") {
+    return json({ ok: false, status: "expired" }, 410); // (made while WALLET_ONLY counted: never finished as a login once it is off)
+  } else if (v2On(env)) {
     session = await getSession(env, request, now);
     const mine = session && session.user ? p.purpose === "link" && p.user_id === session.user.id : p.purpose !== "link";
     if (!mine) return json({ ok: false, status: "expired" }, 410);
@@ -441,7 +835,9 @@ export async function handlePairFinish(request, env, now = Date.now(), ctx = nul
   if (!del.meta?.changes) return json({ ok: false, status: "expired" }, 410); // someone was faster
   const out = await walletProven(env, request, p.wallet, now, session, { link: p.purpose === "link", via: "pair" }); // a login pairing never links
   if (out.body.ok && out.body.linked && session && session.user) await linkNotice(env, session.user, p.wallet, null, ctx, fetchImpl);
-  return answer({ ...out, body: out.body.ok ? { ...out.body, status: "done" } : out.body });
+  // (wallet-only: the pairing's nonce is spent with it)
+  const cookies = p.requester ? [...(out.cookies ? [].concat(out.cookies) : []), clearCookie(PAIR_COOKIE)] : out.cookies;
+  return answer({ ...out, cookies, body: out.body.ok ? { ...out.body, status: "done" } : out.body });
 }
 
 /**
@@ -532,10 +928,11 @@ export async function handleOAuthStart(request, env, provider) {
 
 /**
  * The trip to Google: a one-time state and a PKCE verifier, kept in the OAuth cookie (10 minutes) with the marker of what the trip is
- * for: "" a log-in, ".s" a sign-up, ".l.<when>.<grant>" adding Google to the signed-in account (addGrant). `state` may be chosen by the
+ * for: "" a log-in, ".s" a sign-up, ".l.<when>.<grant>" adding Google to the signed-in account (addGrant), ".g" a legacy link login (stage S14,
+ * src/legacy.js; only while the legacy window is open, and only its own callback takes it). `state` may be chosen by the
  * caller (the grant names it). { url, cookie }.
  */
-async function oauthStart(request, env, provider, marker = "", state = randomToken(16)) {
+export async function oauthStart(request, env, provider, marker = "", state = randomToken(16)) {
   const verifier = randomToken(48);
   const challenge = b64url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))));
   // the return address: the allowlist entry's origin (src/hostbind.js), never the request's own host text

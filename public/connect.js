@@ -2,6 +2,9 @@
 // e-mail  3. dashboard. With the new sign-up on (/api/me says signupFlow "v2") this file loads public/signup.js, which runs the
 // two-step sign-up, the Log in tab and the LINK MODE (a member without a wallet links one); the wallet screens here (pick, sign,
 // phone, app, approve) serve all of them, and hand the wallet's answer to signup.walletProven().
+// Wallet-only sign-in (WALLET_ONLY counting: /api/me says walletOnly; Citycoin.dev master v5, stage S12): this file loads public/wallet-only.js
+// instead, which runs the two paths, Sign in and Register your city; the same wallet screens serve them, the text a wallet signs is a server
+// challenge (POST /api/auth/challenge) and pairing codes travel in POST bodies. Without that answer nothing here changes: `wo` stays null.
 // Needs site.js (window.V), wallets.js (window.VW) and vendor/qrcode.js (window.qrcode).
 (() => {
   "use strict";
@@ -16,6 +19,14 @@
   const panel = $("#connect-panel");
   let state = "pick", active = null, address = null, message = null, pairPin = null, pairPurpose = "login", providers = { google: false, email: false };
   let signup = null; // the v2 sign-up controller (public/signup.js): stays null unless /api/me says signupFlow is "v2", so today's page runs untouched
+  // the wallet-only controller (public/wallet-only.js): stays null unless /api/me says walletOnly (WALLET_ONLY counting on the server)
+  let wo = null;
+  // the server challenge the wallet signs while WALLET_ONLY counts (its id goes back with the signature; it lasts two minutes)
+  let challengeId = null, challengeAt = 0;
+  // the pairing this phone approves: ?pair= (today), or #pair= under wallet-only (public/wallet-only.js hands it to startApprove)
+  let approveCode = pairCode;
+  // a ?pair= approval opened while WALLET_ONLY counts (a code made before the switch): signed with a login challenge
+  let woApprove = false;
 
   const ERR = {
     social_taken: "That Google account is already linked to a different wallet. Sign in with the wallet it's linked to, or use another account.",
@@ -34,7 +45,7 @@
   function setErr(m, near) {
     const e = $("#c-error");
     if (!m) { e.textContent = ""; e.hidden = true; return; }
-    if (shown(near)) near.after(e); else (signup ? $("#su-top") : panel).append(e);
+    if (shown(near)) near.after(e); else (signup ? $("#su-top") : wo ? wo.errSlot() : panel).append(e);
     e.textContent = m; e.hidden = false;
     reveal(e);
   }
@@ -42,7 +53,7 @@
   function setWait(m, near) {
     const w = $("#c-wait");
     if (!m) { w.textContent = ""; w.hidden = true; return; }
-    if (shown(near)) near.after(w); else (signup ? $("#su-top") : panel).append(w);
+    if (shown(near)) near.after(w); else (signup ? $("#su-top") : wo ? wo.errSlot() : panel).append(w);
     w.textContent = m; w.hidden = false;
     reveal(w);
   }
@@ -73,6 +84,7 @@
     const step = s === "social" ? 2 : s === "done" ? 3 : 1;
     $$("#stepper li").forEach((li) => { const n = Number(li.dataset.s); li.classList.toggle("is-active", n === step); li.classList.toggle("is-done", n < step); });
     if (signup) signup.onShow(s);
+    if (wo) wo.onShow(s);
   }
 
   /* ---------- wallet buttons ---------- */
@@ -104,10 +116,10 @@
     return a;
   }
   /** Inside a known wallet app's own browser (not Instagram's): one tap on a wallet connects AND asks for the signature (the sign-up v2 only). */
-  const quickHere = () => Boolean(signup && window.V.walletApp.here());
+  const quickHere = () => Boolean((signup || wo) && window.V.walletApp.here());
   /** The "Already a member? Log in" block: Google or e-mail. Google can't run inside wallet apps. */
   function renderLogin() {
-    if (signup) return; // v2 draws its own Log in block
+    if (signup || wo) return; // v2 draws its own Log in block (wallet-only: there is none)
     const inApp = W.inWalletApp();
     $("#login-google").hidden = !providers.google || inApp;
     $("#login-email").hidden = !providers.email;
@@ -124,12 +136,12 @@
     const rest = W.KNOWN.filter((k) => !list.some((a) => k.match.test(a.name)));
     // a phone (the new sign-up): the wallet apps that can open this page come first; the ones still to install wait behind a second
     // "More wallets" (#wallets-more), so "Wallet on my phone" and "Skip for now" are not 17 rows down. Today's page keeps its one list.
-    const split = Boolean(signup) && W.isMobile;
+    const split = Boolean(signup || wo) && W.isMobile;
     const order = split ? rest.filter((k) => k.open) : W.isMobile ? rest.filter((k) => k.open).concat(rest.filter((k) => !k.open)) : rest;
     const others = split ? rest.filter((k) => !k.open) : [];
-    const carry = signup ? signup.carrier() : null;
+    const carry = signup ? signup.carrier() : wo ? wo.carrier() : null;
     // the Log in tab on a phone (the sign-up v2): a wallet app opens Vicinity signed in already, or signs in with ONE tap there
-    const target = signup && !signup.linkMode() ? (k) => `${location.origin}/connect?mode=login&with=${k.id}` : location.origin + "/connect";
+    const target = wo ? wo.tileTarget() : signup && !signup.linkMode() ? (k) => `${location.origin}/connect?mode=login&with=${k.id}` : location.origin + "/connect";
     $("#wallets-known").replaceChildren(...order.map((k) => knownTile(k, target, carry)));
     const more = $("#wallets-more");
     if (more) { more.hidden = !others.length; $("#wallets-rest").replaceChildren(...others.map((k) => knownTile(k, location.origin + "/connect", null))); }
@@ -139,6 +151,7 @@
     $("#alt-phone em").textContent = samePhone() ? "Approve in your wallet app, then finish here." : "Scan a code with your phone, sign there, continue here.";
     $("#more-wallets").open = list.length === 0;
     if (signup) signup.onShow("pick"); // a wallet turning up changes whether this is a wallet app (Google hidden)
+    if (wo) wo.onShow("pick");
   }
   W.onChange(() => { if (state === "pick") renderPick(); if (state === "approve") renderApprove(); });
 
@@ -156,7 +169,7 @@
   const later = (fn, ms) => waits.push(setTimeout(fn, ms));
   function stopWaits() { waits.forEach(clearTimeout); waits = []; setWait(""); }
   function forget() { attempt++; stopWaits(); resetSign(); }
-  const signLabel = () => (signup ? signup.signLabel() : "Sign in");
+  const signLabel = () => (wo ? wo.signLabel() : signup ? signup.signLabel() : "Sign in");
   function resetSign() { const b = $("#c-sign"); b.disabled = false; b.removeAttribute("aria-busy"); b.textContent = signLabel(); }
   const nameOf = (a) => (a && a.name) || "your wallet";
   /** Where a wallet's request shows: computers keep it behind the wallet's icon in the browser's toolbar. */
@@ -172,6 +185,7 @@
   /** `quick` (inside a known wallet app): the signature is asked for right after the connection, without the "Sign in" tap; on a computer the sign screen waits for it. */
   async function connectWith(adapter, tile, quick = false) {
     if (tile && tile.getAttribute("aria-busy") === "true" && Date.now() - Number(tile.dataset.at || 0) < 1500) return; // a double tap
+    if (wo && !(await wo.beforeWallet(tile))) return; // wallet-only registration: the Terms and the display name first
     forget(); setErr("");
     const my = attempt, name = nameOf(adapter), near = $("#wallets-detected");
     busyTile(tile, true);
@@ -205,6 +219,14 @@
    */
   async function loadMessage(pin) {
     message = null; $("#c-msg").textContent = "Loading…";
+    if (wo || woApprove) { // wallet-only: the server writes the text (a challenge for this purpose, two minutes, once)
+      challengeId = null;
+      const req = wo ? wo.challengeFor(address, pin) : { purpose: "login", address, pair: approveCode };
+      const d = req ? await api("/api/auth/challenge", req) : { ok: false };
+      if (d.ok && d.message && d.challengeId) { message = d.message; challengeId = d.challengeId; challengeAt = Date.now(); $("#c-msg").textContent = d.message; }
+      else { $("#c-msg").textContent = "Couldn't load the message. Try again."; if (wo) wo.challengeFailed(d); }
+      return message;
+    }
     const link = (signup && signup.linkMode()) || (pin && pairPurpose === "link");
     const q = `address=${encodeURIComponent(address)}&action=${link ? "link" : "login"}${pin ? "&pin=" + pin : ""}${pin && link ? "&pair=" + encodeURIComponent(pairCode) : ""}`;
     const d = await api(`/api/message?${q}`);
@@ -217,20 +239,37 @@
   /** The wallet signs the message, the server checks it. isCurrent() false = the person moved on: nothing is sent. */
   async function signIn(pair, isCurrent = () => true) {
     const wallet = active, addr = address;
+    // (wallet-only: a challenge lasts two minutes; one shown for longer than 100 seconds is replaced before the wallet is asked)
+    if ((wo || woApprove) && message && Date.now() - challengeAt > 100_000) message = null;
     const msg = message || await loadMessage(pair ? pairPin : null);
+    const cid = challengeId;
     try {
       if (!msg) throw ours("Couldn't prepare the message. Please try again.");
       const sig = await wallet.signMessage(new TextEncoder().encode(msg));
       if (!isCurrent()) throw Object.assign(new Error("moved on"), { stale: true });
       const body = { address: addr, message: msg, signature: btoa(String.fromCharCode(...sig)) };
+      if (wo || woApprove) body.challengeId = cid;
       if (pair) body.pair = pair;
       else if (W.inWalletApp()) body.inApp = true; // a wallet app's own browser on a phone: its session is renewed while used (src/auth.js renewSession); a computer's is not
-      const d = await api("/api/auth/wallet", body);
+      if (wo && !pair) Object.assign(body, wo.signExtra()); // (wallet-only registration: the wallet app, the hand-off code and its opener)
+      const d = await api(wo && !pair ? wo.signPath() : "/api/auth/wallet", body);
+      if (!d.ok && wo && wo.handles(d.error)) return d; // no account for this wallet, a registration that expired...: the wallet-only page says what to do
+      if (!d.ok && (wo || woApprove)) throw ours(challengeError(d));
       if (!d.ok && signup && signup.handles(d.error)) return d; // no account for this wallet, a wallet already linked...: the sign-up page says what to do
       // (pairing: "where you started" is a computer, or Safari / Chrome on this same phone)
       if (!d.ok) throw ours(d.error === "expired" ? "That message expired. Please sign again." : d.error === "pair_expired" ? "That code expired. Go back to where you started and try again." : d.error === "pin_mismatch" ? "The check number doesn't match. Go back to where you started and try again." : d.error === "offline" ? "Couldn't reach Vicinity. Check your connection and try again." : "Sign-in failed. Please try again.");
       return d;
     } finally { if (message === msg) message = null; }
+  }
+  /** Wallet-only: what a refused challenge answer says (src/challenge.js checkChallenge refusals, the pairing's, the network's). */
+  function challengeError(d) {
+    const e = d && d.error;
+    if (e === "challenge_expired" || e === "challenge_used" || e === "challenge_unknown" || e === "bad_message") return "That message ran out or was already used. Please sign again.";
+    if (e === "pair_expired") return "That code expired. Go back to where you started and try again.";
+    if (e === "wrong_wallet" || e === "signature_mismatch") return "That signature isn't from the wallet you connected. Please try again.";
+    if (e === "slow_down") return "Too many tries from your network right now. Wait a few minutes and try again.";
+    if (e === "offline") return "Couldn't reach the site. Check your connection and try again.";
+    return "Sign-in failed. Please try again.";
   }
   function signError(err, name) {
     if (err && err.ours) return err.message;
@@ -273,6 +312,7 @@
 
   /** The wallet is proven: straight to the dashboard (linked before) or on to Google / e-mail. v2: the sign-up page decides (link, sign in, no account). */
   function after(d) {
+    if (wo) return wo.walletProven(d);
     if (signup) return signup.walletProven(d);
     if (String(d.next || "").startsWith("/dashboard")) {
       show("done");
@@ -414,24 +454,30 @@
   }
   $("#alt-phone").addEventListener("click", async () => {
     setErr("");
-    const ctx = signup ? signup.pairContext() : { for: "connect", purpose: "login", name: null, relay: false };
-    const d = await api("/api/pair", ctx.purpose === "link" ? { purpose: "link" } : {}); // a link pairing joins the wallet to this account; a login one signs the device in
+    if (wo && !(await wo.beforeWallet(null))) return; // wallet-only registration: the Terms and the display name first
+    const ctx = wo ? wo.pairContext() : signup ? signup.pairContext() : { for: "connect", purpose: "login", name: null, relay: false };
+    // a link pairing joins the wallet to this account; a login one signs the device in; a register one (wallet-only) registers this browser's sign-up
+    const d = await api("/api/pair", ctx.purpose === "link" ? { purpose: "link" } : ctx.purpose === "register" ? { purpose: "register" } : {});
+    if (!d.ok && wo && wo.pairFailed(d)) return;
     if (!d.ok) return setErr("Couldn't start. Please try again.", $("#alt-phone")); // (the wallet tapped and the reason stay for the next try)
     if (signup) signup.pairStarted();
-    const p = { code: d.code, pin: d.pin, until: Date.parse(d.expiresAt), for: ctx.for, name: ctx.name || null, relay: Boolean(ctx.relay) };
+    if (wo) wo.pairStarted();
+    // post: the server put the code in the link's fragment (wallet-only), so its status is asked with the code in a POST body, never a URL
+    // (decided by the server's own answer, not only by this page's flag; review finding SEC-10)
+    const p = { code: d.code, pin: d.pin, until: Date.parse(d.expiresAt), for: ctx.for, name: ctx.name || null, relay: Boolean(ctx.relay), ...(/#pair=/.test(String(d.url || "")) ? { post: true } : {}) };
     savePair(p);
     openPair(p, d.url);
   });
   /**
    * The pairing screen for a code: a new one, or (`resumed`) one this tab kept before it was reloaded, which asks the server at once.
    */
-  function openPair(p, url = `${location.origin}/connect?pair=${p.code}`, resumed = false) {
+  function openPair(p, url = `${location.origin}/connect${wo ? "#" : "?"}pair=${p.code}`, resumed = false) {
     show("phone");
     $("#pair-pin").textContent = p.pin;
     // On a phone its wallet apps open the link (it works on any connection, and the sign-in comes back here: the way through when
     // "Open app" can't carry the sign-up, e.g. behind iCloud Private Relay). A tablet keeps the QR code for the phone next to it.
     const phone = samePhone();
-    const why = p.relay && signup ? signup.relayWhy(p.name || null, !phone) : null; // why the pairing (and not "Open app")
+    const why = p.relay && (signup || wo) ? (signup || wo).relayWhy(p.name || null, !phone) : null; // why the pairing (and not "Open app")
     $("#pair-h").textContent = phone ? `Approve in ${p.name || "your wallet app"}, then finish here` : "Scan with your phone";
     $("#pair-why").textContent = why || ""; $("#pair-why").hidden = !why;
     $("#pair-qr").hidden = phone; $("#pair-howto").hidden = phone;
@@ -463,7 +509,8 @@
       clearTimeout(timer);
       if (state !== "phone" || pairPoll !== poll) return;
       if (Date.now() > p.until) return gone(first);
-      const s = await api(`/api/pair?code=${encodeURIComponent(p.code)}`);
+      // (wallet-only: the code in the body, never in a URL)
+      const s = wo || p.post ? await api("/api/pair/status", { code: p.code }) : await api(`/api/pair?code=${encodeURIComponent(p.code)}`);
       if (state !== "phone" || pairPoll !== poll) return; // the person left meanwhile (Back): nothing more
       const onLoad = first && Boolean(s.status); first = first && !s.status; // (no answer at all is not an answer: offline)
       if (s.status === "expired") return gone(onLoad);
@@ -471,7 +518,8 @@
         const f = await api("/api/pair/finish", { code: p.code });
         if (state !== "phone" || pairPoll !== poll) return;
         if (f.ok) { pairPoll = null; forgetPair(); toast(phone ? "Wallet approved ✓" : "Phone approved ✓"); address = f.wallet; return after(f); }
-        if (signup && signup.handles(f.error)) { pairPoll = null; forgetPair(); address = f.wallet || address; return after(f); } // no account for that wallet, or it is taken: said on screen
+        const page = wo || signup;
+        if (page && page.handles(f.error)) { pairPoll = null; forgetPair(); address = f.wallet || address; return after(f); } // no account for that wallet, or it is taken: said on screen
         if (f.status === "expired") return gone(false); // someone was faster: another tab of this browser, a moment ago
       }
       timer = setTimeout(poll, 2000);
@@ -483,6 +531,7 @@
   }
   /** The pairing on screen is gone: did another tab of this browser use it? Then this page carries on from there (true). */
   async function usedElsewhere() {
+    if (wo) return wo.pairGone();
     if (signup) return signup.pairGone();
     const me = await api("/api/me?lite=1");
     if (state !== "phone") return true;
@@ -497,8 +546,10 @@
   function resumePair() {
     const p = savedPair();
     if (!p) return;
-    if ((p.for === "connect") === Boolean(signup)) return forgetPair(); // made by the other sign-up (switched on or off meanwhile)
-    const may = signup ? signup.resumePair(p) : "resume";
+    // made by the other sign-up (switched on or off meanwhile): wallet-only pairings are kept as "wo-login" | "wo-register"
+    if (wo ? !String(p.for).startsWith("wo-") : String(p.for).startsWith("wo-")) return forgetPair();
+    if (!wo && (p.for === "connect") === Boolean(signup)) return forgetPair();
+    const may = wo ? wo.resumePair(p) : signup ? signup.resumePair(p) : "resume";
     if (may === "later") return; // the sign-up isn't on screen yet: kept for the next load
     if (may !== "resume") return forgetPair(); // the sign-up went on (or another way is open): nothing to finish here
     if (Date.now() > p.until) { forgetPair(); return ranOut(p); }
@@ -514,19 +565,23 @@
   // Terms are on record there (noted with termsGate.agreed). Design v4 has no site-entry Terms pop-up any more, so for a login
   // pairing gateNow() below has nothing to open: the Terms bind at account creation (and the member's "I agree" bar, site.js).
   let approveV2 = true;
-  async function startApprove() {
+  /** `code`: today the ?pair= of the address; the wallet-only page passes the #pair= it read (public/wallet-only.js). */
+  async function startApprove(code = pairCode) {
+    approveCode = code;
     show("approve");
     $(".connect__intro").hidden = true;
     window.V.ready.then((me) => {
-      if (!me || me.ok === false || me.signupFlow === "v2") return;
+      if (me && me.walletOnly === true && !wo) woApprove = true; // a ?pair= code from before WALLET_ONLY: approved with a login challenge
+      if (!me || me.ok === false || me.signupFlow === "v2" || me.walletOnly === true) return;
       approveV2 = false; $(".connect__intro").hidden = false; $("#approve-tap").hidden = true; // today's sign-up: its hero and 1-2-3 steps, as before
     });
-    const s = await api(`/api/pair?code=${encodeURIComponent(pairCode)}`);
+    const s = wo ? await api("/api/pair/status", { code: approveCode }) : await api(`/api/pair?code=${encodeURIComponent(approveCode)}`);
     if (s.purpose === "link" && s.status === "waiting" && window.V.termsGate) window.V.termsGate.agreed(s.terms || "2026-10-01"); else gateNow();
     if (s.status !== "waiting") { $("#approve-wallets").hidden = true; return setErr(s.status === "ready" ? "This code was already used." : "This code has expired. Go back to where you started and try again.", $("#approve-pin").parentNode); }
-    pairPin = s.pin; pairPurpose = s.purpose === "link" ? "link" : "login";
+    pairPin = s.pin; pairPurpose = s.purpose === "link" ? "link" : wo && s.purpose === "register" ? "register" : "login";
     $("#approve-pin").textContent = s.pin;
-    if (pairPurpose === "link") {
+    if (wo) wo.approveShown(s); // wallet-only: what the phone is approving (a sign-in, or the registration a computer started)
+    if (pairPurpose === "link" && !wo) { // (wallet-only: the legacy link window's words, public/wallet-only.js approveShown)
       $("#approve-h").textContent = `Link this wallet to ${s.name || "•••"}'s Vicinity account?`;
       $("#approve-owner").textContent = `@${s.handle || "•••"}`;
       $("#approve-city").textContent = s.community ? `${s.community.name}, ${s.community.country}` : ""; // the pin is drawn by pages-connect.css
@@ -559,7 +614,7 @@
       address = await adapter.connect(); active = adapter;
       if (my !== attempt) return;
       await loadMessage(pairPin);
-      const d = await signIn(pairCode, () => my === attempt);
+      const d = await signIn(approveCode, () => my === attempt);
       if (my !== attempt) return;
       stopWaits();
       if (d.paired) {
@@ -633,6 +688,25 @@
     if (loaded) resumePair();
   }
 
+  /* ---------- wallet-only: loaded only when the server says so (WALLET_ONLY counting) ---------- */
+  async function startWalletOnly(me, err) {
+    show("loading"); // hides today's half-drawn pick screen while the wallet-only page loads
+    let loaded = false;
+    try {
+      await loadScript("/wallet-only.js");
+      wo = window.VWalletOnly.start({ panel, params, show, setErr, renderPick, drawQR, connectWith, quickHere, approve: startApprove });
+      loaded = await wo.init(me, err);
+    } catch {
+      wo = null; show("loading");
+      $("#su-loading-text").textContent = "The page didn't load.";
+      $("#su-reload").hidden = false;
+      $("#su-reload").onclick = () => location.reload();
+      setErr("Please reload the page. If it keeps happening, try again in a few minutes.");
+      return;
+    }
+    if (loaded) resumePair(); // reloaded during a pairing (iOS put this tab away while the person was in the wallet app)
+  }
+
   /** Was: the site-entry Terms gate site.js held back for a code or a pairing this page can't vouch for. Design v4 removed that pop-up,
    *  so termsGate.open() does nothing; the call stays so this file reads the same as before (sign-in logic unchanged, rule R5). */
   const gateNow = () => { if (window.V.termsGate) window.V.termsGate.open(); };
@@ -643,6 +717,7 @@
     if (err) history.replaceState(null, "", location.pathname + (pairCode ? `?pair=${pairCode}` : ""));
     if (pairCode) return startApprove(); // (the gate: startApprove decides, once it knows what the pairing is for)
     const me = await window.V.ready;
+    if (me.walletOnly === true) return startWalletOnly(me, err); // WALLET_ONLY counting: Sign in and Register your city, wallet only
     providers = me.providers || providers;
     if (params.get("mode") === "login" || hasAccount()) welcomeBack();
     // the new sign-up: a link code (the wallet app's browser), or a member whose account has no wallet yet (the link mode, whatever the address said)

@@ -389,10 +389,13 @@ test("the path classes: the immutable files, the origin-bound routes of today's 
   // every /api route literal of src/index.js: exactly these are origin-bound (a new route under these prefixes is refused off-host until reviewed)
   const src = read("src/index.js").toString("utf8");
   const routes = [...new Set([...src.matchAll(/["'](\/api\/[a-z0-9/_-]+)["']/g)].map((m) => m[1]))].sort();
-  assert.deepEqual(routes.filter(isOriginBound), ["/api/auth/email/login", "/api/auth/email/start", "/api/auth/email/verify", "/api/auth/logout",
+  // (stages S09 and S10 add the literals of the wallet challenge and of the routes WALLET_ONLY retires, stage S12 the pairing's POST status:
+  // each is origin-bound by its prefix)
+  assert.deepEqual(routes.filter(isOriginBound), ["/api/auth/challenge", "/api/auth/email/login", "/api/auth/email/start", "/api/auth/email/verify",
+    "/api/auth/google/callback", "/api/auth/google/start", "/api/auth/logout",
     "/api/auth/password/reset", "/api/auth/password/reset/start", "/api/auth/reprove", "/api/auth/transfer", "/api/auth/transfer/check", "/api/auth/wallet",
     "/api/locate", "/api/locate/handoff", "/api/locate/handoff/claim", "/api/locate/handoff/complete", "/api/locate/handoff/info", "/api/me/wallet/",
-    "/api/message", "/api/pair", "/api/pair/finish", "/api/signup/"]);
+    "/api/me/wallet/unlink", "/api/message", "/api/pair", "/api/pair/finish", "/api/pair/status", "/api/signup/"]);
   for (const p of ["/api/auth/google/start", "/api/auth/google/callback", "/api/signup/location/handoff/info", "/api/me/wallet/carry/status", "/x/callback", "/api/hooks/webhooks/y", "/api/Webhook"]) assert.ok(isOriginBound(p), p);
   for (const p of ["/api/me", "/api/messages", "/api/pairs", "/api/locatex", "/api/token", "/api/wallet/send/status", "/api/callbacking"]) assert.ok(!isOriginBound(p), p);
   const site = siteConfig(ON);

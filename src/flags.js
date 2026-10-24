@@ -151,3 +151,27 @@ export const publicV5On = (env) => String((env && env.PUBLIC_V5) ?? "").trim().t
  * else, unset included, is the site exactly as before: the old names answer 301 to vicinity.city and http answers 301 to https, any method.
  */
 export const hostRedirectOn = (env) => String((env && env.HOST_REDIRECT) ?? "").trim().toLowerCase() === "on";
+
+/**
+ * WALLET_ONLY=on (Citycoin.dev master v5, stages S09 and S10; master sections 18 WP-02 and 05 BR-03; docs/citycoin-master/schema-and-api.md
+ * sections 3.1 and 4.1) makes the wallet the only way in: a wallet proves itself by signing a server challenge (POST /api/auth/challenge,
+ * src/challenge.js: two minutes, single use, bound to the host, the cluster, the wallet and the purpose, used up in the same D1 batch that
+ * makes the session, refused whenever the database cannot say), an unknown wallet gets no account, and the tiny-transfer proof and the
+ * Google, e-mail and password logins answer 404. It counts only while the v5 configuration check accepts the deployment (src/v5policy.js
+ * walletOnly: DEPLOYMENT_ENV, SITE_ORIGIN and SITE_ORIGINS set and accepted, no other named error), so read it through walletOnly(env), never
+ * alone. Exactly "on" (trimmed, any letter case), and then only with those preconditions; anything else, unset included, is the site exactly
+ * as before: Google, e-mail and password sign-up and sign-in, today's signed messages, today's /api/me keys, and no new route, key, table or
+ * column.
+ */
+export const walletOnlyOn = (env) => String((env && env.WALLET_ONLY) ?? "").trim().toLowerCase() === "on";
+
+/**
+ * LEGACY_LINK=on with LEGACY_LINK_UNTIL=<ISO date or time> (Citycoin.dev master v5, stage S14; master section 05 BR-03 "Where legacy users have
+ * only Google/email records, preserve data but do not infer a wallet from an email or auto-merge. Use the already verified wallet mapping or
+ * authenticated legacy-link evidence; mark unresolved ownership as a specific migration case"; docs/citycoin-master/schema-and-api.md section
+ * 2.2) opens the legacy link window: a member whose account was made with Google or an e-mail address and has no wallet logs in once at
+ * /connect?mode=legacy, gets a restricted 15-minute session that can do nothing but link a wallet to that same account, and links one (src/legacy.js).
+ * It counts only while WALLET_ONLY counts and the v5 configuration check accepts the deployment, LEGACY_LINK_UNTIL included (src/v5policy.js
+ * legacyLink: read it there, never alone). Exactly "on" (trimmed, any letter case); anything else, unset included, is the site exactly as before.
+ */
+export const legacyLinkOn = (env) => String((env && env.LEGACY_LINK) ?? "").trim().toLowerCase() === "on";

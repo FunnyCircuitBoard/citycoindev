@@ -29,6 +29,23 @@
  *                            (hostRedirectRefusals below: the deployed wrangler.jsonc sends every page through the Worker, SITE_ORIGIN and
  *                            SITE_ORIGINS are accepted, and the v5 configuration check accepts the deployment, which needs DEPLOYMENT_ENV and
  *                            SITE_ORIGIN = https://citycoin.dev). Otherwise src/index.js answers exactly as with the switch off.
+ *   walletOnly(env)          WALLET_ONLY as the Worker applies it (stages S09 and S10, src/challenge.js and src/auth.js): on only while its OWN
+ *                            preconditions hold (walletOnlyRefusals below: DEPLOYMENT_ENV, and SITE_ORIGIN and SITE_ORIGINS, which the switch
+ *                            requires by name). An error in an unrelated input (an OFFICIAL_X_URL typo, a refused MAIN_TOKEN_MINT, a malformed
+ *                            LEGACY_LINK_UNTIL) switches off only its own feature, never wallet-only sign-in.
+ *   walletOnlyHeld(env)      WALLET_ONLY is set on but its own preconditions refuse it: the Worker FAILS CLOSED (review finding SEC-1; master
+ *                            section 05 BR-03 "Do not restore Google as the new dashboard login path"). Only wallet-bound sessions count
+ *                            (src/auth.js getSession), the Google, e-mail, password and tiny-transfer routes stay 404, and every sign-in,
+ *                            registration and pairing route answers 503 unavailable (src/index.js) until the configuration is fixed. Only
+ *                            WALLET_ONLY unset (or off) is today's site.
+ *   legacyLink(env, now)     the legacy link window as the Worker applies it (stage S14, src/legacy.js): { state: "off" | "open" | "closed",
+ *                            until }. Open only while WALLET_ONLY counts, LEGACY_LINK is on and LEGACY_LINK_UNTIL is an ISO date still ahead;
+ *                            closed once that LEGACY_LINK_UNTIL has passed while LEGACY_LINK is still on (its routes answer 410; the scheduled
+ *                            job marks unlinked accounts closed_unresolved only after a window was recorded open, src/legacy.js); otherwise off,
+ *                            which is today's site (or, under WALLET_ONLY alone, the S10 answers). A date alone never makes a window.
+ *   IDENTITY_POLICY          the two identity lifetimes of the policy (policy.identity: a 120-second single-use challenge, a 300-second
+ *                            single-use hand-off), so the challenge service reads the master's numbers, never its own; and the policy
+ *                            version a location verified under this master records (users.loc_policy, stage S11).
  *   publicMaster(env, opts)  the `master` key of GET /api/policy: version, approved and active pairs, the selection schedule, the fee
  *                            policy, the main_token block (mint null until configured, verified and in use), legacy_tokens, official_links
  *                            (null when unset) and the public authority addresses. Every part says its own status.
@@ -40,7 +57,7 @@
  * which reads MAIN_TOKEN_MINT, OFFICIAL_X_URL and OFFICIAL_TELEGRAM_URL (none of them supplied by the owner yet).
  */
 import { FLAG_VALUES, MASTER_POLICY, nextSelectionBoundary, validatePolicy } from "./masterpolicy.js";
-import { hostRedirectOn, mainTokenV5On, publicV5On } from "./flags.js";
+import { hostRedirectOn, legacyLinkOn, mainTokenV5On, publicV5On, walletOnlyOn } from "./flags.js";
 import { deploymentAccepted, mainMint, officialLinks } from "./maintoken.js";
 import { DEFAULT_SITE_ORIGIN, DEFAULT_SITE_ORIGINS, normalizeOrigin, siteConfig } from "./site-config.js";
 import { brandOf } from "./brand.js";
@@ -155,6 +172,12 @@ export function checkPolicyConfig(env, { log = (...args) => console.error(...arg
   let redirectOn = false;
   try { redirectOn = hostRedirectOn(env); } catch { /* the switch reads as off */ }
   if (redirectOn) for (const code of hostRedirectRefusals(env)) say(`host|${code}`, "host redirect switch refused", code);
+  let walletOn = false;
+  try { walletOn = walletOnlyOn(env); } catch { /* the switch reads as off */ }
+  if (walletOn) for (const code of walletOnlyRefusals(env)) say(`wallet|${code}`, "wallet-only switch refused", code);
+  let legacyOn = false;
+  try { legacyOn = legacyLinkOn(env); } catch { /* the switch reads as off */ }
+  if (legacyOn) for (const code of legacyLinkRefusals(env)) say(`legacy|${code}`, "legacy link switch refused", code);
   return { ok: r.ok, codes: r.errors.map((e) => e.code) };
 }
 
@@ -236,6 +259,122 @@ export function hostRedirectRefusals(env) {
  *  unset this reads one setting and nothing else, so the Worker's every request costs what it cost before. */
 export function hostRedirect(env) {
   try { return hostRedirectOn(env) && hostRedirectRefusals(env).length === 0; } catch { return false; }
+}
+
+/* ---------------------------------------------------------------- WALLET_ONLY as the Worker applies it */
+
+/** The policy's identity lifetimes in seconds (policy.identity; master section 18: two-minute challenges; section 19 step 4: five-minute
+ *  hand-offs). Read here so src/challenge.js never holds a number of its own (only this module and src/maintoken.js read the policy). */
+export const IDENTITY_POLICY = Object.freeze({ challengeSeconds: P.identity.challenge_seconds, handoffSeconds: P.identity.handoff_seconds,
+  challengeSingleUse: P.identity.challenge_single_use, challengeBinds: Object.freeze([...P.identity.challenge_binds]),
+  // the policy version a location verified under this master records (users.loc_policy; master section 19 step 3, stage S11)
+  policyVersion: MASTER_POLICY.policy_version });
+
+/**
+ * The v5 check's codes that belong to WALLET_ONLY itself: the environment it must name, and the two origins it requires by name (their absence,
+ * their shape, SITE_ORIGIN outside SITE_ORIGINS), or a check that could not run. Every other code (another switch's input, an official link,
+ * the main token, LEGACY_LINK_UNTIL) refuses only its own feature (review finding SEC-1).
+ */
+export const WALLET_ONLY_CODES = Object.freeze(["CONFIG_CHECK_FAILED", "DEPLOYMENT_MISSING", "ENVIRONMENT_INVALID", "ENVIRONMENT_UNSET",
+  "MISSING_SITE_ORIGIN", "MISSING_SITE_ORIGINS", "SITE_ORIGIN_INVALID", "SITE_ORIGIN_NOT_ALLOWED", "SITE_ORIGINS_INVALID"]);
+/** The v5 check's codes that belong to LEGACY_LINK itself (its date, and the rule that the window exists only under WALLET_ONLY). */
+export const LEGACY_LINK_CODES = Object.freeze(["MISSING_LEGACY_LINK_UNTIL", "LEGACY_LINK_UNTIL_INVALID", "LEGACY_LINK_WITHOUT_WALLET_ONLY"]);
+const ownErrors = (env, codes, flag) => policyConfig(env).errors.filter((e) => codes.includes(e.code) || e.path === `deployment.flags.${flag}`);
+
+/**
+ * Why WALLET_ONLY does not count in this environment: [] when every precondition holds, else the reasons (codes only, never a value).
+ *   WALLET_ONLY_SITE_REFUSED    src/site-config.js has no accepted configuration (SITE_ORIGIN and SITE_ORIGINS unset, or refused): a challenge
+ *                               names the allowlist entry it is issued for, and with no allowlist there is none to name.
+ *   WALLET_ONLY_POLICY_REFUSED  the v5 configuration check refuses one of the switch's OWN inputs (WALLET_ONLY_CODES): DEPLOYMENT_ENV unset
+ *                               (ENVIRONMENT_UNSET), SITE_ORIGIN or SITE_ORIGINS missing (MISSING_SITE_ORIGIN, MISSING_SITE_ORIGINS: the switch
+ *                               requires both by name) or malformed. An error elsewhere in the deployment is not a reason here.
+ * Set but refused, the Worker fails closed (walletOnlyHeld below): it never falls back to today's Google, e-mail and password logins.
+ */
+export function walletOnlyRefusals(env) {
+  try {
+    const out = [];
+    if (!siteConfig(env).configured) out.push("WALLET_ONLY_SITE_REFUSED");
+    if (ownErrors(env, WALLET_ONLY_CODES, "WALLET_ONLY").length) out.push("WALLET_ONLY_POLICY_REFUSED");
+    return out;
+  } catch {
+    return ["WALLET_ONLY_CHECK_FAILED"];
+  }
+}
+
+/** WALLET_ONLY is set on AND nothing refuses it (above). Never throws: anything odd reads as off. With the switch unset this reads one setting
+ *  and nothing else. */
+export function walletOnly(env) {
+  try { return walletOnlyOn(env) && walletOnlyRefusals(env).length === 0; } catch { return false; }
+}
+
+/**
+ * WALLET_ONLY is set on but refused (walletOnlyRefusals is not empty): the identity routes fail closed (see the top of this file). False with the
+ * switch unset, off or counting. Never throws: a switch that cannot be read reads as unset.
+ */
+export function walletOnlyHeld(env) {
+  try { return walletOnlyOn(env) && walletOnlyRefusals(env).length > 0; } catch { return false; }
+}
+
+/* ---------------------------------------------------------------- LEGACY_LINK as the Worker applies it */
+
+/**
+ * LEGACY_LINK_UNTIL as an instant (milliseconds), or null when it is unset, blank or not the ISO 8601 date or time the v5 check accepts
+ * (masterpolicy.js: YYYY-MM-DD, or YYYY-MM-DDThh:mm[:ss[.fff]] with Z or an offset). A bare date is the start of that day in UTC (Date.parse),
+ * so "2026-12-31" closes the window at 2026-12-31T00:00:00Z: the pages show the exact instant, never a day that could be read as included.
+ */
+export function legacyLinkUntil(env) {
+  try {
+    const raw = env && env.LEGACY_LINK_UNTIL;
+    if (typeof raw !== "string" || !raw.trim()) return null;
+    const t = raw.trim();
+    if (!/^\d{4}-\d{2}-\d{2}(T[0-9:.]+(Z|[+-]\d{2}:\d{2}))?$/.test(t)) return null;
+    const ms = Date.parse(t);
+    return Number.isFinite(ms) ? ms : null;
+  } catch { return null; }
+}
+
+/**
+ * The legacy link window (stage S14; master section 05 BR-03; schema-and-api.md section 2.2): { state, until } (until: the ISO instant, or null).
+ *   "open"    WALLET_ONLY counts, LEGACY_LINK is on and none of its own inputs is refused (LEGACY_LINK_CODES: MISSING_LEGACY_LINK_UNTIL,
+ *             LEGACY_LINK_UNTIL_INVALID), and LEGACY_LINK_UNTIL is still ahead of `now`. A Google- or e-mail-only member may log in at
+ *             /connect?mode=legacy and link a wallet.
+ *   "closed"  the same, but LEGACY_LINK_UNTIL has passed: every legacy route answers 410 and a restricted session counts for nothing. The scheduled
+ *             job marks the accounts still without a wallet closed_unresolved only once a window was recorded open (src/legacy.js
+ *             closeLegacyWindow, review finding SEC-4): a date in the past that never opened a window closes nobody.
+ *   "off"     anything else: WALLET_ONLY does not count (today's site, or held: src/index.js), it counts without a window (the S10 answers: 404),
+ *             or LEGACY_LINK is off (a LEGACY_LINK_UNTIL alone, however set, is no window, open or closed).
+ * Never throws: anything odd reads as off.
+ */
+export function legacyLink(env, now = Date.now()) {
+  try {
+    if (!walletOnly(env) || !legacyLinkOn(env)) return LEGACY_OFF;
+    const until = legacyLinkUntil(env);
+    if (until === null || ownErrors(env, LEGACY_LINK_CODES, "LEGACY_LINK").length) return LEGACY_OFF;
+    const iso = new Date(until).toISOString();
+    return Object.freeze({ state: until <= now ? "closed" : "open", until: iso });
+  } catch { return LEGACY_OFF; }
+}
+const LEGACY_OFF = Object.freeze({ state: "off", until: null });
+
+/**
+ * Why LEGACY_LINK=on does not open a window in this environment: [] when it does, else the reasons (codes only, never a value).
+ *   LEGACY_LINK_WALLET_ONLY_OFF  WALLET_ONLY does not count here (unset, or refused: its own reasons are logged as wallet-only refusals): the window
+ *                                exists only under wallet-only sign-in (LEGACY_LINK_WITHOUT_WALLET_ONLY when WALLET_ONLY is not even set on).
+ *   LEGACY_LINK_POLICY_REFUSED   the v5 check refuses one of the switch's own inputs (LEGACY_LINK_UNTIL missing or not an ISO date). An error in
+ *                                another input is not a reason here.
+ *   LEGACY_LINK_UNTIL_PASSED     LEGACY_LINK_UNTIL is not ahead of `now`: the window is closed (its routes answer 410), never opened.
+ */
+export function legacyLinkRefusals(env, now = Date.now()) {
+  try {
+    const out = [];
+    if (!walletOnly(env)) out.push("LEGACY_LINK_WALLET_ONLY_OFF");
+    if (ownErrors(env, LEGACY_LINK_CODES, "LEGACY_LINK").length) out.push("LEGACY_LINK_POLICY_REFUSED");
+    const until = legacyLinkUntil(env);
+    if (until !== null && until <= now) out.push("LEGACY_LINK_UNTIL_PASSED");
+    return out;
+  } catch {
+    return ["LEGACY_LINK_CHECK_FAILED"];
+  }
 }
 
 /* ---------------------------------------------------------------- the public policy */

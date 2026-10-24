@@ -72,6 +72,24 @@
  * Sessions and challenges (stage S04, src/hostbind.js; only once SITE_ORIGINS lists a host other than vicinity.city, otherwise exactly as
  *   before): a host outside the allowlist 421 wrong_host · a session, pairing, hand-off or sign-up made on one host is unknown on another
  *   (rows made before: vicinity.city) · hand-off, QR, pairing and Google return links, and the host a wallet signs, from the allowlist
+ * Wallet-only sign-in (stages S09 and S10; only while WALLET_ONLY counts, src/v5policy.js walletOnly; otherwise POST /api/auth/challenge is an
+ *   unknown path and everything else is today's): POST /api/auth/challenge (src/auth.js handleChallenge, src/challenge.js) · /api/auth/wallet
+ *   and /api/auth/reprove take only a server challenge · /api/auth/transfer(/check), /api/auth/google/*, /api/auth/email/*,
+ *   /api/auth/password/*, /api/me/password, /api/me/google/*, /api/me/wallet/unlink 404 not_found (before any method check) ·
+ *   GET /api/message?action=login|link 400 use_challenge · /api/me providers { wallet: true } and walletOnly: true
+ * Wallet-only registration and location once (stages S11 and S13, the same switch): /api/signup/* is the registration of src/register.js
+ *   (location first, then the Terms and an optional display name, then the wallet: this browser's, a five-minute hand-off code for the wallet
+ *   app's browser, or a register pairing, POST /api/pair { purpose: "register" }); POST /api/home only for an account that never had a city,
+ *   /api/locate and /api/locate/handoff only for that (purpose home); no new check-in posts; town requests, founder and squad applications and
+ *   votes ask for no location
+ * The legacy link window (stage S14; only while src/v5policy.js legacyLink says "open" or "closed", which needs WALLET_ONLY to count; otherwise
+ *   the S10 answers): GET /api/auth/google/start?legacy=1 and its callback, POST /api/auth/email/start and /verify with { legacy: true } make a
+ *   restricted 15-minute session for a Google- or e-mail-only account, which can only ask POST /api/auth/challenge { purpose: "legacy_link" }
+ *   and link that wallet at POST /api/me/wallet/link (or through a link pairing, POST /api/pair { purpose: "link" }); every other /api/me/wallet/*
+ *   path is 404 while WALLET_ONLY counts; after LEGACY_LINK_UNTIL those routes answer 410 window_closed (src/legacy.js)
+ * Wallet-only pages (stage S12, the same switch): POST /api/pair/status { code } answers what GET /api/pair?code= answers, so the connect
+ *   page never puts a pairing code in a URL a server sees; a login pairing lives five minutes and its link carries the code in the fragment
+ *   (/connect#pair=); with the switch off /api/pair/status is an unknown path and pairings are today's
  * Settings: SOLANA_RPC_URL, VICINITY_MINT, ADMIN_WALLETS, GOOGLE_CLIENT_ID/SECRET, the e-mail sender settings (see docs/DEPLOY.md),
  * SNAPSHOT_CUTOFF, ATTEST_KEY, JUPITER_API_BASE/KEY, RPC_TIMEOUT_MS (optional); the swap and launchpad cluster settings in src/cluster.js.
  */
@@ -84,8 +102,8 @@ import { readSigned } from "./signed.js";
 import { ensureSchema } from "./store.js";
 import { POLICY, founderAmount } from "./policy.js";
 import { ledgerStatus } from "./ledger.js";
-import { handleEmailStart, handleEmailVerify, handleGoogleAdd, handleLogout, handleOAuthCallback, handleOAuthStart, handlePairFinish, handlePairStart, handlePairStatus,
-  handleReprove, handleTransferCheck, handleTransferStart, handleWalletLogin } from "./auth.js";
+import { handleChallenge, handleEmailStart, handleEmailVerify, handleGoogleAdd, handleLogout, handleOAuthCallback, handleOAuthStart, handlePairFinish, handlePairStart, handlePairStatus,
+  handlePairStatusPost, handleReprove, handleTransferCheck, handleTransferStart, handleWalletLogin } from "./auth.js";
 import { handleContactEmailRemove, handleContactEmailVerify, handleGoogleRemove, handleHome, handleMe, handleMembers, handlePhone, handleTermsAgree, handleUsername } from "./me.js";
 import { handleLocate } from "./attest.js";
 import { handleHandoffClaim, handleHandoffComplete, handleHandoffInfo, handleHandoffStart } from "./handoff.js";
@@ -106,6 +124,8 @@ import { handleReview } from "./coinreview.js";
 import { handleSendBuild } from "./walletsend.js";
 import { linkAccountFor, routeWalletLink } from "./walletlink.js";
 import { routeV2 } from "./signup.js";
+import { routeRegister } from "./register.js";
+import { LEGACY_LOGIN_PATHS, routeLegacyLogin, routeLegacyWallet } from "./legacy.js";
 import { PROFILE_PATHS, routeProfiles } from "./profiles.js";
 import { handleLaunchpad } from "./launchpad.js";
 import { CHART_TTL, handleCoin, handleCoinChart } from "./coin.js";
@@ -126,7 +146,7 @@ import { handleCoinMeta } from "./coinmeta.js";
 import { BROWSER_SECONDS, EDGE_SECONDS, OFFICIAL_CSV_PATH, officialCacheKey, officialCoinsCsv, officialCoinsJson } from "./officialcoins.js";
 import { DEFAULT_SITE, isForwardHost, localDevAllowed, siteConfig } from "./site-config.js";
 import { checkDeploymentConfig } from "./maintoken.js";
-import { checkPolicyConfig, hostRedirect, masterPolicyAnswer, publicMaster, publicV5 } from "./v5policy.js";
+import { checkPolicyConfig, hostRedirect, masterPolicyAnswer, publicMaster, publicV5, walletOnly, walletOnlyHeld } from "./v5policy.js";
 import { hostAnswer, isLocal, wrongHost } from "./hostroute.js";
 import { servedHost } from "./hostbind.js";
 import { officialLinksInPage } from "./footer-social.js";
@@ -176,8 +196,9 @@ async function cached(key, seconds, produce, { edge = 0 } = {}) {
 }
 
 export async function handleVerify(request, env = {}, now = Date.now(), fetchImpl = fetch) {
-  // one-time: a replayed body is 409, not another RPC call; the message must name the host it is checked on (src/hostbind.js)
-  const r = await readSigned(request, now, ["verify"], "verified", undefined, env.DB || null, servedHost(env, request).host);
+  // one-time: a replayed body is 409, not another RPC call; the message must name the host it is checked on (src/hostbind.js); while
+  // WALLET_ONLY counts a message whose single use the database cannot confirm is refused (strict), otherwise accepted as today
+  const r = await readSigned(request, now, ["verify"], "verified", undefined, env.DB || null, servedHost(env, request).host, { strict: walletOnly(env) || walletOnlyHeld(env) });
   if (r.error) return r.error;
   const address = r.parsed.address;
   console.log("wallet verified", address.slice(0, 4) + "…" + address.slice(-4));
@@ -261,6 +282,26 @@ const v5Options = (env, fetchImpl) => {
 
 // Routes that exist only in the new sign-up (SIGNUP_FLOW=v2), besides everything under /api/signup/.
 const V2_EXACT = new Set(["/api/auth/email/login", "/api/auth/password/reset/start", "/api/auth/password/reset", "/api/me/password"]);
+// Routes that are gone while WALLET_ONLY counts (stage S10; master sections 05 BR-03 and 18 WP-02): the tiny-transfer proof (a payment, not a
+// signature), the Google, e-mail and password logins and the Profile's Google sign-in, and unlinking the wallet (one wallet is the account).
+const WALLET_ONLY_GONE = new Set(["/api/auth/transfer", "/api/auth/transfer/check", "/api/auth/google/start", "/api/auth/google/callback",
+  "/api/auth/email/start", "/api/auth/email/verify", "/api/auth/email/login", "/api/auth/password/reset/start", "/api/auth/password/reset",
+  "/api/me/password", "/api/me/google/add", "/api/me/google/remove", "/api/me/wallet/unlink"]);
+// The sign-in, registration and pairing routes that answer 503 while WALLET_ONLY is set on but refused (src/v5policy.js walletOnlyHeld), besides
+// every /api/signup/ path: nothing signs in or registers until the configuration is fixed.
+const WALLET_ONLY_HELD = new Set(["/api/auth/challenge", "/api/auth/wallet", "/api/auth/reprove", "/api/pair", "/api/pair/status", "/api/pair/finish"]);
+
+/**
+ * WALLET_ONLY set on but refused (review finding SEC-1): the Worker fails closed instead of answering as today. The Google, e-mail, password,
+ * tiny-transfer and unlink routes (WALLET_ONLY_GONE) and every /api/me/wallet/ path answer the unknown-path 404 (before any method check), and
+ * the sign-in, registration and pairing routes answer 503 unavailable. Logout, /api/me (signed out unless a wallet session) and everything else
+ * are answered below as usual. null: not one of these paths.
+ */
+function heldAnswer(path) {
+  if (WALLET_ONLY_GONE.has(path) || path.startsWith("/api/me/wallet/")) return json({ error: "not_found" }, 404);
+  if (WALLET_ONLY_HELD.has(path) || path.startsWith("/api/signup/")) return json({ ok: false, error: "unavailable" }, 503);
+  return null;
+}
 
 export async function handleApi(request, env = {}, fetchImpl = fetch, ctx = null) {
   // stage S04 (src/hostbind.js): while the host binding counts, a host outside the allowlist is refused before any route (the Worker entry
@@ -274,12 +315,36 @@ export async function handleApi(request, env = {}, fetchImpl = fetch, ctx = null
   const needsDb = () => (env.DB ? null : json({ ok: false, error: "unavailable" }, 503));
   const db = async (fn) => needsDb() || (await ensureSchema(env.DB), fn());
 
-  // the new sign-up and password log-in: with the switch off they are simply not there (before any method check, so nothing can be probed)
+  // WALLET_ONLY set on but refused (src/v5policy.js walletOnlyHeld): fail closed, never today's logins (review finding SEC-1). Unset: no-op.
+  if (walletOnlyHeld(env)) { const held = heldAnswer(path); if (held) return held; }
+
+  // wallet-only sign-in (WALLET_ONLY counting: src/v5policy.js walletOnly; stages S09 and S10): the server challenge exists, and the routes of
+  // WALLET_ONLY_GONE answer what an unknown path answers (before any method check, so nothing can be probed). With the switch off, or set but
+  // refused, the challenge route is an unknown path and every other route below is exactly today's.
+  // POST /api/pair/status (stage S12): the pairing's status with its code in the body, for the wallet-only pages; the same rule
+  if (path === "/api/auth/challenge" || path === "/api/pair/status" || WALLET_ONLY_GONE.has(path)) {
+    if (walletOnly(env)) {
+      if (path === "/api/pair/status") return only("POST") || handlePairStatusPost(request, env);
+      // the legacy link window (stage S14, src/legacy.js): only the legacy form of a Google or e-mail login path is answered, and only while the
+      // window exists (open: the restricted login; closed: 410 window_closed); everything else here stays the unknown-path 404
+      if (LEGACY_LOGIN_PATHS.has(path)) { const legacy = await routeLegacyLogin(request, env, path, fetchImpl, ctx); if (legacy) return legacy; }
+      if (path !== "/api/auth/challenge") return json({ error: "not_found" }, 404);
+      return only("POST") || needsDb() || (await publicLimit(env, request, "challenge")) || handleChallenge(request, env);
+    }
+    if (path === "/api/auth/challenge" || path === "/api/pair/status") return json({ error: "not_found" }, 404);
+  }
+
+  // the new sign-up and password log-in: with the switch off they are simply not there (before any method check, so nothing can be probed).
+  // While WALLET_ONLY counts (stage S11) /api/signup/* is the wallet-only registration instead, whatever SIGNUP_FLOW says (src/register.js:
+  // location, Terms, then the wallet; the account step, the old finish and the location hand-off into a wallet app answer 404 there)
   if (path.startsWith("/api/signup/") || V2_EXACT.has(path)) {
+    if (walletOnly(env)) return routeRegister(request, env, fetchImpl, ctx);
     if (!v2On(env)) return json({ ok: false, error: "not_enabled" }, 404);
     return routeV2(request, env, fetchImpl, ctx);
   }
-  // the dashboard's wallet link (onboarding v3): the same rule
+  // the dashboard's wallet link (onboarding v3): the same rule. While WALLET_ONLY counts only /api/me/wallet/link exists, as the legacy link of the
+  // legacy link window (stage S14, src/legacy.js: open POST, closed 410, otherwise 404); every other path there is the unknown-path 404
+  if (path.startsWith("/api/me/wallet/") && walletOnly(env)) return routeLegacyWallet(request, env, path);
   if (path.startsWith("/api/me/wallet/")) {
     if (!v2On(env)) return json({ ok: false, error: "not_enabled" }, 404);
     return routeWalletLink(request, env, Date.now(), request.cf, ctx, fetchImpl); // ctx: the link e-mail goes out after the answer
@@ -522,6 +587,8 @@ export async function handleApi(request, env = {}, fetchImpl = fetch, ctx = null
       const address = q.get("address");
       if (!isSolanaAddress(address)) return json({ error: "bad_address" }, 400);
       const action = q.get("action") || "verify";
+      // wallet-only (stage S10): a sign-in or link text comes from the server's challenge only (POST /api/auth/challenge); verify stays
+      if ((walletOnly(env) || walletOnlyHeld(env)) && (action === "login" || action === "link")) return json({ error: "use_challenge" }, 400);
       let statement;
       const pin = q.get("pin") || undefined;
       if (action === "verify") statement = statementFor("verify");
@@ -641,6 +708,8 @@ export async function handleApi(request, env = {}, fetchImpl = fetch, ctx = null
       return only("POST") || handleLogout(request, env);
     case "/api/pair":
       if (method === "POST") return (await publicLimit(env, request, "pair")) || handlePairStart(request, env);
+      // wallet-only (review finding SEC-10): a pairing code never travels in a URL; its status is POST /api/pair/status only
+      if (walletOnly(env)) return json({ error: "method_not_allowed" }, 405);
       return only("GET") || handlePairStatus(request, env);
     case "/api/pair/finish":
       return only("POST") || handlePairFinish(request, env, Date.now(), ctx, fetchImpl);

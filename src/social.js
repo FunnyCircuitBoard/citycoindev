@@ -30,6 +30,7 @@ import { DAY, HOUR, POLICY, iso } from "./policy.js";
 import { HAS_ADDRESS, cleanText } from "./text.js";
 import { toBytes } from "./blobs.js";
 import { feedV2On, profilesOn } from "./flags.js";
+import { walletOnly } from "./v5policy.js";
 import { adminRoleOf } from "./admin.js";
 import { PICTURE_MAX_AGE, bytesApproved } from "./logos.js";
 import { notify, notifyReply } from "./notify.js";
@@ -39,6 +40,10 @@ const KINDS = ["meme", "checkin", "talk"];
 const KINDS_V2 = [...KINDS, "update"]; // feed v2: announcements from the founder, the manager or Vicinity
 const LIMITS = { meme: 280, checkin: 140, talk: 1000, reply: 500, update: 500 };
 const kindsFor = (env) => (feedV2On(env) ? KINDS_V2 : KINDS);
+// The kinds a new post may have. While WALLET_ONLY counts (Citycoin.dev master v5, stage S13; master section 19: "replace future GPS-backed
+// check-in requirements with normal city-associated community activity") no new check-in is posted: it needed a location attestation. The
+// check-ins already posted stay readable (kindsFor: the feed's own list is unchanged).
+const postKindsFor = (env) => (walletOnly(env) ? kindsFor(env).filter((x) => x !== "checkin") : kindsFor(env));
 const MAX_IMAGE = 200_000;
 const POSTS_PER_HOUR = 12;
 const VOTES_PER_HOUR = 60;
@@ -205,7 +210,7 @@ export async function handleNewPost(request, env, fetchImpl = fetch, now = Date.
     if (v2 && !(await visibleTo(db, parent, u.id, canModerate(pw, parent)))) return json({ ok: false, error: "not_found" }, 404); // nor replied to
     if (parent.kind === "checkin") return json({ ok: false, error: "no_checkin_replies" }, 400); // a check-in is a fact, not a thread
   }
-  const kind = parent ? "reply" : kindsFor(env).includes(body.kind) ? body.kind : null;
+  const kind = parent ? "reply" : postKindsFor(env).includes(body.kind) ? body.kind : null;
   if (!kind) return json({ ok: false, error: "bad_kind" }, 400);
   const scope = parent ? parent.scope : kind === "checkin" ? "city" : body.scope === "country" ? "country" : "city";
   if (kind === "update") {

@@ -50,6 +50,10 @@
   const when = (iso) => new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
   const left = (iso) => { const ms = Date.parse(iso) - Date.now(); if (ms <= 0) return "closing now"; const h = Math.floor(ms / 3600000); return h >= 48 ? `${Math.floor(h / 24)} days left` : h >= 1 ? `${h}h left` : `${Math.ceil(ms / 60000)} min left`; };
   let me = null, checkedAt = 0;
+  // wallet-only (WALLET_ONLY counting: /api/me says walletOnly; Citycoin.dev master v5 stage S12): the fresh proof is a server "reprove"
+  // challenge, no transfer proof, no Google sign-in or unlink rows, no new check-in, and no location asked for an application or a town
+  // request (master section 19 WP-03; acceptance A04). With the switch off every line below is today's.
+  const walletOnly = () => Boolean(me && me.walletOnly === true);
   // the launch on our own launchpad (lpMount below): is it switched on here (the server's word in every GET /api/coins answer,
   // launchLabClosed, or the probe asked once); the city whose launch card is shown
   let lpOn = false, lpProbed = false, lpCity = null;
@@ -104,7 +108,7 @@
       $("#proof-code").hidden = true; $("#proof-start").hidden = false;
       // an account without a wallet has nothing to sign with: its login IS its identity, so the person logs in again to confirm it
       const linked = Boolean(me && me.user && me.user.wallet), relogin = Boolean(linked && hint && hint.relogin);
-      $("#proof-login").hidden = linked && !relogin; $("#proof-transfer").hidden = !linked || relogin;
+      $("#proof-login").hidden = linked && !relogin; $("#proof-transfer").hidden = !linked || relogin || walletOnly();
       $("#proof-login").textContent = relogin ? "Log in again" : "Log in again to confirm it's you";
       const list = linked ? W.list() : [];
       // a phone's Safari / Chrome: the wallet app confirms (it opens this page there, signed in); without a remembered app, one chip each
@@ -115,7 +119,7 @@
         : k ? `On this phone you confirm in ${k.name}. It opens this page there, logged in.` : "On this phone you confirm in your wallet app. Pick it: it opens this page there, logged in.";
       if (phone && !k && !relogin) appChips($("#proof-apps"), null, hereNext());
       $("#proof-none").hidden = (linked && list.length > 0) || phone || relogin;
-      $("#proof-none").textContent = linked ? "No wallet found in this browser. Open this page in your wallet app, or use the tiny transfer below."
+      $("#proof-none").textContent = linked ? (walletOnly() ? "No wallet found in this browser. Open this page in your wallet app." : "No wallet found in this browser. Open this page in your wallet app, or use the tiny transfer below.")
         : "Your account has no wallet yet, so there is nothing to sign with. Log in again to confirm it's you.";
       $("#proof-wallets").replaceChildren(...list.map((w) => {
         const b = el("button", "wallet-option"); b.type = "button";
@@ -133,10 +137,11 @@
     try {
       const address = await w.connect();
       if (address !== me.user.wallet) return proofErr(`That's a different wallet. Use the one on your account (${mask(me.user.wallet)}).`);
-      const m = await api(`/api/message?address=${encodeURIComponent(address)}&action=login`);
+      // wallet-only: a "reprove" challenge from the server, bound to this session (src/auth.js walletOnlyReprove); otherwise today's message
+      const m = walletOnly() ? await api("/api/auth/challenge", { purpose: "reprove", address }) : await api(`/api/message?address=${encodeURIComponent(address)}&action=login`);
       if (!m.message) return proofErr("Couldn't prepare the message. Try again.");
       const sig = await w.signMessage(new TextEncoder().encode(m.message));
-      const r = await api("/api/auth/reprove", { address, message: m.message, signature: btoa(String.fromCharCode(...sig)) });
+      const r = await api("/api/auth/reprove", { address, message: m.message, signature: btoa(String.fromCharCode(...sig)), ...(walletOnly() && m.challengeId ? { challengeId: m.challengeId } : {}) });
       if (!r.ok) return proofErr(r.error === "wrong_wallet" ? "That's not your account's wallet." : "Couldn't confirm. Try again.");
       toast("Confirmed ✓"); closeProof(true);
     } catch (e) { proofErr(/reject|cancel|denied/i.test(String(e?.message || e)) ? "Cancelled in your wallet." : "Couldn't connect. Try again."); }
@@ -221,7 +226,7 @@
   $("#locate-cancel").addEventListener("click", () => closeLocate(null, new Error("Cancelled. Nothing was changed.")));
 
   /** What dashboard-roles.js needs from this file. */
-  const roleCtx = { sensitive, refresh: () => refresh(), locateFor, errText, countryName };
+  const roleCtx = { sensitive, refresh: () => refresh(), locateFor, errText, countryName, walletOnly };
 
   /* ---------- identity ---------- */
   const PROVIDER_LABEL = { google: "Google", email: "Email" };
@@ -231,7 +236,7 @@
     // no wallet yet (onboarding v3): the pass says so and offers the link; Copy has nothing to copy
     $$("[data-me-wallet]").forEach((e) => { e.textContent = linked ? mask(u.wallet) : "No wallet linked"; e.classList.toggle("mono", linked); });
     // the pass shows the sign-in method only — never the real name (privacy)
-    $$("[data-me-login]").forEach((e) => (e.textContent = PROVIDER_LABEL[u.provider] || "Google"));
+    $$("[data-me-login]").forEach((e) => (e.textContent = walletOnly() ? "Wallet" : PROVIDER_LABEL[u.provider] || "Google"));
     $("#me-avatar").textContent = initials(name);
     if (window.V.setAccount) window.V.setAccount(u); // the header's account sheet: the username and home community, kept in step
     $("#me-copy").hidden = !linked; $("#me-link").hidden = linked || d.signupFlow !== "v2"; // (Link only while the new sign-up's link routes are on)
@@ -716,16 +721,17 @@
       parts.push(say("Applications open after $VICINITY launches, once you've held your city's founder amount for 7 days in a row. The first qualified claimer becomes Seed Steward at once; if rivals claim together, a 72-hour window decides."));
     } else if (f.eligible) {
       const challenge = Boolean(f.challenging);
-      const label = challenge ? `Challenge ${c && c.seat ? c.seat.name : "the steward"} (checks your location)` : `Apply to found ${home.name} (checks your location)`;
+      const where = walletOnly() ? "" : " (checks your location)"; // (wallet-only: an application asks for no location)
+      const label = challenge ? `Challenge ${c && c.seat ? c.seat.name : "the steward"}${where}` : `Apply to found ${home.name}${where}`;
       const form = el("form", "apply-form");
       const ta = el("textarea"); ta.maxLength = 280; ta.rows = 2; ta.placeholder = challenge ? `Why should locals pick you over ${c && c.seat ? c.seat.name : "the steward"}? (optional, locals see this)` : `Why should you found ${home.name}? (optional, locals see this)`; ta.setAttribute("aria-label", "Your pitch");
       const go = el("button", "btn btn--primary btn--block", label); go.type = "submit";
       form.append(ta, go);
       form.addEventListener("submit", async (e) => {
         e.preventDefault(); showErr("#p-error", "");
-        go.disabled = true; go.textContent = "Checking your location…";
+        go.disabled = true; go.textContent = walletOnly() ? "Applying…" : "Checking your location…";
         try {
-          const r = await sensitive(async () => api("/api/seats/apply", { attestation: (await locateFor("apply")).attestation, pitch: ta.value.trim() }));
+          const r = await sensitive(async () => api("/api/seats/apply", walletOnly() ? { pitch: ta.value.trim() } : { attestation: (await locateFor("apply")).attestation, pitch: ta.value.trim() }));
           if (!r.ok) throw new Error(errText(APPLY_ERR, r, "Couldn't apply. Please try again."));
           toast(r.steward ? `🌟 You're ${home.name}'s Seed Steward` : r.challenge ? `📨 Challenge opened: 72 hours` : `📨 Applied to found ${home.name}`);
           const b = go.getBoundingClientRect(); burst(b.left + b.width / 2, b.top); refresh();
@@ -734,7 +740,7 @@
       });
       parts.push(say(challenge
         ? `✅ You qualify to challenge ${c && c.seat ? c.seat.name : "the steward"}, ${home.name}'s Seed Steward. If 10 verified locals endorse you within 72 hours, an election is forced (the steward defends the seat in it).`
-        : `✅ You qualify: held ${T} $VICINITY for 7 days. Apply from inside ${home.name}: you become Seed Steward at once if nobody else is claiming. If rivals claim together, a 72-hour window scores everyone, locals' endorsements first.`), form);
+        : `✅ You qualify: held ${T} $VICINITY for 7 days. ${walletOnly() ? "Apply" : `Apply from inside ${home.name}`}: you become Seed Steward at once if nobody else is claiming. If rivals claim together, a 72-hour window scores everyone, locals' endorsements first.`), form);
     } else {
       const why = {
         no_home: "Set your home community first.",
@@ -956,7 +962,7 @@
       go.href = wallet ? "#home" : "/connect?mode=link";
       if (wallet) go.dataset.go = "#trade"; else delete go.dataset.go;
     }
-    $("#composer").hidden = (national && checkin) || locked || (update && !mayUpdate());
+    $("#composer").hidden = (national && checkin) || (checkin && walletOnly()) || locked || (update && !mayUpdate());
     $("#c-text").placeholder = me && me.launched && !me.user.wallet ? NEEDS_WALLET_POST : PLACEHOLDER[kind]; // after launch only holders post: a wallet comes first
     $("#c-text").maxLength = kind === "talk" ? 1000 : kind === "meme" ? 280 : update ? 500 : 140;
     $("#c-pic-label").hidden = kind !== "meme";
@@ -981,7 +987,7 @@
     const li = el("li", "empty-feed");
     const where = scope === "city" ? me.user.home.name : countryName(me.user.home.country);
     li.append(el("strong", null, `${{ meme: "No memes yet", checkin: "No check-ins yet", talk: "No discussions yet", update: "No updates yet" }[kind]} in ${where}.`),
-      el("span", null, kind === "checkin" && scope === "country" ? "Check in from your city's Local tab." : kind === "update" ? UPDATE_HINT : "Be the first: the first posts set the tone for everyone who joins after you."));
+      el("span", null, kind === "checkin" && walletOnly() ? "New check-ins are no longer posted. Earlier ones stay here." : kind === "checkin" && scope === "country" ? "Check in from your city's Local tab." : kind === "update" ? UPDATE_HINT : "Be the first: the first posts set the tone for everyone who joins after you."));
     return li;
   }
   async function loadFeed(reset) {
@@ -1726,7 +1732,7 @@
     showErr("#req-err", "");
     if (!/^[\p{L}\p{M}][\p{L}\p{M} .'’-]{0,58}[\p{L}\p{M}.]$/u.test(name)) return showErr("#req-err", "Use letters only for the town name (spaces, - . ' are fine).");
     try {
-      const d = await api("/api/towns", { name, attestation: (await locateFor("request")).attestation });
+      const d = await api("/api/towns", walletOnly() ? { name } : { name, attestation: (await locateFor("request")).attestation });
       if (!d.ok) throw new Error(errText({ one_at_a_time: "You already have a request waiting. One at a time.", bad_name: "Please check the town name." }, d, "Couldn't send. Please try again."));
       toast(`Request sent: ${name}.`);
       $("#req-name").value = ""; loadTowns();
@@ -1764,8 +1770,8 @@
     const linked = Boolean(u.wallet);
     $("#profile-wallet").textContent = linked ? mask(u.wallet) : "No wallet linked";
     $("#profile-wallet").classList.toggle("mono", linked);
-    $("#profile-copy").hidden = !linked; $("#profile-link").hidden = linked || !(me && me.signupFlow === "v2"); $("#profile-unlink").hidden = !linked;
-    $("#profile-provider").textContent = PROVIDER_LABEL[u.provider] || "Google";
+    $("#profile-copy").hidden = !linked; $("#profile-link").hidden = linked || !(me && me.signupFlow === "v2"); $("#profile-unlink").hidden = !linked || walletOnly();
+    $("#profile-provider").textContent = walletOnly() ? "Wallet" : PROVIDER_LABEL[u.provider] || "Google";
     $("#profile-home").textContent = u.home ? `${u.home.name}, ${countryName(u.home.country)}` : "No home community yet";
     $("#username-input").value = u.handle || "";
     $("#username-err").hidden = true;
@@ -1784,17 +1790,22 @@
   let pendingEmail = "";
   function renderEmailView(u) {
     const v = $("#email-view");
+    // wallet-only (review finding F1): the code sender is the e-mail login's, which is gone while the switch counts, so no Add or Change is
+    // offered (a form that can only fail); a contact address kept from before can still be removed, and without one the row is not shown
+    const wo = walletOnly(), fold = $("#email-row") && $("#email-row").closest("details");
+    if (fold) fold.hidden = wo && !u.contact_email;
+    if (wo) { $("#email-form").hidden = true; $("#email-code-form").hidden = true; }
     if (u.contact_email) {
       v.replaceChildren(el("span", "verified-pill", `✓ ${u.contact_email}`),
-        (() => { const b = el("button", "link-btn link-btn--tiny"); b.type = "button"; b.textContent = "Change";
-          b.addEventListener("click", () => { $("#email-form").hidden = false; $("#email-code-form").hidden = true; $("#email-input").focus(); }); return b; })(),
+        ...(wo ? [] : [(() => { const b = el("button", "link-btn link-btn--tiny"); b.type = "button"; b.textContent = "Change";
+          b.addEventListener("click", () => { $("#email-form").hidden = false; $("#email-code-form").hidden = true; $("#email-input").focus(); }); return b; })()]),
         (() => { const b = el("button", "link-btn link-btn--tiny"); b.type = "button"; b.textContent = "Remove";
           b.addEventListener("click", async () => { const r = await api("/api/me/contact/email/remove", {}); if (r.ok) { me.user.contact_email = null; renderEmailView(me.user); toast("E-mail removed"); } }); return b; })());
       $("#email-desc").textContent = "Verified, and not a way to log in. Not used for anything yet. You can remove it any time.";
       $("#profile-email-meta").textContent = u.contact_email;
     } else {
-      v.replaceChildren((() => { const b = el("button", "link-btn link-btn--tiny"); b.type = "button"; b.textContent = "Add";
-        b.addEventListener("click", () => { $("#email-form").hidden = false; $("#email-input").focus(); }); return b; })());
+      v.replaceChildren(...(wo ? [] : [(() => { const b = el("button", "link-btn link-btn--tiny"); b.type = "button"; b.textContent = "Add";
+        b.addEventListener("click", () => { $("#email-form").hidden = false; $("#email-input").focus(); }); return b; })()]));
       $("#email-desc").textContent = "Optional, and not a way to log in. Not used for anything yet. You can remove it any time.";
       $("#profile-email-meta").textContent = "Not added";
     }
@@ -1843,7 +1854,7 @@
   }
   function renderGoogleView(u) {
     const sec = $("#google-sec"), v = $("#google-view");
-    sec.hidden = !(me && me.signupFlow === "v2");
+    sec.hidden = !(me && me.signupFlow === "v2") || walletOnly();
     if (sec.hidden) return;
     const button = (label, fn) => { const b = el("button", "link-btn link-btn--tiny"); b.type = "button"; b.textContent = label; b.addEventListener("click", () => fn(b)); return b; };
     if (u.provider === "google") {
@@ -1946,6 +1957,7 @@
   $("#email-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const err = $("#contact-err"); err.hidden = true;
+    if (walletOnly()) { $("#email-form").hidden = true; return; } // (wallet-only: no code sender; the form is never shown, review finding F1)
     pendingEmail = $("#email-input").value.trim().toLowerCase();
     const r = await api("/api/auth/email/start", { email: pendingEmail });
     if (!r.ok) { err.textContent = r.error === "bad_email" ? "That doesn't look like an e-mail address." : r.error === "too_soon" ? "We just sent a code — wait a minute before asking again." : "Couldn't send the code. Try again."; err.hidden = false; return; }
@@ -2135,12 +2147,28 @@
     for (const n of [...nums, ...$$(".dpv__bar, .dpv__todos", box)]) io.observe(n);
   }
 
-  /** A visitor inside a known wallet app (not Instagram's browser): one tap signs in with that wallet; anywhere else, Join or log in. */
+  /**
+   * A visitor inside a known wallet app (not Instagram's browser): one tap signs in with that wallet; anywhere else, Join or log in. While
+   * /api/me says walletOnly (guestWo; review finding F2) the words are the wallet-first ones (master section 14 DS-06, first registration), and
+   * the example pass says Wallet: there is no Google or e-mail way in. Otherwise today's words, byte for byte.
+   */
+  let guestWo = false;
   function guestCta() {
     const k = WA.here(), a = $("#out-cta");
-    if (!k) { a.textContent = "Join or log in →"; a.href = "/connect"; $("#out-cta-note").textContent = "Takes a minute, with Google or e-mail. Your wallet comes later, from your dashboard: free, one signature."; return; }
+    if (!k) {
+      a.textContent = "Join or log in →"; a.href = "/connect";
+      $("#out-cta-note").textContent = guestWo ? "Verify your city once, then connect your wallet. We keep your city/country, not your raw GPS coordinates."
+        : "Takes a minute, with Google or e-mail. Your wallet comes later, from your dashboard: free, one signature.";
+      return;
+    }
     a.textContent = `Sign in with ${k.name}`; a.href = `/connect?mode=login&with=${k.id}`;
-    $("#out-cta-note").textContent = "One free signature. Nothing is paid or moved. New here? Join with Google or e-mail in Safari or Chrome.";
+    $("#out-cta-note").textContent = guestWo ? "One free signature. Nothing is paid or moved. New here? Register in Safari or Chrome: verify your city once, then connect this wallet."
+      : "One free signature. Nothing is paid or moved. New here? Join with Google or e-mail in Safari or Chrome.";
+  }
+  /** The signed-out page under wallet-only: the wallet-first words, and the example pass's sign-in method ("Google" today) says Wallet. */
+  function guestWalletOnly() {
+    guestWo = true; guestCta();
+    const foot = $("#dash-out .dpv__foot"), login = foot && foot.children && foot.children[0]; if (login) login.textContent = "Wallet";
   }
 
   /* ---------- start ---------- */
@@ -2161,6 +2189,7 @@
     // the tabbed dashboard's key: forgotten on a real answer that will not show it (the switch is off, or nobody is signed in here: a guest
     // on a browser a member once used gets no member placeholders next time); an answer that failed (500, 401, offline) says nothing
     if (!tabbed) { $("#dash-skel").hidden = true; if (d._status === 200 && (d.dashboardV2 !== true || !d.signedIn)) { try { localStorage.removeItem(V2_KEY); } catch {} } }
+    if (!d.signedIn && d.walletOnly === true) guestWalletOnly(); // (wallet-only, signed out: the wallet-first words; review finding F2)
     if (!d.signedIn) {
       // a sign-in in progress: off to /connect, held as it is until the page is left (never the roles at the top for as long as the
       // navigation takes); the page Back brings back is unheld, so it shows the roles

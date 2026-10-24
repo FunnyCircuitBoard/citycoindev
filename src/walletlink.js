@@ -56,6 +56,7 @@ import { RELAY_ASNS, VPN_NETWORK_RE, isRelayNetwork } from "./network.js";
 import { check, clientKey, limitKey } from "./limits.js";
 import { TERMS_VERSION } from "./signup-core.js";
 import { carryRelayOn, v2On } from "./flags.js";
+import { walletOnly } from "./v5policy.js";
 import { emailConfigured, sendMail, walletLinkedEmail } from "./mail.js";
 import { DAY, HOUR, POLICY, iso } from "./policy.js";
 import { clearPasswordSince, passwordSetSince } from "./pwlogin.js";
@@ -76,14 +77,14 @@ const LIMITS = {
 export const WALLET_APPS = new Set(["phantom", "solflare", "backpack", "okx", "coinbase", "trust", "bitget", "magiceden", "exodus", "jupiter",
   "binance", "nightly", "coin98", "tokenpocket", "safepal", "brave"]);
 /** The wallet apps whose open() is a real universal / app link (a code in it never lands on a stranger's web page by design): relay codes only for these. */
-const UL_APPS = new Set(["phantom", "solflare", "backpack"]);
+export const UL_APPS = new Set(["phantom", "solflare", "backpack"]);
 
 const maskWallet = (w) => `${w.slice(0, 4)}…${w.slice(-4)}`;
 /** A name as the wallet app's page may show it before the person confirms: enough to recognise their own ("Sa•••"), no more. */
 export const maskName = (n) => { const a = Array.from(String(n || "").trim()); return a.length ? `${a.slice(0, a.length > 3 ? 2 : 1).join("")}•••` : "•••"; };
 /** The account as the link statement names it: the username (every v2 account has one; an old account without one is named by its number). */
 export const accountName = (u) => (u.handle && /^[A-Za-z][A-Za-z0-9_]{0,39}$/.test(u.handle) ? u.handle : `member${u.id}`);
-const appOf = (x) => (typeof x === "string" && WALLET_APPS.has(x) ? x : null);
+export const appOf = (x) => (typeof x === "string" && WALLET_APPS.has(x) ? x : null);
 
 const badJson = () => json({ ok: false, error: "bad_json" }, 400);
 const badSigned = (error, status = 400) => ({ error: json({ ok: false, error }, status) });
@@ -172,9 +173,11 @@ export async function linkNotice(env, u, wallet, app, ctx = null, fetchImpl = fe
 }
 
 /* ---------------- the "Open app" code: Safari → the wallet app's browser, same phone ---------------- */
+// (the connection, relay, opener and app helpers below are exported unchanged for the wallet-only registration hand-off, stage S11:
+// src/register-core.js binds its codes exactly the way these bind a link code)
 
 /** The connection a code is bound to: a salted hash of the IPv4 address or of the IPv6 /64 (src/limits.js clientKey), never the address. */
-const carryNet = (env, request) => limitKey(env, "carryip", clientKey(request));
+export const carryNet = (env, request) => limitKey(env, "carryip", clientKey(request));
 /** The country of a relay connection, as Cloudflare saw it (two letters; not XX "unknown" or T1 Tor), or null. */
 export const relayCountry = (cf) => { const c = String((cf && cf.country) || "").toUpperCase(); return /^[A-Z]{2}$/.test(c) && c !== "XX" && c !== "T1" ? c : null; };
 /**
@@ -182,9 +185,9 @@ export const relayCountry = (cf) => { const c = String((cf && cf.country) || "")
  * made a relay code (that one is on the phone's own mobile data or Wi-Fi, or on the same relay), but the easiest way for someone ELSE to
  * meet the country bind. A relay code refuses such an opener like one from another country.
  */
-const hostedNetwork = (cf) => Boolean(cf && VPN_NETWORK_RE.test(String(cf.asOrganization || "")));
+export const hostedNetwork = (cf) => Boolean(cf && VPN_NETWORK_RE.test(String(cf.asOrganization || "")));
 /** A relay by its OWN network number (iCloud Private Relay's Cloudflare / Akamai / Fastly exits, WARP): a cloud server merely named "Akamai" is not one. */
-const relayAsn = (cf) => Boolean(cf && RELAY_ASNS.has(Number(cf.asn)));
+export const relayAsn = (cf) => Boolean(cf && RELAY_ASNS.has(Number(cf.asn)));
 /** The two-digit check number of a code (the same on both screens, derived from the code: nothing more to store). */
 async function carryPin(code) {
   const h = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`carry-pin\n${code}`)));
@@ -194,8 +197,8 @@ async function carryPin(code) {
 const carryRef = (id) => String(id).slice(0, 12);
 /** The opener nonces this browser presents: the HttpOnly cookie and the copy its page kept (wallet browsers that drop cookies), well-formed ones only. */
 const NONCE = /^[A-Za-z0-9_-]{32}$/;
-const presented = (request, kept) => [getCookie(request, OPENER_COOKIE), kept].filter((c, i, all) => typeof c === "string" && NONCE.test(c) && all.indexOf(c) === i);
-const openerHash = (nonce) => sha256(`vlo\n${nonce}`);
+export const presented = (request, kept) => [getCookie(request, OPENER_COOKIE), kept].filter((c, i, all) => typeof c === "string" && NONCE.test(c) && all.indexOf(c) === i);
+export const openerHash = (nonce) => sha256(`vlo\n${nonce}`);
 
 const findCarry = async (env, code, now) => {
   if (typeof code !== "string" || !/^[A-Za-z0-9_-]{32,64}$/.test(code)) return null;
@@ -282,7 +285,8 @@ async function handleLink(request, env, x) {
     await perHour(env, "wli", clientKey(request), LIMITS.link.ip),
   ]);
   if (over) return over;
-  const r = await checkSigned(body, request, x.now, ["link"], badSigned, env.DB, servedHost(env, request).host); // a signed message works once, on the host it names
+  // a signed message works once, on the host it names (and, while WALLET_ONLY counts, never when the database cannot confirm that: strict)
+  const r = await checkSigned(body, request, x.now, ["link"], badSigned, env.DB, servedHost(env, request).host, { strict: walletOnly(env) });
   if (r.error) return r.error;
   // the statement names THIS account, and the plain one (the check-number variant belongs to the pairing)
   if (r.parsed.pin || r.parsed.handle !== accountName(s.user)) return json({ ok: false, error: "bad_message" }, 400);
@@ -392,7 +396,7 @@ async function handleCarryClaim(request, env, x) {
   const served = servedHost(env, request);
   // sessions.host (src/hostbind.js), before the signed text is used up: a migration that fails here leaves the signature usable for a retry
   if (served.bound) await ensureHostSchema(env.DB, "sessions");
-  const r = await checkSigned(body, request, x.now, ["link"], badSigned, env.DB, served.host); // (only on the host the text names)
+  const r = await checkSigned(body, request, x.now, ["link"], badSigned, env.DB, served.host, { strict: walletOnly(env) }); // (only on the host the text names)
   if (r.error) return r.error;
   if (r.parsed.pin || r.parsed.handle !== accountName(u.owner)) return json({ ok: false, error: "bad_message" }, 400);
   const wallet = r.parsed.address, app = appOf(body.app), at = iso(x.now);

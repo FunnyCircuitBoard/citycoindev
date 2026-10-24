@@ -126,10 +126,67 @@ export function parseMessage(message) {
   return buildMessage(parsed) === message ? parsed : null;
 }
 
-/** Verify an Ed25519 signature made by a Solana wallet. */
+/* ---------------- Ed25519 points (review finding SEC-2) ----------------
+ * WebCrypto's Ed25519 verify (workerd/BoringSSL, Node/OpenSSL) accepts, for a public key of SMALL ORDER (the identity, the point of order 2,
+ * the points of order 4 and 8, e.g. 11111111111111111111111111111111 = 32 zero bytes, the System Program address), a signature R = a
+ * small-order point, S = 0 on arbitrary messages in a good share of tries: a forgery with no private key. So before any verify, the key and
+ * the signature's R must each be the canonical encoding of a curve point (y < p, x = 0 only with the sign bit clear) that is NOT of small order
+ * ([8]P is not the identity), and S must be canonical (S < L). An honest wallet's key and signatures always are: its key is [a]B and its R is
+ * [r]B, both of prime order L. Program-derived addresses (off the curve) stay valid addresses (isSolanaAddress); they simply cannot sign.
+ */
+const FP = (1n << 255n) - 19n;
+const ORDER_L = (1n << 252n) + 27742317777372353535851937790883648493n;
+const mod = (a) => { const r = a % FP; return r < 0n ? r + FP : r; };
+function powMod(b, e) {
+  let r = 1n; b = mod(b);
+  while (e > 0n) { if (e & 1n) r = (r * b) % FP; b = (b * b) % FP; e >>= 1n; }
+  return r;
+}
+const inv = (a) => powMod(a, FP - 2n);
+const ED_D = mod(-121665n * inv(121666n));
+const SQRT_M1 = powMod(2n, (FP - 1n) / 4n);
+const leInt = (bytes) => { let n = 0n; for (let i = bytes.length - 1; i >= 0; i--) n = (n << 8n) | BigInt(bytes[i]); return n; };
+
+/** The affine point a 32-byte encoding names, or null when it is not a canonical encoding of a point on edwards25519. */
+function decodePoint(bytes) {
+  if (!(bytes instanceof Uint8Array) || bytes.length !== 32) return null;
+  const sign = bytes[31] >> 7;
+  const y = leInt(bytes) & ((1n << 255n) - 1n);
+  if (y >= FP) return null; // non-canonical y
+  const y2 = (y * y) % FP, u = mod(y2 - 1n), v = mod(ED_D * y2 + 1n);
+  let x = (u * powMod(v, 3n) % FP) * powMod(u * powMod(v, 7n), (FP - 5n) / 8n) % FP;
+  const vx2 = (v * x % FP) * x % FP;
+  if (vx2 === mod(-u)) x = (x * SQRT_M1) % FP;
+  else if (vx2 !== u) return null; // not on the curve
+  if (x === 0n && sign === 1) return null; // non-canonical: -0
+  if (Number(x & 1n) !== sign) x = FP - x;
+  return { x, y };
+}
+/** P + Q on edwards25519 (a = -1; the formulas are complete there: no denominator is ever zero). */
+function addPoints(p, q) {
+  const t = (ED_D * p.x % FP) * (q.x * p.y % FP) % FP * q.y % FP;
+  return { x: mod((p.x * q.y + p.y * q.x) * inv(1n + t)), y: mod((p.y * q.y + p.x * q.x) * inv(1n - t)) };
+}
+/** A canonical point of edwards25519 that is not of small order ([8]P is not the identity): a key that can sign, or an R a signer made. */
+export function isSigningPoint(bytes) {
+  const p = decodePoint(bytes);
+  if (!p) return false;
+  let q = p;
+  for (let i = 0; i < 3; i++) q = addPoints(q, q);
+  return !(q.x === 0n && q.y === 1n);
+}
+/** True when the address is a public key that can sign: 32 bytes in base58, a canonical curve point not of small order. */
+export function isWalletKey(str) {
+  if (!isSolanaAddress(str)) return false;
+  try { return isSigningPoint(base58Decode(str)); } catch { return false; }
+}
+
+/** Verify an Ed25519 signature made by a Solana wallet. A key or an R of small order, a non-canonical encoding or S >= L is refused first. */
 export async function verifySignature(addressB58, messageText, signatureBytes) {
   const pub = base58Decode(addressB58);
-  if (pub.length !== 32 || signatureBytes.length !== 64) return false;
+  if (pub.length !== 32 || !signatureBytes || signatureBytes.length !== 64) return false;
+  const sig = signatureBytes instanceof Uint8Array ? signatureBytes : Uint8Array.from(signatureBytes);
+  if (!isSigningPoint(pub) || !isSigningPoint(sig.subarray(0, 32)) || leInt(sig.subarray(32)) >= ORDER_L) return false;
   const key = await crypto.subtle.importKey("raw", pub, { name: "Ed25519" }, false, ["verify"]);
-  return crypto.subtle.verify({ name: "Ed25519" }, key, signatureBytes, new TextEncoder().encode(messageText));
+  return crypto.subtle.verify({ name: "Ed25519" }, key, sig, new TextEncoder().encode(messageText));
 }

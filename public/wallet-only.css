@@ -1,0 +1,44 @@
+/* The connect page while WALLET_ONLY counts (Citycoin.dev master v5, stage S12): public/wallet-only.js adds this file to the page when it
+   starts, so with the switch off no page loads it. Every rule is scoped under .wo-on (the panel) or a wallet-only element; the page's own
+   look (style.css, onboard.css, pages-connect.css) is reused as it is. No inline style anywhere (the security policy blocks it). */
+
+/* the step bar: two steps (your city, then the wallet), no dashed optional third */
+.wo-on .stepper--two.wo-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+/* Register your city, step 2: the city, the Terms and an optional display name above the wallets */
+.wo-on .wo-reg.su-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 0 0 4px; }
+.wo-on .wo-form { display: grid; gap: 12px; margin: 4px 0 8px; }
+.wo-on .wo-form > p { margin: 0; }
+.wo-on .wo-form .su-field label .muted { font-weight: 500; }
+.wo-on .wo-signin { display: grid; gap: 12px; margin: 4px 0 8px; }
+.wo-on .wo-signin > p { margin: 0; }
+
+/* inside a wallet app's browser: "Open in Safari or Chrome" */
+.wo-on .wo-inapp { display: grid; gap: 14px; text-align: center; justify-items: center; }
+.wo-on .wo-inapp > p { margin: 0; max-width: 34rem; }
+.wo-on .wo-inapp .req-form { display: flex; gap: 8px; width: 100%; max-width: 30rem; }
+.wo-on .wo-inapp .req-form .field { flex: 1 1 auto; min-width: 0; min-height: 44px; }
+.wo-on .wo-inapp .req-form .btn { flex: none; min-height: 44px; }
+.wo-on .wo-inapp .link-btn { min-height: 44px; }
+
+/* the legacy link window (stage S14): the one line under Sign in, and the log-in screen of /connect?mode=legacy */
+.wo-on .wo-legacy-note { margin: 4px 0 0; }
+.wo-on .wo-legacy-note a { text-decoration: underline; text-underline-offset: 2px; }
+.wo-on .wo-legacy { display: grid; gap: 14px; }
+.wo-on .wo-legacy > p { margin: 0; }
+.wo-on .wo-lg-login { display: grid; gap: 12px; }
+.wo-on .wo-lg-login .btn { min-height: 44px; }
+.wo-on .wo-lg-form .su-field { display: grid; gap: 8px; }
+.wo-on .wo-lg-form .field { min-height: 44px; width: 100%; }
+.wo-on .wo-lg-or { margin: 0; text-align: center; }
+.wo-on .wo-legacy .link-btn { min-height: 44px; justify-self: start; }
+
+@media (max-width: 380px) {
+  .wo-on .wo-inapp .req-form { flex-direction: column; }
+}
+/* phones: the floating Feedback button (public/feedback.css: 44 px, 10 px from the right edge, above the menu bar) never covers the location
+   step's network line, and the panel's last line can scroll clear of it (review finding F6) */
+@media (max-width: 900px) {
+  .wo-on #su-loc-ask p.tiny { padding-right: 56px; }
+  .wo-on { padding-bottom: 64px; }
+}

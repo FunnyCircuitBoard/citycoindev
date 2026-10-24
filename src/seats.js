@@ -41,7 +41,7 @@ import { countryCities } from "./cities.js";
 import { sha256hex } from "./blobs.js";
 import { HAS_ADDRESS, cleanText } from "./text.js";
 import { notifyOn, profilesOn } from "./flags.js";
-import { mainTokenV5 } from "./v5policy.js";
+import { mainTokenV5, walletOnly } from "./v5policy.js";
 import { attempt, notify, notifyMany } from "./notify.js";
 
 const F = POLICY.founder;
@@ -270,10 +270,14 @@ export async function handleApply(request, env, fetchImpl = fetch, now = Date.no
   const pitch = cleanText(body.pitch, 280);
   if (pitch == null) return json({ ok: false, error: "too_long", max: 280 }, 400);
   if (HAS_ADDRESS.test(pitch)) return json({ ok: false, error: "no_addresses" }, 400);
-  const at = await useAttestation(env, body.attestation, { userId: u.id, purpose: "apply", now });
-  if (!at.ok) return json({ ok: false, error: at.error }, 400);
-  // Locals apply standing in the city; dark-city adopters prove liveness with any fresh attestation.
-  if (!e.darkAdoption && at.att.city !== e.cityId) return json({ ok: false, error: "not_in_city", here: at.att.cityName || null }, 403);
+  // Locals apply standing in the city; dark-city adopters prove liveness with any fresh attestation. While WALLET_ONLY counts (Citycoin.dev
+  // master v5, stage S13; master section 19: a founder application never asks for location) no attestation is asked: the city is the
+  // member's registered one (eligibility), or a dark city under the adoption rule.
+  if (!walletOnly(env)) {
+    const at = await useAttestation(env, body.attestation, { userId: u.id, purpose: "apply", now });
+    if (!at.ok) return json({ ok: false, error: at.error }, 400);
+    if (!e.darkAdoption && at.att.city !== e.cityId) return json({ ok: false, error: "not_in_city", here: at.att.cityName || null }, 403);
+  }
 
   if (e.challenging) {
     const w = await openChallengeWindow(env, e, u, now, fetchImpl);
@@ -888,9 +892,12 @@ export async function handleSquadApply(request, env, fetchImpl = fetch, now = Da
   const pitch = cleanText(body.pitch, 280);
   if (pitch == null) return json({ ok: false, error: "too_long", max: 280 }, 400);
   if (HAS_ADDRESS.test(pitch)) return json({ ok: false, error: "no_addresses" }, 400);
-  const at = await useAttestation(env, body.attestation, { userId: u.id, purpose: "apply", now });
-  if (!at.ok) return json({ ok: false, error: at.error }, 400);
-  if (at.att.city !== squad.city_id) return json({ ok: false, error: "not_in_city", here: at.att.cityName || null }, 403);
+  // (while WALLET_ONLY counts, stage S13: no attestation, as for a lone applicant above; eligibility holds the city rule)
+  if (!walletOnly(env)) {
+    const at = await useAttestation(env, body.attestation, { userId: u.id, purpose: "apply", now });
+    if (!at.ok) return json({ ok: false, error: at.error }, 400);
+    if (at.att.city !== squad.city_id) return json({ ok: false, error: "not_in_city", here: at.att.cityName || null }, 403);
+  }
 
   if (e.challenging) {
     const w = await openChallengeWindow(env, e, u, now, fetchImpl);

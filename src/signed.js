@@ -21,7 +21,7 @@ export function base64ToBytes(b64) {
  * and a real signature from the address. Returns { parsed, body } or { error: Response }.
  * With `db`, the message also works only once (see checkSigned). `host`: see checkSigned.
  */
-export async function readSigned(request, now, actions, errKey, maxBody = MAX_BODY, db = null, host = undefined) {
+export async function readSigned(request, now, actions, errKey, maxBody = MAX_BODY, db = null, host = undefined, opts = {}) {
   const bad = (error, status = 400) => ({ error: json({ [errKey]: false, error }, status) });
   const len = Number(request.headers.get("content-length") || 0);
   if (len > maxBody) return bad("too_large", 413);
@@ -33,7 +33,7 @@ export async function readSigned(request, now, actions, errKey, maxBody = MAX_BO
   } catch {
     return bad("bad_json");
   }
-  return checkSigned(body, request, now, actions, bad, db, host);
+  return checkSigned(body, request, now, actions, bad, db, host, opts);
 }
 
 /**
@@ -46,8 +46,12 @@ export async function readSigned(request, now, actions, errKey, maxBody = MAX_BO
  * (src/hostbind.js servedHost(env, request).host: an allowlist entry while the host binding counts, null for a refused host, which
  * matches nothing); left out, it is the request URL's own host, as before (and that is also what servedHost gives while the binding
  * does not count). So a message signed for vicinity.city is refused on citycoin.dev, and the other way round, whatever the settings.
+ *
+ * `opts.strict` (true only while WALLET_ONLY counts: src/v5policy.js walletOnly; Citycoin.dev master v5, stage S09): a message whose single use
+ * the database cannot confirm is refused ("unavailable", 503) instead of accepted. Left out (every caller while the switch is off): exactly as
+ * before, the message is accepted when the used-message store cannot answer (noteMessage below).
  */
-export async function checkSigned(body, request, now, actions, bad, db = null, host = undefined) {
+export async function checkSigned(body, request, now, actions, bad, db = null, host = undefined, opts = {}) {
   const { address, message, signature } = body || {};
   if (!isSolanaAddress(address)) return bad("bad_address");
 
@@ -67,7 +71,11 @@ export async function checkSigned(body, request, now, actions, bad, db = null, h
   let ok = false;
   try { ok = await verifySignature(address, message, sig); } catch { ok = false; }
   if (!ok) return bad("signature_mismatch", 401);
-  if (db && (await noteMessage(db, message, issued)) === false) return bad("replayed", 409);
+  if (db) {
+    const fresh = await noteMessage(db, message, issued);
+    if (fresh === false) return bad("replayed", 409);
+    if (fresh === null && opts && opts.strict === true) return bad("unavailable", 503); // wallet-only: never accepted unconfirmed
+  }
   return { parsed, body };
 }
 
