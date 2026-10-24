@@ -56,7 +56,7 @@ import { RELAY_ASNS, VPN_NETWORK_RE, isRelayNetwork } from "./network.js";
 import { check, clientKey, limitKey } from "./limits.js";
 import { TERMS_VERSION } from "./signup-core.js";
 import { carryRelayOn, v2On } from "./flags.js";
-import { walletOnly } from "./v5policy.js";
+import { legacySeatsFrozen, walletOnly } from "./v5policy.js";
 import { emailConfigured, sendMail, walletLinkedEmail } from "./mail.js";
 import { DAY, HOUR, POLICY, iso } from "./policy.js";
 import { clearPasswordSince, passwordSetSince } from "./pwlogin.js";
@@ -519,7 +519,10 @@ async function handleDisown(request, env, x) {
   const still = "EXISTS (SELECT 1 FROM users WHERE id = ?1 AND wallet = ?2 AND wallet_at = ?3)";
   const now = iso(x.now);
   const q = (sql, ...more) => env.DB.prepare(sql).bind(u.id, u.wallet, wa, ...more);
-  const res = await env.DB.batch([
+  // the legacy seats frozen (stage S16, src/v5policy.js legacySeats): no seat, squad or application row is written (docs/citycoin-master/
+  // schema-and-api.md section 3.9: no writer once frozen; no member loses a role). The rest of "Remove it" still runs: the wallet, the other
+  // sessions, the codes and a password set since the link go, so a stranger is out of the account whatever the seats say
+  const legacy = legacySeatsFrozen(env) ? [] : [
     // a seat taken since the link: voided (no cooldown for the owner), with a public record like any ended seat. A NEUTRAL one: no actor
     // (the public log, /api/audit, never names the member as the victim of anything, and src/elections.js credits moderation service
     // by actor: nobody gains from it), and words that say only what happened to the seat
@@ -535,6 +538,9 @@ async function handleDisown(request, env, x) {
         AND NOT EXISTS (SELECT 1 FROM squad_members m WHERE m.squad_id = squads.id AND m.user_id <> ?1) AND ${still}`),
     q(`DELETE FROM squad_members WHERE user_id = ?1 AND joined_at >= ?3 AND ${still}`),
     q(`UPDATE applications SET withdrawn = 1 WHERE user_id = ?1 AND withdrawn = 0 AND created_at >= ?3 AND ${still}`),
+  ];
+  const res = await env.DB.batch([
+    ...legacy,
     // every other browser out; this one keeps its login, without the wallet; no live link code or link pairing survives
     q(`DELETE FROM sessions WHERE user_id = ?1 AND id <> ?4 AND ${still}`, s.id),
     q(`UPDATE sessions SET wallet = NULL, proven_at = NULL WHERE id = ?4 AND ${still}`, s.id),

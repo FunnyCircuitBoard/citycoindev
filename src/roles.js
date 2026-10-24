@@ -3,7 +3,9 @@
  *   Admin            → a wallet in the ADMIN_WALLETS setting (Cloudflare → Settings → Variables)
  *   Country manager  → elected for a 90-day term (src/elections.js), while their founder seat is active
  *   City founder     → holds an ACTIVE founder seat (src/seats.js); a seat in grace keeps its badge
- *                      but not its powers
+ *                      but not its powers. While the legacy seats are frozen (stage S16, src/v5policy.js legacySeats) the
+ *                      seat and its badge stay, but a founder seat alone no longer moderates (master section 15: "generic
+ *                      founder moderation" is replaced; managers and admins moderate as before)
  *   Holder           → holds any $VICINITY
  *   Member           → signed in, not holding (yet)
  */
@@ -11,6 +13,7 @@ import { tokenMint } from "./official.js";
 import { liveAmounts } from "./chain.js";
 import { isSolanaAddress } from "./solana.js";
 import { iso } from "./policy.js";
+import { legacySeatsFrozen } from "./v5policy.js";
 
 /** Weekly meme votes: founders and country managers have stronger votes (their "special voting rights"). */
 export const VOTE_WEIGHT = { member: 1, holder: 1, founder: 2, manager: 3, admin: 1 };
@@ -39,6 +42,8 @@ export async function managerOf(env, cc, now = Date.now()) {
 /**
  * Everything a person may do right now:
  *   { admin, launched, amount, holder, seat, founderCity, managerCountry, level, weight }
+ * plus founderModeration: false while the legacy seats are frozen (stage S16; the key is absent otherwise): the seat, the level and the vote
+ * weight stay (nobody loses a role), but the founder branch of canModerate is off.
  */
 export async function powersOf(env, user, fetchImpl = fetch, now = Date.now()) {
   const launched = Boolean(tokenMint(env));
@@ -56,12 +61,16 @@ export async function powersOf(env, user, fetchImpl = fetch, now = Date.now()) {
   return {
     admin, launched, amount, holder: amount > 0, seat, founderCity, founderCountry: founderCity ? seat.country : null,
     managerCountry, level, weight: VOTE_WEIGHT[managerCountry ? "manager" : founderCity ? "founder" : "member"],
+    ...(legacySeatsFrozen(env) ? { founderModeration: false } : {}),
   };
 }
 
-/** May these powers moderate this post? Admin anywhere, a manager in their country, a founder in their city. */
+/** The city this person moderates as its founder: their founder city, or null while the legacy seats are frozen (powersOf founderModeration). */
+export const moderatesCity = (p) => (p.founderCity && p.founderModeration !== false ? p.founderCity : null);
+
+/** May these powers moderate this post? Admin anywhere, a manager in their country, a founder in their city (not while frozen: moderatesCity). */
 export const canModerate = (p, post) =>
-  Boolean(p.admin || (p.managerCountry && post.country === p.managerCountry) || (p.founderCity && post.scope === "city" && post.place === p.founderCity));
+  Boolean(p.admin || (p.managerCountry && post.country === p.managerCountry) || (moderatesCity(p) && post.scope === "city" && post.place === p.founderCity));
 
 /** Is this person banned from posting here (a country, or everywhere)? */
 export async function activeBan(db, userId, country, now = Date.now()) {

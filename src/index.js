@@ -94,7 +94,7 @@
  * SNAPSHOT_CUTOFF, ATTEST_KEY, JUPITER_API_BASE/KEY, RPC_TIMEOUT_MS (optional); the swap and launchpad cluster settings in src/cluster.js.
  */
 import { activeMint, checkOfficial, mainCacheTag, marketLink, officialFor, teamFor, teamWalletLabel, tokenMint, withMint } from "./official.js";
-import { handleAdmin } from "./admin.js";
+import { ADMIN_LEGACY_WRITERS, handleAdmin } from "./admin.js";
 import { SHOW_STALE_MS, getHolding, getTokenFacts, getTopHolders, holderSnapshot, isTeamLock, isTeamWallet, rankOf, rankWithAmount } from "./chain.js";
 import { base58Encode, buildMessage, isSolanaAddress, statementFor } from "./solana.js";
 import { SECURITY_HEADERS, json } from "./http.js";
@@ -110,7 +110,7 @@ import { handleHandoffClaim, handleHandoffComplete, handleHandoffInfo, handleHan
 import { handleDelete, handleMedia, handleNewPost, handlePosts, handleReport, handleVote } from "./social.js";
 import { handleMute, handleMutes } from "./mutes.js";
 import { handleNotices, handleNoticesPrefs, handleNoticesRead } from "./notify.js";
-import { handleApply, handleDecideObjection, handleEndorse, handleObject, handleResign, handleResult, handleSeats, handleSquadApply, handleSquadCreate, handleSquadGet, handleSquadJoin, handleSquadLeave, handleWithdraw, seatsFrozen } from "./seats.js";
+import { LEGACY_SEATS_STATUS, handleApply, handleDecideObjection, handleEndorse, handleObject, handleResign, handleResult, handleSeats, handleSquadApply, handleSquadCreate, handleSquadGet, handleSquadJoin, handleSquadLeave, handleWithdraw, legacySeatsFrozen, seatsFrozen } from "./seats.js";
 import { handleElectionResult, handleElectionVote } from "./elections.js";
 import { handleAppeal, handleAudit, handleBanDecision, handleDecideAppeal, handleHide, handleModQueue, handleMyTowns, handleProposeBan,
   handleTownDecision, handleTownRequest, handleUnhide } from "./moderation.js";
@@ -489,7 +489,12 @@ export async function handleApi(request, env = {}, fetchImpl = fetch, ctx = null
   }
 
   // paths with an id in them
-  if (path.startsWith("/api/admin/")) return db(() => handleAdmin(request, env, Date.now(), fetchImpl));
+  if (path.startsWith("/api/admin/")) {
+    // the admin routes that write the legacy seat tables answer 410 while the legacy seats are frozen (stage S16, src/admin.js
+    // ADMIN_LEGACY_WRITERS), before the schema step or any read; any other method falls through to their usual 405
+    if (method === "POST" && ADMIN_LEGACY_WRITERS.includes(path.slice("/api/admin/".length))) { const frozen = seatsFrozen(env); if (frozen) return frozen; }
+    return db(() => handleAdmin(request, env, Date.now(), fetchImpl));
+  }
   // the city-coin reviews (COIN_V2_REVIEW=on with COIN_V2_READY=on, src/coinreview.js): with the switch off every such path is an unknown
   // path (404) for every method
   if (path.startsWith("/api/coins/review/")) return coinV2ReviewOn(env) ? handleReview(request, env, path.slice("/api/coins/review/".length), fetchImpl) : json({ error: "not_found" }, 404);
@@ -519,6 +524,9 @@ export async function handleApi(request, env = {}, fetchImpl = fetch, ctx = null
       if (blocked) return blocked;
       const out = { policy: POLICY, snapshotCutoff: snapshotCutoff(env), launched: Boolean(tokenMint(env)),
         balanceHistory: env.DB ? await ledgerStatus(env, Date.now()) : { running: false } };
+      // the legacy seats frozen (stage S16, src/seats.js LEGACY_SEATS_STATUS): the seat, squad, steward and election rules of `policy` are history,
+      // and the answer says so; otherwise no such key, exactly today's answer
+      if (legacySeatsFrozen(env)) out.legacySeats = LEGACY_SEATS_STATUS;
       // the v5 policy (PUBLIC_V5=on with the configuration accepted, src/v5policy.js); otherwise exactly today's answer
       if (publicV5(env)) out.master = await publicMaster(env, v5Options(env, fetchImpl));
       return json(out);
@@ -686,7 +694,9 @@ export async function handleApi(request, env = {}, fetchImpl = fetch, ctx = null
       if (blocked) return blocked;
       const cc = url.searchParams.get("country") || "";
       if (!/^[A-Z]{2}$/.test(cc)) return json({ error: "bad_country" }, 400);
-      const rule = "Elected for 90 days by the country's verified locals (votes 50%, service 30%, capped holdings 20%). Until then, the admin covers it.";
+      // the legacy elections frozen (stage S16): no election opens, so the election rule is not described as the current one
+      const rule = legacySeatsFrozen(env) ? "No new country manager election opens. A term already under way runs until its end date. Until a country has a manager, the admin covers it."
+        : "Elected for 90 days by the country's verified locals (votes 50%, service 30%, capped holdings 20%). Until then, the admin covers it.";
       if (!env.DB) return json({ country: cc, manager: null, rule });
       await ensureSchema(env.DB);
       const mgr = await managerOf(env, cc);

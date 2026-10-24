@@ -18,7 +18,7 @@ import { averages, dayOf, latestBalances, samplesStale } from "./ledger.js";
 import { activeBan, amountsFor } from "./roles.js";
 import { sha256hex } from "./blobs.js";
 import { profilesOn } from "./flags.js";
-import { mainTokenV5 } from "./v5policy.js";
+import { legacySeatsFrozen } from "./v5policy.js";
 import { notifyMany } from "./notify.js";
 
 const M = POLICY.manager, F = POLICY.founder;
@@ -42,8 +42,9 @@ export async function candidates(env, cc, now) {
 
 /** The scheduled job's part: start and end terms, close and open elections. */
 export async function advanceElections(env, now = Date.now(), fetchImpl = fetch) {
-  // MAIN_TOKEN_V5 counting: the legacy elections are frozen with the legacy seats (src/seats.js legacySeatsFrozen); nothing is moved
-  if (mainTokenV5(env)) return { skipped: "legacy_seats_frozen" };
+  // the legacy elections are frozen with the legacy seats (LEGACY_SEATS=frozen or MAIN_TOKEN_V5 counting: src/v5policy.js legacySeats, stage
+  // S16): nothing is read or moved, no term starts or ends, no election opens or is decided
+  if (legacySeatsFrozen(env)) return { skipped: "legacy_seats_frozen" };
   const db = env.DB;
   const out = { opened: 0, decided: 0, started: 0, ended: 0 };
   // terms: start the upcoming ones, end the finished ones, end those whose founder lost the seat
@@ -146,8 +147,12 @@ export async function handleElectionVote(request, env, now = Date.now()) {
 
 /** A country's manager picture: current term, the open election (with candidates and your vote). */
 export async function countryPicture(env, cc, viewer, now = Date.now()) {
-  const db = env.DB;
-  const term = await db.prepare(`SELECT t.*, u.handle, u.name, s.city_name, s.status AS seat_status FROM manager_terms t
+  const db = env.DB, frozen = legacySeatsFrozen(env);
+  // frozen (stage S16): the job no longer marks a finished term ended, so a term is shown only until its own end date (as managerOf counts it)
+  const term = frozen
+    ? await db.prepare(`SELECT t.*, u.handle, u.name, s.city_name, s.status AS seat_status FROM manager_terms t
+    JOIN users u ON u.id = t.user_id JOIN seats s ON s.id = t.seat_id WHERE t.country = ? AND t.status = 'active' AND t.ends_at > ?`).bind(cc, iso(now)).first()
+    : await db.prepare(`SELECT t.*, u.handle, u.name, s.city_name, s.status AS seat_status FROM manager_terms t
     JOIN users u ON u.id = t.user_id JOIN seats s ON s.id = t.seat_id WHERE t.country = ? AND t.status = 'active'`).bind(cc).first();
   const e = await db.prepare("SELECT * FROM elections WHERE country = ? AND status = 'open'").bind(cc).first();
   let election = null;
@@ -155,7 +160,8 @@ export async function countryPicture(env, cc, viewer, now = Date.now()) {
     const cands = await candidates(env, cc, now);
     const votes = new Map((await db.prepare("SELECT seat_id, COUNT(*) AS n FROM election_votes WHERE election_id = ? GROUP BY seat_id").bind(e.id).all()).results.map((r) => [r.seat_id, r.n]));
     const mine = viewer ? await db.prepare("SELECT seat_id FROM election_votes WHERE election_id = ? AND user_id = ?").bind(e.id, viewer.id).first() : null;
-    const why = viewer ? await voterProblem(env, viewer, { scope: "country", place: cc, openedAt: e.opened_at, now }) : "sign_in";
+    // frozen (stage S16): the election is history, nobody may vote in it (the vote route answers 410)
+    const why = frozen ? "seats_frozen" : viewer ? await voterProblem(env, viewer, { scope: "country", place: cc, openedAt: e.opened_at, now }) : "sign_in";
     election = { id: e.id, openedAt: e.opened_at, closesAt: e.closes_at, myVote: mine ? mine.seat_id : null, canVote: !why, whyNot: why,
       candidates: cands.map((c) => ({ seatId: c.id, name: c.handle || c.name || "Founder", city: c.city_name, votes: votes.get(c.id) || 0, you: Boolean(viewer && c.user_id === viewer.id) })) };
   }

@@ -41,23 +41,37 @@ import { countryCities } from "./cities.js";
 import { sha256hex } from "./blobs.js";
 import { HAS_ADDRESS, cleanText } from "./text.js";
 import { notifyOn, profilesOn } from "./flags.js";
-import { mainTokenV5, walletOnly } from "./v5policy.js";
+import { legacySeatsFrozen, walletOnly } from "./v5policy.js";
 import { attempt, notify, notifyMany } from "./notify.js";
 
 const F = POLICY.founder;
 
 /**
- * The legacy seats measure $VICINITY (balances, hold streaks, the 14-day averages). While MAIN_TOKEN_V5 counts ($VICINITY is then a
- * legacy token, history only; owner amendment 01 section 5.4, and the v5 configuration check refuses the switch unless LEGACY_SEATS=frozen)
- * they make no new decision: the job's seats and elections steps do nothing (no window closed, no seat activated, put in grace or
- * released, no term or election moved), and every seat, squad, endorsement, objection, resign and election writer answers 410
- * (src/index.js). The reads (the map, a city's picture, the published results) stay: history. With the switch off nothing changes.
+ * The legacy seats freeze (Citycoin.dev master v5, stage S16; LEGACY_SEATS=frozen, or MAIN_TOKEN_V5 counting: the legacy seats measure
+ * $VICINITY, owner amendment 01 section 5.4). One gate decides it, src/v5policy.js legacySeats; read it through legacySeatsFrozen. While
+ * frozen the machinery makes no new decision: the job's seats and elections steps do nothing (no window closed, no seat activated, put in
+ * grace or released, no term or election moved), the balance samples stop updating the hold streaks (src/ledger.js), and every seat,
+ * squad, endorsement, objection, resign and election writer answers 410 seats_frozen before it reads or writes anything (src/index.js,
+ * src/admin.js). The reads (the map, a city's picture, the published results, the squad readiness) stay: history (master section 15 "Keep
+ * historical records readable, but do not let historical rules authorize new actions"; docs/citycoin-master/schema-and-api.md section 3.9).
+ * Nobody loses a seat or a term: statuses stay as recorded. With the switch off nothing changes.
  */
-export const legacySeatsFrozen = (env) => mainTokenV5(env);
+export { legacySeatsFrozen };
 /** The writers' answer while frozen (410), or null. */
 export const seatsFrozen = (env) => (legacySeatsFrozen(env)
-  ? json({ ok: false, error: "seats_frozen", message: "Founder seats, squads and elections are closed for changes while the main token changes. Nothing was changed." }, 410)
+  ? json({ ok: false, error: "seats_frozen", message: "Founder seats, squads and elections are closed for changes. Nothing was changed." }, 410)
   : null);
+/**
+ * GET /api/policy while frozen (the key `legacySeats`; absent otherwise): the founder seat, squad, steward and country-manager election rules of
+ * `policy` are history, not the current rules. `policy` itself stays as published, versioned and unchanged: every seat and election stores the
+ * version it was decided under, and the pages built before the freeze read their numbers from it.
+ */
+export const LEGACY_SEATS_STATUS = Object.freeze({
+  state: "frozen",
+  history: Object.freeze(["policy.founder", "policy.voters", "policy.manager"]),
+  statement: "The founder seat, squad, steward and country manager election rules in policy.founder, policy.voters and policy.manager are history: "
+    + "no new seat claim, endorsement, objection, squad, resignation or election is accepted. Existing seats, terms and results stay as recorded and readable.",
+});
 const mask = (w) => (w ? `${w.slice(0, 5)}*****${w.slice(-3)}` : null);
 const clamp = (v, a = 0, b = 100) => Math.max(a, Math.min(b, v));
 
@@ -858,6 +872,8 @@ export async function squadPicture(env, u, now = Date.now(), fetchImpl = fetch) 
   const mineRow = await db.prepare(
     `SELECT s.* FROM squads s JOIN squad_members m ON m.squad_id = s.id WHERE m.user_id = ? AND s.status IN ('forming', 'applied') ORDER BY s.id DESC LIMIT 1`).bind(u.id).first();
   if (mineRow) return { mine: await squadView(env, await getSquad(db, mineRow.id), now, fetchImpl), joinable: null, canCreate: false };
+  // frozen (stage S16): no squad is created or joined (those routes answer 410), so none is offered
+  if (legacySeatsFrozen(env)) return { mine: null, joinable: null, canCreate: false };
   // squads can only form in a city with no live seat: the same rule create and join enforce
   if (await liveSeatOfCity(db, u.home_city)) return { mine: null, joinable: null, canCreate: false };
   const open = await db.prepare("SELECT * FROM squads WHERE city_id = ? AND status = 'forming' ORDER BY id LIMIT 1").bind(u.home_city).first();
@@ -1034,7 +1050,7 @@ export async function handleSeats(env, now = Date.now()) {
 
 /** A city's founder picture: the live seat, the open window (with applicants), the last result. */
 export async function cityPicture(env, cityId, viewer, now = Date.now(), fetchImpl = fetch) {
-  const db = env.DB;
+  const db = env.DB, frozen = legacySeatsFrozen(env);
   const seat = await db.prepare("SELECT s.*, u.handle, u.name FROM seats s JOIN users u ON u.id = s.user_id WHERE s.city_id = ? AND s.status IN ('provisional', 'active', 'grace', 'steward')").bind(cityId).first();
   const w = await db.prepare("SELECT * FROM windows WHERE city_id = ? AND status = 'open'").bind(cityId).first();
   let windowView = null;
@@ -1044,7 +1060,8 @@ export async function cityPicture(env, cityId, viewer, now = Date.now(), fetchIm
       FROM applications a JOIN users u ON u.id = a.user_id WHERE a.window_id = ? AND a.withdrawn = 0 ORDER BY a.id`).bind(w.id).all()).results;
     const mine = viewer ? await db.prepare("SELECT application_id FROM endorsements WHERE window_id = ? AND user_id = ?").bind(w.id, viewer.id).first() : null;
     const applicant = viewer && apps.some((x) => x.user_id === viewer.id);
-    const why = viewer ? (applicant ? "applicant" : await voterProblem(env, viewer, { scope: "city", place: cityId, openedAt: w.opened_at, now })) : "sign_in";
+    // frozen (stage S16): the window is history, nobody may endorse in it (the endorse route answers 410)
+    const why = frozen ? "seats_frozen" : viewer ? (applicant ? "applicant" : await voterProblem(env, viewer, { scope: "city", place: cityId, openedAt: w.opened_at, now })) : "sign_in";
     windowView = {
       id: w.id, openedAt: w.opened_at, closesAt: w.closes_at, threshold: w.threshold,
       applicants: apps.map((x) => ({ id: x.id, name: x.handle || x.name || "Member", pitch: x.pitch, endorsements: x.endorsements, you: Boolean(viewer && x.user_id === viewer.id) })),
@@ -1053,9 +1070,10 @@ export async function cityPicture(env, cityId, viewer, now = Date.now(), fetchIm
   }
   const last = await db.prepare("SELECT id, status, decided_at, result_hash FROM windows WHERE city_id = ? AND status IN ('decided', 'empty') ORDER BY id DESC LIMIT 1").bind(cityId).first();
   const objections = seat ? (await db.prepare("SELECT COUNT(*) AS n FROM objections WHERE seat_id = ? AND status = 'open'").bind(seat.id).first()).n : 0;
-  // A steward's progress towards the early confirmation: verified local holders so far, and how many are needed.
+  // A steward's progress towards the early confirmation: verified local holders so far, and how many are needed. Frozen (stage S16): no
+  // confirmation happens (the job's seats step is skipped), so none is counted towards
   let quorum = null;
-  if (seat && seat.status === "steward") {
+  if (seat && seat.status === "steward" && !frozen) {
     const wallets = await checkedInWallets(db, cityId);
     const amounts = tokenMint(env) && wallets.length ? await amountsFor(env, wallets, fetchImpl) : new Map();
     quorum = { have: wallets.filter((w) => (amounts.get(w) || 0) > 0).length, need: F.stewardQuorum };

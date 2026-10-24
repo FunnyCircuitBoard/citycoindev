@@ -233,6 +233,28 @@ test("the lock lasts the 7 days only, and never touches the owner's own logins: 
   assert.equal((await app.send("/api/me/wallet/unlink", { method: "POST", body: {} })).status, 200);
 });
 
+test("the legacy seats frozen (stage S16): Remove it still takes the wallet off and every other browser out, and writes no seat, squad or application row", async () => {
+  Object.assign(env, { LEGACY_SEATS: "frozen", DEPLOYMENT_ENV: "test" });
+  const m = await safari();
+  const app = await linkInApp(m);
+  advance(60_000);
+  const at = new Date(Date.now()).toISOString();
+  const db = env.DB;
+  const w = await db.prepare("INSERT INTO windows (city_id, city_name, country, policy, threshold, opened_at, closes_at, status) VALUES ('5142056', 'Utica', 'US', 5, 1, ?, ?, 'open') RETURNING id").bind(at, new Date(Date.now() + DAY).toISOString()).first();
+  await db.prepare("INSERT INTO applications (window_id, city_id, user_id, wallet, created_at) VALUES (?, '5142056', ?, ?, ?)").bind(w.id, m.u.id, m.w.address, at).run();
+  const sq = await db.prepare("INSERT INTO squads (city_id, city_name, country, created_by, status, created_at) VALUES ('5140405', 'Syracuse', 'US', ?, 'forming', ?) RETURNING id").bind(m.u.id, at).first();
+  await db.prepare("INSERT INTO squad_members (squad_id, user_id, wallet, joined_at) VALUES (?, ?, ?, ?)").bind(sq.id, m.u.id, m.w.address, at).run();
+  const seat = await db.prepare("INSERT INTO seats (city_id, city_name, country, user_id, wallet, policy, threshold, status, created_at) VALUES ('5106834', 'Albany', 'US', ?, ?, 5, 1, 'steward', ?) RETURNING id").bind(m.u.id, m.w.address, at).first();
+  const legacy = async () => Promise.all(["seats", "squads", "squad_members", "applications", "windows"].map(async (t) => (await db.prepare(`SELECT * FROM ${t} ORDER BY rowid`).all()).results));
+  const before = await legacy();
+  assert.equal((await disown(m.b)).status, 200, "Remove it is never refused because of the freeze");
+  assert.deepEqual(await legacy(), before, "no seat voided, squad disbanded, place left or application withdrawn: nobody loses a role");
+  assert.equal(await count("mod_actions WHERE action = 'void_seat'"), 0, "and no record of a seat ending");
+  assert.equal((await one(env.DB, "SELECT wallet FROM users WHERE id = ?", m.u.id)).wallet, null, "the wallet is off the account");
+  assert.equal((await app.get("/api/me?lite=1")).signedIn, false, "the wallet app's browser is out");
+  // the same with the switch off voids the seat, as today (the test below)
+});
+
 test("whatever the wallet joined since the link goes with it: a seat taken since is voided (a public record, no cooldown), an open application withdrawn, a squad place left (an emptied squad disbanded); one from BEFORE the link refuses", async () => {
   const m = await safari();
   const app = await linkInApp(m);

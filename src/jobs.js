@@ -52,6 +52,8 @@ async function runSteps(env, now, fetchImpl, rand) {
     catch (e) { console.error("job step failed", name, String((e && e.stack) || e)); out[name] = { error: String((e && e.message) || e) }; }
   };
   await step("sample", () => maybeSample(env, now, fetchImpl, rand));
+  // the legacy seats and elections: while frozen (LEGACY_SEATS=frozen, or MAIN_TOKEN_V5 counting: src/v5policy.js legacySeats, stage S16) both
+  // steps are skipped before any read ({ skipped: "legacy_seats_frozen" }), and the sample above updates no hold streak (src/ledger.js)
   await step("seats", () => advanceSeats(env, now, fetchImpl));
   await step("elections", () => advanceElections(env, now, fetchImpl));
   await step("moderation", () => expireModeration(env, now));

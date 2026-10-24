@@ -101,22 +101,35 @@ test("the switch counts only with every precondition; each missing one is named,
   assert.equal(mainTokenV5({ get MAIN_TOKEN_V5() { throw new Error("boom"); } }), false);
 });
 
-test("pages not built for the switch: every value accepted, and the whole API, the footer hook and the job are today's; the reason is logged once", async () => {
+// FULL also sets LEGACY_SEATS=frozen (the v5 check requires it for the switch), which since stage S16 freezes the legacy seats on its own: "the
+// switch adds nothing" is checked against the same settings without MAIN_TOKEN_V5 (test/legacy-seats-freeze.test.js has the freeze itself)
+const { MAIN_TOKEN_V5: _unused, ...FULL_SWITCH_OFF } = FULL;
+
+test("pages not built for the switch: every value accepted, and the whole API, the footer hook and the job are what the same settings answer without it; the reason is logged once", async () => {
   const routes = ["/api/official", "/api/token", "/api/holders", "/api/rank?address=Hdr1111111111111111111111111111111111111111", "/api/seats", "/api/policy",
     "/api/launchpad", `/api/coin?mint=${LEGACY}`, `/api/coin?mint=${FAKE_MINT}`, "/api/swap/config", "/api/swap/tokens?q=vicinity", `/api/check?q=${LEGACY}`,
     `/api/check?q=${FAKE_MINT}`, "/api/check?q=%40VicinityCitySOL", `/api/check?q=${encodeURIComponent(FAKE_X)}`, "/api/members", "/api/coins"];
   const answers = async (env) => { const out = {}; for (const r of routes) { _resetSwap(); _resetLaunchpad(); _resetCoin(); out[r] = await call(env, r); } return out; };
-  const off = W.newWorld(BASE); holders();
+  const off = W.newWorld(FULL_SWITCH_OFF); holders();
   const today = await answers(off);
   const on = W.newWorld(FULL); holders();
   assert.deepEqual(await answers(on), today);
+  const plain = W.newWorld(BASE); holders();
+  const live = await answers(plain);
+  for (const r of routes) {
+    if (r !== "/api/policy") { assert.deepEqual(today[r], live[r], r); continue; }
+    // the legacy seats frozen: /api/policy says so (the key legacySeats), and nothing else in it moves
+    const { legacySeats, ...rest } = JSON.parse(today[r].body);
+    assert.equal(legacySeats.state, "frozen");
+    assert.deepEqual(rest, JSON.parse(live[r].body));
+  }
   const quote = { method: "POST", body: JSON.stringify({ inputMint: SOL, outputMint: LEGACY, amount: "0.1" }) };
   assert.deepEqual(await call(on, "/api/swap/quote", quote), await call(off, "/api/swap/quote", quote), "the swap is today's too");
   const html = readFileSync(new URL("../public/404.html", import.meta.url), "utf8");
   const res = new Response(html, { status: 404, headers: { "content-type": "text/html" } });
   assert.equal(await officialLinksInPage(res, FULL), res, "the footer hook hands the asset back untouched");
   assert.equal(socialProfiles(FULL), SOCIAL_PROFILES);
-  const jobOff = await runJobs(W.newWorld(BASE), Date.now(), net(), () => 0);
+  const jobOff = await runJobs(W.newWorld(FULL_SWITCH_OFF), Date.now(), net(), () => 0);
   assert.deepEqual(await runJobs(W.newWorld(FULL), Date.now(), net(), () => 0), jobOff);
   checkPolicyConfig(FULL); checkDeploymentConfig(FULL);
   assert.deepEqual(errors.filter((e) => /refused/.test(e)), ["main token switch refused MAIN_TOKEN_V5_PAGES_NOT_BUILT"], "one line, a code, no value");
@@ -176,12 +189,22 @@ test("SWON-1: while the switch counts, the legacy seats and elections make no ne
   }
   assert.equal((await on.a.send("/api/seats")).status, 200, "the map and the results stay readable: history");
 
-  // the same settings with pages not built for the switch: exactly today's decision
+  // the same settings with pages not built for the switch: the main token does not count, and LEGACY_SEATS=frozen freezes the seats on its own
+  // (stage S16: one gate, src/v5policy.js legacySeats)
   pagesAsCommitted();
   const held = await stewardWhoseBalanceFell();
   Object.assign(held.env, ACCEPTED, { MAIN_TOKEN_MINT: FAKE_MINT });
-  assert.deepEqual(await advanceSeats(held.env, Date.now(), W.chain()), today);
-  assert.equal((await held.a.send("/api/seats/withdraw", { method: "POST", body: {} })).status === 410, false);
+  assert.equal(mainTokenV5(held.env), false);
+  assert.deepEqual(await advanceSeats(held.env, Date.now(), W.chain()), { skipped: "legacy_seats_frozen" });
+  assert.equal((await held.a.send("/api/seats/withdraw", { method: "POST", body: {} })).status, 410);
+  // and the switch set without the legacy seats frozen (the v5 check refuses it): exactly today's decision
+  const live = await stewardWhoseBalanceFell();
+  Object.assign(live.env, { MAIN_TOKEN_V5: "on", DEPLOYMENT_ENV: "test", MAIN_TOKEN_MINT: FAKE_MINT });
+  pagesBuiltWithSwitch();
+  assert.equal(mainTokenV5(live.env), false);
+  assert.deepEqual(await advanceSeats(live.env, Date.now(), W.chain()), today);
+  assert.equal((await live.a.send("/api/seats/withdraw", { method: "POST", body: {} })).status === 410, false);
+  pagesAsCommitted();
 });
 
 /* ---------------------------------------------------------------- SWON-5 / SEC-6: no swap for the legacy token */

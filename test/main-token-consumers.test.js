@@ -138,11 +138,19 @@ test("unset or refused MAIN_TOKEN_MINT, or a refused v5 configuration, under the
     { ...BASE, ...ACCEPTED, BRAND: "citycoin", MAIN_TOKEN_MINT: FAKE_MINT }, // not the label set the pages were built with
   ];
   for (const extra of cases) {
+    // the same settings without MAIN_TOKEN_V5: since stage S16 a LEGACY_SEATS=frozen in them freezes the legacy seats on its own (also when its
+    // environment is missing: held frozen), which /api/policy states; with the seats not frozen that is today's site exactly
+    const { MAIN_TOKEN_V5: _unused, ...without } = extra;
+    W.useClock("2026-10-24T12:00:00Z");
+    const baseEnv = W.newWorld(without); holders();
+    const expected = await answers(baseEnv);
+    if (String(extra.LEGACY_SEATS || "").toLowerCase() !== "frozen") assert.deepEqual(expected, today, JSON.stringify(without));
+    else assert.equal(expected["/api/policy"].body.legacySeats.state, "frozen");
     W.useClock("2026-10-24T12:00:00Z");
     const env = W.newWorld(extra); holders();
-    assert.deepEqual(await answers(env), today, JSON.stringify(extra));
-    const offJob = await runJobs(W.newWorld(BASE), Date.now(), net().fetchImpl, () => 0);
-    assert.deepEqual(await runJobs(env, Date.now(), net().fetchImpl, () => 0), offJob, `${JSON.stringify(extra)}: the job is today's too`);
+    assert.deepEqual(await answers(env), expected, JSON.stringify(extra));
+    const offJob = await runJobs(W.newWorld(without), Date.now(), net().fetchImpl, () => 0);
+    assert.deepEqual(await runJobs(env, Date.now(), net().fetchImpl, () => 0), offJob, `${JSON.stringify(extra)}: the job is the switch-off job too`);
   }
 });
 
@@ -277,7 +285,8 @@ test("the job start runs the configuration check: a named problem is logged once
     "and why the switch does nothing, once");
   for (const r of refused) assert.equal(r.sample.sampled, true, "the legacy sampler runs as today");
   _resetDeploymentCheck(); _resetPolicyCheck(); errors = [];
-  assert.deepEqual(await run({}), refused, "the same runs as with the switch off");
+  // (ACCEPTED sets LEGACY_SEATS=frozen, which since stage S16 freezes the seats and elections steps on its own)
+  assert.deepEqual(await run({ DEPLOYMENT_ENV: "test", LEGACY_SEATS: "frozen" }), refused, "the same runs as with the main-token switch off");
   assert.deepEqual(errors.filter((e) => /deployment config|main token switch/.test(e)), [], "switch off: nothing");
 });
 
