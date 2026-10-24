@@ -33,7 +33,7 @@ import { PAIRS, launchedCoins } from "./coins.js";
 import { jupiterPriceFor } from "./marketlive.js";
 import { ensureSchema } from "./store.js";
 import { buildKind, publicLimit, walletLimit } from "./guards.js";
-import { jupiterConfig, launchpadCluster, launchpadTradingOn, swapCluster, swapOn } from "./cluster.js";
+import { jupiterConfig, launchpadCluster, launchpadTradingOn, swapCluster, swapFeeRefusal, swapOn } from "./cluster.js";
 import { ADDRESSES } from "./sol/pda.js";
 import { decodeLookupTable } from "./sol/dbc.js";
 import { formatAmount, parseAmount, readSwapInput } from "./sol/input.js";
@@ -95,7 +95,7 @@ const failed = { keyed: { until: 0, code: null }, lite: { until: 0, code: null }
 const paused = (keyed, now) => now < (keyed ? failed.keyed : failed.lite).until;
 const decimalsOf = new Map(); // mint -> { at, promise }
 const alts = new Source("jupiter_alt", { ttlMs: 10 * 60_000, staleMs: 10 * 60_000 });
-export const _resetSwap = () => { routes.clear(); builds.clear(); quotes.clear(); failed.keyed = { until: 0, code: null }; failed.lite = { until: 0, code: null }; decimalsOf.clear(); alts.reset(); budget.tokens = 0; budget.at = 0; budget.rps = 0; standIn.at = -Infinity; standIn.until = 0; standIn.code = null; };
+export const _resetSwap = () => { feeRefusalsLogged.clear(); routes.clear(); builds.clear(); quotes.clear(); failed.keyed = { until: 0, code: null }; failed.lite = { until: 0, code: null }; decimalsOf.clear(); alts.reset(); budget.tokens = 0; budget.at = 0; budget.rps = 0; standIn.at = -Infinity; standIn.until = 0; standIn.code = null; };
 export const _swapState = () => ({ builds: builds.size, quotes: quotes.size, failedUntil: Math.max(failed.keyed.until, failed.lite.until), failed: { keyed: failed.keyed.until, lite: failed.lite.until }, bucket: budget.tokens, standInAt: standIn.at, standInUntil: standIn.until });
 
 class JupiterError extends Error { constructor(code, status, retryAfterS) { super(code); this.code = code; this.status = status; this.retryAfterS = retryAfterS; } }
@@ -133,8 +133,8 @@ function jupiterBuild(env, p, fetchImpl, now) {
   let hit = builds.get(key);
   if (!hit || now - hit.at >= BUILD_TTL_MS) {
     const jc = jupiterConfig(env);
+    // never a platformFeeBps or a feeAccount: the swap platform fee is pinned to 0 (stage S39, src/cluster.js swapFeeRefusal)
     const q = new URLSearchParams({ inputMint: p.inputMint, outputMint: p.outputMint, amount: String(p.amountRaw), taker: p.taker, slippageBps: String(p.slippageBps), maxAccounts: "64", wrapAndUnwrapSol: "true" });
-    if (jc.platformFeeBps && jc.feeAccount) { q.set("platformFeeBps", String(jc.platformFeeBps)); q.set("feeAccount", jc.feeAccount); }
     hit = { at: now, key, promise: jupiterGet(env, `${jc.base}/swap/v2/build?${q}`, fetchImpl, now) };
     hit.promise.catch(() => { if (builds.get(key) === hit) builds.delete(key); });
     builds.delete(key); builds.set(key, hit);
@@ -222,6 +222,20 @@ const fail = (e) => {
 const legacyUnderV5 = (env, mint) => mainTokenV5(env) && (isLegacyMint(mint) || (Boolean(activeMint(env)) && mint === activeMint(env)));
 const LEGACY_SWAP = "$VICINITY is a legacy token now: no swap or purchase is offered for it here. Your tokens stay yours, and you can still send them from your wallet.";
 
+/**
+ * A swap platform-fee setting other than 0 (src/cluster.js swapFeeRefusal; Citycoin.dev master v5, stage S39): /quote and /tx answer
+ * 503 swap_unavailable with the reason, before the attempt counters, any chain read or any Jupiter call, so no fee can reach a request
+ * or a transaction. Logged once per server (Worker isolate) and reason, never with the setting's value. Every other route, the swap
+ * config included, answers as before; with the settings unset or "0" (production) nothing here runs.
+ */
+const feeRefusalsLogged = new Set();
+function feeRefused(env) {
+  const reason = swapFeeRefusal(env);
+  if (!reason) return null;
+  if (!feeRefusalsLogged.has(reason)) { feeRefusalsLogged.add(reason); console.error("swap refused: platform fee setting", reason); }
+  return json({ ok: false, error: "swap_unavailable", reason }, 503, noStore);
+}
+
 /** Everything /quote and /tx share: the input, the decimals, the raw amount, the curve check. { error } or the prepared trade. */
 async function prepare(request, env, fetchImpl, now, { takerRequired }) {
   const body = await readJson(request, 4096);
@@ -257,6 +271,8 @@ const curveAnswer = (c) => json({ ok: true, source: "curve", ...c, useRoute: "/a
 
 /** POST /api/swap/quote (the route has checked the switch, the method and the Origin). */
 export async function handleSwapQuote(request, env, fetchImpl = fetch, now = Date.now()) {
+  const refused = feeRefused(env);
+  if (refused) return refused;
   const slow = await publicLimit(env, request, "swap_quote");
   if (slow) return slow;
   const p = await prepare(request, env, fetchImpl, now, { takerRequired: false });
@@ -278,7 +294,7 @@ export async function handleSwapQuote(request, env, fetchImpl = fetch, now = Dat
       catch (e) { if (!passing(e)) throw e; body = await jupiterQuote(env, params, fetchImpl, later(now, t0)); src = "jupiter_quote"; }
     } else { body = await jupiterQuote(env, params, fetchImpl, now); src = "jupiter_quote"; }
     if (!body || !/^\d+$/.test(String(body.outAmount)) || BigInt(body.outAmount) <= 0n) return json({ ok: false, error: "amount_too_small" }, 400, noStore);
-    if (src === "jupiter_build") await checkJupiterBuild(body, { taker: input.taker, inputMint: input.inputMint, outputMint: input.outputMint, inAmount: amountRaw, platformFeeBps: jc.platformFeeBps, feeAccount: jc.feeAccount });
+    if (src === "jupiter_build") await checkJupiterBuild(body, { taker: input.taker, inputMint: input.inputMint, outputMint: input.outputMint, inAmount: amountRaw });
     const id = await sha22(buildKey({ ...params, taker: input.taker || "-" }));
     return json({ ok: true, ...quoteFrom(src, body, { ...input, inDec, outDec, prices: await pricesP, now, id, jc }) }, 200, noStore);
   } catch (e) { return fail(e); }
@@ -310,6 +326,8 @@ async function verifiedTables(env, build, fetchImpl, now) {
 
 /** POST /api/swap/tx: the unsigned Jupiter transaction for `taker`, checked, simulated, with our compute budget. */
 export async function handleSwapTx(request, env, fetchImpl = fetch, now = Date.now()) {
+  const refused = feeRefused(env);
+  if (refused) return refused;
   const kind = buildKind(request, "swap_tx"); // a Buy tap, or the panel's own build before the tap (?auto=1): counted apart
   const slow = await publicLimit(env, request, kind);
   if (slow) return slow;
@@ -328,7 +346,7 @@ export async function handleSwapTx(request, env, fetchImpl = fetch, now = Date.n
     else if (takeToken(jc.rps, now)) build = await jupiterBuild(env, params, fetchImpl, now).promise;
     else throw new JupiterError("jupiter_busy", 503, 2); // this server's share of the plan is spent this second: never an unmetered build
     if (!build || !/^\d+$/.test(String(build.outAmount)) || BigInt(build.outAmount) <= 0n) return json({ ok: false, error: "amount_too_small" }, 400, noStore);
-    await checkJupiterBuild(build, { taker: input.taker, inputMint: input.inputMint, outputMint: input.outputMint, inAmount: amountRaw, platformFeeBps: jc.platformFeeBps, feeAccount: jc.feeAccount });
+    await checkJupiterBuild(build, { taker: input.taker, inputMint: input.inputMint, outputMint: input.outputMint, inAmount: amountRaw });
     let tables;
     try { tables = await verifiedTables(env, build, fetchImpl, now); }
     catch (e) { if (e.alt) { console.error("lookup table refused", e.message); return json({ ok: false, error: e.message }, 502, noStore); } throw e; }

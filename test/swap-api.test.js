@@ -344,31 +344,26 @@ test("swap: with the switch on the trade links of /api/launchpad and /api/coin c
   assert.equal((await off.call("/api/launchpad")).data.vicinity.links.here, undefined);
 });
 
-test("swap: the platform fee is reported as configured (not a fixed 0), and with a fee on the build must pay it to SWAP_FEE_ACCOUNT and nobody else", async () => {
+test("swap: no platform fee (Citycoin.dev master v5, stage S39): reported as 0, never asked of Jupiter, a build that charges one is refused, and a fee setting stops the swaps (test/free-transfer.test.js has the rest)", async () => {
   const FEE_ACCT = "GjJyeC1r2RgkuoCWMyPYkCWSGSGLcz266EaAkLA27AhL";
-  const off = world();
+  const off = world({ SWAP_PLATFORM_FEE_BPS: "0" });
+  assert.equal((await off.call("/api/swap/config")).data.platformFeeBps, 0);
   assert.equal((await off.call("/api/swap/quote", { body: quoteBody() })).data.fees.platformFeeBps, 0);
-  // the fee set but no account: no fee is charged (jupiterConfig says 50 bps but feeAccount null): the Worker asks for no fee and reports what it charges
-  const on = world({ SWAP_PLATFORM_FEE_BPS: "50", SWAP_FEE_ACCOUNT: FEE_ACCT });
-  assert.equal((await on.call("/api/swap/config")).data.platformFeeBps, 50);
-  const q = await on.call("/api/swap/quote", { body: quoteBody() });
-  assert.equal(q.data.fees.platformFeeBps, 50, "a keyless estimate reports the fee the transaction will charge");
-  const b = await on.call("/api/swap/quote", { body: quoteBody({ taker: TAKER }) });
-  assert.equal(b.status, 200, JSON.stringify(b.data));
-  assert.equal(b.data.fees.platformFeeBps, 50);
-  const ask = on.W.jup.log.find((l) => l.path === "/swap/v2/build");
-  assert.deepEqual([ask.q.platformFeeBps, ask.q.feeAccount], ["50", FEE_ACCT], "Jupiter is asked for the fee to our account");
-  const tx = await on.call("/api/swap/tx", { body: quoteBody({ taker: TAKER }) });
+  const tx = await off.call("/api/swap/tx", { body: quoteBody({ taker: TAKER }) });
   assert.equal(tx.status, 200, JSON.stringify(tx.data));
-  assert.deepEqual([tx.data.fees.platformFeeBps, tx.data.quote.fees.platformFeeBps], [50, 50]);
-  // the build pays the fee to a stranger: refused before anything is compiled or simulated
-  const bad = world({ SWAP_PLATFORM_FEE_BPS: "50", SWAP_FEE_ACCOUNT: FEE_ACCT }, { jupiter: { platformFeeBps: 50, feeAccount: "47ugnHuxsmgNZu8KEv1VXW7wPVVwMWti8vVrK4ADDxWa" } });
-  const r = await bad.call("/api/swap/tx", { body: quoteBody({ taker: TAKER }) });
-  assert.deepEqual([r.status, r.data.error], [502, "jupiter_refused"]);
-  assert.ok(!bad.W.rpc.log.some((l) => l.methods.includes("simulateTransaction")));
-  // the build charges a fee although none is configured: refused (the swap's bps must equal the setting)
+  assert.deepEqual([tx.data.fees.platformFeeBps, tx.data.quote.fees.platformFeeBps], [0, 0]);
+  const ask = off.W.jup.log.find((l) => l.path === "/swap/v2/build");
+  assert.deepEqual([ask.q.platformFeeBps, ask.q.feeAccount], [undefined, undefined], "Jupiter is never asked for a fee");
+  // the build charges a fee nobody asked for: refused before anything is compiled or simulated
   const sneaky = world({}, { jupiter: { platformFeeBps: 50, feeAccount: FEE_ACCT } });
   assert.deepEqual((await sneaky.call("/api/swap/tx", { body: quoteBody({ taker: TAKER }) })).data.error, "jupiter_refused");
+  assert.ok(!sneaky.W.rpc.log.some((l) => l.methods.includes("simulateTransaction")));
+  // a fee setting (what used to turn a fee on) refuses every quote and build instead, and the config still says 0
+  const on = world({ SWAP_PLATFORM_FEE_BPS: "50", SWAP_FEE_ACCOUNT: FEE_ACCT });
+  assert.equal((await on.call("/api/swap/config")).data.platformFeeBps, 0);
+  assert.deepEqual((await on.call("/api/swap/quote", { body: quoteBody({ taker: TAKER }) })).data, { ok: false, error: "swap_unavailable", reason: "platform_fee_not_zero" });
+  assert.deepEqual((await on.call("/api/swap/tx", { body: quoteBody({ taker: TAKER }) })).data, { ok: false, error: "swap_unavailable", reason: "platform_fee_not_zero" });
+  assert.deepEqual(on.W.jup.log, []);
 });
 
 test("swap: /tx takes from the same per-server Jupiter budget as the previews (never an unmetered build); a quote reuses its build without a token", async () => {

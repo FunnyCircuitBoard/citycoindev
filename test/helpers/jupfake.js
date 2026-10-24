@@ -105,6 +105,13 @@ function corrupt(b, code, { taker, outAta, wsolAta, inRaw }) {
     case "alt_mismatch": b.addressesByLookupTableAddress = { [ALT_KEY]: [other, ...buildUsdc.addressesByLookupTableAddress[ALT_KEY].slice(1)] }; break;
     case "alt_missing": b.addressesByLookupTableAddress = { [other]: [taker] }; break;
     case "compute_budget_program": b.computeBudgetInstructions.push(apiIx(other, [], Uint8Array.of(3))); break;
+    // a platform fee slipped in (stage S39: the Worker asks for none and accepts none): the fee account in the swap's optional slot, with
+    // or without a fee in its data; a token transfer (plain or checked) or a SOL transfer from the taker to a fee wallet beside the swap
+    case "fee_account": b.swapInstruction.accounts[7] = { pubkey: other, isSigner: false, isWritable: true }; break;
+    case "fee_bps_and_account": { const d = fromBase64(b.swapInstruction.data); d.set(u16le(50), 26); b.swapInstruction.data = toBase64(d); b.swapInstruction.accounts[7] = { pubkey: other, isSigner: false, isWritable: true }; break; }
+    case "fee_token_transfer": b.otherInstructions.push(apiIx(PROGRAM_IDS.token, [[b.swapInstruction.accounts[2].pubkey, false, true], [other, false, true], [taker, true, false]], concat([Uint8Array.of(3), u64le(1000n)]))); break;
+    case "fee_token_transfer_checked": b.otherInstructions.push(apiIx(PROGRAM_IDS.token, [[b.swapInstruction.accounts[2].pubkey, false, true], [b.outputMint, false, false], [other, false, true], [taker, true, false]], concat([Uint8Array.of(12), u64le(1000n), Uint8Array.of(6)]))); break;
+    case "fee_sol_transfer": b.otherInstructions.push(apiIx(PROGRAM_IDS.system, [[taker, true, true], [other, false, true]], concat([Uint8Array.of(2, 0, 0, 0), u64le(1000n)]))); break;
     default: throw new Error("unknown hostile " + code);
   }
   void outAta; void wsolAta;

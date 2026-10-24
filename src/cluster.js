@@ -16,7 +16,8 @@
  *                         set EXPLICITLY it turns on lpSetup (below): the admin "City coins" tab, /api/lp/*, /coin-meta/*
  *   JUPITER_API_BASE      https://api.jup.ag (the keyed Swap V2 host); JUPITER_LITE_BASE https://lite-api.jup.ag (keyless quotes)
  *   JUPITER_API_KEY       secret (x-api-key); JUPITER_RPS the plan's requests per second for the per-server bucket (default 1)
- *   SWAP_PLATFORM_FEE_BPS, SWAP_FEE_ACCOUNT  a platform fee on Jupiter swaps (default 0 and none: an owner decision)
+ *   SWAP_PLATFORM_FEE_BPS, SWAP_FEE_ACCOUNT  no longer a fee: the swap platform fee is pinned to 0 (Citycoin.dev master v5, stage S39;
+ *                         swapFeeRefusal below). Unset, blank or "0" is today's no fee; any other value makes the swap routes refuse
  * Fixed in code (the same on both clusters): Meteora's programs, the dev wallet (a constant inside our program), Jupiter's program.
  */
 import { isSolanaAddress } from "./solana.js";
@@ -84,17 +85,35 @@ export function lpSetup(env = {}) {
   };
 }
 
-/** Jupiter settings: the keyed base for /swap/v2/build, the keyless lite base for /swap/v1/quote, the key, the plan's rps. */
+/**
+ * The swap platform fee is pinned to 0 (Citycoin.dev master v5, stage S39; master section 29, "Zero launch/send/receive platform fees":
+ * "Builders contain no flat/percentage platform payment, hidden surcharge or transfer tax"). No code path asks Jupiter for a fee or
+ * accepts a build that charges one (src/swap.js, src/jupswap.js). The two old settings are read only to be refused: wrangler.jsonc keeps
+ * dashboard variables across deploys (keep_vars), and a fee setting the code quietly ignored would look live to whoever set it.
+ * Null (no refusal) when SWAP_PLATFORM_FEE_BPS is unset, blank or "0" and SWAP_FEE_ACCOUNT is unset or blank: production sets neither.
+ * Otherwise the reason every swap quote and build is refused with (src/swap.js feeRefused):
+ *   platform_fee_not_zero   SWAP_PLATFORM_FEE_BPS is a whole number above 0 ("50")
+ *   platform_fee_malformed  SWAP_PLATFORM_FEE_BPS is anything else ("0.5", "-1", "00", "abc")
+ *   fee_account_set         SWAP_FEE_ACCOUNT holds any value
+ */
+export function swapFeeRefusal(env = {}) {
+  const bps = str(env && env.SWAP_PLATFORM_FEE_BPS);
+  if (bps !== "" && bps !== "0") return /^[1-9][0-9]*$/.test(bps) ? "platform_fee_not_zero" : "platform_fee_malformed";
+  return str(env && env.SWAP_FEE_ACCOUNT) ? "fee_account_set" : null;
+}
+
+/**
+ * Jupiter settings: the keyed base for /swap/v2/build, the keyless lite base for /swap/v1/quote, the key, the plan's rps. `platformFeeBps`
+ * is always 0 (pinned, above) and `feeRefusal` is swapFeeRefusal's answer.
+ */
 export function jupiterConfig(env = {}) {
   const base = (str(env.JUPITER_API_BASE) || "https://api.jup.ag").replace(/\/+$/, "");
   const lite = (str(env.JUPITER_LITE_BASE) || "https://lite-api.jup.ag").replace(/\/+$/, "");
   const key = str(env.JUPITER_API_KEY);
   const rps = Number(env.JUPITER_RPS);
-  const feeBps = Number(env.SWAP_PLATFORM_FEE_BPS);
   return {
     base, lite, key: key || null, keyed: Boolean(key), rps: Number.isFinite(rps) && rps > 0 ? Math.min(150, rps) : 1,
-    platformFeeBps: Number.isInteger(feeBps) && feeBps > 0 && feeBps <= 1000 ? feeBps : 0,
-    feeAccount: isSolanaAddress(str(env.SWAP_FEE_ACCOUNT)) ? str(env.SWAP_FEE_ACCOUNT) : null,
+    platformFeeBps: 0, feeRefusal: swapFeeRefusal(env),
     headers: key ? { "x-api-key": key } : {},
   };
 }

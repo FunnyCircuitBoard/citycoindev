@@ -7,7 +7,8 @@
  *   * the swap instruction calls Jupiter's program with one of its two ExactIn routes (route_v2, shared_accounts_route_v2),
  *     read by position: the taker authorises it, the input leaves the taker's own account of the input mint, the output lands
  *     only in the taker's own account of the output mint, the amount in / quoted out / slippage equal the JSON, the minimum it
- *     enforces on chain is the JSON's otherAmountThreshold, the platform fee is what we configured (0) and there is no
+ *     enforces on chain is the JSON's otherAmountThreshold, the platform fee is 0 (pinned: Citycoin.dev master v5, stage S39,
+ *     src/cluster.js swapFeeRefusal; the swap's optional fee account may only be the taker's own output account) and there is no
  *     positive-slippage cut;
  *   * every setup, cleanup and other instruction is allow-listed by program, opcode and accounts: create-idempotent of the
  *     taker's own associated account of a mint on the route; a System transfer of at most the amount from the taker to the
@@ -63,7 +64,7 @@ export function decodeJupiterSwap(ix) {
   if (disc === JUPITER_SWAP_DISCRIMINATORS.route_v2) {
     // user_transfer_authority, user_source, user_destination, source_mint, destination_mint, source_token_program,
     // destination_token_program, an optional account (the program id = none: it is where a platform fee would be paid to, so
-    // with a fee it must be OUR fee account and without one it may only be the taker's own destination), event_authority, program
+    // it may only be the taker's own destination: no fee is accepted, stage S39), event_authority, program
     const optional = acc(7);
     return { kind: "route_v2", authority: acc(0), source: acc(1), destinations: optional === JUPITER_PROGRAM ? [acc(2)] : [acc(2), optional], optional: optional === JUPITER_PROGRAM ? null : optional,
       sourceMint: acc(3), destinationMint: acc(4), sourceTokenProgram: acc(5), destinationTokenProgram: acc(6), ...args(8) };
@@ -79,12 +80,12 @@ export function decodeJupiterSwap(ix) {
 
 /**
  * Refuse everything that is not exactly the swap we asked for (see the top of the file). Resolves to the decoded swap.
- * `inAmount` is the raw amount we asked Jupiter for; `platformFeeBps` what SWAP_PLATFORM_FEE_BPS says (0 by default) and
- * `feeAccount` SWAP_FEE_ACCOUNT: with a fee on, the swap's optional account must be THAT account (nobody else is paid), and
- * only the route_v2 layout is accepted (where the fee account sits in shared_accounts_route_v2 is not known to this port:
- * such a build is refused, fail closed, until a recorded fee-on answer teaches it).
+ * `inAmount` is the raw amount we asked Jupiter for. No platform fee is ever accepted (stage S39): the swap's fee is 0 and
+ * its optional account, when there is one, is the taker's own output account (the SDK's rule too, solana/sdk/launchpad/
+ * jupiter.mts). The old `platformFeeBps` and `feeAccount` options are refused when a caller still asks for a fee.
  */
 export async function checkJupiterBuild(build, { taker, inputMint, outputMint, inAmount, platformFeeBps = 0, feeAccount = null, maxSlippageBps = 5000 }) {
+  if (platformFeeBps !== 0 || feeAccount !== null) throw refuse("platform_fee_option");
   if (!build || typeof build !== "object") throw refuse("not_an_object");
   if (build.swapMode !== "ExactIn") throw refuse("swap_mode");
   if (build.inputMint !== inputMint) throw refuse("input_mint");
@@ -114,17 +115,12 @@ export async function checkJupiterBuild(build, { taker, inputMint, outputMint, i
   if (!TOKEN_PROGRAMS.includes(sw.sourceTokenProgram) || !TOKEN_PROGRAMS.includes(sw.destinationTokenProgram)) throw refuse("token_program");
   if (sw.source !== await ata(taker, inputMint, sw.sourceTokenProgram)) throw refuse("source_account");
   const outAta = await ata(taker, outputMint, sw.destinationTokenProgram);
-  if (!sw.destinations.length || sw.destinations[0] !== outAta) throw refuse("destination_account");
-  if (platformFeeBps > 0) {
-    // a fee on: the optional account is the fee's destination and must be ours (and the layout one this port knows the fee's place in)
-    if (sw.kind !== "route_v2") throw refuse("platform_fee_layout");
-    if (!feeAccount || sw.optional !== feeAccount) throw refuse("platform_fee_account");
-  } else if (!sw.destinations.every((d) => d === outAta)) throw refuse("destination_account");
+  if (!sw.destinations.length || !sw.destinations.every((d) => d === outAta)) throw refuse("destination_account");
   if (sw.inAmount !== jsonIn) throw refuse("swap_in_amount");
   if (sw.quotedOutAmount !== out) throw refuse("swap_quoted_out");
   if (sw.slippageBps !== build.slippageBps) throw refuse("swap_slippage");
   if (sw.minOut !== threshold) throw refuse("swap_min_out");
-  if (sw.platformFeeBps !== platformFeeBps) throw refuse("platform_fee");
+  if (sw.platformFeeBps !== 0) throw refuse("platform_fee");
   if (sw.positiveSlippageBps !== 0) throw refuse("positive_slippage");
 
   // every helper, by opcode and accounts

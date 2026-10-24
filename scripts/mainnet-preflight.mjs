@@ -204,7 +204,8 @@ export async function preflight(env, { fetchImpl = fetch, now = Date.now(), site
   // ---- Jupiter ----
   row(jc.keyed ? "PASS" : "WARN", "JUPITER_API_KEY", jc.keyed ? `set (${jc.key.length} characters, never printed): builds on the plan's own allowance` : "not set here: previews are keyless estimates and builds run on Jupiter's ANONYMOUS allowance, which may stop without notice (portal.jup.ag gives a key; required for a launch)");
   row(jc.keyed && jc.rps > 1 ? "PASS" : "WARN", "JUPITER_RPS", `${jc.rps} per second per server${jc.rps === 1 ? " (the default: set the plan's rate, e.g. 10, or most previews during a rush become estimates)" : jc.rps < 10 ? " (below 10: a launch-day rush will see estimates instead of builds)" : ""}`);
-  row(jc.platformFeeBps ? (jc.feeAccount ? "PASS" : "FAIL") : "PASS", "SWAP_PLATFORM_FEE_BPS / SWAP_FEE_ACCOUNT", jc.platformFeeBps ? (jc.feeAccount ? `${jc.platformFeeBps} bps to ${jc.feeAccount}` : `${jc.platformFeeBps} bps but no valid SWAP_FEE_ACCOUNT: no fee will be charged`) : "no platform fee (an owner decision; 0 by default)");
+  // the swap platform fee is pinned to 0 (Citycoin.dev master v5, stage S39; src/cluster.js swapFeeRefusal): any other setting stops the swaps
+  row(jc.feeRefusal ? "FAIL" : "PASS", "SWAP_PLATFORM_FEE_BPS / SWAP_FEE_ACCOUNT", jc.feeRefusal ? `refused (${jc.feeRefusal}): the swap platform fee is pinned to 0, and while this setting is there every swap quote and build answers swap_unavailable; delete it or set SWAP_PLATFORM_FEE_BPS to 0 and SWAP_FEE_ACCOUNT to nothing` : "no platform fee (pinned to 0)");
   if (isSolanaAddress(mint)) {
     try {
       const { res: q, body: d, ms } = await getJson(fetchImpl, `${jc.lite}/swap/v1/quote?inputMint=${SOL}&outputMint=${mint}&amount=10000000&slippageBps=100&swapMode=ExactIn`);
@@ -217,15 +218,14 @@ export async function preflight(env, { fetchImpl = fetch, now = Date.now(), site
     const BUILD = "Jupiter build SOL → $VICINITY", host = new URL(jc.base).host, how = jc.keyed ? "keyed" : "KEYLESS (Jupiter's anonymous allowance, which may stop without notice: set JUPITER_API_KEY before a launch)";
     try {
       const q = new URLSearchParams({ inputMint: SOL, outputMint: mint, amount: "10000000", taker: ADDRESSES.feeRecipient, slippageBps: "100", maxAccounts: "64", wrapAndUnwrapSol: "true" });
-      if (jc.platformFeeBps && jc.feeAccount) { q.set("platformFeeBps", String(jc.platformFeeBps)); q.set("feeAccount", jc.feeAccount); }
       const { res, body, ms } = await getJson(fetchImpl, `${jc.base}/swap/v2/build?${q}`, { headers: jc.headers });
       if (res.status === 429) row("WARN", BUILD, `429 from ${host} (${how}): the allowance is used up right now (Retry-After ${res.headers.get("retry-after") || "?"} s)`);
       else if (!res.ok || !body) row(jc.keyed ? "FAIL" : "WARN", BUILD, `HTTP ${res.status} ${body && (body.error || body.message) ? String(body.error || body.message).slice(0, 80) : ""} from ${host} (${how}): ${jc.keyed ? "the key or the plan is not accepted" : "the anonymous allowance refused it; a key is the fix"}`);
       else {
         try {
-          await checkJupiterBuild(body, { taker: ADDRESSES.feeRecipient, inputMint: SOL, outputMint: mint, inAmount: 10_000_000n, platformFeeBps: jc.platformFeeBps, feeAccount: jc.feeAccount });
-          row(jc.keyed ? "PASS" : "WARN", BUILD, `${host} answered in ${ms} ms (${how}) and the Worker's validator accepts today's layout (${(body.routePlan || []).map((r) => r.swapInfo && r.swapInfo.label).filter(Boolean).join(" + ") || "?"}, ${Object.keys(body.addressesByLookupTableAddress || {}).length} lookup tables${jc.platformFeeBps ? `, platform fee ${jc.platformFeeBps} bps to ${short(jc.feeAccount)}` : ""}); nothing was signed or sent`);
-        } catch (e) { row("FAIL", BUILD, `Jupiter answered (${how}) but the Worker's validator refuses it (${e && e.code ? e.code : errText(e)}): swaps would answer jupiter_refused until src/jupswap.js learns the new layout${jc.platformFeeBps ? " (a platform fee is on: the fee-on layout was never recorded from a real answer, see docs/MAINNET.md)" : ""}`); }
+          await checkJupiterBuild(body, { taker: ADDRESSES.feeRecipient, inputMint: SOL, outputMint: mint, inAmount: 10_000_000n });
+          row(jc.keyed ? "PASS" : "WARN", BUILD, `${host} answered in ${ms} ms (${how}) and the Worker's validator accepts today's layout (${(body.routePlan || []).map((r) => r.swapInfo && r.swapInfo.label).filter(Boolean).join(" + ") || "?"}, ${Object.keys(body.addressesByLookupTableAddress || {}).length} lookup tables); nothing was signed or sent`);
+        } catch (e) { row("FAIL", BUILD, `Jupiter answered (${how}) but the Worker's validator refuses it (${e && e.code ? e.code : errText(e)}): swaps would answer jupiter_refused until src/jupswap.js learns the new layout`); }
       }
     } catch (e) { row(jc.keyed ? "FAIL" : "WARN", BUILD, `unreachable (${how}): ${errText(e)}`); }
   }
