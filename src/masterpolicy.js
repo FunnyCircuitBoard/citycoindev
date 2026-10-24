@@ -42,7 +42,7 @@ const DOCUMENT = {
   "status": {
     "policy": "approved_target",
     "deployment": "not_deployed",
-    "statement": "DESIGN. These are the approved target values of MASTER CHANGE ORDER V5 (23 Oct 2026). Approval of this policy is not evidence that anything is built, deployed, audited or active: live status comes only from deployment and chain state (master section 16, Configuration acceptance). No v5 value is in force on the live site. In this repository's Worker code, src/maintoken.js reads the amendment-01 helpers (stage S02A) and src/v5policy.js validates the Worker's settings against this policy and, only while the PUBLIC_V5 switch is on and the configuration is accepted, publishes it (stage S07). Owner amendment 01 (24 Oct 2026) replaces the fixed main-token mint with a centrally configured main token: an owner-supplied mint (MAIN_TOKEN_MINT) that is verified on chain before use and stays null until then. The old $VICINITY mint is a legacy token, history only.",
+    "statement": "DESIGN. These are the approved target values of MASTER CHANGE ORDER V5 (23 Oct 2026). Approval of this policy is not evidence that anything is built, deployed, audited or active: live status comes only from deployment and chain state (master section 16, Configuration acceptance). No v5 value is in force on the live site. In this repository's Worker code, src/maintoken.js reads the amendment-01 helpers (stage S02A) and src/v5policy.js validates the Worker's settings against this policy and, only while the PUBLIC_V5 switch is on and the configuration is accepted, publishes it (stage S07). Owner amendment 01 (24 Oct 2026) replaces the fixed main-token mint with a centrally configured main token: an owner-supplied mint (MAIN_TOKEN_MINT) that is verified on chain before use and stays null until then. The old $VICINITY mint is a legacy token, history only. The owner's decision of 24 Oct 2026 on the old names (amendments: owner-decision-2026-10-24-domains) drops the old-host redirect: vicinity.city, www.vicinity.city, vicinitycity.com and www.vicinitycity.com are not forwarded to citycoin.dev.",
     "baseline": "live site main 4aa408e; draft program vicinity_curve ec148c2 (not deployed anywhere public)",
     "prepared": "2026-10-24"
   },
@@ -53,7 +53,15 @@ const DOCUMENT = {
       "source": "owner instruction; its verbatim intent is recorded in docs/citycoin-master/amendment-01-new-main-token.md",
       "summary": "A new main token with a new Solana mint, a new official X page and a new official Telegram handle, each supplied by the owner, verified, and configured in one place (MAIN_TOKEN_MINT, OFFICIAL_X_URL, OFFICIAL_TELEGRAM_URL). The old $VICINITY mint becomes a legacy token, history only. No automatic swap, migration, airdrop or transfer of anyone's holdings.",
       "overrides": "master sections 02, 07, 14, 16 and 28 where they keep the existing main-token mint or forbid a replacement main-token mint; for the main token only",
-      "values_supplied": false
+      "values_supplied": false,
+      "values_supplied_note": "false: not all three values are supplied. OFFICIAL_X_URL was supplied by the owner in writing on 24 Oct 2026 and is set only in the Worker settings (wrangler.jsonc), with an incomplete verification record (docs/citycoin-master/amendment-01-new-main-token.md section 4.4); MAIN_TOKEN_MINT and OFFICIAL_TELEGRAM_URL are not supplied. This policy holds null for all three (main_token.mint, official_links, deployment.inputs) and never holds the values themselves."
+    },
+    {
+      "id": "owner-decision-2026-10-24-domains",
+      "date": "2026-10-24",
+      "source": "owner decision in writing; its words and what it changes are recorded in docs/citycoin-master/domain-cutover.md section 0",
+      "summary": "No forwarding (308, 301 or 302) from vicinity.city, www.vicinity.city, vicinitycity.com or www.vicinitycity.com to citycoin.dev. After the move both names are left blank (not served by this Worker, not redirected) for the owner's other use. vicinity.city keeps serving until citycoin.dev serves the site, and the legacy launch path is closed before it stops.",
+      "overrides": "master section 04 (BR-02) where it requires the old hosts to redirect to citycoin.dev and their routes to be kept for at least 12 months after the redirect; for the old hosts only"
     }
   ],
   "policy": {
@@ -768,7 +776,7 @@ const DOCUMENT = {
       "per_quote_path_evidence": true,
       "legacy_new_launch_disable_before_new_launches": true,
       "website_rebrand_independent_of_financial_activation": true,
-      "legacy_redirect_min_months": 12,
+      "legacy_redirect_min_months": 0,
       "legacy_immutable_metadata": "exact bytes served as long as existing assets depend on them; never redirected",
       "replaces": "previous 30-day rotation-specific gate",
       "fabricated_elapsed_time": false
@@ -1179,7 +1187,7 @@ const DOCUMENT = {
         "per_quote_path_evidence": "§37 WP-12A",
         "legacy_new_launch_disable_before_new_launches": "§37 WP-12A step 9",
         "website_rebrand_independent_of_financial_activation": "§37 WP-12A",
-        "legacy_redirect_min_months": "§04 BR-02",
+        "legacy_redirect_min_months": "§04 BR-02; 0 by the owner's decision of 24 Oct 2026 (amendments: owner-decision-2026-10-24-domains): the old hosts are not redirected",
         "legacy_immutable_metadata": "§04 BR-02",
         "replaces": "§37 WP-12A",
         "fabricated_elapsed_time": "§37 WP-12A; §01"

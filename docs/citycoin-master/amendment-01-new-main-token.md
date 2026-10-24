@@ -1,10 +1,19 @@
 # Amendment 01: a new main token, a new official X page and a new official Telegram
 
-> **DESIGN. NOTHING IS LIVE.** Written 24 October 2026. The owner has **not** supplied the new mint, the new X address or the new
-> Telegram address yet. All three are unknown, and they stay empty (`null`) in every file of this package until the owner supplies
-> them and they pass the verification in section 4. Nothing on the live site (main `4aa408e`) changes until (1) the owner supplies
+> **DESIGN. NOTHING IS LIVE.** Written 24 October 2026. The owner has **not** supplied the new mint or the new Telegram address yet.
+> Both are unknown and stay empty until the owner supplies them and they pass the verification in section 4. The X address was
+> supplied in writing on 24 October 2026 (update below) and is set only in `wrangler.jsonc`; the policy files (`policy.json` and its
+> mirror `src/masterpolicy.js`) keep `null` for all three. Nothing on the live site (main `4aa408e`) changes until (1) the owner supplies
 > verified values, (2) the code stage that reads them is merged, and (3) the token and official-link rollout switch
 > `MAIN_TOKEN_V5` is turned on by its own configuration pull request. Until then the live site keeps showing what it shows today.
+>
+> **Update, 24 October 2026: the owner supplied the X address in writing** ("the twitter handle is @CityCoinDev", then the link
+> https://x.com/citycoindev). It is configured as `OFFICIAL_X_URL` = `https://x.com/CityCoinDev` in `wrangler.jsonc` by a
+> configuration pull request (branch `cc/config-x`, not merged). Its verification record is section 4.4, and it is **not complete**:
+> the account was read only by an automated HTTP read, not yet by a person in a browser (step 3 of section 4.2), and nothing yet
+> proves it is the owner's (step 4). With every master switch off the value is shown nowhere public; the only difference is the
+> admin-only configuration view, which reports that it is set. The policy files keep `null` (section 3). The mint and the Telegram
+> address are still not supplied and stay empty.
 
 ## 1. The owner's instruction
 
@@ -35,7 +44,7 @@ migration and any retroactive change to an existing minted coin; the amendment s
 | Official Telegram | None listed | `OFFICIAL_TELEGRAM_URL`, owner-supplied and verified. Empty means not shown. |
 | Hourly holder distribution | Per city coin | **Unchanged.** It measures holders of each city coin, not the main token. |
 | Fees, selection clock, activity points, manager approval, metadata review, program changes | As in master v5 | **Unchanged.** |
-| Deployed programs, program IDs, `/coin-meta/*`, `/brand/vicinity-512.png` | Kept | **Unchanged** (legacy compatibility, master section 08). |
+| Deployed programs, program IDs, `/coin-meta/*`, `/brand/vicinity-512.png` | Kept | **Unchanged** (legacy compatibility, master section 08). The files stay and are served on citycoin.dev; on vicinity.city only until S55 (owner decision of 24 Oct 2026, domain-cutover.md section 0). |
 | Policy version | `citycoin-master-v5` | Unchanged string. The `policy_digest` (schema-and-api.md section 2.1) differs, so two deployments can still be told apart. No row has been recorded under the version yet. |
 
 ## 3. Central configuration keys and their validation
@@ -80,13 +89,16 @@ link checker use the configured official links, and `$VICINITY` is shown as lega
 (`BRAND=citycoin`, implementation-report.md stage S48) or after it, never before the values are verified.
 
 **Shape is not verification.** A key that passes these checks only has the right form. Nobody writes a value into the configuration
-until the verification record of section 4 exists for it.
+until the verification record of section 4 exists for it. The owner may direct a value to be configured before its record is
+complete, as he did on 24 October 2026 for X (section 4.4); no switch may show such a value until its record is complete and
+signed off.
 
 ## 4. Verification procedure
 
-Each value is verified once, before it is configured, and again on the day the switch goes on. Every read is read-only: no
-transaction, no signature, no keypair, no secret. The record is a new section of this file (section 9), committed with the
-configuration pull request that sets the value.
+Each value is verified once, before it is configured (or, where the owner directs it to be configured first, before any switch
+shows it: section 3), and again on the day the switch goes on. Every read is read-only: no transaction, no signature, no keypair,
+no secret. The record is written into this file (section 4.4 for the values supplied so far; section 9 lists every record),
+committed with the configuration pull request that sets the value.
 
 ### 4.1 The mint
 
@@ -147,6 +159,25 @@ configuration pull request that sets the value.
 
 Re-run 4.1 steps 3 to 6 and 4.2 step 3. Any difference from the record (an authority that appeared, a renamed account) stops the
 switch until the owner decides.
+
+### 4.4 Record: the official X address (24 October 2026; incomplete)
+
+| Step of 4.2 | Result |
+|---|---|
+| 1. Source | Supplied by the owner in writing, in the working conversation of 24 October 2026: "the twitter handle is @CityCoinDev", then the link "https://x.com/citycoindev". X handles do not depend on letter case; the value is configured in the form the owner wrote first, `https://x.com/CityCoinDev`. Not taken from a search or a similar-looking account. |
+| 2. Shape | Done. `officialLinks({ OFFICIAL_X_URL: "https://x.com/CityCoinDev" })` (src/masterpolicy.js, `readXUrl`) returns `xUrl` `https://x.com/CityCoinDev` with no problem, and `validateDeploymentConfig` accepts it with every feature off. It is not the legacy account: the same check refuses `https://x.com/vicinitycitysol` with `LEGACY_SOCIAL_LINK_AS_OFFICIAL`. |
+| 3. The page exists | **Open: an automated anonymous HTTP read only** (evidence below); the person-in-a-browser check this step asks for is not done. At 20:55 UTC, GET `https://x.com/CityCoinDev` and `https://x.com/citycoindev` answered 200 with X's own profile data for one account: title "CityCoin (@CityCoinDev) / X", `og:url` `https://x.com/CityCoinDev`, description "An official launchpad for CityCoins.", 0 posts, joined October 2026, and a profile-banner address that names account number `2113657954452819968`. A made-up handle answered 404 ("User Profile Not Found"), so the 200 is specific to this account. An earlier check the same day had seen only X's script page, answering 200 for any name, and could not read the account; why the answers differed was not established. A repeat of the read at 21:20 UTC gave the same title, `og:url`, description and account number, and the made-up handle again answered 404. |
+| 4. It is the official account | **Not done.** The only evidence is the owner's written statement. None of the three forms is recorded: the owner has not shown that he is signed in to the account; the profile data read in step 3 names no website (neither `https://citycoin.dev` nor `https://vicinity.city`), so the second form needs the owner to add that link first; posts of the legacy account `@VicinityCitySOL` were not read. |
+| 5. Record | Normalized address `https://x.com/CityCoinDev`; name shown "CityCoin"; account number `2113657954452819968` (lets section 4.3 see a renamed account); evidence as above. Step 2 and the automated read of step 3 were run by the coding agent working in this repository, on 24 October 2026; no person has checked the account yet, and there is no second sign-off (section 8, item 2). |
+
+**Status: incomplete; configured on the owner's written decision.** The configuration pull request (branch `cc/config-x`, not merged)
+writes the value with this record, so section 3's rule that nobody configures a value before its record exists is met only in part,
+under the exception section 3 allows on the owner's direction: the record exists; step 3 (only an automated read so far) and step 4
+are open. What the value does with every master switch off: only `GET /api/admin/config` (admin only) reports that `OFFICIAL_X_URL`
+is set, never the value; `src/official.js` `socialProfiles` and `src/v5policy.js` `configuredValues` read it only while
+`MAIN_TOKEN_V5` counts, and the rebrand stage in progress (not merged) shows it under `BRAND=citycoin`. Before any switch shows it:
+a person opens the address in a browser and records what it shows, one form of step 4 is met and recorded here, a second person
+signs off, and section 4.3 is re-run on the day.
 
 ## 5. Current consumers that must move from the legacy mint to the configured main mint
 
@@ -272,7 +303,7 @@ address with the old handle is not official; test/site.test.js:92 adds a made-up
 | Page footers (generated, hard-coded) | public/404.html:94, admin.html:122, app.html:168, cities.html:236, coin.html:252, connect.html:534, credits.html:142, dashboard.html:929, index.html:204, launchpad.html:170, locate.html:108, official.html:204, profile.html:267, rules.html:216, terms.html:285, token.html:269 (16 pages) | `https://x.com/VicinityCitySOL` written into each page at build time | Regenerated from the configuration by the page build; never edited by hand |
 | Dashboard help | scripts/pages/src/dashboard.html:754 (public/dashboard.html:825) | "Contact us on X (@VicinityCitySOL)" | From configuration, hidden when unset |
 | Terms of Use | scripts/pages/src/terms.html:45, 112, 166, 197 (public/terms.html:113, 180, 234, 265) | The contact clauses name the X account | A new Terms version approved by the owner (00-reconciliation.md OB-12, rebrand-inventory.md L07). The 2026-10-01 text stays at its versioned address. |
-| Countdown site (vicinitycity.com) | countdown/public/index.html:7, 14, 19, 21, 34, 36, 57, 59, 133, 158; countdown/public/teaser.js:7, 27, 46, 251 | Follow buttons for the old account | History (rebrand-inventory.md section 3.6); it redirects at cutover (U11) |
+| Countdown site (vicinitycity.com) | countdown/public/index.html:7, 14, 19, 21, 34, 36, 57, 59, 133, 158; countdown/public/teaser.js:7, 27, 46, 251 | Follow buttons for the old account | History (rebrand-inventory.md section 3.6). Since 3 Oct 2026 the countdown Worker sends every request to vicinity.city, so these pages are not shown. By the owner's decision of 24 Oct 2026 vicinitycity.com is not forwarded to citycoin.dev: its forward ends when the owner detaches the domain (domain-cutover.md section 0) |
 | Tests | test/official-socials.test.js (lines 2-47), test/site.test.js:200, test/mobile-polish.test.js:76, test/api.test.js:35, test/hardening-coins.test.js:188-190, test/fixtures/launchlab/raymint.json | Assert the old account | Change with the code; new tests use format-only test fixture handles |
 
 ## 7. How `$VICINITY` is presented after the switch
@@ -303,7 +334,9 @@ Until then, the live site keeps today's behavior, including the legacy mint and 
 
 ## 9. Verification records
 
-None yet. The owner has not supplied any of the three values. This section receives the records of section 4 when they exist.
+One, incomplete: the official X address, `https://x.com/CityCoinDev`, supplied by the owner in writing on 24 October 2026 (section
+4.4: steps 1 and 2 done; step 3 open (automated read only); step 4 open). The mint and the Telegram address are not
+supplied, so they have no record. This section lists every record of section 4 as it is written.
 
 ## 10. Commands run for this file (24 October 2026, read-only)
 
@@ -322,6 +355,12 @@ None yet. The owner has not supplied any of the three values. This section recei
   scripts/pages/build.mjs at the cited lines.
 - No RPC call, no network request, no transaction, no keypair and no secret. Nothing about the new mint was read, because no mint
   has been supplied.
+- For the X record of section 4.4 (24 October 2026, after the owner supplied the address): `officialLinks` and
+  `validateDeploymentConfig` of src/masterpolicy.js run with `OFFICIAL_X_URL` set to `https://x.com/CityCoinDev` and to the legacy
+  account in lower case; anonymous HTTP GET (no sign-in, no cookie) of `https://x.com/CityCoinDev`, `https://x.com/citycoindev` and a
+  made-up handle at 20:55 UTC, repeated at 21:20 UTC, reading only the page title and the profile `meta` tags; the downloaded pages
+  were deleted afterwards.
+  No message was sent and no account was signed in to.
 
 ## 11. Stage S02A implementation (local branch `cc/s02`, not merged, nothing deployed)
 

@@ -107,6 +107,12 @@
     // (the website never holds a key). Needs COIN_V2_READY on as well. OFF: built and tested dark on 23 Oct 2026. "on" only after the
     // owner's go; anything else than "on" is the site exactly as before (change the value, do not delete the line: keep_vars).
     "COIN_V2_BATCH": "off",
+    // The official Citycoin.dev X account (owner amendment 01; src/maintoken.js officialLinks): supplied by the owner in writing
+    // on 24 Oct 2026 ("the twitter handle is @CityCoinDev"); verification record in docs/citycoin-master/amendment-01-new-main-token.md
+    // section 4. Shown only where the master switches show official links (MAIN_TOKEN_V5, BRAND=citycoin); with those off the only
+    // difference is the admin configuration view (GET /api/admin/config), which then reports that it is set (presence, never the value).
+    // OFFICIAL_TELEGRAM_URL and MAIN_TOKEN_MINT stay unset until the owner supplies them.
+    "OFFICIAL_X_URL": "https://x.com/CityCoinDev",
     // Community feed v2 (src/flags.js feedV2On): the "update" post kind, delete your own post, mute, the author's city on every
     // national post, one confirmation before the first national post. ON since 17 Oct 2026, by the owner ("switch on all the
     // builds"). To switch off: "off" (change the value, do not delete the line: keep_vars) in a pull request; anything else than
@@ -124,9 +130,9 @@
     "run_worker_first": ["/api/*", "/coin-meta/*", "/official-coins.csv"],
     "not_found_handling": "404-page"
   },
-  // vicinity.city is the site. The others forward to it (src/index.js).
-  // vicinitycity.net and www.vicinitycity.net go back in here once their old DNS records are deleted
-  // (until then Cloudflare refuses them and the whole deploy fails).
+  // vicinity.city is the site; www.vicinity.city forwards to it on the Worker-first paths (src/index.js). Both routes stay until
+  // stage S55 removes them, with no redirect (owner decision of 24 Oct 2026, docs/citycoin-master/domain-cutover.md section 0).
+  // vicinitycity.net and www.vicinitycity.net: not attached; their use is the owner's call (domain-cutover.md section 0).
   "routes": [
     { "pattern": "vicinity.city", "custom_domain": true },
     { "pattern": "www.vicinity.city", "custom_domain": true }

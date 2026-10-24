@@ -23,7 +23,7 @@ Master v5 says it "supersedes every earlier Vicinity/Citycoin handoff and confli
 
 **Kept, but changed to fit v5:** `COIN_V2_READY` (fixed defaults) and `COIN_V2_REVIEW` (change requests and review). Their storage, hashing, art and screening code is reused, with owner-only review, no auto-publish and on-chain locks (section 5.5). The wallet sign-in path, the uniqueness index on `users.wallet`, the location checks of the sign-up, the carry and pairing code, and the holder reader are reused in the new flows.
 
-**Kept unchanged as legacy compatibility:** the two deployed programs and every on-chain identifier, the `$VICINITY` mint as a legacy token (history only; owner amendment 01 replaces it as the main token, section 5.12), `/coin-meta/*` and `/brand/vicinity-512.png` on vicinity.city, and every historical record (section 8). History stays readable and never authorizes a new action.
+**Kept unchanged as legacy compatibility:** the two deployed programs and every on-chain identifier, the `$VICINITY` mint as a legacy token (history only; owner amendment 01 replaces it as the main token, section 5.12), `/coin-meta/*` and `/brand/vicinity-512.png` (the files stay and are served on citycoin.dev; on vicinity.city only until S55, by the owner's decision of 24 Oct 2026: `domain-cutover.md` section 0), and every historical record (section 8). History stays readable and never authorizes a new action.
 
 ## 2. Sources and conventions
 
@@ -43,7 +43,7 @@ Master v5 says it "supersedes every earlier Vicinity/Citycoin handoff and confli
 | `ACTIVITY_POINTS`, `MANAGER_APPS` | roles | off | activity ledger; owner-reviewed manager applications |
 | `METADATA_V5`, `LAUNCH_V5`, `LEGACY_LAUNCH` | metadata and launch | v5 metadata and launch off; legacy launch builders on | fixed defaults and owner inbox; self-service launch on the custom program (`LAUNCH_V5`; one working note called it `CC_LAUNCH`); `LEGACY_LAUNCH=off` builds no legacy approval or launch |
 | `CC_TRADING`, `CC_HOURLY` | programs and money | off | custom-curve trading and hourly processing (`CC_HOURLY` has a `shadow` stage). The public policy and fee display follow `PUBLIC_V5`. |
-| `BRAND`, `SITE_ORIGIN(S)`, `HOST_REDIRECT`, `PUBLIC_V5`, `DASHBOARD_V5` | brand and domain | today's bytes and hosts | Citycoin.dev labels, citycoin.dev origin, old-host redirects, new public pages and dashboard |
+| `BRAND`, `SITE_ORIGIN(S)`, `HOST_REDIRECT`, `PUBLIC_V5`, `DASHBOARD_V5` | brand and domain | today's bytes and hosts | Citycoin.dev labels, citycoin.dev origin, old-host redirects (`HOST_REDIRECT`, not to be turned on since the owner's decision of 24 Oct 2026: `domain-cutover.md` section 0), new public pages and dashboard |
 | `MAIN_TOKEN_V5` + `MAIN_TOKEN_MINT`, `OFFICIAL_X_URL`, `OFFICIAL_TELEGRAM_URL` | token and official links (amendment 01) | today's token page, links and footer (the legacy `$VICINITY` mint and the legacy X account) | every main-token consumer reads the owner-supplied, verified `MAIN_TOKEN_MINT`; `$VICINITY` is shown as legacy; the footer and checker use the configured links (empty means not shown) |
 
 The values, defaults and named validation errors of these switches are in `schema-and-api.md` section 2.2 and `src/masterpolicy.js` (`FLAG_VALUES`); `BRAND`, `DASHBOARD_V5`, `INDEXING` and the theme switch are listed in `implementation-report.md` section 5.
@@ -296,7 +296,7 @@ Merged work with no conflict found: the feed, notifications, Wallet tab and Send
 
 - `vicinity_launchpad` (`AkMP9qvAYmb8Vyu63Qhw8Z4ee1fgQbCRKkXWy5r5A1Ai`) and `vicinity_rewards` (`EVwxp3V9YSvsyDEjp39B9wRDQxHR2xF2CNeR8AMRYrgG`): their IDs, layouts, PDAs and compiled constants, including `METADATA_URI_PREFIX = "https://vicinity.city/coin-meta/"` (lp:constants.rs:68).
 - The `$VICINITY` mint `2aVkhRfAEm44tMhFo8oamWvumGGvweFqnUwukRMBkray` and its on-chain name "VICINITY CITY" and symbol "VICINITY", as a **legacy token** (history only). It is no longer the main token (owner amendment 01, section 5.12), and nobody's holdings are swapped, migrated or transferred.
-- `/coin-meta/*` on vicinity.city, serving exact bytes and never redirected. `/brand/vicinity-512.png`, which the on-chain Meteora partner metadata names. `/official-coins.csv` on the old host for at least the redirect window.
+- `/coin-meta/*` on vicinity.city, serving exact bytes and never redirected. `/brand/vicinity-512.png`, which the on-chain Meteora partner metadata names. `/official-coins.csv` on the old host. Since the owner's decision of 24 Oct 2026 (no forwarding from the old names; `domain-cutover.md` section 0) these stay on vicinity.city only until it stops being served at S55, after the legacy launch path is closed; the files themselves stay and are served on citycoin.dev. For `/brand/vicinity-512.png`, which the on-chain partner record names, S55 also waits until that record is updated or the owner accepts in writing that the vicinity.city address goes dark (`domain-cutover.md` section 4).
 - The legacy Meteora modules, while any legacy asset could exist. The single 10-minute job with its D1 lease (src/jobs.js:22-37), so that adding citycoin.dev to the same Worker adds no second scheduler (D10).
 - The details of each kept item are in `rebrand-inventory.md`.
 

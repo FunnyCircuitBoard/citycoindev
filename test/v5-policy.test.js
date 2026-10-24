@@ -47,16 +47,20 @@ const policyLines = () => errors.filter((e) => e.startsWith("policy config refus
 /* ---------------------------------------------------------------- with the switch off: today's site */
 
 test("the default: today's settings describe the policy's own default deployment, which validates; the fast answer equals the full check", () => {
+  // the one v5 input today's settings carry: the official X link the owner supplied on 24 Oct 2026 (amendment 01), shown only while a
+  // master switch counts; every switch stays at its default
+  assert.equal(LIVE.OFFICIAL_X_URL, "https://x.com/CityCoinDev");
+  const withX = { ...MASTER_POLICY.deployment, inputs: { ...MASTER_POLICY.deployment.inputs, OFFICIAL_X_URL: LIVE.OFFICIAL_X_URL } };
   for (const env of [{}, LIVE, { ...LIVE, PUBLIC_V5: "off" }, { ...LIVE, PUBLIC_V5: "", MAIN_TOKEN_V5: "  " }, { ...LIVE, [ENVIRONMENT_SETTING]: "", SITE_ORIGINS: [] },
     { ...LIVE, LEGACY_SEATS: "On", LEGACY_LAUNCH: "on", MAIN_TOKEN_V5: "OFF " }]) {
-    assert.deepEqual(deploymentFromEnv(env), MASTER_POLICY.deployment, JSON.stringify(env).slice(0, 80));
+    assert.deepEqual(deploymentFromEnv(env), env.OFFICIAL_X_URL ? withX : MASTER_POLICY.deployment, JSON.stringify(env).slice(0, 80));
     assert.deepEqual(validatePolicy({ ...MASTER_POLICY, deployment: deploymentFromEnv(env) }), { ok: true, errors: [] });
     assert.deepEqual(policyConfig(env), { ok: true, errors: [], environment: "unset" });
     assert.equal(publicV5(env), false);
   }
-  // none of today's settings is a v5 switch or input: the check reads only names the policy defines
+  // none of today's settings is a v5 switch, and the only v5 input is the official X link: the check reads only names the policy defines
   const read = new Set([...Object.keys(MASTER_POLICY.deployment.flags), ENVIRONMENT_SETTING, ...INPUT_SETTINGS, ...Object.keys(MASTER_POLICY.deployment.inputs.secrets_present)]);
-  assert.deepEqual(Object.keys(LIVE).filter((k) => read.has(k)), []);
+  assert.deepEqual(Object.keys(LIVE).filter((k) => read.has(k)), ["OFFICIAL_X_URL"]);
   assert.deepEqual(checkPolicyConfig(LIVE), { ok: true, codes: [] });
   assert.deepEqual(errors, [], "nothing is logged");
 });
