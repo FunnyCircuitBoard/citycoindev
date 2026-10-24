@@ -588,10 +588,13 @@ mod tests {
     fn u11_uri_is_keyed_by_mint() {
         let mint = Pubkey::new_from_array([7u8; 32]);
         let uri = metadata_uri(&mint);
-        assert_eq!(uri, format!("https://vicinity.city/coin-meta/{mint}.json"));
+        assert_eq!(
+            uri,
+            format!("https://citycoin.dev/coin-meta/v1/{mint}.json")
+        );
         assert!(uri.len() <= 200, "Metaplex URI limit");
         let max = metadata_uri(&Pubkey::new_from_array([255u8; 32]));
-        assert!(max.len() <= 81);
+        assert!(max.len() <= 83);
     }
 
     #[test]

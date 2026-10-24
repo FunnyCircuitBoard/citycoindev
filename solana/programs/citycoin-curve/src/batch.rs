@@ -8,7 +8,7 @@
 //! (`sdk/fixtures/launch-batch.json`).
 //!
 //! ```text
-//! leaf = SHA-256( 0x00 || "vicinity_curve/launch_leaf" || 0x01 || program_id
+//! leaf = SHA-256( 0x00 || "citycoin_curve/launch_leaf" || 0x01 || program_id
 //!               || batch_seq u64 LE || city_id u64 LE || founder || config_id u16 LE
 //!               || meta_hash || name_len u8 || name || symbol_len u8 || symbol )
 //! node = SHA-256( 0x01 || min(a, b) || max(a, b) )     unsigned byte-wise comparison
@@ -263,7 +263,7 @@ mod tests {
         symbol: &str,
     ) -> Vec<u8> {
         let mut v = vec![0x00];
-        v.extend_from_slice(b"vicinity_curve/launch_leaf");
+        v.extend_from_slice(b"citycoin_curve/launch_leaf");
         v.push(0x01);
         v.extend_from_slice(program.as_ref());
         v.extend_from_slice(&seq.to_le_bytes());
@@ -299,9 +299,9 @@ mod tests {
             "ddcc511e9df7568a13fbc2d6d6091020af5ed62e6120b50315600481bd1feff5",
         ];
         let want_leaf = [
-            "539ae27079e009d0b140bea745a90b939c5f5eaf299312a252f9ec0e10cc71e0",
-            "a606901235eb24b9a37c1fdc60354539b91f5cd1dcc4d553580d46cdcbc0f44e",
-            "0c5ac2c3a5e2fdccf0a2a12d1e9f6696d7c49934e330e3939978835a22f84a5c",
+            "888596052e104b3b7a1dd760ac70521d6513a36ee5a0fcb6bfffa83d335bf5bd",
+            "30792bb1929f110ebb31f2f803823bf0c37bbfa1ca702d4b8e517c3cd688bcaf",
+            "dffd802ed2445e98003e1b7cc415d591d0221e44538f8de200bde412ea43a13d",
         ];
         let want_len = [156usize, 154, 160];
         let mut leaves = vec![];
@@ -336,7 +336,7 @@ mod tests {
             hex(&pre0),
             [
                 "00",
-                "766963696e6974795f63757276652f6c61756e63685f6c656166",
+                "63697479636f696e5f63757276652f6c61756e63685f6c656166",
                 "01",
                 "0bb520f977287355b716c92bda75a1efcf5dafc69a57e01481083ae4df2e1c49",
                 "0700000000000000",
@@ -353,12 +353,12 @@ mod tests {
         let n01 = node_hash(&leaves[0], &leaves[1]);
         assert_eq!(
             hex(&n01),
-            "6565f42ef55b9b2dea2aaad63bdb674e5827004781161dfcefa49ab88085c4b3"
+            "0b404ae865a1193e7569fe7dd327bcae408eb67cc063423aba09d62241770301"
         );
         let r = root(&levels);
         assert_eq!(
             hex(&r),
-            "678ab4f7709c306d03b4a47bbc0bd93272acd8cf6fd38c2d6d7629a88f4b5d45"
+            "652d37380cf4a683c2029292928c87b74d97d658c1a4aa6d268a3e4927a5e94e"
         );
         assert_eq!(proof(&levels, 0), vec![leaves[1], leaves[2]], "London");
         assert_eq!(proof(&levels, 1), vec![leaves[0], leaves[2]], "Paris");
@@ -509,7 +509,7 @@ mod tests {
         // the fixture's worked example equals 3.12's
         assert_eq!(
             fx["workedExample"]["root"].as_str().unwrap(),
-            "678ab4f7709c306d03b4a47bbc0bd93272acd8cf6fd38c2d6d7629a88f4b5d45"
+            "652d37380cf4a683c2029292928c87b74d97d658c1a4aa6d268a3e4927a5e94e"
         );
     }
 

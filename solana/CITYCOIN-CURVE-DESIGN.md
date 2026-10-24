@@ -294,10 +294,10 @@ Rows M3, M4, M7, M8, M11, M12, M16 and M21 were revised after the review (Append
 | `BATCH_MAX_LEAD_SECS` | 172,800 (48 hours) | latest `valid_from` after publication: a list is never signed long before it takes force (4.25) |
 | `BATCH_MAX_VALIDITY_SECS` | 172,800 (48 hours) | longest window from `valid_from` to `valid_until` (4.25, O31) |
 | `MAX_BATCH_LEAVES` / `MAX_BATCH_PROOF_LEN` | 512 / 9 | most leaves in one batch, and the proof length that covers them (`ceil(log2 512)`): keeps `launch_from_batch` with the founder's first buy inside one transaction (11.3) and bounds what one batch can approve (8.1) |
-| `LAUNCH_LEAF_TAG` / `LAUNCH_LEAF_VERSION` | the 26 ASCII bytes `vicinity_curve/launch_leaf` / 1 | domain separation and version of a launch leaf (3.12) |
+| `LAUNCH_LEAF_TAG` / `LAUNCH_LEAF_VERSION` | the 26 ASCII bytes `citycoin_curve/launch_leaf` / 1 | domain separation and version of a launch leaf (3.12) |
 | `MERKLE_LEAF_PREFIX` / `MERKLE_NODE_PREFIX` | 0x00 / 0x01 | leaf and inner-node prefixes, as in `vicinity_rewards`' `merkle.rs` (3.12) |
 | `PAYOUT_COOLDOWN_SECS` | 86,400 | reused |
-| `METADATA_URI_PREFIX` | `https://vicinity.city/coin-meta/` | URI = prefix + mint (base58) + `.json` (reused) |
+| `METADATA_URI_PREFIX` | `https://citycoin.dev/coin-meta/v1/` | URI = prefix + mint (base58) + `.json`, at most 34 + 44 + 5 = 83 bytes (Metaplex allows 200); the `v1/` segment versions the metadata layout, so a later layout gets a new path instead of rewriting immutable URIs; citycoin.dev must serve `/coin-meta/v1/` before the first coin of this program launches (8.4) |
 | `MAX_NAME_LEN` / `MAX_SYMBOL_LEN` | 32 / 10 bytes | reused (Metaplex limits) |
 | `METAPLEX_PROGRAM_ID` | `metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s` | metadata for classic SPL coins |
 | `NATIVE_MINT` | `So11111111111111111111111111111111111111112` | reward mint of the city's rewards vault |
@@ -523,7 +523,10 @@ number), `opted_in_at` i64 (136), `bump` u8 (144).
   `launch` copies into `Coin.meta_hash` and emits in `CoinLaunched`. The website serves that
   JSON write-once, and the JSON's `image` URL contains the image's SHA-256, served write-once
   too, so a compromised website can be detected by anyone who compares hashes (it cannot be
-  prevented, T37).
+  prevented, T37). The prefix is `https://citycoin.dev/coin-meta/v1/` (3.2; until 24 October
+  2026 the draft used `https://vicinity.city/coin-meta/`, never on chain for this program), so
+  citycoin.dev must serve `/coin-meta/v1/<mint>.json` before this program's first coin launches
+  (a website step, 8.4 and 14.1).
 * **Ordinary transfers** of the coin never touch `citycoin_curve`, carry no Citycoin.dev fee and
   cannot be hooked, frozen or clawed back (R3).
 
@@ -573,7 +576,7 @@ from `launch_from_batch`'s own arguments and its signer (4.27).
 
 ```
 leaf = SHA-256( 0x00                                MERKLE_LEAF_PREFIX
-             || "vicinity_curve/launch_leaf"        LAUNCH_LEAF_TAG, 26 ASCII bytes
+             || "citycoin_curve/launch_leaf"        LAUNCH_LEAF_TAG, 26 ASCII bytes
              || 0x01                                LAUNCH_LEAF_VERSION
              || program_id                          32 bytes: the program that verifies the proof
              || batch_seq        u64 LE
@@ -643,7 +646,7 @@ meta_hash L2    ddcc511e9df7568a13fbc2d6d6091020af5ed62e6120b50315600481bd1feff5
 
 preimage of L0 (156 bytes), field by field:
   00                                                                 leaf prefix
-  766963696e6974795f63757276652f6c61756e63685f6c656166               "vicinity_curve/launch_leaf"
+  63697479636f696e5f63757276652f6c61756e63685f6c656166               "citycoin_curve/launch_leaf"
   01                                                                 version
   0bb520f977287355b716c92bda75a1efcf5dafc69a57e01481083ae4df2e1c49   program id
   0700000000000000                                                   batch_seq 7
@@ -655,14 +658,14 @@ preimage of L0 (156 bytes), field by field:
   06 4c4f4e444f4e                                                    "LONDON"
 (L1's preimage is 154 bytes, L2's 160)
 
-L0   = 539ae27079e009d0b140bea745a90b939c5f5eaf299312a252f9ec0e10cc71e0
-L1   = a606901235eb24b9a37c1fdc60354539b91f5cd1dcc4d553580d46cdcbc0f44e
-L2   = 0c5ac2c3a5e2fdccf0a2a12d1e9f6696d7c49934e330e3939978835a22f84a5c
-N01  = SHA-256(01 || L0 || L1)    (L0 < L1)
-     = 6565f42ef55b9b2dea2aaad63bdb674e5827004781161dfcefa49ab88085c4b3
+L0   = 888596052e104b3b7a1dd760ac70521d6513a36ee5a0fcb6bfffa83d335bf5bd
+L1   = 30792bb1929f110ebb31f2f803823bf0c37bbfa1ca702d4b8e517c3cd688bcaf
+L2   = dffd802ed2445e98003e1b7cc415d591d0221e44538f8de200bde412ea43a13d
+N01  = SHA-256(01 || L1 || L0)    (L1 < L0)
+     = 0b404ae865a1193e7569fe7dd327bcae408eb67cc063423aba09d62241770301
        L2 has no sibling on level 0 and is promoted unchanged
-root = SHA-256(01 || L2 || N01)   (L2 < N01)
-     = 678ab4f7709c306d03b4a47bbc0bd93272acd8cf6fd38c2d6d7629a88f4b5d45
+root = SHA-256(01 || N01 || L2)   (N01 < L2)
+     = 652d37380cf4a683c2029292928c87b74d97d658c1a4aa6d268a3e4927a5e94e
 
 proofs: London [L1, L2]; Paris [L0, L2]; New York City [N01]
 depth(3) = 2, so a proof of more than 2 hashes is refused
@@ -2950,7 +2953,9 @@ call (I19).
   theft of any one member key (review R7-2); the program metadata (IDL) is published; config #0 is added (a
   warning names any field that differs from 5.9's); every enabled config keeps the buyback rule
   below (`CONFIG_BUYBACK_THROUGHPUT`; a disabled one is a warning, review R9-PF-1); the time lock is set (unless the owner chose
-  O11's alternative). **Afterwards, as an operating rule** (review
+  O11's alternative); and citycoin.dev serves `https://citycoin.dev/coin-meta/v1/<mint>.json`
+  write-once (3.10; a website step that the checklist, which reads only the chain, does not
+  check). **Afterwards, as an operating rule** (review
   R2-DIFF-1, SPEC-1): the upgrade authority is never moved to `FEE_RECIPIENT` (the program
   checks it only at `init_launchpad`), and `set_guardian` and `set_payout_config` never name a
   key that already holds a coin's founder seat (the program refuses the guardian and the payout
@@ -4092,8 +4097,10 @@ if he chooses it; review R9-PF-1).
 * **Official list** (`/official-coins.csv`): from accounts owned by `citycoin_curve` with the
   `CurveCoin` discriminator (filtered by program owner, never by bytes alone) and the old
   program's `Coin` accounts (none on mainnet), for the Jupiter tag and trackers.
-* **Metadata JSON**: served write-once at `METADATA_URI_PREFIX + mint + ".json"`, its SHA-256
-  equal to `Coin.meta_hash`, its image URL content-addressed (3.10).
+* **Metadata JSON**: served write-once at `METADATA_URI_PREFIX + mint + ".json"`
+  (`https://citycoin.dev/coin-meta/v1/<mint>.json`), its SHA-256 equal to `Coin.meta_hash`, its
+  image URL content-addressed (3.10). Not built yet: the site must serve `/coin-meta/v1/` before
+  the first coin of this program launches (8.4).
 * **Old launch path**: hidden once the old program's launches are paused (8.5).
 * **Honest copy**: the round trip costs about 4.9%; within the program no admin can move
   money, and the same Squads multisig can upgrade the program after a 48-hour delay and

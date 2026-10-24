@@ -202,7 +202,7 @@ pub const MAX_BATCH_LEAVES: u32 = 512;
 pub const MAX_BATCH_PROOF_LEN: u8 = 9;
 /// Domain tag of a launch leaf (3.12): 26 ASCII bytes.
 #[constant]
-pub const LAUNCH_LEAF_TAG: [u8; 26] = *b"vicinity_curve/launch_leaf";
+pub const LAUNCH_LEAF_TAG: [u8; 26] = *b"citycoin_curve/launch_leaf";
 /// Version byte of a launch leaf (3.12); a later layout takes 2.
 #[constant]
 pub const LAUNCH_LEAF_VERSION: u8 = 1;
@@ -214,7 +214,7 @@ pub const MERKLE_LEAF_PREFIX: u8 = 0x00;
 pub const MERKLE_NODE_PREFIX: u8 = 0x01;
 /// Every coin's metadata URI is this prefix, the mint (base58) and ".json".
 #[constant]
-pub const METADATA_URI_PREFIX: &str = "https://vicinity.city/coin-meta/";
+pub const METADATA_URI_PREFIX: &str = "https://citycoin.dev/coin-meta/v1/";
 /// Longest on-chain coin name (Metaplex limit), in bytes.
 #[constant]
 pub const MAX_NAME_LEN: u8 = 32;

@@ -7,7 +7,7 @@
 // key from his own wallet. Nothing here holds or asks for a key, and nothing here touches the network: chain state is
 // passed in (decoded accounts, or sets of what exists).
 //
-//   leaf = SHA-256( 0x00 || "vicinity_curve/launch_leaf" || 0x01 || program_id || batch_seq u64 LE || city_id u64 LE
+//   leaf = SHA-256( 0x00 || "citycoin_curve/launch_leaf" || 0x01 || program_id || batch_seq u64 LE || city_id u64 LE
 //                   || founder || config_id u16 LE || meta_hash || name_len u8 || name || symbol_len u8 || symbol )
 //   node = SHA-256( 0x01 || min(a, b) || max(a, b) )
 //

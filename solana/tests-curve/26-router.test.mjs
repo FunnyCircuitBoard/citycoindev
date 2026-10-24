@@ -29,7 +29,7 @@ import { World, S, SOL, LAMPORTS, expectFail, tokenAccountInfo } from './helpers
 
 const ROUTER_SO = process.env.VCURVE_ROUTER_SO || join(SOL, 'target', 'curve-router', 'deploy', 'curve_test_router.so');
 /** A fixed throwaway address for the router (no key behind it). */
-const ROUTER_ID = new web3.PublicKey(createHash('sha256').update('vicinity curve test router').digest()).toBase58();
+const ROUTER_ID = new web3.PublicKey(createHash('sha256').update('citycoin curve test router').digest()).toBase58();
 
 function routerSo() {
   if (!existsSync(ROUTER_SO)) {

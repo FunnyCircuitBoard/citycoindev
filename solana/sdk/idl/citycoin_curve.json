@@ -6088,7 +6088,7 @@
           26
         ]
       },
-      "value": "[118, 105, 99, 105, 110, 105, 116, 121, 95, 99, 117, 114, 118, 101, 47, 108, 97, 117, 110, 99, 104, 95, 108, 101, 97, 102]"
+      "value": "[99, 105, 116, 121, 99, 111, 105, 110, 95, 99, 117, 114, 118, 101, 47, 108, 97, 117, 110, 99, 104, 95, 108, 101, 97, 102]"
     },
     {
       "name": "LAUNCH_LEAF_VERSION",
@@ -6276,7 +6276,7 @@
         "Every coin's metadata URI is this prefix, the mint (base58) and \".json\"."
       ],
       "type": "string",
-      "value": "\"https://vicinity.city/coin-meta/\""
+      "value": "\"https://citycoin.dev/coin-meta/v1/\""
     },
     {
       "name": "METAPLEX_PROGRAM_ID",

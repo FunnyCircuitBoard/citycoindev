@@ -1248,7 +1248,7 @@ fn idl_address_and_constants() {
     has("MERKLE_NODE_PREFIX", MERKLE_NODE_PREFIX.to_string());
     let tag: Vec<u8> = serde_json::from_str(&constants["LAUNCH_LEAF_TAG"]).unwrap();
     assert_eq!(tag, LAUNCH_LEAF_TAG.to_vec());
-    assert_eq!(&tag[..], b"vicinity_curve/launch_leaf");
+    assert_eq!(&tag[..], b"citycoin_curve/launch_leaf");
     assert_eq!(MAX_BATCH_LEAVES, 512);
     assert_eq!(
         MAX_BATCH_PROOF_LEN as u32,

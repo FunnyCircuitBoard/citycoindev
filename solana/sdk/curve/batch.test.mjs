@@ -29,20 +29,20 @@ test('U13 the worked example of 3.12: preimages, leaves, root, proofs, the depth
   const b = S.buildLaunchBatch(worked(), { batchSeq: 7n });
   assert.equal(S.CURVE_PROGRAM_ID, 'nhgCmApbVPVeAkhpQZeoBkrKkNWfkoyKDzeUxSYS7tk');
   assert.deepEqual(b.leaves.map(toHex), [
-    '539ae27079e009d0b140bea745a90b939c5f5eaf299312a252f9ec0e10cc71e0',
-    'a606901235eb24b9a37c1fdc60354539b91f5cd1dcc4d553580d46cdcbc0f44e',
-    '0c5ac2c3a5e2fdccf0a2a12d1e9f6696d7c49934e330e3939978835a22f84a5c',
+    '888596052e104b3b7a1dd760ac70521d6513a36ee5a0fcb6bfffa83d335bf5bd',
+    '30792bb1929f110ebb31f2f803823bf0c37bbfa1ca702d4b8e517c3cd688bcaf',
+    'dffd802ed2445e98003e1b7cc415d591d0221e44538f8de200bde412ea43a13d',
   ]);
-  assert.equal(toHex(b.root), '678ab4f7709c306d03b4a47bbc0bd93272acd8cf6fd38c2d6d7629a88f4b5d45');
-  assert.equal(toHex(hashNode(b.leaves[0], b.leaves[1])), '6565f42ef55b9b2dea2aaad63bdb674e5827004781161dfcefa49ab88085c4b3');
+  assert.equal(toHex(b.root), '652d37380cf4a683c2029292928c87b74d97d658c1a4aa6d268a3e4927a5e94e');
+  assert.equal(toHex(hashNode(b.leaves[0], b.leaves[1])), '0b404ae865a1193e7569fe7dd327bcae408eb67cc063423aba09d62241770301');
   assert.deepEqual(worked().map((e) => S.launchLeafPreimage({ batchSeq: 7n, ...e }).length), [156, 154, 160]);
   assert.equal(toHex(S.launchLeafPreimage({ batchSeq: 7n, ...worked()[0] })), [
-    '00', '766963696e6974795f63757276652f6c61756e63685f6c656166', '01', '0bb520f977287355b716c92bda75a1efcf5dafc69a57e01481083ae4df2e1c49',
+    '00', '63697479636f696e5f63757276652f6c61756e63685f6c656166', '01', '0bb520f977287355b716c92bda75a1efcf5dafc69a57e01481083ae4df2e1c49',
     '0700000000000000', '1f57280000000000', '11'.repeat(32), '0000', 'c252ce452838061b9ee03879063abccd3482e5fa49174b1ab87b5196e4a44d58',
     '064c6f6e646f6e', '064c4f4e444f4e'].join(''));
   assert.deepEqual(S.launchBatchProof(b, 2_643_743n).map(toHex), [toHex(b.leaves[1]), toHex(b.leaves[2])]);
   assert.deepEqual(S.launchBatchProof(b, 2_988_507n).map(toHex), [toHex(b.leaves[0]), toHex(b.leaves[2])]);
-  assert.deepEqual(S.launchBatchProof(b, 5_128_581n).map(toHex), ['6565f42ef55b9b2dea2aaad63bdb674e5827004781161dfcefa49ab88085c4b3']);
+  assert.deepEqual(S.launchBatchProof(b, 5_128_581n).map(toHex), ['0b404ae865a1193e7569fe7dd327bcae408eb67cc063423aba09d62241770301']);
   assert.equal(b.depth, 2); assert.equal(S.maxProofLen(3), 2);
   // Paris as "Parisx", another config, ticker, metadata hash, signer, batch or program: another leaf, InvalidProof
   const p = S.launchBatchProof(b, 2_988_507n);
@@ -62,7 +62,7 @@ test('U13 the shared fixture: the generator reproduces sdk/fixtures/launch-batch
   assert.equal(`${JSON.stringify(launchBatchFixture(), null, 1)}\n`, committed, 'run node sdk/curve/gen-launch-batch-fixture.mjs');
   const fx = JSON.parse(committed);
   assert.equal(fx.trees.length, 71);
-  assert.equal(fx.workedExample.root, '678ab4f7709c306d03b4a47bbc0bd93272acd8cf6fd38c2d6d7629a88f4b5d45');
+  assert.equal(fx.workedExample.root, '652d37380cf4a683c2029292928c87b74d97d658c1a4aa6d268a3e4927a5e94e');
   for (const t of fx.trees) {
     for (const s of t.samples) {
       assert.ok(S.verifyLaunchProof({ root: fromHex(t.root), leaf: fromHex(s.leaf), proof: s.proof.map(fromHex), leafCount: t.leaves }), `tree ${t.leaves} sample ${s.index}`);

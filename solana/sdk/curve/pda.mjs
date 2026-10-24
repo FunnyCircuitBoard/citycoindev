@@ -3,7 +3,7 @@
 // are returned as base58 strings; inputs may be base58 strings, @solana/kit
 // addresses or web3.js PublicKeys.
 import web3 from '@solana/web3.js';
-import { ADDRESSES, CLUSTERS, CURVE_PROGRAM_ID, SEEDS } from './constants.mjs';
+import { ADDRESSES, CLUSTERS, CURVE_PROGRAM_ID, METADATA_URI_PREFIX, SEEDS } from './constants.mjs';
 
 const { PublicKey } = web3;
 
@@ -94,4 +94,4 @@ export const associatedTokenAddress = (owner, mint, tokenProgram = ADDRESSES.tok
   pda([toKey(owner).toBuffer(), toKey(tokenProgram).toBuffer(), toKey(mint).toBuffer()], ADDRESSES.associatedToken);
 
 /** `METADATA_URI_PREFIX + mint + ".json"` (3.10). */
-export const metadataUri = (mint) => `https://vicinity.city/coin-meta/${toKey(mint).toBase58()}.json`;
+export const metadataUri = (mint) => `${METADATA_URI_PREFIX}${toKey(mint).toBase58()}.json`;

@@ -59,7 +59,7 @@ test('L05 launch: accounts, metadata, meta_hash, the 9.1-coin burn, authorities 
   // Metaplex metadata: immutable, the approved name and symbol, the URI, no creators, update authority the Coin
   const md = readMetadata(w.accountInfo(S.metadataAddress(h.mint)).data);
   assert.deepEqual([md.name, md.symbol, md.uri, md.isMutable, md.updateAuthority, md.hasCreators, md.sellerFeeBasisPoints],
-    ['New York', 'NYC', `https://vicinity.city/coin-meta/${h.mint}.json`, false, h.coin, false, 0]);
+    ['New York', 'NYC', `https://citycoin.dev/coin-meta/v1/${h.mint}.json`, false, h.coin, false, 0]);
   // the approval closed, its rent back to the admin
   assert.equal(w.approval(5_128_581n), null);
   assert.equal(w.lamportsOf(w.admin.address) - admin0, apRent);
@@ -73,7 +73,7 @@ test('L05 launch: accounts, metadata, meta_hash, the 9.1-coin burn, authorities 
   // the event carries the meta hash and the URI (the checker compared every field)
   const ev = res.events.find((e) => e.name === 'CoinLaunched').data;
   assert.deepEqual([...ev.meta_hash], metaHash('nyc.json'));
-  assert.equal(ev.uri, `https://vicinity.city/coin-meta/${h.mint}.json`);
+  assert.equal(ev.uri, `https://citycoin.dev/coin-meta/v1/${h.mint}.json`);
   // the token instructions of the launch: one mint_to, one dust burn, one set_authority, nothing else on the mint or vault
   const tokenTags = res.top.find((t) => t.name === 'launch').inner.filter((i) => i.program === S.ADDRESSES.token).map((i) => i.data[0]);
   assert.equal(tokenTags.filter((t) => t === 7).length, 1, 'mint_to once');
