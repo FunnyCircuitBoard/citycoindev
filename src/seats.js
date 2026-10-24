@@ -66,6 +66,15 @@ export const seatsFrozen = (env) => (legacySeatsFrozen(env)
  * `policy` are history, not the current rules. `policy` itself stays as published, versioned and unchanged: every seat and election stores the
  * version it was decided under, and the pages built before the freeze read their numbers from it.
  */
+/**
+ * A founder or manager action refused by stillFounder (the live backing balance below the seat's amount) while the legacy seats are frozen (stage
+ * S16 review fix S16-R1 / SEC-S16-1): stillFounder writes nothing then (no grace period starts, no seat is released after repeated graces: the
+ * skipped job could never put it back, and nobody may lose a role while frozen), so the answer says only what is true: 403 below_amount with these
+ * words. With the switch off every caller answers as before (403 in_grace, the seat having just entered its grace period).
+ */
+export const FROZEN_BELOW_AMOUNT = "Your balance is below your founder seat's amount, so this was not done. Nothing was changed.";
+/** stillFounder's refusal while frozen (403 below_amount), or null: `belowAmountFrozen(env) || <today's in_grace answer>`. */
+export const belowAmountFrozen = (env) => (legacySeatsFrozen(env) ? json({ ok: false, error: "below_amount", message: FROZEN_BELOW_AMOUNT }, 403) : null);
 export const LEGACY_SEATS_STATUS = Object.freeze({
   state: "frozen",
   history: Object.freeze(["policy.founder", "policy.voters", "policy.manager"]),
@@ -636,7 +645,10 @@ export async function enterGrace(db, seat, now, reason = "balance") {
 
 /**
  * Before any founder / manager power is used: the live balance must still be at the founder amount.
- * If not, the seat goes into grace right now and the action is refused.
+ * If not, the seat goes into grace right now and the action is refused. While the legacy seats are frozen (stage S16, review fix S16-R1 /
+ * SEC-S16-1) the action is refused all the same but nothing is written: no grace period starts and no seat is released (docs/citycoin-master/
+ * schema-and-api.md section 3.9, "no writer once frozen"; the job that would put a seat back is skipped, so a grace started now would take
+ * the role for the whole freeze). The caller answers belowAmountFrozen(env) then.
  */
 export async function stillFounder(env, seat, now, fetchImpl = fetch) {
   if (!seat || (seat.status !== "active" && seat.status !== "steward")) return false;
@@ -644,6 +656,7 @@ export async function stillFounder(env, seat, now, fetchImpl = fetch) {
   const balances = Object.fromEntries((await amountsFor(env, wallets, fetchImpl)).entries());
   const amount = await seatBalance(env.DB, seat, balances);
   if (amount >= seat.threshold) return true;
+  if (legacySeatsFrozen(env)) return false; // frozen: refused, nothing written
   await enterGrace(env.DB, seat, now, "live_check");
   return false;
 }

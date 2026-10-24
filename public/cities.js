@@ -1719,18 +1719,23 @@
     if (!c) { row.hidden = true; return; }
     row.hidden = false;
     const cname = countries[c.cc] || c.cc;
-    row.replaceChildren(el("span", "mod-row__icon"), el("span", null, `Country moderator (${cname}): loading…`));
+    row.replaceChildren(el("span", "mod-row__icon"), el("span", null, `${seatsFrozen() ? "Country manager" : "Country moderator"} (${cname}): loading…`));
     try {
       let d = modCache.get(c.cc);
       if (!d) { d = await (await fetch(`/api/moderator?country=${c.cc}`)).json(); modCache.set(c.cc, d); }
       if (selected !== c && mode === "claim") return;
       const txt = el("span");
-      if (d.moderator) {
+      // the legacy seats frozen (stage S16 review fix S16-R2): the answer the server gives, the country manager on record ({ name, city, endsAt })
+      // or the frozen rule; never the old "city founder who holds the most" line. Without the key (today) the line reads as before
+      if (seatsFrozen()) {
+        const m = d.manager;
+        txt.textContent = m ? `Country manager (${cname}): ${m.name} (${m.city}), term until ${new Date(m.endsAt).toLocaleDateString()}.` : `Country manager (${cname}): none. ${d.rule || ""}`.trim();
+      } else if (d.moderator) {
         txt.append(document.createTextNode(`Country moderator (${cname}): `), solscan(d.moderator.wallet),
           document.createTextNode(` · founder of ${d.moderator.city} · holds ${fmt(d.moderator.amount)} $VICINITY`));
       } else txt.textContent = `Country moderator (${cname}): ${d.launched ? "no founders here yet." : "picked at launch."} It's the city founder in ${cname} who holds the most $VICINITY.`;
       row.replaceChildren(el("span", "mod-row__icon"), txt);
-    } catch { row.replaceChildren(el("span", "mod-row__icon"), el("span", null, `Country moderator (${cname}): the city founder holding the most $VICINITY.`)); }
+    } catch { row.replaceChildren(el("span", "mod-row__icon"), el("span", null, seatsFrozen() ? `Country manager (${cname}): couldn't be loaded just now.` : `Country moderator (${cname}): the city founder holding the most $VICINITY.`)); }
   }
 
   /* =================== empty land: pick one of the three nearest communities =================== */

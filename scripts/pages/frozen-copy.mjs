@@ -149,7 +149,7 @@ export const FROZEN_COPY = Object.freeze({
         "        <p class=\"lead hero4__lead\">Every real city can get one official coin, run by the people who live there.</p>\n"],
       // Hold to&nbsp;found Hold your city's founder amount of $VICINITY, set by its size, through …
       ["            <h3>Hold to&nbsp;found</h3>\n            <p>Hold your city's founder amount of $VICINITY, set by its size, through random balance checks for seven days.</p>\n            <a class=\"how4__link\" href=\"/rules#founders\">How founding works <span aria-hidden=\"true\">→</span></a>\n",
-        "            <h3>Join your&nbsp;city</h3>\n            <p>Sign up and set your home community once: its members, holders and feed are in your dashboard.</p>\n            <a class=\"how4__link\" href=\"/dashboard\">Open your dashboard <span aria-hidden=\"true\">→</span></a>\n"],
+        "            <h3>Join your&nbsp;city</h3>\n            <p>Sign up and set your home community: its members, holders and feed are in your dashboard.</p>\n            <a class=\"how4__link\" href=\"/dashboard\">Open your dashboard <span aria-hidden=\"true\">→</span></a>\n"],
       // Locals qualify as City Founder and launch the city's one official coin.
       ["            <p>Locals qualify as City Founder and launch the city's one official coin.</p>\n",
         "            <p>A city's founder launches its one official coin on the Launchpad.</p>\n"],

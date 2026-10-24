@@ -255,6 +255,31 @@ test("the legacy seats frozen (stage S16): Remove it still takes the wallet off 
   // the same with the switch off voids the seat, as today (the test below)
 });
 
+test("the legacy seats frozen (review finding SEC-S16-4): a seat that Remove it left on the account, backed by the removed wallet, gives no founder coin action; nothing is written", async () => {
+  Object.assign(env, { LEGACY_SEATS: "frozen", DEPLOYMENT_ENV: "test" });
+  const m = await safari();
+  await linkInApp(m);
+  advance(60_000);
+  const at = new Date(Date.now()).toISOString();
+  const db = env.DB;
+  // claimed with the linked wallet (before the freeze, as far as the rows can tell), backed by a balance at its amount
+  await db.prepare("INSERT INTO seats (city_id, city_name, country, user_id, wallet, policy, threshold, status, created_at, activated_at) VALUES ('5142056', 'Utica', 'US', ?, ?, 5, 1, 'active', ?, ?)")
+    .bind(m.u.id, m.w.address, at, at).run();
+  assert.equal((await disown(m.b)).status, 200);
+  env.VICINITY_MINT = "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm";
+  const { setHolding } = await import("./helpers/world.js");
+  setHolding(m.w.address, 10);
+  const seats = async () => (await db.prepare("SELECT * FROM seats ORDER BY id").all()).results;
+  const before = await seats();
+  const me = await m.b.get("/api/me");
+  assert.deepEqual([me.user.wallet, me.level, me.founder.seat.status], [null, "founder", "active"], "the seat stays as recorded (nobody loses a role)");
+  for (const [path, body] of [["/api/coins/design", { name: "Utica Coin", pitch: "The Handshake City, on the map.", pair: "SOL", color: "emerald" }], ["/api/coins/mint", { mint: "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU" }]]) {
+    assert.deepEqual(await err(await m.b.send(path, { method: "POST", body })), [403, "no_wallet"], `${path}: not on the removed wallet's balance`);
+  }
+  assert.deepEqual(await seats(), before);
+  assert.equal(await count("city_coins"), 0, "no coin designed");
+});
+
 test("whatever the wallet joined since the link goes with it: a seat taken since is voided (a public record, no cooldown), an open application withdrawn, a squad place left (an emptied squad disbanded); one from BEFORE the link refuses", async () => {
   const m = await safari();
   const app = await linkInApp(m);

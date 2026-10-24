@@ -36,7 +36,7 @@ import { coinV2BatchOn, coinV2ReadyOn } from "./flags.js";
 import { launchHold, reviewPause } from "./coinreview.js";
 import { buildTx, checkCluster, checkGenesis, checkedRoute, readAccounts, respond } from "./lpkit.js";
 import { liveSeatOfUser } from "./roles.js";
-import { stillFounder } from "./seats.js";
+import { FROZEN_BELOW_AMOUNT, legacySeatsFrozen, stillFounder } from "./seats.js";
 import { iso } from "./policy.js";
 import { keyLimit, publicLimit, walletLimit } from "./guards.js";
 import { displayTicker } from "./tickers.js";
@@ -98,8 +98,13 @@ async function founderOf(env, u, cityId, now, fetchImpl) {
   if (seat.status !== "active" && seat.status !== "steward") {
     return { error: err("not_founder", seat.status === "grace" ? "Your founder seat is in its grace period: hold the founder amount again, then launch." : "Your founder seat is not final yet.", 403) };
   }
+  // the legacy seats frozen (stage S16, review fixes SEC-S16-4 and S16-R1 / SEC-S16-1): the seat's own wallet must be the account's (a seat stays
+  // as recorded after an unlink or a "Remove it"), and a balance below the amount starts no grace period (below_amount). Off: as before
+  const frozen = legacySeatsFrozen(env);
+  if (frozen && u.wallet !== seat.wallet) return { error: err("wallet_mismatch", "Your founder seat is held by another wallet. Sign in with that wallet to launch.", 403) };
   let ok;
   try { ok = await stillFounder(env, seat, now, fetchImpl); } catch (e) { console.error("founder check failed", codeOf(e)); return { error: err("rpc_unavailable", "Your balance could not be checked just now. Try again in a minute.", 503) }; }
+  if (!ok && frozen) return { error: err("below_amount", FROZEN_BELOW_AMOUNT, 403) };
   if (!ok) return { error: err("in_grace", "Your balance is below the founder amount, so your seat went into its grace period. Hold the founder amount again, then launch.", 403) };
   return { seat };
 }

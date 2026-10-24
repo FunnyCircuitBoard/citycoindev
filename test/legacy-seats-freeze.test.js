@@ -4,8 +4,8 @@
 // seats and elections steps, the balance samples stop updating the hold streaks (the samples themselves go on), a founder seat alone no longer
 // moderates, and /api/policy, /api/me and /api/moderator stop describing the seven-day, ladder, steward, squad and election rules as current.
 // The history reads stay and nobody loses a seat or a term. LEGACY_SEATS unset, blank or "on" is today's site exactly; a "frozen" whose own
-// inputs are refused is held frozen (master section 15); a value outside the switch's set is refused by name and is today's site. Every
-// wallet, mint and name below is a clearly fake test fixture.
+// inputs are refused is held frozen (master section 15); a value outside the switch's set is refused by name and held frozen too (review fix
+// SEC-S16-3; test/legacy-seats-review.test.js has the review's other fixes). Every wallet, mint and name below is a clearly fake test fixture.
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import * as W from "./helpers/world.js";
@@ -126,6 +126,7 @@ const writers = (w) => [
   ["admin", "/api/admin/objections/decide", { id: w.objection, uphold: true, note: "test" }],
   ["admin", "/api/admin/elections/create", { country: "CA", seats: 1, closesInDays: 7 }],
   ["admin", "/api/admin/test/seed", {}],
+  ["admin", "/api/admin/test/reset", { confirm: "RESET" }],
 ];
 const HISTORY = (w) => ["/api/seats", "/api/claims", `/api/seats/results/${w.decided}`, `/api/elections/results/${w.pastElection}`];
 const ADMIN_HISTORY = ["/api/admin/seats", "/api/admin/claims", "/api/admin/objections?status=all", "/api/admin/elections"];
@@ -133,7 +134,7 @@ const bodyOf = async (res) => ({ status: res.status, body: await res.text() });
 
 /* ---------------------------------------------------------------- the gate */
 
-test("the gate: frozen only with LEGACY_SEATS=frozen; held frozen when its own inputs are refused; unset, on or a refused value is today's site", () => {
+test("the gate: frozen only with LEGACY_SEATS=frozen; held frozen when its own inputs are refused or the value is outside the set; unset or on is today's site", () => {
   for (const env of [{}, { LEGACY_SEATS: "" }, { LEGACY_SEATS: "  " }, { LEGACY_SEATS: "on" }, { LEGACY_SEATS: " On " }, { LEGACY_SEATS: "on", DEPLOYMENT_ENV: "test" }]) {
     assert.equal(legacySeats(env), "on", JSON.stringify(env));
     assert.equal(legacySeatsFrozen(env), false);
@@ -147,7 +148,7 @@ test("the gate: frozen only with LEGACY_SEATS=frozen; held frozen when its own i
   for (const env of [{}, { LEGACY_SEATS: "on" }, { LEGACY_SEATS: "off", DEPLOYMENT_ENV: "test" }, { LEGACY_SEATS: "  " }]) {
     assert.equal(legacySeats(env), "held", `pages built frozen, ${JSON.stringify(env)}: never reopened by a setting`);
     assert.equal(legacySeatsFrozen(env), true);
-    assert.deepEqual(legacySeatsRefusals(env), ["LEGACY_SEATS_UNSET_PAGES_FROZEN"]);
+    assert.deepEqual(legacySeatsRefusals(env), env.LEGACY_SEATS === "off" ? ["LEGACY_SEATS_VALUE_REFUSED", "LEGACY_SEATS_UNSET_PAGES_FROZEN"] : ["LEGACY_SEATS_UNSET_PAGES_FROZEN"]);
   }
   assert.equal(legacySeats(FROZEN), "frozen");
   assert.equal(legacySeats({ LEGACY_SEATS: " FROZEN ", DEPLOYMENT_ENV: "Preview" }), "frozen", "trimmed, any letter case, as the v5 check reads it");
@@ -167,11 +168,13 @@ test("the gate: frozen only with LEGACY_SEATS=frozen; held frozen when its own i
     assert.equal(legacySeats(env), "frozen", JSON.stringify(bad));
     assert.deepEqual(legacySeatsRefusals(env), [], JSON.stringify(bad));
   }
-  // a value outside the switch's set does not express it: refused by name (FLAG_VALUE_INVALID), and today's site (pages built without the freeze)
+  // a value outside the switch's set: refused by name (FLAG_VALUE_INVALID) and held frozen (review fix SEC-S16-3: a dashboard typo never
+  // reopens the writers; before the fix it read as today's site)
   pagesAsCommitted();
   for (const v of ["off", "true", "freeze", "1", "yes", "frozen!", "frozen,on"]) {
-    assert.equal(legacySeats({ LEGACY_SEATS: v, DEPLOYMENT_ENV: "test" }), "on", v);
-    assert.equal(legacySeats({ LEGACY_SEATS: v }), "on", v);
+    assert.equal(legacySeats({ LEGACY_SEATS: v, DEPLOYMENT_ENV: "test" }), "held", v);
+    assert.equal(legacySeats({ LEGACY_SEATS: v }), "held", v);
+    assert.deepEqual(legacySeatsRefusals({ LEGACY_SEATS: v }), ["LEGACY_SEATS_VALUE_REFUSED"], v);
   }
   // never throws: a setting that cannot be read reads as unset (with the pages built frozen: held)
   assert.equal(legacySeats({ get LEGACY_SEATS() { throw new Error("boom"); } }), "on");
@@ -221,7 +224,8 @@ test("refusals are logged once per isolate by name; with the switch unset, on or
   assert.deepEqual(errors, ["legacy seats switch refused LEGACY_SEATS_PAGES_NOT_BUILT (held frozen)"]);
   _resetPolicyCheck(); errors = [];
   checkPolicyConfig({ LEGACY_SEATS: "freeze", DEPLOYMENT_ENV: "test" });
-  assert.deepEqual(errors, ["policy config refused FLAG_VALUE_INVALID deployment.flags.LEGACY_SEATS"], "a value outside the set: named, and today's site");
+  assert.deepEqual(errors, ["policy config refused FLAG_VALUE_INVALID deployment.flags.LEGACY_SEATS", "legacy seats switch refused LEGACY_SEATS_VALUE_REFUSED (held frozen)"],
+    "a value outside the set: named, and held frozen (review fix SEC-S16-3)");
 });
 
 /* ---------------------------------------------------------------- the writers */
@@ -248,10 +252,10 @@ test("every legacy writer answers 410 seats_frozen before any read or write (not
   assert.deepEqual(await dump(w.db), before, "not one row or table changed");
   // the admin list is exactly the admin writers above
   assert.deepEqual([...ADMIN_LEGACY_WRITERS].sort(), writers(w).filter(([, p]) => p.startsWith("/api/admin/")).map(([, p]) => p.slice("/api/admin/".length)).sort());
-  // other methods keep their 405; the test lab's reset (fake rows only) is not frozen
+  // other methods keep their 405 (the test lab's reset is one of the frozen writers since review fix SEC-S16-5: it deletes seeded seat rows)
   assert.equal((await w.admin.send("/api/admin/seats/decide")).status, 405);
   assert.equal((await w.applicant.send("/api/seats/apply")).status, 405);
-  assert.equal((await w.admin.send("/api/admin/test/reset", { method: "POST", body: { confirm: "RESET" } })).status, 200);
+  assert.equal((await w.admin.send("/api/admin/test/reset")).status, 405);
 
   // the same requests with the switch off are today's: none answers 410 (each its own outcome: done, or its own rule)
   setEnv(w.env, OFF);
@@ -263,11 +267,12 @@ test("every legacy writer answers 410 seats_frozen before any read or write (not
   }
 });
 
-test("held frozen (LEGACY_SEATS=frozen, DEPLOYMENT_ENV missing) still answers 410; a refused value is today's writer; an unrelated error never unfreezes", async () => {
+test("held frozen (LEGACY_SEATS=frozen, DEPLOYMENT_ENV missing, or a value outside the set) still answers 410; unset or on is today's writer; an unrelated error never unfreezes", async () => {
   const w = await world();
   await W.reprove(w.founder);
   for (const [vars, frozen] of [[{ LEGACY_SEATS: "frozen" }, true], [{ LEGACY_SEATS: "Frozen", DEPLOYMENT_ENV: "nowhere" }, true],
-    [{ ...FROZEN, OFFICIAL_X_URL: "nope", MAIN_TOKEN_MINT: "bad" }, true], [{ LEGACY_SEATS: "freeze", DEPLOYMENT_ENV: "test" }, false], [{ LEGACY_SEATS: "off" }, false]]) {
+    [{ ...FROZEN, OFFICIAL_X_URL: "nope", MAIN_TOKEN_MINT: "bad" }, true], [{ LEGACY_SEATS: "freeze", DEPLOYMENT_ENV: "test" }, true], [{ LEGACY_SEATS: "off" }, true],
+    [{ LEGACY_SEATS: "on" }, false], [{}, false]]) {
     setEnv(w.env, { ...OFF, OFFICIAL_X_URL: undefined, MAIN_TOKEN_MINT: undefined, ...vars });
     const r = await W.browser(w.env).send("/api/seats/apply", { method: "POST", body: {} });
     assert.equal(r.status, frozen ? 410 : 401, JSON.stringify(vars));

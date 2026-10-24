@@ -44,12 +44,13 @@ import { seatsFrozen } from "./seats.js";
 
 /**
  * The admin routes that write the legacy seat tables (Citycoin.dev master v5, stage S16; docs/citycoin-master/schema-and-api.md section 3.9): a
- * founder claim's approval or rejection, an objection's decision (an upheld one revokes a seat), opening a country election, and the test lab's
- * seed (fake seats, an objection and an election). While the legacy seats are frozen (src/v5policy.js legacySeats) each answers 410 seats_frozen
- * before the role, the wallet proof or any row is read (src/index.js asks before the schema step too). Their GET lists stay: history. The test
- * lab's reset is not one of them: it removes only the rows the seed recorded in admin_test (the preview site's fake founders), never a real record.
+ * founder claim's approval or rejection, an objection's decision (an upheld one revokes a seat), opening a country election, the test lab's
+ * seed (fake seats, an objection and an election) and its reset (which deletes the seats, the objection and the election the seed recorded in
+ * admin_test, with the seed's fake members and posts: review fix SEC-S16-5 of stage S16, "no writer once frozen" has no exception). While the
+ * legacy seats are frozen (src/v5policy.js legacySeats) each answers 410 seats_frozen before the role, the wallet proof or any row is read
+ * (src/index.js asks before the schema step too). Their GET lists stay: history.
  */
-export const ADMIN_LEGACY_WRITERS = Object.freeze(["seats/decide", "objections/decide", "elections/create", "test/seed"]);
+export const ADMIN_LEGACY_WRITERS = Object.freeze(["seats/decide", "objections/decide", "elections/create", "test/seed", "test/reset"]);
 
 const ROLES = ["moderator", "admin", "owner"];
 const LEVEL = { moderator: 1, admin: 2, owner: 3 };
@@ -854,7 +855,7 @@ export async function handleAdmin(request, env, now = Date.now(), fetchImpl = fe
     case "feedback/update": { const b = only("POST"); return b || run(await needPost("moderator"), (c) => handleInboxUpdate(request, c)); }
     case "feedback/delete": { const b = only("POST"); return b || run(await needPost("admin"), (c) => handleInboxDelete(request, c)); }
     case "test/seed": { const b = only("POST"); return b || seatsFrozen(env) || run(await needPost("owner"), handleTestSeed); }
-    case "test/reset": { const b = only("POST"); return b || run(await needPost("owner"), (c) => handleTestReset(request, c)); }
+    case "test/reset": { const b = only("POST"); return b || seatsFrozen(env) || run(await needPost("owner"), (c) => handleTestReset(request, c)); }
     case "test/preview-role": { const b = only("POST"); return b || run(await needPost("owner"), (c) => handlePreviewRole(request, c)); }
     default: return json({ ok: false, error: "not_found" }, 404);
   }

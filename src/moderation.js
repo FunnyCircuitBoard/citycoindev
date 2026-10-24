@@ -15,7 +15,7 @@ import { access } from "./access.js";
 import { useAttestation } from "./attest.js";
 import { POLICY, HOUR, DAY, iso } from "./policy.js";
 import { adminWallets, canModerate, managerOf, moderatesCity, powersOf } from "./roles.js";
-import { stillFounder } from "./seats.js";
+import { belowAmountFrozen, stillFounder } from "./seats.js";
 import { CITY_NAME_RE } from "./solana.js";
 import { cleanText } from "./text.js";
 import { COLS, FROM, present } from "./social.js";
@@ -33,8 +33,9 @@ async function moderator(request, env, now, fetchImpl) {
   if (a.error) return a;
   const pw = await powersOf(env, a.u, fetchImpl, now);
   // (a founder who moderates nothing, while the legacy seats are frozen, is not asked to hold: each route below answers not_allowed for them)
+  // (frozen: a manager below the amount is refused without a grace period, review fix S16-R1 / SEC-S16-1: below_amount, nothing written)
   if (!pw.admin && pw.founderCity && (pw.managerCountry || moderatesCity(pw)) && !(await stillFounder(env, pw.seat, now, fetchImpl))) {
-    return { error: json({ ok: false, error: "in_grace" }, 403) };
+    return { error: belowAmountFrozen(env) || json({ ok: false, error: "in_grace" }, 403) };
   }
   return { u: a.u, pw };
 }

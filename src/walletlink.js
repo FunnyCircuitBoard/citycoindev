@@ -467,6 +467,9 @@ async function handleCarryStatus(request, env, x) {
  * enough once a wallet is linked), and refuses while the person holds a live founder seat, an open application or a squad
  * place (seat_or_application: resign or withdraw first). Every session of the person loses the wallet and its proof. In the 7 days after
  * a link from another browser, a session that wallet made may not (link_new): the owner's "Remove it" is the way then.
+ * While the legacy seats are frozen (stage S16, review fix SEC-S16-2) those rows are history and no longer block it: resign, withdraw and
+ * leave answer 410 and no window closes, so the old seat state would otherwise decide an account action for the whole freeze (master section
+ * 07 BR-05). The rows stay as recorded, each with its own wallet; a founder coin action then needs that wallet on the account again.
  */
 async function handleUnlink(request, env, x) {
   const s = await getSession(env, request, x.now);
@@ -474,7 +477,7 @@ async function handleUnlink(request, env, x) {
   if (!s.user.wallet) return json({ ok: false, error: "no_wallet" }, 409);
   if (linkLocked(s, x.now)) return lockedAnswer(s.user);
   if (!(s.proven_at && isFresh(s, x.now) && s.wallet === s.user.wallet)) return json({ ok: false, error: "reprove" }, 403);
-  const busy = await env.DB.prepare(`SELECT 1 AS x FROM seats WHERE user_id = ?1 AND status IN ('provisional', 'active', 'grace', 'steward')
+  const busy = legacySeatsFrozen(env) ? null : await env.DB.prepare(`SELECT 1 AS x FROM seats WHERE user_id = ?1 AND status IN ('provisional', 'active', 'grace', 'steward')
       UNION ALL SELECT 1 FROM applications a JOIN windows w ON w.id = a.window_id WHERE a.user_id = ?1 AND a.withdrawn = 0 AND w.status = 'open'
       UNION ALL SELECT 1 FROM squad_members WHERE user_id = ?1 LIMIT 1`).bind(s.user.id).first();
   if (busy) return json({ ok: false, error: "seat_or_application" }, 409);

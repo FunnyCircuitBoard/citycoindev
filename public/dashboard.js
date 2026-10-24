@@ -83,6 +83,9 @@
     no_wallet: "Link a wallet first.",
     wallet_required: "Link a wallet first.",
     in_grace: "Your founder seat is in grace: hold the founder amount again to use moderation.",
+    // (the two below come only while the legacy seats are frozen, stage S16 review fixes S16-R1 and SEC-S16-4)
+    below_amount: "Your balance is below your founder seat's amount, so this was not done. Nothing was changed.",
+    wallet_mismatch: "Your founder seat is held by another wallet. Link that wallet to your account to do this.",
     not_allowed: "Only the right moderator can do that.",
     needs_second_moderator: "That needs a second moderator: you can't confirm your own action.",
     needs_manager: "A confirmed hide can only be undone by the Country Manager or an admin.",
@@ -1975,9 +1978,10 @@
     // the 7 days after a wallet joined from another app, in a browser logged in before: that wallet's own proof is not the way (on a
     // phone it lives in the wallet app, whose sessions may not unlink then): "Remove it" is, and it logs that app out too
     if (me.walletNew && me.walletNew.notMe) { closeProfile(); return removeWallet(); }
-    if (!confirm(seatsFrozen() ? "Unlink this wallet? Your rank and badges go with it until you link one again." : "Unlink this wallet? Your rank, badges and founder eligibility go with it until you link one again.")) return;
+    // (frozen: a seat on record no longer blocks the unlink, stage S16 review fix SEC-S16-2; its coin tools need its own wallet linked again)
+    if (!confirm(seatsFrozen() ? `Unlink this wallet? Your rank and badges go with it until you link one again${me.founder && me.founder.seat ? ", and your founder seat's coin tools until you link this same wallet again" : ""}.` : "Unlink this wallet? Your rank, badges and founder eligibility go with it until you link one again.")) return;
     const r = await sensitive(() => api("/api/me/wallet/unlink", {}));
-    if (!r || !r.ok) return toast(r && r.error === "seat_or_application" ? (seatsFrozen() ? "A founder seat, an application or a squad place is on record for this wallet, so it stays linked." : "Resign or withdraw first.") : errText({ reprove: "Please confirm it's you with your wallet first." }, r || {}, "Couldn't unlink. Try again."));
+    if (!r || !r.ok) return toast(r && r.error === "seat_or_application" ? "Resign or withdraw first." : errText({ reprove: "Please confirm it's you with your wallet first." }, r || {}, "Couldn't unlink. Try again."));
     toast("Wallet unlinked"); linkedNow = false;
     try { localStorage.removeItem(WCARD_SKIP); } catch {}
     await refresh(); openProfile();
