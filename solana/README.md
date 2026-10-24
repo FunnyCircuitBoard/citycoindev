@@ -16,8 +16,9 @@ specification, `LAUNCHPAD-AUDIT.md` its build and test record and
 `vicinity_rewards`, which the launchpad work did not change.
 
 **A third program, not deployed:** `citycoin_curve` (`programs/citycoin-curve`,
-with its integer math crate `crates/citycoin-curve-math`), a fully custom
-launchpad without Meteora: one coin per city with its own bonding curve, its
+with its integer math crate `crates/citycoin-curve-math`; named `vicinity_curve`
+until it was renamed for Citycoin.dev on 24 October 2026, before its audit
+build), a fully custom launchpad without Meteora: one coin per city with its own bonding curve, its
 own pool after graduation, fee buckets, payouts, buyback-and-burn and a daily
 batch launch approval. `CITYCOIN-CURVE-DESIGN.md` is its specification,
 `CITYCOIN-CURVE-NOTES.md` its implementation notes, `CITYCOIN-CURVE-DEVNET.md`

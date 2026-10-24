@@ -35,6 +35,15 @@ and keys, every invariant of section 9 and where it is checked, the review histo
 10, the known limitations, the open owner decisions, the rehearsal D01
 (`CITYCOIN-CURVE-DEVNET.md`) and the questions for the auditor.
 
+**Renamed on 24 October 2026.** The product Vicinity is now Citycoin.dev, and this program, which
+had never been deployed on mainnet, took its Citycoin names before the audit build: `citycoin_curve`
+(crate `citycoin-curve`), the math crate `citycoin-curve-math`, the leaf tag `citycoin_curve/launch_leaf`
+(3.2, 3.12) and the metadata prefix `https://citycoin.dev/coin-meta/v1/` (3.2, 3.10). No fee value,
+fee-share rule, account, instruction, check, PDA seed or program id changed; every binary hash did
+(`CITYCOIN-CURVE-AUDIT.md` 2.3). The deployed `vicinity_rewards` and `vicinity_launchpad`, $VICINITY and
+every reference to them keep their names. Appendix C, the notes' entries 1 to 106 and the D01 record
+predate the rename and keep the names of their day (NOTES 107).
+
 This file merges two independent designs, `vcurve-design/A.md` (security-first minimalism)
 and `vcurve-design/B.md` (economics and integration). Where they differed, the safer choice
 was taken; section 0.2 lists every such decision and its reason. Every number in sections 5
@@ -524,7 +533,8 @@ number), `opted_in_at` i64 (136), `bump` u8 (144).
   JSON write-once, and the JSON's `image` URL contains the image's SHA-256, served write-once
   too, so a compromised website can be detected by anyone who compares hashes (it cannot be
   prevented, T37). The prefix is `https://citycoin.dev/coin-meta/v1/` (3.2; until 24 October
-  2026 the draft used `https://vicinity.city/coin-meta/`, never on chain for this program), so
+  2026 the draft used `https://vicinity.city/coin-meta/`, which no coin of this program carries on
+  any public cluster), so
   citycoin.dev must serve `/coin-meta/v1/<mint>.json` before this program's first coin launches
   (a website step, 8.4 and 14.1).
 * **Ordinary transfers** of the coin never touch `citycoin_curve`, carry no Citycoin.dev fee and
@@ -3672,9 +3682,10 @@ Target: at most 450 KB (today's `vicinity_launchpad` is 433,960 bytes with Meteo
 interfaces). The Metaplex wrapper of anchor-spl adds code; `no-idl` removes Anchor's six IDL
 handlers; measure (C03). Measured: 605,664 bytes for the production build of revision 3 after
 review round 5, 728,256 bytes with the batch launch approval (devnet 728,256, halt-all 727,032)
-and 738,064 since review round 6 made its three settings events event CPIs (devnet 738,064, halt-all
-736,840; about 0.05 SOL more rent; `npm run vcurve:sbf`; cargo-build-sbf 4.4.0, platform-tools v1.57;
-NOTES 20, 76 and 82), above
+738,064 from review round 6, which made its three settings events event CPIs (devnet 738,064, halt-all
+736,840; about 0.05 SOL more rent; NOTES 20, 76 and 82), and 738,072 since the rename of 24 October 2026
+(devnet 738,072, halt-all 736,848; the longer metadata prefix and the new names; NOTES 107; `npm run
+vcurve:sbf`; cargo-build-sbf 4.4.0, platform-tools v1.57), above
 the target, which costs rent (about 0.62 SOL more for the program data account and as much for each
 buffer), not
 behaviour; no build prints a stack warning (C04). The program data account rent at 5,080 lamports per byte is about
@@ -4725,6 +4736,13 @@ buybacks, 11,973 payouts, 300 graduations, never a non-completing buy with dust)
 
 ## Appendix C. Review responses (revision 1 to revision 2; revision 3)
 
+*Note of 24 October 2026: every review round below, and the review of the audit pack, saw the program
+under its earlier name `vicinity_curve` (crate `vicinity-curve`, math crate `vicinity-curve-math`, leaf tag
+`vicinity_curve/launch_leaf`, metadata prefix `https://vicinity.city/coin-meta/`), and the binary hashes
+they cite (`0a5beef2...` among them) are of those builds. Their text is kept as it was; only the links to
+this file and its companions follow the new file names. The rename itself is the last subsection of this
+appendix.*
+
 Each finding was checked against the code and the math before it was applied. "Applied" means
 the fix is in this file as the reviewer proposed or in an equivalent form; where a part was not
 applied, the reason is given.
@@ -5145,3 +5163,19 @@ monitor process (paging, the site's database) and the website's batch page (14.1
 rehearsal ran on 23 October 2026 on a local validator that copied devnet's programs and accounts,
 not on devnet itself, and without the site's list or the monitor process (12.5;
 `CITYCOIN-CURVE-DEVNET.md`, whose record is in `rehearsals/vicinity-curve-d01/`).
+
+### Revision 3: the rename to `citycoin_curve` (24 October 2026)
+
+Not a review finding: the owner's change order (the product is now Citycoin.dev; "update on-chain
+everything to citycoin") applied before the audit build, as master v5 and the rebrand inventory (row P15)
+require for this not-yet-deployed program. NOTES 107 has the details.
+
+| item | changed in |
+|---|---|
+| the program, its crates, IDL, SDK, tests, scripts and documents named `citycoin_curve` / `citycoin-curve` / `citycoin-curve-math`; product text Citycoin.dev | the whole file; 3.1, 5.16, 14.3 |
+| `LAUNCH_LEAF_TAG` = `citycoin_curve/launch_leaf` (26 bytes; version 1); the worked example's leaves, node and root regenerated | 3.2, 3.12 |
+| `METADATA_URI_PREFIX` = `https://citycoin.dev/coin-meta/v1/` (URI at most 83 bytes); citycoin.dev serves `/coin-meta/v1/` before the first coin launches | 3.2, 3.10, 8.4, 14.1 |
+| binary sizes and hashes | 11.4; `CITYCOIN-CURVE-AUDIT.md` 2.3 |
+
+No fee value, fee-share rule, account layout, instruction, check, PDA seed or program id changed; the
+deployed programs and every reference to them keep their names.

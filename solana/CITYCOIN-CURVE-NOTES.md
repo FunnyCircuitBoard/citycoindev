@@ -8,7 +8,7 @@ specification of the owner's batch launch approval, entry 76 its build and entry
 tests of its rules; entries 78 to 82 answer review round 6, of the batch launch approval,
 entries 83 to 90 review round 7, entries 91 to 96 review round 8, entries 97 and 98 the
 verification of round 8, entries 99 to 102 review round 9, entry 103 its verification, entries 104 and 105
-review round 10 and entry 106 the review of the audit pack). The
+review round 10, entry 106 the review of the audit pack and entry 107 the rename to `citycoin_curve`). The
 specification is authoritative. Each entry below records one place where the build had to clarify the
 specification, or deviates from it, with the section, the issue and the choice taken. Where
 the specification was ambiguous, the safer reading was built. Nothing here changes an
@@ -16,6 +16,18 @@ economic figure: every worked example of 5.14 and every figure of 5.9, 5.10 and 
 reproduced to the lamport and raw unit by the tests.
 
 Stage 1 (this file's first entries): the math crate `crates/citycoin-curve-math`.
+
+**Names changed after entries 1 to 106 (note of 24 October 2026).** Entries 1 to 106 were written while the
+program was called `vicinity_curve`, and they keep the names, paths, commands and measurements of their day:
+read `vicinity_curve` as `citycoin_curve`, `vicinity-curve` (crate and `programs/` directory) as
+`citycoin-curve`, `vicinity-curve-math` / `vicinity_curve_math` as `citycoin-curve-math` /
+`citycoin_curve_math`, `sdk/idl/vicinity_curve.json` as `sdk/idl/citycoin_curve.json`,
+`$VICINITY_BATCH_ARCHIVE` and `~/.vicinity-curve/` as `$CITYCOIN_BATCH_ARCHIVE` and `~/.citycoin-curve/`, and
+`VICINITY-CURVE-*.md` as `CITYCOIN-CURVE-*.md` (links in this file already point at the new file names).
+The leaf tag `vicinity_curve/launch_leaf` and the metadata prefix `https://vicinity.city/coin-meta/` they
+mention are now `citycoin_curve/launch_leaf` and `https://citycoin.dev/coin-meta/v1/`. Every binary hash,
+size and compute figure they record was measured on the builds before the rename and is superseded; the
+current hashes are in `CITYCOIN-CURVE-AUDIT.md` 2.3. Entry 107 records the rename.
 
 ---
 
@@ -3481,3 +3493,46 @@ multisig with `FEE_RECIPIENT` among its members and no time lock, no `Launchpad`
 `FEE_RECIPIENT_IS_VAULT_MEMBER` and the time-lock warning; the same with the `Launchpad`; a multisig without
 `FEE_RECIPIENT` passes; `FEE_RECIPIENT` in the guardian's multisig (set, or proposed before the `Launchpad` exists) and in
 an approver multisig is refused; a guardian multisig named while no guardian is set or proposed is not read.
+
+### 107. The rename to `citycoin_curve`: names, the leaf tag and the metadata prefix (1.4, 3.1, 3.2, 3.10, 3.12, 8.4, 11.4, 14.1; the owner's change order of 24 October 2026)
+
+**Spec.** The owner renamed the product Vicinity to Citycoin.dev and asked to "update on-chain everything
+to citycoin"; master v5 (rebrand inventory row P15) asks that this not-yet-deployed program take its
+Citycoin product names and citycoin.dev permanent metadata before the audit build, while the deployed
+programs, their ids, PDA seeds, mints and history keep theirs.
+
+**Choice.** Renamed where the name is this program's own: the crate `citycoin-curve` (lib and `#[program]`
+module `citycoin_curve`, `programs/citycoin-curve`), the math crate `citycoin-curve-math`, the IDL
+`sdk/idl/citycoin_curve.json` (its discriminators do not depend on the program name: instructions are
+`sha256("global:<name>")`, accounts `sha256("account:<Name>")`, events `sha256("event:<Name>")`, so the IDL's
+only changes are its `metadata.name`, its description, doc text and the two constants below), Anchor.toml,
+the workspace, the CI job's `-p` flags, the batch tool's archive (`$CITYCOIN_BATCH_ARCHIVE`,
+`~/.citycoin-curve/`) and the documents (`CITYCOIN-CURVE-*.md`); product text "Vicinity" became
+"Citycoin.dev". Two on-chain strings changed: `LAUNCH_LEAF_TAG` is `citycoin_curve/launch_leaf` (26 bytes like
+the old tag; `LAUNCH_LEAF_VERSION` stays 1 because the leaf layout did not change), and `METADATA_URI_PREFIX` is
+`https://citycoin.dev/coin-meta/v1/` (34 bytes; a URI is at most 34 + 44 + 5 = 83 bytes, under Metaplex's
+200; `metadata_uri` sizes its `String` from the prefix, so no buffer is fixed; the Metaplex metadata account
+is 607 bytes in litesvm with either prefix, measured by launching a coin on the old and on the new production
+build against the pinned Metaplex dump, so a launch costs the same rent). The `v1/` segment
+versions the metadata layout: a later layout takes a new path rather than a rewrite of URIs that are
+immutable once written. citycoin.dev must serve `/coin-meta/v1/<mint>.json` before the first coin of this
+program launches (8.4; a website step, not built). The test-only router's address seed is now
+`citycoin curve test router`.
+
+Unchanged on purpose: `declare_id!` and the throwaway id `nhgCm...`, every PDA seed (none contains
+"vicinity"), every account and event layout, the compiled ids of `vicinity_rewards` and the old
+`vicinity_launchpad` and every reference to them (names, ids, the `Registry` discriminator, the error texts
+that name them), `$VICINITY`, the branch `feat/vicinity-curve`, the short directory names `scripts/vcurve`,
+`tests-vcurve` and `target/vcurve-builds` and the `VCURVE_*` switches (no "vicinity" in them), and the
+record of rehearsal D01 (`rehearsals/vicinity-curve-d01/`, kept as it ran, with a dated note).
+
+Regenerated from the code, never by hand: the IDL (`npm run vcurve:idl`), the launch-batch fixture
+(`node sdk/curve/gen-launch-batch-fixture.mjs`), the golden vectors (`python3 generate_vectors.py` and
+`G01_WRITE=1`, whose only change is the file name in their `about` lines). The worked example of 3.12, pinned
+in `sdk/curve/batch.test.mjs` and the Rust unit test U13, takes the generator's new leaves, node and root,
+recomputed independently with Python's SHA-256; with the new values `L1 < L0` and `N01 < L2`.
+
+Every binary changed: production 738,072 bytes (8 more than 738,064), devnet 738,072, halt-all 736,848; the
+hashes before and after are in `CITYCOIN-CURVE-AUDIT.md` 2.3, with the gate run in its Appendix B. No fee
+value, fee-share rule, account, instruction or check changed; the review rounds and D01 measured the build
+before the rename.

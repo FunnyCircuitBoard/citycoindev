@@ -9,6 +9,17 @@ rule changed and the program binary did not change (the production build is stil
 on 24 October 2026 after a review of this record and of the audit pack (`CITYCOIN-CURVE-AUDIT.md`
 section 8 lists its items).
 
+**Names changed after this record (note of 24 October 2026).** D01 rehearsed the program while it was
+called `vicinity_curve`; on 24 October 2026, after this record, it was renamed `citycoin_curve` for
+Citycoin.dev (crate `citycoin-curve`, math crate `citycoin-curve-math`, IDL `sdk/idl/citycoin_curve.json`,
+this file `CITYCOIN-CURVE-DEVNET.md`), its leaf tag became `citycoin_curve/launch_leaf` and its metadata
+prefix `https://citycoin.dev/coin-meta/v1/` (`CITYCOIN-CURVE-NOTES.md` entry 107). This record is kept as it
+ran: its names, paths, leaves, roots, URIs and hashes are those of the build it measured (production
+`0a5beef2...`, `devnet` `d052b8fc...`), which the rename superseded; the renamed builds' hashes are in
+`CITYCOIN-CURVE-AUDIT.md` 2.3. The batch roots and leaves of section 6.3 and the coins' metadata URIs below
+cannot be reproduced with the renamed program, whose leaves and URIs differ. Section 10 says what a re-run
+needs. The record directory keeps its name, `rehearsals/vicinity-curve-d01/`.
+
 **What this record is.** Every signature, slot and account below belongs to a local validator, not
 to devnet: none can be looked up on any public cluster, and that validator's ledger, pruned during
 the run, was not kept. What is kept is in `rehearsals/vicinity-curve-d01/` (section 12): the
@@ -551,6 +562,13 @@ No program defect and no tool defect was found. What differed, and why:
    its paths point at the session's scratchpad and must be set first) checks the devnet genesis hash
    before every send. The batch launch then needs the same 12 hours and 10 minutes. Signatures on
    devnet itself are what would let anyone check this record's figures.
+4. **Since the rename of 24 October 2026** (note at the top): a re-run deploys the renamed `devnet` build,
+   `target/vcurve-builds/devnet/citycoin_curve.so` from `npm run vcurve:sbf` (738,072 bytes, sha256
+   `03361f06087dca3d3bcb97d004628b67b38fa14420f25f71dc7803707ef76b61` with the toolchain of
+   `CITYCOIN-CURVE-AUDIT.md` 2.1), not the `vicinity_curve.so` (`d052b8fc...`) measured here; the driver's
+   paths, the IDL file name and its expected read-back hash must be updated with it, and its batch lists
+   rebuilt with the SDK, because every leaf and root changes with the new leaf tag. Such a run would be a new
+   rehearsal with its own record, not a correction of this one.
 
 ## 12. The record kept in the repository
 
