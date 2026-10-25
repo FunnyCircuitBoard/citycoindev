@@ -28,10 +28,14 @@ export const SOCIAL_PROFILES = [
 ];
 
 export const OFFICIAL = {
-  updated: "2026-09-27", // vicinity.city is the main address; vicinitycity.net forwards to it
+  updated: "2026-10-25", // vicinity.city is the main address; citycoin.dev serves the same site (stage S06); vicinitycity.net forwards to vicinity.city
   // Only addresses we control for sure. (The two workers.dev addresses were listed before: a workers.dev name can be
   // claimed by anyone once it is released, so a name on this list that is not ours would vouch for a fake site.)
-  websites: ["vicinity.city", "vicinitycity.com", "vicinitycity.net"],
+  // citycoin.dev: the owner's own zone on the site's Cloudflare account, attached to this Worker by stage S06 (wrangler.jsonc routes) in the
+  // same change that lists it here, so the "Check a link" box on the site says the new address is ours (S06 review, finding R1). Like every
+  // name here, its www. form is checked as the name itself (the zone is the owner's; www.citycoin.dev is not attached, docs/citycoin-master/
+  // domain-cutover.md section 2). The old names leave this list before the owner puts them to their other use (section 0, item 6).
+  websites: ["vicinity.city", "citycoin.dev", "vicinitycity.com", "vicinitycity.net"],
   github: [],             // code is private
   socials: [...new Set(SOCIAL_PROFILES.map((p) => p.handle))], // the official accounts' @handles (see SOCIAL_PROFILES)
   tokenContract: VICINITY_MINT,

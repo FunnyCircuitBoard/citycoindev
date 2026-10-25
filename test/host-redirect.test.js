@@ -96,6 +96,9 @@ const mask = (t) => String(t).replace(/[A-Za-z0-9_-]{20,}/g, (m) => (m === MINT 
 /** Routes whose answer names the request's own host today (the wallet challenge's text, the Google return address: stage S04 moves them
  *  to configuration). Their served answer is compared with the same request, not with the same path on vicinity.city. */
 const HOST_NAMED = new Set(["/api/message", "/api/auth/google/start"]);
+/** While the host binding counts (stage S06 as committed), the answers that name the host they are served as: HOST_NAMED, and the pairing
+ *  link of POST /api/pair (built on the allowlist entry's origin, src/hostbind.js). */
+const OWN_HOST_NAMED = new Set([...HOST_NAMED, "/api/pair"]);
 /** The switch-off request whose answer a served request must equal: the same request on the canonical host (and on a host whose answer
  *  names it), else the same path on vicinity.city, which the switch-off Worker serves in place (it 301s the old names). */
 const reference = (url, path) => {
@@ -197,7 +200,8 @@ const UNSET_CONFIGS = [
 test("switch unset: every host, scheme, method and path class answers as today (301 from the old names and from http, the same answer elsewhere)", async () => {
   assert.equal(VARS.HOST_REDIRECT, undefined);
   for (const [label, extra, refused] of UNSET_CONFIGS) {
-    const env = world(extra), ref = world(extra);
+    const env = world(extra), ref = world(extra), vic = world(extra);
+    const committed = label.startsWith("as committed");
     assert.equal(hostBound(siteConfig(env)), label.startsWith("as committed"), `${label}: the binding counts only with the committed site settings`);
     for (const host of [...ACCEPTED_HOSTS, ...UNKNOWN_HOSTS, "VICINITY.CITY", "localhost"]) {
       for (const proto of ["https", "http"]) {
@@ -216,6 +220,12 @@ test("switch unset: every host, scheme, method and path class answers as today (
               // served in place: no answer of the entry (a redirect or a refusal), the route's own answer, as a second world gives it
               assert.ok(got.status !== 308 && got.status !== 421 && !(got.status === 301 && got.body === null), at);
               assert.deepEqual(got, await call(ref, url, method), at);
+              // as committed, citycoin.dev serves the same site as vicinity.city: every answer served in place there equals the same request on
+              // vicinity.city (in a third world given the same requests in the same order: citycoin.dev's come first), except the routes whose
+              // answer names the host it is served as (OWN_HOST_NAMED: the wallet challenge's text, the Google return address, the pairing
+              // link; domain-cutover.md section 1.2). S06 review, R8.
+              if (committed && host === "citycoin.dev" && proto === "https" && !OWN_HOST_NAMED.has(new URL(url).pathname))
+                assert.deepEqual(got, await call(vic, `https://vicinity.city${path}`, method), `${at}: the same answer as vicinity.city's`);
             }
           }
         }

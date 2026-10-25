@@ -49,7 +49,7 @@ import { PASSWORD_MAX, checkPassword, hashPassword, verifyPassword } from "./pas
 import { HOUR, iso } from "./policy.js";
 import { asText, endSignup } from "./signup-core.js";
 import { ensureHostSchema, ensureLimitsSchema, ensureOnboardSchema } from "./store.js";
-import { hostWrite, servedHost } from "./hostbind.js";
+import { hostWrite, mailOrigin, servedHost } from "./hostbind.js";
 import { linkLocked, lockedAnswer } from "./walletlink.js";
 import { dropLoginsStatement } from "./logins.js";
 
@@ -174,7 +174,7 @@ export async function handleResetStart(request, env, x) {
   const user = await env.DB.prepare("SELECT id FROM users WHERE provider = 'email' AND provider_id = ?").bind(email).first();
   const pending = [];
   const waitUntil = (p) => (ctx && ctx.waitUntil ? ctx.waitUntil(p) : pending.push(p)); // ctx.waitUntil must be called on ctx
-  const sent = await sendEmailCode(env, email, { fetchImpl, now, kind: "reset", codeKey: resetKey(email), waitUntil, noSend: !user });
+  const sent = await sendEmailCode(env, email, { fetchImpl, now, kind: "reset", codeKey: resetKey(email), waitUntil, noSend: !user, origin: mailOrigin(servedHost(env, request)) });
   await Promise.all(pending); // only without a ctx (tests): so the mail has really gone when we answer
   if (!sent.ok) return json({ ok: false, error: sent.error }, sent.status);
   return json({ ok: true });

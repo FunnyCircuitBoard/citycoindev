@@ -9,3 +9,10 @@
 
 /fonts/*
   Cache-Control: public, max-age=31536000, immutable
+
+# citycoin.dev serves the same pages as vicinity.city while vicinity.city stays the canonical site (stage S06, until stage S55): search
+# engines are asked not to index this second copy. A host-qualified rule: the static-assets engine matches it against https://<host><path>
+# (absolute URLs are allowed in _headers), so it applies on citycoin.dev only; vicinity.city's pages are unchanged. Stage S55, which makes
+# citycoin.dev canonical, removes this rule (docs/citycoin-master/domain-cutover.md section 4, "Before step 4").
+https://citycoin.dev/*
+  X-Robots-Tag: noindex

@@ -146,10 +146,10 @@ export async function dropLoginsStatement(db, userId) {
  * linkNotice). The address is read before the answer; only the sending runs after it (ctx.waitUntil; without a ctx, in tests, it is
  * awaited). A failed mail is logged without the address and never undoes the add.
  */
-export async function googleNotice(env, u, ctx = null, fetchImpl = fetch) {
+export async function googleNotice(env, u, ctx = null, fetchImpl = fetch, origin = undefined) {
   const to = u && (u.provider === "email" ? u.provider_id : u.contact_email);
   if (!to || !emailConfigured(env)) return;
-  const p = sendMail(env, { to, ...googleAddedEmail() }, { fetchImpl })
+  const p = sendMail(env, { to, ...googleAddedEmail(origin) }, { fetchImpl }) // origin: the host Google was added on (src/hostbind.js mailOrigin)
     .then((r) => { if (!r.ok) console.error("google sign-in notice not sent", r.error); })
     .catch((e) => console.error("google sign-in notice failed", String((e && e.message) || e).slice(0, 80)));
   if (ctx && ctx.waitUntil) ctx.waitUntil(p); else await p;

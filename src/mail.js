@@ -147,11 +147,33 @@ const KINDS = {
   reset: { name: "password reset code", Name: "Your password reset code", finish: "set a new password" },
 };
 
-/** The verification-code e-mail, branded like the site. Returns { subject, text, html }. The subject is the same for every kind. */
-export function verificationEmail(code, kind = "signin") {
+/** The origin the e-mails name when no other is given: today's site, the address every mail has always named. */
+export const MAIL_ORIGIN = "https://vicinity.city";
+/**
+ * The site an e-mail names: { origin, host, eo, eh } (eo and eh HTML-escaped). `origin` is the origin the request was served as
+ * (src/hostbind.js mailOrigin: an allowlist entry while the host binding counts, else MAIL_ORIGIN), so a sign-up or session made on
+ * citycoin.dev, which is found only there, gets links to citycoin.dev (stage S06 review, finding R3). Anything that is not exactly an
+ * http(s) origin with a plain host name (or address) and optional port falls back to MAIL_ORIGIN; with MAIL_ORIGIN every e-mail is byte for
+ * byte what it was.
+ */
+function mailSite(origin) {
+  let u = null;
+  try { u = typeof origin === "string" ? new URL(origin) : null; } catch { u = null; }
+  const ok = u && (u.protocol === "https:" || u.protocol === "http:") && u.origin === origin && /^(\[[0-9a-f:.]+\]|[a-z0-9.-]+)(:\d+)?$/.test(u.host);
+  const site = ok ? { origin: u.origin, host: u.host } : { origin: MAIL_ORIGIN, host: new URL(MAIL_ORIGIN).host };
+  const esc = (t) => String(t).replace(/[<>&"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[c]));
+  return { ...site, eo: esc(site.origin), eh: esc(site.host) };
+}
+
+/**
+ * The verification-code e-mail, branded like the site. Returns { subject, text, html }. The subject is the same for every kind.
+ * `origin`: the site the code is to be entered on (mailSite above); left out, today's https://vicinity.city.
+ */
+export function verificationEmail(code, kind = "signin", origin = MAIL_ORIGIN) {
   const k = KINDS[kind] || KINDS.signin;
+  const site = mailSite(origin);
   const subject = `${code} is your Vicinity code`;
-  const text = `Your Vicinity ${k.name} is ${code}.\n\nEnter it at https://vicinity.city/connect — it expires in 10 minutes.\nIf you didn't ask for this, just ignore this email.\n\n— Vicinity · One city. One coin. One community.`;
+  const text = `Your Vicinity ${k.name} is ${code}.\n\nEnter it at ${site.origin}/connect — it expires in 10 minutes.\nIf you didn't ask for this, just ignore this email.\n\n— Vicinity · One city. One coin. One community.`;
   const esc = String(code).replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]));
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background-color:#060C17;">
@@ -172,13 +194,13 @@ export function verificationEmail(code, kind = "signin") {
 </td></tr></table>
 </td></tr>
 <tr><td align="center" style="padding:14px 48px 4px;">
-<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.7;color:#8A97AD;">Enter this code on vicinity.city to ${k.finish}.<br>It expires in <b style="color:#E8EDF5;">10 minutes</b>.</div>
+<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.7;color:#8A97AD;">Enter this code on ${site.eh} to ${k.finish}.<br>It expires in <b style="color:#E8EDF5;">10 minutes</b>.</div>
 </td></tr>
 <tr><td align="center" style="padding:18px 32px 36px;">
-<a href="https://vicinity.city/connect" style="display:inline-block;background-color:#FF5A36;color:#FFFFFF;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:700;text-decoration:none;padding:13px 40px;border-radius:999px;">Enter code</a>
+<a href="${site.eo}/connect" style="display:inline-block;background-color:#FF5A36;color:#FFFFFF;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:700;text-decoration:none;padding:13px 40px;border-radius:999px;">Enter code</a>
 </td></tr>
 <tr><td align="center" style="padding:0 48px 32px;">
-<div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.8;color:#5A6B87;">If you didn't request this code, you can safely ignore this email.<br>&copy; 2026 Vicinity &middot; <a href="https://vicinity.city" style="color:#5B8CFF;text-decoration:none;">vicinity.city</a></div>
+<div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.8;color:#5A6B87;">If you didn't request this code, you can safely ignore this email.<br>&copy; 2026 Vicinity &middot; <a href="${site.eo}" style="color:#5B8CFF;text-decoration:none;">${site.eh}</a></div>
 </td></tr>
 </table>
 </td></tr></table>
@@ -195,13 +217,14 @@ const APP_NAMES = { phantom: "Phantom", solflare: "Solflare", backpack: "Backpac
  * "A wallet was connected to your Vicinity account": sent when a wallet joins an account from ANOTHER browser (a wallet app's own
  * browser, or a pairing), so the owner can say "that wasn't me" within 7 days (src/walletlink.js handleDisown). It holds only the wallet
  * masked ("Abcd…wxyz"), the app it was connected in (a name from the list above, else "A wallet app") and the dashboard link. Returns
- * { subject, text, html }, branded like the code e-mail.
+ * { subject, text, html }, branded like the code e-mail. `origin`: the site the dashboard link opens (as verificationEmail's).
  */
-export function walletLinkedEmail(masked, app) {
+export function walletLinkedEmail(masked, app, origin = MAIL_ORIGIN) {
   const who = APP_NAMES[app] || null;
+  const site = mailSite(origin);
   const subject = "A wallet was connected to your Vicinity account";
   const what = who ? `${who} (wallet ${masked}) was connected to your Vicinity account.` : `The wallet ${masked} was connected to your Vicinity account.`;
-  const text = `${what} If that was you, there's nothing to do.\n\nIf it wasn't you, open your dashboard on https://vicinity.city/dashboard within 7 days and tap “Remove it”.\n\n— Vicinity · One city. One coin. One community.`;
+  const text = `${what} If that was you, there's nothing to do.\n\nIf it wasn't you, open your dashboard on ${site.origin}/dashboard within 7 days and tap “Remove it”.\n\n— Vicinity · One city. One coin. One community.`;
   const esc = (s) => String(s).replace(/[<>&"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[c]));
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background-color:#060C17;">
@@ -218,7 +241,7 @@ export function walletLinkedEmail(masked, app) {
 <div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.7;color:#8A97AD;">If that was you, there's nothing to do.<br>If it wasn't you, open your dashboard within <b style="color:#E8EDF5;">7 days</b> and tap “Remove it”.</div>
 </td></tr>
 <tr><td align="center" style="padding:18px 32px 36px;">
-<a href="https://vicinity.city/dashboard" style="display:inline-block;background-color:#FF5A36;color:#FFFFFF;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:700;text-decoration:none;padding:13px 40px;border-radius:999px;">Open my dashboard</a>
+<a href="${site.eo}/dashboard" style="display:inline-block;background-color:#FF5A36;color:#FFFFFF;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:700;text-decoration:none;padding:13px 40px;border-radius:999px;">Open my dashboard</a>
 </td></tr>
 </table>
 </td></tr></table>
@@ -230,12 +253,14 @@ export function walletLinkedEmail(masked, app) {
  * "Google sign-in was added to your Vicinity account": sent when a member adds Google as a way to log in (src/logins.js googleNotice), so
  * an owner who did not add it hears of it the same day. It names no Google account (we keep only Google's account number, and never put
  * it in a mail) and says the two ways to take it off: Remove in the Profile, or a new password ("Forgot or never set a password?"), which
- * also logs out every browser. Returns { subject, text, html }, branded like the code e-mail.
+ * also logs out every browser. Returns { subject, text, html }, branded like the code e-mail. `origin`: the site its links open (as
+ * verificationEmail's).
  */
-export function googleAddedEmail() {
+export function googleAddedEmail(origin = MAIL_ORIGIN) {
+  const site = mailSite(origin);
   const subject = "Google sign-in was added to your Vicinity account";
   const what = "Google sign-in was added to your Vicinity account: from now on, “Log in with Google” with that Google account opens it.";
-  const fix = "If it wasn't you, set a new password: on https://vicinity.city/connect tap Log in, then “Forgot or never set a password?”. That logs out every browser and removes this Google sign-in. Or open your dashboard, Profile, Google sign-in, and tap “Remove”.";
+  const fix = `If it wasn't you, set a new password: on ${site.origin}/connect tap Log in, then “Forgot or never set a password?”. That logs out every browser and removes this Google sign-in. Or open your dashboard, Profile, Google sign-in, and tap “Remove”.`;
   const text = `${what} If that was you, there's nothing to do.\n\n${fix}\n\n— Vicinity · One city. One coin. One community.`;
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background-color:#060C17;">
@@ -249,10 +274,10 @@ export function googleAddedEmail() {
 <div style="font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.6;color:#E8EDF5;">${what}</div>
 </td></tr>
 <tr><td align="center" style="padding:10px 48px 4px;">
-<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.7;color:#8A97AD;">If that was you, there's nothing to do.<br>If it wasn't you, set a new password: on vicinity.city tap Log in, then “Forgot or never set a password?”. That logs out every browser and removes this Google sign-in.</div>
+<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.7;color:#8A97AD;">If that was you, there's nothing to do.<br>If it wasn't you, set a new password: on ${site.eh} tap Log in, then “Forgot or never set a password?”. That logs out every browser and removes this Google sign-in.</div>
 </td></tr>
 <tr><td align="center" style="padding:18px 32px 36px;">
-<a href="https://vicinity.city/connect?mode=login" style="display:inline-block;background-color:#FF5A36;color:#FFFFFF;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:700;text-decoration:none;padding:13px 40px;border-radius:999px;">Open Vicinity</a>
+<a href="${site.eo}/connect?mode=login" style="display:inline-block;background-color:#FF5A36;color:#FFFFFF;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:700;text-decoration:none;padding:13px 40px;border-radius:999px;">Open Vicinity</a>
 </td></tr>
 </table>
 </td></tr></table>
