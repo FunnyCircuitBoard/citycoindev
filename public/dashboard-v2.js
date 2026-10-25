@@ -534,6 +534,8 @@
   function today(d) {
     const f = d.founder || {}, seat = f.seat, c = d.community, n = d.national, sq = d.squad, h = d.holding || {}, u = d.user;
     const city = u.home ? u.home.name : "your city", seated = Boolean(seat && (seat.status === "active" || seat.status === "steward"));
+    // (a page built for another label set while its token is not live: founder actions are paused there, so no coin step is offered: RB-1)
+    const paused = Boolean(BRAND) && !d.launched;
     const rows = [];
     const add = (title, sub, tone, tab, go, exact) => rows.push({ title, sub, tone, href: tab[0] === "/" ? tab : "#" + tab, go, exact });
     const legacy = !frozenSeats(d); // (frozen: none of the seat, window, squad or election steps below is offered)
@@ -550,9 +552,9 @@
     const rf = readyFounder(), rcoin = Boolean(rf && rf.coin);
     if (readyOn()) { if (seated && coinKnown && rcoin && !rf.inUse && !rf.gate && (!coin || (!coin.launched && !coin.waiting))) add(...readyStep(rf, seat.city), "ok", "founder", "#coin-ready"); }
     // (the legacy launch path closed: the studio is not offered, so neither is this step)
-    else if (seated && coinKnown && !coin && !launchClosed()) add(`Design ${seat.city}'s coin`, "Name, pitch, pair, colour, logo (shown once checked). Public and logged.", "ok", "founder", "#coin-studio");
+    else if (seated && !paused && coinKnown && !coin && !launchClosed()) add(`Design ${seat.city}'s coin`, "Name, pitch, pair, colour, logo (shown once checked). Public and logged.", "ok", "founder", "#coin-studio");
     // the old path's step only while the server says that path is open (never from a guess: a status call still on its way, a probe that failed)
-    if (seated && coin && !coin.mint && !coin.waiting && labOpen() && !readyOn() && !launchClosed()) add("Add your coin's contract", "Launched it on Raydium LaunchLab? Send the address for a check.", "ok", "founder", "#cs-mint");
+    if (seated && !paused && coin && !coin.mint && !coin.waiting && labOpen() && !readyOn() && !launchClosed()) add("Add your coin's contract", "Launched it on Raydium LaunchLab? Send the address for a check.", "ok", "founder", "#cs-mint");
     if (seated && lp.on && lp.state === "ready") add("Launch your city coin", "An admin approved it. One signature in your wallet.", "ok", "founder", "#lp-launch");
     // with the Vicinity launchpad set up, a contract sent through the old LaunchLab path is never recorded, only rejected (src/coins.js)
     if (seated && coin && coin.waiting && lpEra()) add("Old contract waiting", LEGACY_CONTRACT, "info", "city", "#coin", true);
@@ -756,6 +758,10 @@
       // (no Buy & swap on a page built for another label set: that card is not shown there)
       if (BRAND) button("Founder path", "btn btn--primary", () => goTo("#progress")); else button("Buy & swap", "btn btn--primary", () => goTo("#trade"));
     }
+    // a page built for another label set while its token is not live (/api/me launched false): founder actions are paused there (the Worker
+    // answers founder_paused, src/seats.js founderPaused; rebrand review finding RB-1), so the card offers no design, choice or launch; a coin
+    // already launched keeps its card below
+    else if (BRAND && !d.launched && (st === "active" || st === "steward") && !(coinKnown && coin && coin.launched)) { note.textContent = brand`Founder and manager actions are paused until the Vicinity token is live.`; go.hidden = true; fcardAction = null; }
     else if (!coinKnown) { note.textContent = ""; go.hidden = true; fcardAction = null; }
     // (closed: the launch card or the ready-made coin's card right under this one says the closed line, so it is said here only when neither
     // shows: once per tab, review finding S23-OFF-3)

@@ -36,7 +36,7 @@ import { json, readJson, sameSite } from "./http.js";
 import { access } from "./access.js";
 import { DAY, HOUR, iso } from "./policy.js";
 import { activeBan, liveSeatOfCity, liveSeatOfUser, powersOf } from "./roles.js";
-import { FROZEN_BELOW_AMOUNT, holdsFounderAmount, legacySeatsFrozen, stillFounder } from "./seats.js";
+import { frozenRefusal, holdsFounderAmount, stillFounder } from "./seats.js";
 import { check, limitKey } from "./limits.js";
 import { ensureLimitsSchema, ensureLogoSchema, ensureSchema } from "./store.js";
 import { publicLimit } from "./guards.js";
@@ -200,7 +200,8 @@ export const releasedSymbol = (cityId) => `~${cityId}`;
 const gate = (code, bw = SAME) => ({ code, message: bw.say(GATES[code]) });
 /** below_amount's words while the legacy seats are frozen (stage S16 review fix S16-R1): no grace period follows a low balance then. */
 const BELOW_FROZEN = "Your balance is below the founder amount. Hold it again to choose your coin.";
-const belowGate = (env, bw = SAME) => (legacySeatsFrozen(env) ? { code: "below_amount", message: bw.say(BELOW_FROZEN) } : gate("below_amount", bw));
+// (founder_paused while no token is live under another label set: src/seats.js frozenRefusal, rebrand review finding RB-1)
+const belowGate = (env, bw = SAME) => { const r = frozenRefusal(env, bw.say(BELOW_FROZEN)); return r ? { code: r.error, message: r.message } : gate("below_amount", bw); };
 /**
  * Why the founder cannot use the coin now, or null. `live`: the founder-amount check already made (true / false / "error").
  * Reads only (the GET's and the POSTs' common part).
@@ -460,7 +461,7 @@ export async function handleReadyArt(request, env, fetchImpl = fetch, now = Date
   if (slow) return slow;
   const live = await liveCheck(env, seat, fetchImpl);
   if (live === "error") return fail("rpc_unavailable", 503);
-  if (!live) return legacySeatsFrozen(env) ? fail("below_amount", 403, { message: BELOW_FROZEN }) : fail("below_amount", 403); // looked at only: no grace period starts here
+  if (!live) { const r = frozenRefusal(env, BELOW_FROZEN); return r ? fail(r.error, 403, { message: r.message }) : fail("below_amount", 403); } // looked at only: no grace period starts here
   const d = await coinDefaults(env, w.cityId, seat.country);
   if (!d.ok) return json({ ok: false, error: d.code, message: d.message }, d.code === "list_unavailable" ? 503 : 409);
   await ensureReadySchema(env.DB);
@@ -490,7 +491,7 @@ export async function handleReadyUse(request, env, fetchImpl = fetch, now = Date
   // (while the legacy seats are frozen nothing is written and the answer is below_amount: stage S16 review fix S16-R1 / SEC-S16-1)
   let still;
   try { still = await stillFounder(env, seat, now, fetchImpl); } catch { return fail("rpc_unavailable", 503); }
-  if (!still) return legacySeatsFrozen(env) ? fail("below_amount", 403, { message: FROZEN_BELOW_AMOUNT }) : fail("in_grace", 403);
+  if (!still) { const r = frozenRefusal(env); return r ? fail(r.error, 403, { message: r.message }) : fail("in_grace", 403); }
   const d = await coinDefaults(env, cityId, seat.country);
   if (!d.ok) return json({ ok: false, error: d.code, message: d.message }, d.code === "list_unavailable" ? 503 : 409);
   const g = await coinGate(env, { u, seat, d, live: true, cityId, fetchImpl, now });

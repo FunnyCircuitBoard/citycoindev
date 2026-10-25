@@ -99,6 +99,8 @@
     in_grace: "Your founder seat is in grace: hold the founder amount again to use moderation.",
     // (the two below come only while the legacy seats are frozen, stage S16 review fixes S16-R1 and SEC-S16-4)
     below_amount: "Your balance is below your founder seat's amount, so this was not done. Nothing was changed.",
+    // (only on a page built for another label set while its token is not live: src/seats.js founderPaused, the server's own words)
+    founder_paused: (d) => d.message || "Founder and manager actions are paused. Nothing was changed.",
     wallet_mismatch: "Your founder seat is held by another wallet. Link that wallet to your account to do this.",
     not_allowed: "Only the right moderator can do that.",
     needs_second_moderator: "That needs a second moderator: you can't confirm your own action.",
@@ -343,7 +345,8 @@
         cardReset(card); card.classList.add("is-done", "wcard--folded");
         $("#wcard-kicker").textContent = "Profile complete · 3 of 3";
         $("#wcard-title").textContent = "Wallet linked ✓";
-        $("#wcard-lead").textContent = `${short(u.wallet)} is the wallet of your account. ${seatsFrozen(d) ? "Your holdings and rank are live." : "Your holdings, rank and founder path are live."}`;
+        // (a page built for another label set while its token is not live: no holdings or rank exist there yet, rebrand review finding RB-3)
+        $("#wcard-lead").textContent = `${short(u.wallet)} is the wallet of your account.${BRAND && !d.launched ? "" : ` ${seatsFrozen(d) ? "Your holdings and rank are live." : "Your holdings, rank and founder path are live."}`}`;
         $("#wcard-perks").hidden = true; $("#wcard-actions").hidden = true; $("#wcard-tiny").hidden = false;
         if (wn && wn.notMe) noteLine(wn);
         return;
@@ -364,7 +367,7 @@
     $("#wcard-kicker").textContent = fold ? "Your profile · 2 of 3" : "Complete your profile · 2 of 3";
     $("#wcard-title").textContent = "Connect your wallet";
     $("#wcard-lead").textContent = phone ? `${k ? k.name : "Your wallet app"} opens. Approve once, and you stay there, logged in.`
-      : fold ? (seatsFrozen(d) ? "Free, one signature. Unlocks your holdings, rank and badges." : "Free, one signature. Unlocks your holdings, rank, badges and the founder path.")
+      : fold ? (BRAND && !d.launched ? "Free, one signature." : seatsFrozen(d) ? "Free, one signature. Unlocks your holdings, rank and badges." : "Free, one signature. Unlocks your holdings, rank, badges and the founder path.")
       : brand`Free: one signature, not a transaction. Vicinity never asks for your recovery phrase or private key.`;
     const waiting = linkStarted();
     $("#wcard-wait").hidden = !waiting;
@@ -1352,14 +1355,15 @@
         : rdy ? (byV && !chosenV ? brand`Your city coin is made by Vicinity, and the city list changed since it was chosen: see your Founder tab. Nothing has launched yet.`
           : brand`Your city coin is the one made by Vicinity, in your Founder tab. Nothing has launched yet.`)
           : "Change anything until your coin launches. Every save is public in the log.")
-        : `Your coin, your call. Design ${c.name}'s coin below: everyone in ${c.name} will see it.`)
+        : BRAND && !me.launched ? brand`Founder and manager actions are paused until the Vicinity token is live.` : `Your coin, your call. Design ${c.name}'s coin below: everyone in ${c.name} will see it.`)
       : cd ? (cd.launched ? `The one official ${c.ticker ? tk : `${c.name} coin`}. Buy or swap it in the panel on the right.`
         : byV ? brand`Made by Vicinity from the city list. Nothing has launched yet.` : rdy ? `Designed by ${c.name}'s founder. Nothing has launched yet.`
           : `Designed by ${c.name}'s founder. It launches on ${lpOn ? brand`the Vicinity launchpad` : "Raydium LaunchLab"}.`)
       : seat ? `${seat.name}, ${c.name}'s founder, hasn't designed the coin yet. It'll appear here the moment they do.`
       : `${c.name}'s founder designs this coin: its name, logo, colour and what it's paired with.${seatsFrozen() ? "" : " The seat is still open: see the founder path."}`;
-    // with the ready-made coin on (COIN_V2_READY), the coin is made by Vicinity and chosen in its own card: the old studio stays hidden
-    $("#coin-studio").hidden = !mine || Boolean(cd && cd.launched) || me.coinV2Ready === true || launchClosed();
+    // with the ready-made coin on (COIN_V2_READY), the coin is made by Vicinity and chosen in its own card: the old studio stays hidden; on a page
+    // built for another label set while its token is not live, founder actions are paused (src/seats.js founderPaused): hidden too
+    $("#coin-studio").hidden = !mine || Boolean(cd && cd.launched) || me.coinV2Ready === true || launchClosed() || (Boolean(BRAND) && !me.launched);
     if (mine && !studioDirty) fillStudio();
     if (cready) cready.repaint(); // the ready-made coin's preview, painted earlier, stands in this card again
   }

@@ -84,7 +84,7 @@ export const FROZEN_COPY = Object.freeze({
         "                <span class=\"dpv__todo\"><span class=\"dpv__todo-t\">Pick a username</span><span class=\"dpv__todo-s\">Your public name everywhere on {{productName}}</span><span class=\"dpv__go\">→</span></span>\n                <span class=\"dpv__todo\"><span class=\"dpv__todo-t\">Post to Utica</span><span class=\"dpv__todo-s\">Memes, check-ins and discussions</span><span class=\"dpv__go\">→</span></span>\n"],
       // The founder path for your city and your city coin
       ["            <li>The founder path for <span id=\"wcard-city\">your city</span> and your city coin</li>\n",
-        "            <li>Your rank in <span id=\"wcard-city\">your city</span></li>\n"],
+        "            <li>Your rank in <span id=\"wcard-city\">your city</span><!--@if citycoin-->, once the {{productName}} token is live<!--@end--></li>\n"],
       // Your country · how managers are elected
       ["              <p class=\"kicker\">Your country · <a href=\"/rules#managers\">how managers are elected</a></p>\n",
         "              <p class=\"kicker\">Your country</p>\n"],
@@ -158,7 +158,7 @@ export const FROZEN_COPY = Object.freeze({
         "            <h3>Join your&nbsp;city</h3>\n            <p>Sign up and set your home community: its members, holders and feed are in your dashboard.</p>\n            <a class=\"how4__link\" href=\"/dashboard\">Open your dashboard <span aria-hidden=\"true\">→</span></a>\n"],
       // Locals qualify as City Founder and launch the city's one official coin.
       ["            <p>Locals qualify as City Founder and launch the city's one official coin.</p>\n",
-        "            <p>A city's founder launches its one official coin on the Launchpad.</p>\n"],
+        "            <p>A city's founder launches its one official coin on the Launchpad<!--@if citycoin--> once the {{productName}} token is live<!--@end-->.</p>\n"],
       // What is Vicinity? A map of every real city, where each community gets one official coin, l…
       ["<!--@if citycoin-->\n          <details><summary>What is {{productName}}?</summary><p>A map of every real city, where each community gets one official coin, local leaders and its own feed for memes, check-ins, discussions and weekly votes. The {{productName}} Launchpad lets each city launch its coin.</p></details>\n<!--@else-->\n          <details><summary>What is Vicinity?</summary><p>A map of every real city, where each community gets one official coin, local leaders and its own feed for memes, check-ins, discussions and weekly votes. $VICINITY is the token locals hold to found their city — it launched on October 3 on Raydium LaunchLab. The Vicinity Launchpad then lets each city launch its coin.</p></details>\n<!--@end-->\n",
         "<!--@if citycoin-->\n          <details><summary>What is {{productName}}?</summary><p>A map of every real city, where each community gets one official coin, local leaders and its own feed for memes, check-ins, discussions and weekly votes. The {{productName}} Launchpad lets each city launch its coin.</p></details>\n<!--@else-->\n          <details><summary>What is Vicinity?</summary><p>A map of every real city, where each community gets one official coin, local leaders and its own feed for memes, check-ins, discussions and weekly votes. $VICINITY launched on October 3 on Raydium LaunchLab. The Vicinity Launchpad then lets each city launch its coin.</p></details>\n<!--@end-->\n"],

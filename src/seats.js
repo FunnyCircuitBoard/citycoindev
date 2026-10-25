@@ -36,7 +36,8 @@ import { useAttestation } from "./attest.js";
 import { DAY, POLICY, founderAmount, iso } from "./policy.js";
 import { averages, dayOf, latestBalances, samplesStale, tenure } from "./ledger.js";
 import { LIVE, activeBan, adminWallets, amountsFor, liveSeatOfCity, liveSeatOfUser } from "./roles.js";
-import { LAUNCHPAD_OPENS_AT, tokenMint } from "./official.js";
+import { LAUNCHPAD_OPENS_AT, legacyHidden, tokenMint } from "./official.js";
+import { brandWords } from "./brandwords.js";
 import { countryCities } from "./cities.js";
 import { sha256hex } from "./blobs.js";
 import { HAS_ADDRESS, cleanText } from "./text.js";
@@ -73,8 +74,27 @@ export const seatsFrozen = (env) => (legacySeatsFrozen(env)
  * words. With the switch off every caller answers as before (403 in_grace, the seat having just entered its grace period).
  */
 export const FROZEN_BELOW_AMOUNT = "Your balance is below your founder seat's amount, so this was not done. Nothing was changed.";
-/** stillFounder's refusal while frozen (403 below_amount), or null: `belowAmountFrozen(env) || <today's in_grace answer>`. */
-export const belowAmountFrozen = (env) => (legacySeatsFrozen(env) ? json({ ok: false, error: "below_amount", message: FROZEN_BELOW_AMOUNT }, 403) : null);
+/**
+ * Founder and manager actions while no token is live under a label set other than today's (src/official.js legacyHidden without the main
+ * token: tokenMint is null; the Citycoin.dev rebrand, review finding RB-1). A seat's amount is an amount of the legacy token, which that site
+ * measures nowhere, so no founder could ever pass stillFounder or holdsFounderAmount, and calling their balance low would be false (it is not
+ * read at all). Those actions stay closed while no token is live, and every refusal says so in its own code and words: founder_paused,
+ * founderPausedWords. Nothing is read or written for it (that label set is always built with the legacy seats frozen: scripts/pages/build.mjs
+ * pageBrandPrerequisites). A choice the owner can revisit (implementation-report.md, rebrand stage, owner decision 7): the alternative, S19's,
+ * asks no live balance of a recorded founder at all. With today's label set false, so every answer is as before (S16's below_amount included).
+ */
+export const founderPaused = (env) => legacyHidden(env) && !tokenMint(env);
+/** founder_paused's words, in the label set's name (founderPaused is never true under today's). */
+export const founderPausedWords = (env) => `Founder and manager actions are paused until the ${brandWords(env).brand.productName} token is live. Nothing was changed.`;
+/**
+ * The code and words of a founder refusal that writes nothing, once stillFounder or holdsFounderAmount said no: founder_paused (above), or while
+ * the legacy seats are frozen S16-R1's below_amount with `below` (each route's own words); null otherwise (today's answers, in_grace and the
+ * like, which follow a grace period that stillFounder just started).
+ */
+export const frozenRefusal = (env, below = FROZEN_BELOW_AMOUNT) => (founderPaused(env) ? { error: "founder_paused", message: founderPausedWords(env) }
+  : legacySeatsFrozen(env) ? { error: "below_amount", message: below } : null);
+/** stillFounder's refusal that writes nothing (403 below_amount or founder_paused: frozenRefusal), or null: `belowAmountFrozen(env) || <today's in_grace answer>`. */
+export const belowAmountFrozen = (env) => { const r = frozenRefusal(env); return r ? json({ ok: false, ...r }, 403) : null; };
 export const LEGACY_SEATS_STATUS = Object.freeze({
   state: "frozen",
   history: Object.freeze(["policy.founder", "policy.voters", "policy.manager"]),
@@ -652,6 +672,7 @@ export async function enterGrace(db, seat, now, reason = "balance") {
  */
 export async function stillFounder(env, seat, now, fetchImpl = fetch) {
   if (!seat || (seat.status !== "active" && seat.status !== "steward")) return false;
+  if (founderPaused(env)) return false; // no token live under another label set: nothing read, nothing written (the caller says founder_paused)
   const wallets = await seatWallets(env.DB, seat);
   const balances = Object.fromEntries((await amountsFor(env, wallets, fetchImpl)).entries());
   const amount = await seatBalance(env.DB, seat, balances);
@@ -669,6 +690,7 @@ export async function stillFounder(env, seat, now, fetchImpl = fetch) {
  */
 export async function holdsFounderAmount(env, seat, fetchImpl = fetch) {
   if (!seat || (seat.status !== "active" && seat.status !== "steward")) return false;
+  if (founderPaused(env)) return false; // (as stillFounder: nothing read; the caller says founder_paused)
   const wallets = await seatWallets(env.DB, seat);
   const balances = Object.fromEntries((await amountsFor(env, wallets, fetchImpl)).entries());
   return (await seatBalance(env.DB, seat, balances)) >= seat.threshold;

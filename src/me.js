@@ -80,9 +80,11 @@ export function badgesFor({ u, launched, amount, position, seat, manager, admin,
   // no badge describes a holding, an amount or a holder rank of a token that has no supply yet (review finding F3); they come back with it
   if (bw.on && !launched) for (let i = list.length - 1; i >= 0; i--) if (TOKEN_BADGES.has(list[i].id)) list.splice(i, 1);
   if (!legacyFrozen) return list;
-  // (and the wallet badge no longer promises a founder path: the dashboards built with the freeze show none)
+  // (and the wallet badge no longer promises a founder path: the dashboards built with the freeze show none; under a label set other than today's
+  // with no live token it promises no holdings or rank either, which do not exist there yet: rebrand review finding RB-3)
   const recorded = { city_founder: "A founder seat on record.", country_manager: "A country manager term on record.",
-    wallet: "A Solana wallet linked to your account with one free signature. It unlocks holdings, rank and badges." };
+    wallet: bw.on && !launched ? "A Solana wallet linked to your account with one free signature."
+      : "A Solana wallet linked to your account with one free signature. It unlocks holdings, rank and badges." };
   return list.filter((b) => b.id !== "founder_ready").map((b) => (recorded[b.id] ? { ...b, detail: recorded[b.id] } : b));
 }
 

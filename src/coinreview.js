@@ -46,7 +46,7 @@ import { json, readJson, sameSite } from "./http.js";
 import { access } from "./access.js";
 import { DAY, HOUR, iso } from "./policy.js";
 import { activeBan, liveSeatOfCity, liveSeatOfUser } from "./roles.js";
-import { FROZEN_BELOW_AMOUNT, legacySeatsFrozen, stillFounder } from "./seats.js";
+import { frozenRefusal, stillFounder } from "./seats.js";
 import { check, limitKey } from "./limits.js";
 import { ensureLimitsSchema, ensureLogoSchema, ensureSchema } from "./store.js";
 import { designFrozen } from "./lpcoins.js";
@@ -298,7 +298,8 @@ async function templateArt(env, symbol, name) {
 
 /**
  * The basis a request or a description starts from: the founder's current choice (theirs, still the design) or else Vicinity's defaults.
- * { name, symbol, description, art, template (the content's: "t1" or null), templateColumn, hash, content, isDefaults, version }.
+ * { name, symbol, description, art, template (the content's: the label set's template id, "t1" today or "t1c" under the Citycoin.dev label set,
+ * src/coinready.js templateOf; or null), templateColumn, hash, content, isDefaults, version }.
  * `draw`: the defaults' picture is drawn now if it never was (only from a POST); without it, no picture means art null.
  */
 async function basisOf(env, { cityId, seat, d, now, draw = false }) {
@@ -543,7 +544,7 @@ async function founderPost(request, env, now, fetchImpl, kind, { max = 2048 } = 
   let still;
   try { still = await stillFounder(env, seat, now, fetchImpl); } catch { return { error: fail("rpc_unavailable", 503) }; }
   // (while the legacy seats are frozen nothing is written and the answer is below_amount: stage S16 review fix S16-R1 / SEC-S16-1)
-  if (!still) return { error: legacySeatsFrozen(env) ? fail("below_amount", 403, { message: FROZEN_BELOW_AMOUNT }) : fail("in_grace", 403) };
+  if (!still) { const r = frozenRefusal(env); return { error: r ? fail(r.error, 403, { message: r.message }) : fail("in_grace", 403) }; } // (founder_paused: src/seats.js)
   const d = await coinDefaults(env, cityId, seat.country);
   if (!d.ok) return { error: json({ ok: false, error: d.code, message: d.message }, d.code === "list_unavailable" ? 503 : 409) };
   const st = await coinState(env, cityId);
