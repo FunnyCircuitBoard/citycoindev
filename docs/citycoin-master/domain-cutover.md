@@ -5,7 +5,20 @@ Master change order v5, section 04 (BR-02) and section 05 (BR-03). Started in st
 section 2. All three were merged in PR #97 (`2608bd9`) with their switches off. On 24 October 2026 the owner decided that the old names
 are not forwarded (section 0): stage S56 (the redirects) is dropped, and the cutover now finishes in S55. Each later stage adds its part.
 
-**Status on 25 October 2026: step 2 (stage S06) is prepared in a configuration pull request, not merged, on the owner's go of the same
+**Status of step 4 (stage S55), 25 October 2026: built on local branch `cc/s55` on the go-live branch `cc/golive` (`0606956`, PR #106, not
+merged), not merged and not deployed** (implementation-report.md section 11, "Stage S55"). On the owner's go of 25 October 2026 ("I still see
+nothing on Citycoin.dev. Vicinity still active. What are you doing? Get them all sorted. Don't wait for my permission just go ahead and execute
+all the changes."), `wrangler.jsonc` lists citycoin.dev alone (`SITE_ORIGINS` and `SITE_ORIGIN` `https://citycoin.dev`) and keeps the
+citycoin.dev route alone: the `vicinity.city` and `www.vicinity.city` custom domains are removed, with no redirect (section 0). The two
+`noindex` rules leave `public/_headers`, the post-deploy check checks citycoin.dev (section 4, "Before step 4"), the link checker's official
+list is citycoin.dev alone (section 0, item 6), and the owner's go is recorded as his acceptance that `https://vicinity.city/brand/vicinity-512.png`
+goes dark (policy amendment `owner-decision-2026-10-25-golive`). It is merged only after PR #106 is merged and deployed and citycoin.dev passes
+its checks (implementation-report.md section 11, "Deploy checklist for S55"). On 25 October 2026 at 11:53 UTC citycoin.dev still had no A
+record (DNS over HTTPS): the S06 attach had not happened yet (deploy run 97 failed at the citycoin.dev custom domain for want of the token's
+zone), so S55 waits. One gate of section 4 is not met and is a recorded deviation: the on-chain pause of the legacy launchpad
+(`launches_paused` is 0); no approval exists and only the owner's admin wallet can create one (section 4, "Before step 4").
+
+**Status on 25 October 2026 (written before S55): step 2 (stage S06) is prepared in a configuration pull request, not merged, on the owner's go of the same
 day** ("Don't wait for my permission just go ahead and execute all the changes"). It attaches citycoin.dev as a custom domain of this
 Worker and lists it in `SITE_ORIGINS` in the same `wrangler.jsonc`, with `DEPLOYMENT_ENV=production` (section 2, item 2; section 3,
 step 2). Until that pull request is merged and deployed nothing here is applied: no DNS record, Cloudflare setting, route, custom domain
@@ -86,8 +99,10 @@ What stops answering once vicinity.city is removed (section 3, step 4), for the 
 6. **The link checker** calls `vicinity.city`, `vicinitycity.com` and `vicinitycity.net` official (`src/official.js` `websites`,
    rebrand-inventory.md C03). They come off that list, and citycoin.dev goes on, before the owner puts either name to its other use;
    otherwise the checker would vouch for a site that is no longer this one. citycoin.dev goes on in the S06 pull request (review finding
-R1: from the attach on, the checker on citycoin.dev would otherwise call citycoin.dev "not on our official list"); the old names coming off
-is still a later code change.
+R1: from the attach on, the checker on citycoin.dev would otherwise call citycoin.dev "not on our official list"); the old names come off in
+the S55 pull request (branch `cc/s55`, not merged): the list is `["citycoin.dev"]`, `updated` 2026-10-25, and the checker answers each old name
+(and its www.) "This was an earlier address of Citycoin.dev. It no longer serves the Citycoin.dev site, so nothing there is official." while
+this Worker does not serve it (`src/official.js` `FORMER_WEBSITES`): never "official", never "ours", never "a copy of our name".
 
 ## 1. What stage S03 built (dark)
 
@@ -288,6 +303,16 @@ Master section 05 keeps Google out of the new wallet-only login path (S15), so t
    kept for 12 months: the owner's decision replaces master section 04's rule. Preconditions: citycoin.dev serves the site and passed the
    checks of section 4, and the legacy launch path is closed (section 0, item 1). After the deploy Cloudflare no longer sends either name
    to this Worker, and the names are the owner's to use as he decides. Nothing from them is redirected.
+
+   **Status (25 October 2026): built on branch `cc/s55`, not merged.** `routes` is `[{ "pattern": "citycoin.dev", "custom_domain": true }]`
+   and `SITE_ORIGINS` is `https://citycoin.dev`. How the deploy removes the two names (read in wrangler 4.137, `node_modules/wrangler/wrangler-dist/cli.js`
+   `publishCustomDomains`): wrangler sends the listed custom domains with `PUT .../workers/scripts/vicinity-map/domains/records` and
+   `override_scope: true`, after a `domains/changeset?replace_state=true`, so the custom domains of this Worker that the list leaves out are
+   detached. The deploy token still needs the vicinity.city zone for that (keep it until the S55 deploy has run). Should a vicinity.city name
+   ever reach this Worker again (attached by hand, say), the Worker refuses it: the host binding's allowlist is citycoin.dev alone, and the
+   legacy hosts count as accepted only while `SITE_ORIGINS` lists vicinity.city (`src/site-config.js` `servesLegacy`, added by S55), so every
+   Worker path answers `421 {"error":"wrong_host","origin":"https://citycoin.dev"}` with no `Location` (its pages would still come from the
+   static assets: never attach a host the allowlist does not list, item 2).
 5. **vicinitycity.net** is not routed to the Worker today (wrangler.jsonc comment on `routes`; it answers 403 from Cloudflare). This plan
    does not attach it, and the owner's decision does not name it (open, section 0).
 6. **vicinitycity.com and www.vicinitycity.com** are not this Worker's: they are custom domains of the countdown Worker
@@ -320,7 +345,9 @@ are rehearsed first.
    1, and the Google console entry (section 1.3). The deploy of the merge attaches the domain; then the checks of section 4, "After step 2",
    are run. If the attach fails for want of the token's zone (step 1), see the status under section 2, item 2.
 3. **Checks on citycoin.dev** while both hosts serve (section 4, "After step 2").
-4. **S55, a configuration pull request, makes citycoin.dev the canonical origin and removes the vicinity.city routes**:
+4. **S55, a configuration pull request, makes citycoin.dev the canonical origin and removes the vicinity.city routes** (*status, 25 Oct
+   2026: built on branch `cc/s55` on `cc/golive`, not merged; `SITE_ORIGIN` was already set by the go-live pull request; see the status at the
+   top and section 4, "Before step 4"*):
    `SITE_ORIGIN=https://citycoin.dev`, `SITE_ORIGINS=https://citycoin.dev`, and the `vicinity.city` and `www.vicinity.city` entries
    removed from wrangler.jsonc `routes`, with no redirect (section 2, item 4). Only after the legacy launch path is closed (section 0,
    item 1: stage S58), the checks of step 3 pass and every item of section 4, "Before step 4", holds. The label switches of S55 may
@@ -371,32 +398,56 @@ the go-live's deploy (`WALLET_ONLY=on`, `BRAND=citycoin`, `SITE_ORIGIN=https://c
   hosts, the host binding (a wallet sign-in, the copied `vs` cookie, the cross-host `Origin`), www.citycoin.dev,
   `node scripts/check-live.mjs https://citycoin.dev` and "Check a link".
 
-**Before step 4:**
+**Before step 4** (each item's status on 25 October 2026, read for the S55 pull request; implementation-report.md section 11, "Stage S55",
+has the exact values):
 
 - The legacy launch path is closed: a read-only RPC read of the legacy launchpad PDA shows `launches_paused = 1` (signed by
   `13qRam…sRiN`, external E3), and the website builds no legacy launch (`LEGACY_LAUNCH=off`, S58).
+  *Status: the website part holds (`LEGACY_LAUNCH=off`, the go-live pull request). The on-chain pause does not: the Launchpad PDA
+  `4g9KRZ76Mpw6HCCu713yEGzm1txdCod3S1SugL7M9GwN` reads `launches_paused = 0` (finalized, slot 461247266). What stands in its place: `launch`
+  consumes an `Approval` account that only `approve_launch`, signed by the Launchpad's admin (`13qRam…sRiN`, the owner's wallet), creates
+  (program source `solana/programs/vicinity-launchpad/src/instructions/launch.rs` and `approve_launch.rs`; the deployed program's bytes equal
+  the committed build, SHA-256 `32906e19…c1621a`), and there are 0 `Approval` accounts and 0 `Coin` accounts on chain (getProgramAccounts by
+  size 179 and by the `Approval` discriminator). So nobody but the owner's wallet can make a launch possible. S55 proceeds under the owner's
+  go of 25 Oct 2026 with this recorded deviation; the pause stays recommended as an owner step.*
 - No coin names vicinity.city: `/official-coins.csv` is empty and the legacy launchpad has launched no coin. Any such coin stops step 4
   until the owner decides (policy `release_gates.legacy_immutable_metadata`: exact bytes served as long as existing assets depend on
   them).
+  *Status: holds. `https://vicinity.city/official-coins.csv` answered 200 `text/csv; charset=utf-8` with an empty body (11:53 UTC), its JSON
+  `coins: []`, and the program has 0 `Coin` accounts.*
 - The on-chain partner record `2be9mDcn…si11` (section 0, item 2): a read-only RPC read shows that it names an address on
   citycoin.dev, or the owner has accepted in writing that `https://vicinity.city/brand/vicinity-512.png` goes dark and that
   acceptance is recorded as an owner decision in `policy.json` `amendments` and `src/masterpolicy.js` (kept identical), for this one
   file on the old host. Without one of the two, step 4 waits (policy `release_gates.legacy_immutable_metadata`).
+  *Status: the record still names vicinity.city (read 11:51 UTC, slot 461246860: name "Vicinity", website "https://vicinity.city", logo
+  "https://vicinity.city/brand/vicinity-512.png", fee claimer `13qRam63xqqd8KNUoAmHWQu7ro71oHqEsYHYaG5MsRiN`). The owner's go of 25 Oct 2026
+  is recorded as the acceptance: amendment `owner-decision-2026-10-25-golive`, in both files. The file stays served at
+  `https://citycoin.dev/brand/vicinity-512.png` with unchanged bytes. The DBC IDL committed here (`solana/idls/dynamic_bonding_curve.json`)
+  has `create_partner_metadata` and no instruction that updates or closes a partner record, so an update may not be possible with that
+  program version (not checked against the deployed DBC); any update is the fee-claimer wallet holder's (the owner's) step.*
 - The post-deploy check checks citycoin.dev: `scripts/check-live.mjs` (default base `https://vicinity.city`, run after every deploy
   by `.github/workflows/deploy.yml`) takes its base from `SITE_ORIGIN` (rebrand-inventory.md U10, stage S54). Otherwise the S55
   deploy removes the vicinity.city routes and then fails its own live check, leaving a failed run with the site already changed.
+  *Status: done in the S55 pull request. With no address the check reads `SITE_ORIGIN` from `wrangler.jsonc` (falls back to
+  `https://citycoin.dev`); the deploy workflow runs it that way. `scripts/cities/tickers.mjs` reads the official list from the same origin.*
 - Items 3 to 6 of section 0 are known to the owner; the mail sender and the link checker's list (items 5 and 6) are settled.
 - The S55 pull request removes the `https://citycoin.dev/*` rule (`X-Robots-Tag: noindex`) from `public/_headers`, or the canonical site
   stays out of search engines.
   Since the go-live pull request (branch `cc/golive`, not merged; owner's go of 25 Oct 2026), the rules in `public/_headers` are
   `https://vicinity.city/*` and `https://www.vicinity.city/*` instead, and citycoin.dev is indexed. Once the go-live is deployed, the S55
   pull request removes those two rules together with the routes.
+  *Status: done in the S55 pull request; `public/_headers` is byte for byte as before S06 (`5150529`): no host rule, no X-Robots-Tag.*
+- *Items 3 to 6 of section 0: item 5 (mail) is settled by the go-live (sender on citycoin.dev; no route sends mail under wallet-only
+  sign-in), item 6 by S55 (the list); items 3 and 4 are the owner's to know: an old link, bookmark, tracker or Google callback on vicinity.city
+  gets no answer from this site after the deploy.*
 
-**After step 4:**
+**After step 4** (the S55 deploy checklist, implementation-report.md section 11, runs these):
 
 - citycoin.dev answers as after step 2, and its pages and links name `https://citycoin.dev` as the canonical origin.
+- `curl -sI https://citycoin.dev/` answers 200 with no `x-robots-tag`; `node scripts/check-live.mjs` passes (it checks citycoin.dev).
 - `curl -sI https://vicinity.city/` and `curl -sI https://www.vicinity.city/` get no answer from this Worker and no `location` that
   points at citycoin.dev.
+- A wallet sign-in works on citycoin.dev (the owner's own wallet, never a test key on production).
 - The synthetic probes stay green on citycoin.dev through the observation period (external E15).
 
 **After step 5:** `curl -sI https://vicinitycity.com/` and `curl -sI https://www.vicinitycity.com/` no longer answer 302 to
@@ -409,6 +460,13 @@ the go-live's deploy (`WALLET_ONLY=on`, `BRAND=citycoin`, `SITE_ORIGIN=https://c
 Step 4 rolls back by putting the two vicinity.city routes back in wrangler.jsonc and `SITE_ORIGIN` and `SITE_ORIGINS` back to their step 2
 values, then deploying; members' vicinity.city sessions are then still valid until they expire (section 6). This works only while the owner
 has not yet put vicinity.city to its other use. Once he has, there is no way back to vicinity.city, only fixes on citycoin.dev.
+As built on branch `cc/s55` (after the go-live, which already set `SITE_ORIGIN=https://citycoin.dev`): change `SITE_ORIGINS` back to
+`https://citycoin.dev https://vicinity.city` (change the value, never delete the line: `keep_vars`), put back
+`{ "pattern": "vicinity.city", "custom_domain": true }` and `{ "pattern": "www.vicinity.city", "custom_domain": true }` after the citycoin.dev
+route, and put the two `noindex` host rules back in `public/_headers`, in one pull request. With vicinity.city listed again the legacy hosts
+are accepted again (`src/site-config.js` `servesLegacy`) and the link checker calls vicinity.city official again (a served host); the old
+names stay off `src/official.js` `websites` unless that pull request puts them back. Rolling the go-live back needs this first: the page
+build refuses `SITE_ORIGIN` "" with S55's single-host `SITE_ORIGINS` (`SITE_ORIGIN_NOT_ALLOWED`).
 
 The host binding (section 1.2) rolls back with `SITE_ORIGINS`: set it back to `https://vicinity.city` (or blank both settings) and deploy.
 Change the value in `wrangler.jsonc`; do not delete the line, and do not count on a plain revert of the S06 merge, which deletes it:
