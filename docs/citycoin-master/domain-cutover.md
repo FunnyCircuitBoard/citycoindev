@@ -5,8 +5,8 @@ Master change order v5, section 04 (BR-02) and section 05 (BR-03). Started in st
 section 2. All three were merged in PR #97 (`2608bd9`) with their switches off. On 24 October 2026 the owner decided that the old names
 are not forwarded (section 0): stage S56 (the redirects) is dropped, and the cutover now finishes in S55. Each later stage adds its part.
 
-**Status of step 4 (stage S55), 25 October 2026: built on local branch `cc/s55` on the go-live branch `cc/golive` (`0d516c0`, PR #106, not
-merged; S55 was built on `0606956` and rebased), not merged and not deployed** (implementation-report.md section 11, "Stage S55"). On the
+**Status of step 4 (stage S55), 25 October 2026: built on local branch `cc/s55` on the go-live branch `cc/golive` (`31213b8`, PR #106, not
+merged; S55 was built on `0606956` and rebased, last onto `31213b8`), not merged and not deployed** (implementation-report.md section 11, "Stage S55"). On the
 owner's go of 25 October 2026 ("I still see nothing on Citycoin.dev. Vicinity still active. What are you doing? Get them all sorted. Don't wait
 for my permission just go ahead and execute all the changes."), `wrangler.jsonc` lists citycoin.dev alone (`SITE_ORIGINS` and `SITE_ORIGIN`
 `https://citycoin.dev`) and keeps the citycoin.dev route alone: the `vicinity.city` and `www.vicinity.city` custom domains are removed, with no
@@ -23,14 +23,16 @@ on-chain. That pause needs your signature. It's still worth doing, but nobody ca
 exist on-chain, and the website no longer builds launches." Items 6 and 7 cannot be met and stay recorded as not met. S55 is not merged before
 its blocking items hold:
 
-1. **PR #106 merged and deployed, citycoin.dev serving, the checks of section 4, "After step 2", run** (section 3, step 3): not met, blocking.
+1. **PR #106 merged and deployed, citycoin.dev serving, the checks of section 4, "After step 2", run** (section 3, step 3), as the go-live
+   changed them (the go-live note there; the S54-probe line is item 7): not met, blocking.
    At 14:31 UTC citycoin.dev had no A record (DNS over HTTPS: the zone's SOA only): the S06 attach had not happened (deploy run 97 failed at the
    citycoin.dev custom domain for want of the token's zone).
 2. **The legacy launch path closed on chain** (section 0, item 1; section 4, "Before step 4"): **recorded deviation (a)**, not met as written.
    The legacy launchpad's `launches_paused` is 0 (slot 461291984), and only the owner's wallet can set it; he has not signed the pause, and his
    go does not name it. Why the protection still holds: a launch needs an `Approval` account that only `approve_launch`, signed by the admin
    `13qRam63xqqd8KNUoAmHWQu7ro71oHqEsYHYaG5MsRiN`, creates (program source); 0 `Approval` accounts exist (getProgramAccounts by size 179 and by
-   discriminator); `LEGACY_LAUNCH=off` makes the website build and accept no approval or launch; 0 coins were launched (0 `Coin` accounts,
+   discriminator); `LEGACY_LAUNCH=off` makes the website build and accept no approval or launch from the go-live's deploy on, which comes
+   before this merge (item 1); 0 coins were launched (0 `Coin` accounts,
    `/official-coins.csv` empty). Residual risk, stated plainly: the admin wallet, or the program's upgrade authority (the Squads vault
    `AB5qB1iAukPB7p1dkukQ1qSke3yQBDeSd5o69dLFGs7X`, 2 of 3), could still create an approval or change the code, and the pause itself would not
    stop the admin, who can unpause. The pause stays a recommended owner step (external E3). The fresh read-only re-check right before the
@@ -39,7 +41,8 @@ its blocking items hold:
    `https://vicinity.city/brand/vicinity-512.png` (slot 461291984). Policy amendment `owner-decision-2026-10-25-golive` is in force, the same in
    both files: it applies the owner's general go to this file, with the consequence stated to him in writing by the lead developer (quoted
    above); the go does not name the file, and the amendment does not say that he named or specifically accepted it. Why the protection still
-   holds: no coin depends on that record (its fee claimer's one DBC config has 0 pools; 0 launches), the brand is now Citycoin.dev, and the file
+   holds: no coin depends on that record (its fee claimer's one DBC config has 0 pools, a count read again right before the merge because
+   anyone can create a pool there outside the launchpad; 0 launches), the brand is now Citycoin.dev, and the file
    stays at `https://citycoin.dev/brand/vicinity-512.png` with unchanged bytes.
 4. **Items 3 and 4 of section 0 known to the owner:** **recorded deviation (c)**. The owner asked for both names to be left blank (section 0).
    The consequence (every old vicinity.city link, bookmark and tracker, and the Google sign-in callback on vicinity.city, get no answer from this
@@ -454,7 +457,8 @@ has the exact values):
 
 - The legacy launch path is closed: a read-only RPC read of the legacy launchpad PDA shows `launches_paused = 1` (signed by
   `13qRam…sRiN`, external E3), and the website builds no legacy launch (`LEGACY_LAUNCH=off`, S58).
-  *Status: recorded deviation (a); not met as written. The website part holds (`LEGACY_LAUNCH=off`, the go-live pull request). The on-chain
+  *Status: recorded deviation (a); not met as written. The website part holds from the go-live's deploy on, which comes before this merge
+  (`LEGACY_LAUNCH=off`, the go-live pull request; production has it unset until then). The on-chain
   pause does not: the Launchpad PDA `4g9KRZ76Mpw6HCCu713yEGzm1txdCod3S1SugL7M9GwN` reads `launches_paused = 0` (finalized, 14:31 UTC, slot
   461291984; admin `13qRam63xqqd8KNUoAmHWQu7ro71oHqEsYHYaG5MsRiN`, no pending admin), and the owner has not signed `set_pause(launches = true)`.
   The S55 review (finding H2) had made the pause a blocking pre-merge item, as PR #106's item 6 then was. The lead developer decided on 25 Oct
@@ -486,7 +490,9 @@ has the exact values):
   delegation, and before either merge stated the consequence to him in writing ("the old Vicinity logo address stored on-chain (the Meteora
   partner record) will stop loading"; the status at the top). It is not recorded as the owner naming or specifically accepting this file. Why
   the protection still holds: no coin depends on that record (the fee claimer's one DBC config, `EZVHCgxKZhvXmUGMXJMEw8tZHiTmoHPyM9mNNQ5u1kSP`,
-  has 0 pools at 14:34 UTC, slot 461293023, and the legacy launchpad has launched 0 coins), the brand is now Citycoin.dev, and the file stays
+  has 0 pools at 14:34 UTC, slot 461293023, and the legacy launchpad has launched 0 coins; the pool count can change without the owner,
+  because anyone can create a pool on that config outside the launchpad, so it is read again right before the merge and a pool there stops
+  it: implementation-report.md, S55 deploy checklist item 2), the brand is now Citycoin.dev, and the file stays
   served at `https://citycoin.dev/brand/vicinity-512.png` with unchanged bytes. The DBC IDL committed here (`solana/idls/dynamic_bonding_curve.json`)
   has `create_partner_metadata` and no instruction that updates or closes a partner record, so an update may not be possible with that
   program version (not checked against the deployed DBC); any update is the fee-claimer wallet holder's (the owner's) step.*
@@ -511,12 +517,14 @@ has the exact values):
 
 **After step 4** (the S55 deploy checklist, implementation-report.md section 11, runs these):
 
-- citycoin.dev answers as after step 2, and its pages and links name `https://citycoin.dev` as the canonical origin.
+- citycoin.dev answers as after step 2 (the checks as the go-live note there gives them), and its pages and links name
+  `https://citycoin.dev` as the canonical origin.
 - `curl -sI https://citycoin.dev/` answers 200 with no `x-robots-tag`; `node scripts/check-live.mjs` passes (it checks citycoin.dev).
 - `curl -sI https://vicinity.city/` and `curl -sI https://www.vicinity.city/` get no answer from this Worker and no `location` that
   points at citycoin.dev.
 - A wallet sign-in works on citycoin.dev (the owner's own wallet, never a test key on production).
-- The synthetic probes stay green on citycoin.dev through the observation period (external E15).
+- The synthetic probes stay green on citycoin.dev through the observation period (external E15). Not met: S54 is not built (the status
+  at the top, item 7), so the S55 deploy checklist does not run this check.
 
 **After step 5:** `curl -sI https://vicinitycity.com/` and `curl -sI https://www.vicinitycity.com/` no longer answer 302 to
 `https://vicinity.city/`, and nothing forwards them to citycoin.dev.
@@ -537,8 +545,9 @@ every deploy runs every test: a pull request that only puts `SITE_ORIGINS`, the 
 1. Before it: the owner has not put vicinity.city to its other use, and the deploy token has the `vicinity.city` zone again (`docs/DEPLOY.md`
    step 1). Without the zone, wrangler uploads the new version and then fails to attach the two names: the run goes red and vicinity.city
    stays detached.
-2. The pull request: `git revert --no-commit <the S55 merge commit on main>` (on the branch before the merge, the code commits are `e37da6e`
-   (built as `6e7e611`), the review follow-up commit `0647e01` and the commit that put the amendment in force), then `git checkout HEAD -- '*.md'` so the documents keep the S55 record, and a dated line in them that
+2. The pull request: `git revert --no-commit <the S55 merge commit on main>` (on the branch before the merge, the code commit is `62984da`
+   (built as `6e7e611`, then `e37da6e`), the review follow-up commit `4601d0b` (was `0647e01`) and the commit that put the amendment in
+   force `ba54d77` (was `ffefa61`)), then `git checkout HEAD -- '*.md'` so the documents keep the S55 record, and a dated line in them that
    says why it was rolled back. The revert changes values only: `SITE_ORIGINS` back to `https://citycoin.dev https://vicinity.city`,
    `{ "pattern": "vicinity.city", "custom_domain": true }` and `{ "pattern": "www.vicinity.city", "custom_domain": true }` back after the
    citycoin.dev route, the two `noindex` host rules back in `public/_headers`; no line of `wrangler.jsonc` is deleted, so `keep_vars` is no
