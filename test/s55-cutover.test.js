@@ -10,8 +10,9 @@
 //   - public/_headers carries no X-Robots-Tag rule;
 //   - the post-deploy check (scripts/check-live.mjs) checks the configured canonical origin by default, and the deploy workflow relies on it;
 //   - the link checker never calls vicinity.city, vicinitycity.com or vicinitycity.net official again;
-//   - the policy amendment owner-decision-2026-10-25-golive, the same in docs/citycoin-master/policy.json and src/masterpolicy.js, not in force:
-//     the owner's general go is not recorded as his acceptance of the partner logo going dark (S55 review finding H1).
+//   - the policy amendment owner-decision-2026-10-25-golive, the same in docs/citycoin-master/policy.json and src/masterpolicy.js, in force as
+//     S55's recorded deviation (b): it applies the owner's general go to the partner logo going dark, with that consequence stated to him in
+//     writing by the lead developer, and never says that the owner named or specifically accepted the file (S55 review finding H1).
 // Fake wallets and fake data only; nothing here reaches a network.
 import { test, beforeEach, after } from "node:test";
 import assert from "node:assert/strict";
@@ -39,6 +40,8 @@ const RECORD = committedFile("src/pages-built.js", "utf8");
 const BUILT = Object.fromEntries([.../export const PAGES_BUILT = Object\.freeze\((\{[^}]*\})\);/.exec(RECORD)[1].matchAll(/(\w+): ("[^"]*"|true|false)/g)].map(([, k, v]) => [k, JSON.parse(v)]));
 const CC = "https://citycoin.dev";
 const GO = "I still see nothing on Citycoin.dev. Vicinity still active. What are you doing? Get them all sorted. Don't wait for my permission just go ahead and execute all the changes.";
+// the lead developer's written statement to the owner, 25 Oct 2026, before either merge (the part about the partner logo), quoted as written
+const LEAD_STATEMENT = "For step 3 I'm taking your message as written approval of two things. First, the old Vicinity logo address stored on-chain (the Meteora partner record) will stop loading.";
 const DECISION = "i dont want any domain forward from vicinty. leve that blank both. vicinity.city and vicinitycity.com i wil need them for other purpose.";
 /** Every name of the old site, with and without www. */
 const OLD_NAMES = ["vicinity.city", "www.vicinity.city", "vicinitycity.net", "www.vicinitycity.net", "vicinitycity.com", "www.vicinitycity.com"];
@@ -268,7 +271,7 @@ test("the link checker never calls vicinity.city, vicinitycity.com or vicinityci
 
 /* ---------------------------------------------------------------- the policy amendment */
 
-test("the policy amendment owner-decision-2026-10-25-golive is in policy.json and src/masterpolicy.js, the same, quoting the owner's go; not in force until his specific acceptance is quoted", () => {
+test("the policy amendment owner-decision-2026-10-25-golive is in policy.json and src/masterpolicy.js, the same, in force under the owner's general go, with the consequence stated to him in writing; it never says he named the file", () => {
   const json = JSON.parse(readFileSync(new URL("../docs/citycoin-master/policy.json", import.meta.url), "utf8"));
   const id = "owner-decision-2026-10-25-golive";
   const inJson = json.amendments.find((a) => a.id === id), inModule = MASTER_POLICY.amendments.find((a) => a.id === id);
@@ -282,13 +285,18 @@ test("the policy amendment owner-decision-2026-10-25-golive is in policy.json an
   assert.match(inJson.summary, /2be9mDcnk6rK2XVnNiTBH4JmeWWwFzmUXMSrXMS8si11/);
   assert.match(inJson.summary, /https:\/\/citycoin\.dev\/brand\/vicinity-512\.png with unchanged bytes/);
   assert.match(inJson.summary, /fee-claimer wallet holder's step \(the owner's\)/);
-  // S55 review finding H1: the go does not name the file, so the entry records no acceptance the owner did not write and overrides nothing
-  // until his specific written acceptance is quoted in it (a blocking item of the S55 deploy checklist)
-  assert.match(inJson.source, /It is a general instruction: it does not name this file, the partner record or Meteora, so it is not recorded as his acceptance of this file going dark\. His specific written acceptance is open/);
-  assert.match(inJson.summary, /^Not in force: prepared with stage S55, waiting for the owner\./);
-  assert.match(inJson.summary, /only with his specific written acceptance, a blocking item of its deploy checklist: until that acceptance is quoted in this entry, or the record names an address on citycoin\.dev, the gate holds for this file too and S55 does not merge/);
-  for (const f of ["source", "summary", "overrides"]) assert.doesNotMatch(inJson[f], /is his written acceptance|has accepted|accepted in writing/, f);
-  assert.match(inJson.overrides, /^nothing until the owner's specific written acceptance is quoted in this entry; then release_gates\.legacy_immutable_metadata \(master section 04, BR-02\) for this one file on the old host only/);
+  // Recorded deviation (b) of S55 (the lead developer's decision of 25 Oct 2026 under the owner's delegation): the entry is in force, applied
+  // under the owner's general go, and quotes the lead developer's written statement of this consequence to the owner, made before either merge.
+  // S55 review finding H1 still holds: the go does not name the file, so no field says that the owner named or specifically accepted it.
+  assert.match(inJson.source, /It is a general instruction: it does not name this file, the partner record or Meteora, and this entry does not record that the owner named or specifically accepted this file\./);
+  assert.ok(inJson.source.includes(`(quoted as written): "${LEAD_STATEMENT}"`), "the lead developer's written statement to the owner, quoted as written");
+  assert.match(inJson.source, /The lead developer, under the owner's delegation, applies the go to this file, and before either merge stated this consequence to the owner in writing, in the working conversation on 25 Oct 2026/);
+  assert.match(inJson.summary, /^In force since 25 Oct 2026: applied under the owner's general go \(source\), a recorded deviation of stage S55; nothing changes on the live site until S55 is merged and deployed\./);
+  assert.match(inJson.summary, /What the gate protects still holds: no coin depends on that record \(the fee claimer's one DBC config, EZVHCgxKZhvXmUGMXJMEw8tZHiTmoHPyM9mNNQ5u1kSP, has 0 pools, and the legacy launchpad has launched 0 coins/);
+  for (const f of ["source", "summary", "overrides"]) {
+    assert.doesNotMatch(inJson[f], /is his written acceptance|(?<!not record that the )owner (has |had )?(named|accepted|specifically accepted)|accepted in writing|his (specific |written )+acceptance|Not in force/, f);
+  }
+  assert.match(inJson.overrides, /^release_gates\.legacy_immutable_metadata \(master section 04, BR-02\) for this one file on the old host only \(https:\/\/vicinity\.city\/brand\/vicinity-512\.png\); the gate itself is unchanged and keeps covering every other legacy asset/);
   // the gate itself is unchanged
   assert.equal(json.policy.release_gates.legacy_immutable_metadata, "exact bytes served as long as existing assets depend on them; never redirected");
   assert.equal(MASTER_POLICY.policy.release_gates.legacy_immutable_metadata, json.policy.release_gates.legacy_immutable_metadata);

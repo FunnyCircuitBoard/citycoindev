@@ -361,8 +361,9 @@ test("switch accepted: unknown hosts are refused for every method and path, neve
 // routes 12 months after the redirect, so the old names were 308'd to citycoin.dev and their immutable files served in place. The owner's
 // decision of 24 Oct 2026 replaced that: no forwarding, the names left blank. From S55 on, with SITE_ORIGINS citycoin.dev alone, the legacy
 // hosts are unknown hosts, refused even with the switch accepted; the files keep their bytes on citycoin.dev, and the one address named on
-// chain that goes dark, https://vicinity.city/brand/vicinity-512.png, waits for the owner's specific written acceptance: policy amendment
-// owner-decision-2026-10-25-golive, prepared and not in force until it is quoted there, a blocking item of the S55 deploy checklist.)
+// chain that goes dark, https://vicinity.city/brand/vicinity-512.png, is S55's recorded deviation (b): policy amendment
+// owner-decision-2026-10-25-golive, in force, applies the owner's general go (which does not name the file) to it, with that consequence
+// stated to him in writing by the lead developer.)
 test("switch accepted with SITE_ORIGINS citycoin.dev alone (stage S55): the legacy hosts are refused, never redirected to citycoin.dev; the immutable files keep their bytes on citycoin.dev", async () => {
   pagesReachWorker();
   try {

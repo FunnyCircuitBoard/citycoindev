@@ -3,8 +3,12 @@
 //     run-as-script test compared import.meta.url (symbolic links resolved) with process.argv[1] (as typed), so it checked nothing and exited 0;
 //   - S55-DEPLOY-1: the rollback text names a revert of the S55 code (the configuration and the tests that pin it, together) and the deploy
 //     token's vicinity.city zone, never a pull request that changes the two settings alone (which fails the suite the deploy's build runs);
-//   - H1, H2, H3, H5: the S55 documents declare no gate met by inference: the owner's specific acceptance of the partner logo going dark, the
-//     on-chain pause, his acknowledgement of what stops answering, and the census and backup are blocking items of the S55 deploy checklist;
+//   - H1, H2, H3, H5: the S55 documents declare no gate met by inference. H1: no text says that the owner named or specifically accepted the
+//     partner logo going dark; the guard reads every S55 document, the policy entry in both files and the comments of the tests that pin them.
+//     Since the lead developer's decision of 25 Oct 2026 (under the owner's delegation, after his go), the three gates that need the owner's
+//     signature or his specific words (the on-chain pause, the partner logo, his knowledge of what stops answering) are recorded deviations
+//     (a), (b) and (c), each with its evidence, and the blocking items are: PR #106 merged and deployed with citycoin.dev checked, a fresh
+//     read-only re-check of the chain (any Approval stops the merge), the census and a restore point, and the lead developer's message sent;
 //   - H4: docs/DEPLOY.md names the live-check step of the deploy workflow by its name.
 // Nothing here reaches a network: the check is pointed at a server on 127.0.0.1 that this test starts.
 import { test } from "node:test";
@@ -16,6 +20,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { startedAsScript } from "../scripts/check-live.mjs";
+import { MASTER_POLICY } from "../src/masterpolicy.js";
 
 const read = (f) => readFileSync(new URL(`../${f}`, import.meta.url), "utf8");
 const CHECK_LIVE = fileURLToPath(new URL("../scripts/check-live.mjs", import.meta.url));
@@ -86,38 +91,120 @@ test("the S55 rollback is a revert of the S55 code with the deploy token's vicin
 
 /* ---------------------------------------------------------------- H1, H2, H3, H5: no gate declared met by inference */
 
-test("the S55 documents declare no gate met by inference: the partner logo, the on-chain pause, the owner's acknowledgement and the census are blocking", () => {
+const LEAD_STATEMENT = "For step 3 I'm taking your message as written approval of two things. First, the old Vicinity logo address stored on-chain (the Meteora partner record) will stop loading. Second, I'm going ahead before the old launchpad is paused on-chain. That pause needs your signature. It's still worth doing, but nobody can launch through the old launchpad anyway: no launch approvals exist on-chain, and the website no longer builds launches.";
+const s55Texts = () => {
   const cutover = read("docs/citycoin-master/domain-cutover.md");
   const report = read("docs/citycoin-master/implementation-report.md");
-  const inventory = read("docs/citycoin-master/rebrand-inventory.md");
+  const lines = report.split("\n");
   const s55 = report.slice(report.indexOf("### Stage S55:"), report.indexOf("## 12. Commands run for this report"));
-  const status = cutover.slice(cutover.indexOf("**Status of step 4 (stage S55)"), cutover.indexOf("**Status on 25 October 2026 (written before S55)"));
-  const note = report.slice(report.indexOf("> **Status note added with stage S55"), report.indexOf("## Contents"));
-  const row = report.split("\n").find((l) => l.startsWith("| **S55** Website cutover |"));
-  const c04 = inventory.split("\n").find((l) => l.startsWith("| C04 |"));
-  // H1: the owner's general go is not recorded as his acceptance of the partner logo going dark
-  for (const [label, text] of [["domain-cutover.md", cutover], ["the S55 section", s55], ["the status note", note], ["the S55 row", row], ["C04", c04]]) {
-    // the first version's words (each an affirmative claim; the corrected texts say "is not recorded as ...")
-    assert.doesNotMatch(text, /go (of 25 Oct(ober)? 2026 )?is recorded as (his|the|that) acceptance|\bis recorded as that acceptance|records the owner's go( of 25 Oct 2026, quoted as written,)? as his acceptance|the gate is met by the owner's written acceptance|partner-image acceptance recorded/, label);
+  return {
+    cutover, report, s55,
+    status: cutover.slice(cutover.indexOf("**Status of step 4 (stage S55)"), cutover.indexOf("**Status on 25 October 2026 (written before S55)")),
+    note: report.slice(report.indexOf("> **Status note added with stage S55"), report.indexOf("## Contents")),
+    row: lines.find((l) => l.startsWith("| **S55** Website cutover |")),
+    log: lines.filter((l) => /^\| 2026-10-25 \((stage S55|S55 )/.test(l)).join("\n"),
+    c04: read("docs/citycoin-master/rebrand-inventory.md").split("\n").find((l) => l.startsWith("| C04 |")),
+    checklist: s55.slice(s55.indexOf("**Deploy checklist for S55.**"), s55.indexOf("**Rollback**")),
+  };
+};
+// The false claim of S55 review finding H1, in each wording seen so far and its near variants: that the owner named, or specifically
+// accepted, the partner logo going dark (or that his go is that acceptance). The amendment's own wording, which applies his general go to
+// the file with the consequence stated to him in writing and says that he did not name it, passes. Conditions a gate states ("or the owner
+// accepts in writing that ...") are not claims, and the review table's finding titles describe the defect found.
+const FALSE_ACCEPTANCE = [
+  /go (of 25 Oct(ober)? 2026 )?is recorded as (his|the|that) acceptance|\bis recorded as that acceptance|records the owner's go( of 25 Oct 2026, quoted as written,)? as his acceptance|the gate is met by the owner's written acceptance|partner-image acceptance recorded/i,
+  /(?<!\bnot (?:be |been )?recorded )\bas (?:his|the|that|the owner's) (?:written |specific )?acceptance\b/i, // "... as the acceptance that ... goes dark"
+  /\b(?:it|amendment|entry|go|record|decision) accepts\b|\baccepts (?:\w+ ){0,2}going dark/i, // "the record it accepts going dark"
+  /(?<!\b(?:or|unless|until|if|when) )\b(?:the owner|he) (?:has |had )?(?:accepted in writing|accepted that|specifically accepted (?:this|the|that)|named (?:this|the|that) (?:file|logo|address|partner))/i,
+  /(?<!\b(?:until|unless|when|once|if|after) )\b(?:his|the owner's) (?:specific |written )+acceptance (?:is|was) (?:given|recorded|quoted|received|in hand)/i,
+];
+const testComments = (f) => read(f).split("\n").filter((l) => /^\s*\/\//.test(l)).join("\n");
+
+test("H1, widened: no S55 text, policy entry or test comment says that the owner named or specifically accepted the partner logo going dark", () => {
+  const t = s55Texts();
+  const amendment = (doc) => doc.amendments.find((a) => a.id === "owner-decision-2026-10-25-golive");
+  const json = JSON.parse(read("docs/citycoin-master/policy.json"));
+  const reconciliation = read("docs/citycoin-master/00-reconciliation.md").split("\n").filter((l) => l.includes("/brand/vicinity-512.png")).join("\n");
+  const findingTitles = (text) => text.replace(/^\| (?:H\d|S55-[A-Z]+-\d|SEC-NIT-\d)[^|]*\|/gm, "|");
+  const texts = [
+    ["domain-cutover.md", t.cutover], ["the S55 section", findingTitles(t.s55)], ["the status note", t.note], ["the S55 row", t.row],
+    ["the S55 update-log rows", t.log], ["C04", t.c04], ["00-reconciliation.md", reconciliation], ["docs/DEPLOY.md", read("docs/DEPLOY.md")],
+    ["README.md", read("README.md")],
+    ...["source", "summary", "overrides"].flatMap((f) => [[`policy.json ${f}`, amendment(json)[f]], [`src/masterpolicy.js ${f}`, amendment(MASTER_POLICY)[f]]]),
+    // the two places the first H1 pass missed: the report's count note (in the S55 section, above) and this comment
+    ...["test/masterpolicy.test.js", "test/brand-adapters.test.js", "test/host-redirect.test.js", "test/s55-cutover.test.js"].map((f) => [`${f} (comments)`, testComments(f)]),
+  ];
+  for (const [label, text] of texts) {
+    assert.ok(text && text.length > 40, `${label}: read`);
+    for (const re of FALSE_ACCEPTANCE) assert.doesNotMatch(text, re, label);
   }
-  assert.match(status, /3\. \*\*The partner record's logo\*\* \(section 0, item 2\): not met\./);
-  assert.match(c04, /not recorded as that acceptance/);
-  // H2: the pause is a blocking pre-merge item, no deviation
-  assert.doesNotMatch(cutover + note + row + s55, /recorded deviation: the on-chain pause|One gate is a recorded deviation|proceeds under the owner's go of 25 Oct 2026 with this recorded deviation|\*\*Deviation, recorded\.\*\*/);
-  assert.match(status, /2\. \*\*The legacy launch path closed on chain\*\*[^]*?: not met\./);
-  // H3: the checklist's pre-merge items are all blocking, and the status lists every precondition that is not met or not evidenced
-  const checklist = s55.slice(s55.indexOf("**Deploy checklist for S55.**"), s55.indexOf("**Rollback**"));
-  assert.match(checklist, /^\*\*Deploy checklist for S55\.\*\* Items 1 to 5 come before the merge, each recorded in the pull request with its time, and all five are blocking/);
-  for (const n of [1, 2, 3, 4, 5]) assert.match(checklist, new RegExp(`^${n}\\. \\*\\*Blocking: `, "m"), `item ${n} is blocking`);
-  assert.match(checklist, /launches_paused = 1/);
-  assert.doesNotMatch(checklist, /set_pause\(launches = true\)` on the legacy launchpad \(recommended\)/);
+  // the guard catches both wordings the first H1 pass missed, and the first version's
+  for (const missed of [
+    "and the record it accepts going dark (name \"Vicinity\", the vicinity.city logo address)",
+    "(stage S55 added the third: the owner's go of 25 Oct 2026 as the acceptance that https://vicinity.city/brand/vicinity-512.png goes dark;",
+    "it records the owner's go of 25 Oct 2026, quoted as written, as his acceptance that this address goes dark",
+    "the owner has accepted in writing that this address goes dark",
+    "the owner named the file in his go",
+    "his specific written acceptance is quoted in the entry",
+  ]) assert.ok(FALSE_ACCEPTANCE.some((re) => re.test(missed)), missed);
+  // ... and lets the honest wording through
+  for (const honest of [
+    amendment(json).source, amendment(json).summary, t.c04,
+    "it does not name this file, the partner record or Meteora, and this entry does not record that the owner named or specifically accepted this file",
+    "So step 4 waits until either the record names an address on citycoin.dev, or the owner accepts in writing that this address goes dark",
+    "it is not recorded as his acceptance of this file going dark",
+    "nothing until the owner's specific written acceptance is quoted in this entry",
+  ]) for (const re of FALSE_ACCEPTANCE) assert.doesNotMatch(honest, re, honest.slice(0, 80));
+  // the honest wording is there: applied under the owner's general go, with the consequence stated to him in writing, never named by him
+  assert.match(amendment(json).source, /this entry does not record that the owner named or specifically accepted this file\. The lead developer, under the owner's delegation, applies the go to this file, and before either merge stated this consequence to the owner in writing/);
+  assert.match(amendment(json).summary, /^In force since 25 Oct 2026: applied under the owner's general go \(source\)/);
+  assert.match(t.status, /3\. \*\*The partner record's logo\*\* \(section 0, item 2\): \*\*recorded deviation \(b\)\*\*\.[^]*?the go does not name the file, and the amendment does not say that he named or specifically accepted it\./);
+  assert.match(t.c04, /not recorded as that acceptance/);
+  assert.match(t.c04, /does not say that he named or specifically accepted it/);
+});
+
+test("the gates that need the owner's signature or his words are recorded deviations (a), (b), (c) with their evidence; the blocking items are the four the lead developer does right before the merge", () => {
+  const t = s55Texts();
+  // the lead developer's written statement to the owner, quoted as written, where the decision is recorded
+  for (const [label, text] of [["domain-cutover.md status", t.status], ["the S55 section", t.s55]]) assert.ok(text.replace(/\n\s*/g, " ").includes(`(quoted as written): "${LEAD_STATEMENT}"`), label);
+  // (a) the on-chain pause: not met as written, with its evidence, the residual risk, still recommended; the fresh re-check is blocking
+  assert.match(t.status, /2\. \*\*The legacy launch path closed on chain\*\* \(section 0, item 1; section 4, "Before step 4"\): \*\*recorded deviation \(a\)\*\*, not met as written\./);
+  const a = t.s55.slice(t.s55.indexOf("- **(a) The on-chain pause"), t.s55.indexOf("- **(b) The partner record's logo"));
+  for (const must of [/It is 0: only the owner's wallet can set it/, /he has not signed it, and his go does not name it/, /0 `Approval` accounts exist on chain \(by size 179 and by discriminator\)/,
+    /`LEGACY_LAUNCH=off` \(the go-live\) makes the website build and accept no approval or launch/, /0 coins were launched \(`\/official-coins\.csv` empty, 0 `Coin` accounts\)/,
+    /Residual risk, stated plainly: the admin wallet `13qRam63xqqd8KNUoAmHWQu7ro71oHqEsYHYaG5MsRiN`, or the program's upgrade authority \(the Squads vault `AB5qB1iAukPB7p1dkukQ1qSke3yQBDeSd5o69dLFGs7X`, 2 of 3\), could still create an approval or change the code, and the pause itself would not stop an admin, who can unpause/,
+    /The pause stays a recommended owner step/]) assert.match(a, must);
+  // (b) and (c)
+  assert.match(t.s55, /- \*\*\(b\) The partner record's logo \(gate "legacy_immutable_metadata"\)\.\*\*[^]*?no coin depends on that record \(the fee claimer's one DBC config has 0 pools, and the legacy launchpad has launched 0 coins\)/);
+  assert.match(t.status, /4\. \*\*Items 3 and 4 of section 0 known to the owner:\*\* \*\*recorded deviation \(c\)\*\*\.[^]*?That message is not sent yet: sending it is a blocking item\./);
+  assert.match(t.s55, /- \*\*\(c\) Items 3 and 4 of `domain-cutover\.md` section 0 known to the owner\.\*\*[^]*?That message is not sent yet/);
+  // nothing claims the pause signed, the gate met, or the message sent
+  assert.doesNotMatch(t.cutover + t.note + t.row + t.s55, /(?<!\b(?:if|unless|until|when|once) )the owner (?:has )?signed (?:the pause|`?set_pause)|the pause (?:is|was|has been) signed|message (?:is|was|has been) sent|(?<!not )met by the owner/);
+  // the status lists every precondition, with the ones that cannot be met recorded as not met
   for (const item of ["PR #106 merged and deployed", "The legacy launch path closed on chain", "The partner record's logo", "Items 3 and 4 of section 0 known to the owner",
-    "The database census and backup before and after", "The rollback rehearsed on preview first", "The synthetic probes of S54"]) {
-    assert.ok(status.includes(`**${item}`), `the status lists: ${item}`);
+    "The database census and restore point before and after", "The rollback rehearsed on preview first", "The synthetic probes of S54"]) {
+    assert.ok(t.status.includes(`**${item}`), `the status lists: ${item}`);
   }
+  assert.match(t.status, /1\. \*\*PR #106 merged and deployed[^]*?: not met, blocking\./);
+  assert.match(t.status, /5\. \*\*The database census and restore point before and after\*\*[^]*?blocking\./);
+  assert.match(t.status, /6\. \*\*The rollback rehearsed on preview first\*\*[^]*?cannot be met/);
+  assert.match(t.status, /7\. \*\*The synthetic probes of S54\*\*[^]*?not built\./);
+  // the checklist: four blocking items, done right before the merge; the deviations are not among them
+  assert.match(t.checklist, /^\*\*Deploy checklist for S55\.\*\* Items 1 to 4 come before the merge, each done by the lead developer right before the merge and recorded in the pull request with its time, and all four are blocking/);
+  for (const n of [1, 2, 3, 4]) assert.match(t.checklist, new RegExp(`^${n}\\. \\*\\*Blocking: `, "m"), `item ${n} is blocking`);
+  assert.doesNotMatch(t.checklist, /^5\. \*\*Blocking/m);
+  assert.match(t.checklist, /^1\. \*\*Blocking: PR #106 \(the go-live\) is merged and deployed, and citycoin\.dev passes the checks of `domain-cutover\.md` section 4, "After step 2"\*\*/m);
+  assert.match(t.checklist, /^2\. \*\*Blocking: a fresh read-only re-check of the chain, right before the merge\*\*[^]*?by `dataSize` 179 and by the `Approval` discriminator `e90999310bde3b82` \(0 expected\)[^]*?\*\*If any `Approval` or `Coin` account exists, or the list is not empty, STOP: do not merge\*\*/m);
+  assert.match(t.checklist, /^3\. \*\*Blocking: the census and a restore point\*\*[^]*?If neither a backup nor a restore point is recorded, do not merge\./m);
+  assert.match(t.checklist, /^4\. \*\*Blocking: the lead developer's message to the owner of deviation \(c\), sent\*\*/m);
+  assert.match(t.checklist, /the on-chain pause `set_pause\(launches = true\)` on the legacy launchpad, which stays recommended \(deviation \(a\); E3, S58\)/);
+  assert.doesNotMatch(t.checklist, /Blocking: the legacy launch path is closed on chain|Blocking: the partner record's logo|Blocking: the owner's written acknowledgement|or the owner's written waiver/);
+  // the policy entry of the domains decision is unchanged ("the legacy launch path is closed before it stops"): the deviation is recorded, not
+  // written into the policy as if the owner had decided it
+  assert.match(JSON.parse(read("docs/citycoin-master/policy.json")).amendments.find((x) => x.id === "owner-decision-2026-10-24-domains").summary, /the legacy launch path is closed before it stops/);
   // H5: the safety argument is qualified by the upgrade authority
-  assert.doesNotMatch(cutover, /So nobody but the owner's wallet can make a launch possible\./);
-  assert.match(cutover, /So, under the deployed code, nobody but the owner's wallet can make a launch possible; any change to that code\n {2}needs the program's upgrade authority, the Squads vault `AB5qB1iAukPB7p1dkukQ1qSke3yQBDeSd5o69dLFGs7X` \(2 of 3\)/);
+  assert.doesNotMatch(t.cutover, /So nobody but the owner's wallet can make a launch possible\./);
+  assert.match(t.cutover, /So, under the deployed code, nobody but the owner's wallet can make a launch possible; any change to that code\n {2}needs the program's upgrade authority, the Squads vault `AB5qB1iAukPB7p1dkukQ1qSke3yQBDeSd5o69dLFGs7X` \(2 of 3\)/);
 });
 
 /* ---------------------------------------------------------------- H4: the deploy step's name */

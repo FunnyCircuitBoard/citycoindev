@@ -688,8 +688,9 @@ const SERVER_LEFT = Object.freeze({
   today: { "brand.js": 3, "coinart.js": 1, "coinmeta.js": 2, "lpadmin.js": 1, "lpkit.js": 1, "mail.js": 18, "sol/lpadmin-ix.js": 1, "solana.js": 2 },
   legacy: { "coin.js": 1, "me.js": 1, "official.js": 30, "policy.js": 1, "portfolio.js": 2, "swap.js": 2 },
   // 25 since main ec1e838 (#100): the owner's domains decision names vicinity.city in the policy statement; 28 since stage S55: the amendment
-  // owner-decision-2026-10-25-golive (prepared, not in force) quotes the owner's go ("Vicinity still active") and the on-chain partner record
-  // whose logo address would go dark (name "Vicinity", the vicinity.city logo address). Records of the policy document, never shown on a page
+  // owner-decision-2026-10-25-golive (in force since 25 Oct 2026, S55's recorded deviation (b)) quotes the owner's go ("Vicinity still active")
+  // and the lead developer's written statement to him, and names the on-chain partner record whose logo address goes dark at the S55 deploy
+  // (name "Vicinity", the vicinity.city logo address): three strings. Records of the policy document, never shown on a page
   record: { "masterpolicy.js": 28 },
 });
 const LEGACY_FILES = new Set(["coin.js", "me.js", "official.js", "portfolio.js", "swap.js"]);

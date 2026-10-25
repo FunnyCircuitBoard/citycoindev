@@ -5,33 +5,55 @@ Master change order v5, section 04 (BR-02) and section 05 (BR-03). Started in st
 section 2. All three were merged in PR #97 (`2608bd9`) with their switches off. On 24 October 2026 the owner decided that the old names
 are not forwarded (section 0): stage S56 (the redirects) is dropped, and the cutover now finishes in S55. Each later stage adds its part.
 
-**Status of step 4 (stage S55), 25 October 2026: built on local branch `cc/s55` on the go-live branch `cc/golive` (`0606956`, PR #106, not
-merged), not merged and not deployed** (implementation-report.md section 11, "Stage S55"). On the owner's go of 25 October 2026 ("I still see
-nothing on Citycoin.dev. Vicinity still active. What are you doing? Get them all sorted. Don't wait for my permission just go ahead and execute
-all the changes."), `wrangler.jsonc` lists citycoin.dev alone (`SITE_ORIGINS` and `SITE_ORIGIN` `https://citycoin.dev`) and keeps the
-citycoin.dev route alone: the `vicinity.city` and `www.vicinity.city` custom domains are removed, with no redirect (section 0). The two
-`noindex` rules leave `public/_headers`, the post-deploy check checks citycoin.dev (section 4, "Before step 4") and the link checker's official
-list is citycoin.dev alone (section 0, item 6). Its preconditions are not met yet. As read for the S55 review (25 October 2026), each of these
-is unmet or not evidenced; items 1 to 5 are blocking items of implementation-report.md section 11, "Deploy checklist for S55", and S55 is not
-merged before they hold:
+**Status of step 4 (stage S55), 25 October 2026: built on local branch `cc/s55` on the go-live branch `cc/golive` (`0d516c0`, PR #106, not
+merged; S55 was built on `0606956` and rebased), not merged and not deployed** (implementation-report.md section 11, "Stage S55"). On the
+owner's go of 25 October 2026 ("I still see nothing on Citycoin.dev. Vicinity still active. What are you doing? Get them all sorted. Don't wait
+for my permission just go ahead and execute all the changes."), `wrangler.jsonc` lists citycoin.dev alone (`SITE_ORIGINS` and `SITE_ORIGIN`
+`https://citycoin.dev`) and keeps the citycoin.dev route alone: the `vicinity.city` and `www.vicinity.city` custom domains are removed, with no
+redirect (section 0). The two `noindex` rules leave `public/_headers`, the post-deploy check checks citycoin.dev (section 4, "Before step 4")
+and the link checker's official list is citycoin.dev alone (section 0, item 6). Its preconditions, as read on 25 October 2026 (the chain last at
+14:31 to 14:35 UTC), are listed below. Items 1 and 5 are not met and are blocking items of implementation-report.md section 11, "Deploy checklist
+for S55", with two more blocking items done right before the merge: a fresh read-only re-check of the chain (any `Approval` stops the merge) and
+the lead developer's message to the owner of item 4. Items 2, 3 and 4 need the owner's signature or his specific words, and are not blocking any
+more: the lead developer decided, under the owner's delegation and after his go of 25 October 2026, to take each as a recorded deviation, with its
+evidence and the reason the protection it was meant to give still holds. Before either merge he told the owner in writing, in the working
+conversation on 25 October 2026 (quoted as written): "For step 3 I'm taking your message as written approval of two things. First, the old
+Vicinity logo address stored on-chain (the Meteora partner record) will stop loading. Second, I'm going ahead before the old launchpad is paused
+on-chain. That pause needs your signature. It's still worth doing, but nobody can launch through the old launchpad anyway: no launch approvals
+exist on-chain, and the website no longer builds launches." Items 6 and 7 cannot be met and stay recorded as not met. S55 is not merged before
+its blocking items hold:
 
-1. **PR #106 merged and deployed, citycoin.dev serving, the checks of section 4, "After step 2", run** (section 3, step 3): not met. At 11:53
-   UTC citycoin.dev had no A record (DNS over HTTPS): the S06 attach had not happened (deploy run 97 failed at the citycoin.dev custom domain
-   for want of the token's zone).
-2. **The legacy launch path closed on chain** (section 0, item 1; section 4, "Before step 4"): not met. The legacy launchpad's
-   `launches_paused` is 0, and only the owner's wallet can set it.
-3. **The partner record's logo** (section 0, item 2): not met. The record still names `https://vicinity.city/brand/vicinity-512.png`, and the
-   owner has not accepted in writing that this address goes dark: his go of 25 October 2026 is a general instruction that does not name it.
-   Policy amendment `owner-decision-2026-10-25-golive` is prepared in both files and is not in force until his words are quoted in it.
-4. **Items 3 and 4 of section 0 known to the owner:** not evidenced.
-5. **The database census and backup before and after** (implementation-report.md section 6, S55 row; external E9): not taken for S55 (the
-   census of 11:30 UTC was the go-live's).
+1. **PR #106 merged and deployed, citycoin.dev serving, the checks of section 4, "After step 2", run** (section 3, step 3): not met, blocking.
+   At 14:31 UTC citycoin.dev had no A record (DNS over HTTPS: the zone's SOA only): the S06 attach had not happened (deploy run 97 failed at the
+   citycoin.dev custom domain for want of the token's zone).
+2. **The legacy launch path closed on chain** (section 0, item 1; section 4, "Before step 4"): **recorded deviation (a)**, not met as written.
+   The legacy launchpad's `launches_paused` is 0 (slot 461291984), and only the owner's wallet can set it; he has not signed the pause, and his
+   go does not name it. Why the protection still holds: a launch needs an `Approval` account that only `approve_launch`, signed by the admin
+   `13qRam63xqqd8KNUoAmHWQu7ro71oHqEsYHYaG5MsRiN`, creates (program source); 0 `Approval` accounts exist (getProgramAccounts by size 179 and by
+   discriminator); `LEGACY_LAUNCH=off` makes the website build and accept no approval or launch; 0 coins were launched (0 `Coin` accounts,
+   `/official-coins.csv` empty). Residual risk, stated plainly: the admin wallet, or the program's upgrade authority (the Squads vault
+   `AB5qB1iAukPB7p1dkukQ1qSke3yQBDeSd5o69dLFGs7X`, 2 of 3), could still create an approval or change the code, and the pause itself would not
+   stop the admin, who can unpause. The pause stays a recommended owner step (external E3). The fresh read-only re-check right before the
+   merge is blocking.
+3. **The partner record's logo** (section 0, item 2): **recorded deviation (b)**. The record still names
+   `https://vicinity.city/brand/vicinity-512.png` (slot 461291984). Policy amendment `owner-decision-2026-10-25-golive` is in force, the same in
+   both files: it applies the owner's general go to this file, with the consequence stated to him in writing by the lead developer (quoted
+   above); the go does not name the file, and the amendment does not say that he named or specifically accepted it. Why the protection still
+   holds: no coin depends on that record (its fee claimer's one DBC config has 0 pools; 0 launches), the brand is now Citycoin.dev, and the file
+   stays at `https://citycoin.dev/brand/vicinity-512.png` with unchanged bytes.
+4. **Items 3 and 4 of section 0 known to the owner:** **recorded deviation (c)**. The owner asked for both names to be left blank (section 0).
+   The consequence (every old vicinity.city link, bookmark and tracker, and the Google sign-in callback on vicinity.city, get no answer from this
+   site; members sign in again on citycoin.dev with the same wallet) is stated to him in writing by the lead developer in the working
+   conversation before the S55 merge. That message is not sent yet: sending it is a blocking item.
+5. **The database census and restore point before and after** (implementation-report.md section 6, S55 row; external E9): not taken for S55
+   (the census of 11:30 UTC was the go-live's), blocking. The D1 Time Travel timestamp stands in for the backup script, whose credentials the
+   release session does not hold, as for the go-live.
 6. **The rollback rehearsed on preview first** (S55 row; section 3): cannot be met, because no preview environment exists (S05 is not built:
    `workers_dev` and `preview_urls` are false, and there is one D1 database). A local rehearsal of the rollback of section 5 stands in, recorded
    in implementation-report.md section 11; the re-attach of vicinity.city itself cannot be rehearsed without a second Worker.
 7. **The synthetic probes of S54** (section 4, "After step 2" and "After step 4"; external E15): not built. The deploy checklist's manual
-   checks run before and right after the deploy, and the owner is told in writing, with item 4, that no probe watches citycoin.dev during the
-   observation period.
+   checks run before and right after the deploy, and the lead developer's message of item 4 tells the owner that no probe watches citycoin.dev
+   during the observation period.
 
 **Status on 25 October 2026 (written before S55): step 2 (stage S06) is prepared in a configuration pull request, not merged, on the owner's go of the same
 day** ("Don't wait for my permission just go ahead and execute all the changes"). It attaches citycoin.dev as a custom domain of this
@@ -97,6 +119,9 @@ What stops answering once vicinity.city is removed (section 3, step 4), for the 
    (read-only, 25 Oct 2026 14:08 UTC, slots 461285542 and 461285543; `launches_paused` still 0). A fresh read-only re-check right before that merge is
    blocking, and any `Approval` stops the merge (implementation-report.md section 11, go-live deploy checklist item 6). The pause stays
    the owner's recommended step. How it bears on step 4 is S55's record.
+   *S55 note (25 Oct 2026):* for step 4 the pause is a recorded deviation too (deviation (a), with the values re-read at 14:31 UTC: the status
+   at the top, item 2, and section 4, "Before step 4"), taken under the owner's go by the lead developer's decision, and a fresh read-only
+   re-check right before the S55 merge is blocking in the same way. The pause stays the owner's recommended step.
 2. **`/brand/vicinity-512.png` on vicinity.city.** The Meteora DBC partner-metadata account `2be9mDcn…si11` names this address on chain
    (rebrand-inventory.md C04). After step 4 it gets no answer from this site; the file itself stays and is served on citycoin.dev.
    Whether DBC lets the fee-claimer wallet update that record was not verified. The policy keeps this file under
@@ -104,11 +129,18 @@ What stops answering once vicinity.city is removed (section 3, step 4), for the 
    does not name it. So step 4 waits until either the record names an address on citycoin.dev, or the owner accepts in writing that
    this address goes dark and that acceptance is recorded as an owner decision in `policy.json` `amendments` and its mirror
    `src/masterpolicy.js` (section 4, "Before step 4").
+   *S55 note (25 Oct 2026):* neither condition is met as written: the record is unchanged, and the owner's go does not name this address.
+   Recorded deviation (b): amendment `owner-decision-2026-10-25-golive` is in force in both files; it applies the owner's general go to this
+   file, with the consequence stated to him in writing by the lead developer before either merge (quoted in the status at the top), and does
+   not say that he named or specifically accepted it. No coin depends on that record (section 4, "Before step 4").
 3. **`/official-coins.csv` and the read-only API on vicinity.city** (rebrand-inventory.md C09, C10). A tracker that registered the
    vicinity.city address (whether any did was not verified) must use citycoin.dev's.
 4. **Every old link and bookmark** (posts of `@VicinityCitySOL`, listings that name `https://vicinity.city`, the Google sign-in
    callback registered for vicinity.city) gets no answer from this site. A member signs in again on citycoin.dev with the same wallet
    (section 6). Visitors learn the new address only from what the site and the official accounts tell them before step 4.
+   *S55 note (25 Oct 2026), items 3 and 4:* recorded deviation (c). The owner asked for both names to be left blank; the lead developer states
+   these consequences to him in writing, in the working conversation, before the S55 merge (a blocking item of the S55 deploy checklist; not
+   sent yet). Whether any tracker registered the vicinity.city address is still not verified.
 5. **Mail.** The sender is on vicinity.city (wrangler.jsonc `EMAIL_FROM`, rebrand-inventory.md U03). It moves to citycoin.dev once
    the mail provider verifies it, or mail notices stop (in-app only), before the owner puts vicinity.city to another use.
 6. **The link checker** calls `vicinity.city`, `vicinitycity.com` and `vicinitycity.net` official (`src/official.js` `websites`,
@@ -362,12 +394,15 @@ are rehearsed first. (S05 is not built; for step 4 a local rehearsal of the roll
    are run. If the attach fails for want of the token's zone (step 1), see the status under section 2, item 2.
 3. **Checks on citycoin.dev** while both hosts serve (section 4, "After step 2").
 4. **S55, a configuration pull request, makes citycoin.dev the canonical origin and removes the vicinity.city routes** (*status, 25 Oct
-   2026: built on branch `cc/s55` on `cc/golive`, not merged; `SITE_ORIGIN` was already set by the go-live pull request; its preconditions are
-   not met yet, and it is not merged before they hold: see the status at the top and section 4, "Before step 4"*):
+   2026: built on branch `cc/s55` on `cc/golive`, not merged; `SITE_ORIGIN` was already set by the go-live pull request; its blocking items
+   are not met yet, and it is not merged before they hold; three preconditions are recorded deviations taken under the owner's go: see the
+   status at the top and section 4, "Before step 4"*):
    `SITE_ORIGIN=https://citycoin.dev`, `SITE_ORIGINS=https://citycoin.dev`, and the `vicinity.city` and `www.vicinity.city` entries
    removed from wrangler.jsonc `routes`, with no redirect (section 2, item 4). Only after the legacy launch path is closed (section 0,
-   item 1: stage S58), the checks of step 3 pass and every item of section 4, "Before step 4", holds. The label switches of S55 may
-   go in the same pull request or follow it (implementation-report.md, stage S55).
+   item 1: stage S58), the checks of step 3 pass and every item of section 4, "Before step 4", holds. (*As built for S55:* the on-chain
+   pause, the partner record and the owner's knowledge of items 3 and 4 of section 0 are recorded deviations (a), (b) and (c); the other items
+   of section 4, "Before step 4", hold or are blocking.) The label switches of S55 may go in the same pull request or follow it
+   (implementation-report.md, stage S55).
 5. **The owner removes the vicinitycity.com forward** (section 2, item 6): any time, before or after the other steps; it is independent
    of the site.
 
@@ -419,31 +454,40 @@ has the exact values):
 
 - The legacy launch path is closed: a read-only RPC read of the legacy launchpad PDA shows `launches_paused = 1` (signed by
   `13qRam…sRiN`, external E3), and the website builds no legacy launch (`LEGACY_LAUNCH=off`, S58).
-  *Status: not met, so step 4 waits. The website part holds (`LEGACY_LAUNCH=off`, the go-live pull request). The on-chain pause does not:
-  the Launchpad PDA `4g9KRZ76Mpw6HCCu713yEGzm1txdCod3S1SugL7M9GwN` reads `launches_paused = 0` (finalized, slot 461247266). The pause is a
-  blocking pre-merge item of the S55 deploy checklist, as it is of PR #106's (item 6); the first version of S55 recorded it as a deviation, which
-  the S55 review (finding H2) took back. For context only, not in its place: `launch` consumes an `Approval` account that only
-  `approve_launch`, signed by the Launchpad's admin (`13qRam…sRiN`, the owner's wallet), creates (program source
-  `solana/programs/vicinity-launchpad/src/instructions/launch.rs` and `approve_launch.rs`; the deployed program's bytes equal the committed
-  build, SHA-256 `32906e19…c1621a`), and there are 0 `Approval` accounts and 0 `Coin` accounts on chain (getProgramAccounts by size 179 and by
-  the `Approval` discriminator). So, under the deployed code, nobody but the owner's wallet can make a launch possible; any change to that code
-  needs the program's upgrade authority, the Squads vault `AB5qB1iAukPB7p1dkukQ1qSke3yQBDeSd5o69dLFGs7X` (2 of 3).*
+  *Status: recorded deviation (a); not met as written. The website part holds (`LEGACY_LAUNCH=off`, the go-live pull request). The on-chain
+  pause does not: the Launchpad PDA `4g9KRZ76Mpw6HCCu713yEGzm1txdCod3S1SugL7M9GwN` reads `launches_paused = 0` (finalized, 14:31 UTC, slot
+  461291984; admin `13qRam63xqqd8KNUoAmHWQu7ro71oHqEsYHYaG5MsRiN`, no pending admin), and the owner has not signed `set_pause(launches = true)`.
+  The S55 review (finding H2) had made the pause a blocking pre-merge item, as PR #106's item 6 then was. The lead developer decided on 25 Oct
+  2026, under the owner's delegation and after his go, to go ahead before the pause, and told the owner so in writing before either merge (the
+  status at the top). Why it is safe to proceed: `launch` consumes an `Approval` account that only `approve_launch`, signed by the Launchpad's
+  admin (the owner's wallet), creates (program source `solana/programs/vicinity-launchpad/src/instructions/launch.rs` and `approve_launch.rs`;
+  the deployed program's bytes equal the committed build, SHA-256 `32906e19…c1621a`); there are 0 `Approval` accounts (getProgramAccounts by
+  size 179 and by the `Approval` discriminator `e90999310bde3b82`) and 0 `Coin` accounts (14:31 UTC, slots 461291985 to 461291986);
+  `LEGACY_LAUNCH=off` makes the website build and accept no approval or launch; `/official-coins.csv` is empty.
+  So, under the deployed code, nobody but the owner's wallet can make a launch possible; any change to that code
+  needs the program's upgrade authority, the Squads vault `AB5qB1iAukPB7p1dkukQ1qSke3yQBDeSd5o69dLFGs7X` (2 of 3). Residual risk, stated
+  plainly: that wallet could still create an approval and the vault could change the code; the pause itself would not stop the admin, who can
+  unpause. The pause stays a recommended owner step. A fresh read-only re-check right before the S55 merge is blocking: any `Approval` stops
+  the merge.*
 - No coin names vicinity.city: `/official-coins.csv` is empty and the legacy launchpad has launched no coin. Any such coin stops step 4
   until the owner decides (policy `release_gates.legacy_immutable_metadata`: exact bytes served as long as existing assets depend on
   them).
-  *Status: holds. `https://vicinity.city/official-coins.csv` answered 200 `text/csv; charset=utf-8` with an empty body (11:53 UTC), its JSON
-  `coins: []`, and the program has 0 `Coin` accounts.*
+  *Status: holds. `https://vicinity.city/official-coins.csv` answered 200 `text/csv; charset=utf-8` with an empty body (11:53 UTC, and again at
+  14:31 UTC), its JSON `coins: []`, and the program has 0 `Coin` accounts.*
 - The on-chain partner record `2be9mDcn…si11` (section 0, item 2): a read-only RPC read shows that it names an address on
   citycoin.dev, or the owner has accepted in writing that `https://vicinity.city/brand/vicinity-512.png` goes dark and that
   acceptance is recorded as an owner decision in `policy.json` `amendments` and `src/masterpolicy.js` (kept identical), for this one
   file on the old host. Without one of the two, step 4 waits (policy `release_gates.legacy_immutable_metadata`).
-  *Status: the record still names vicinity.city (read 11:51 UTC, slot 461246860: name "Vicinity", website "https://vicinity.city", logo
-  "https://vicinity.city/brand/vicinity-512.png", fee claimer `13qRam63xqqd8KNUoAmHWQu7ro71oHqEsYHYaG5MsRiN`), so the gate is not met by the
-  record. Nor by the owner's go of 25 Oct 2026: it is a general instruction that does not name this address, the partner record or Meteora, so
-  it is not his written acceptance of this file going dark (S55 review finding H1). His specific written acceptance is a blocking pre-merge item
-  of the S55 deploy checklist; amendment `owner-decision-2026-10-25-golive` is prepared in both files and is not in force until his words are
-  quoted in it. Until then step 4 waits. The file stays served at
-  `https://citycoin.dev/brand/vicinity-512.png` with unchanged bytes. The DBC IDL committed here (`solana/idls/dynamic_bonding_curve.json`)
+  *Status: recorded deviation (b). The record still names vicinity.city (read 11:51 UTC, slot 461246860, and again at 14:31 UTC, slot
+  461291984: name "Vicinity", website "https://vicinity.city", logo "https://vicinity.city/brand/vicinity-512.png", fee claimer
+  `13qRam63xqqd8KNUoAmHWQu7ro71oHqEsYHYaG5MsRiN`), so the gate is not met by the record. Nor by the owner's words as the gate asks: his go of 25
+  Oct 2026 is a general instruction that does not name this address, the partner record or Meteora (S55 review finding H1). Amendment
+  `owner-decision-2026-10-25-golive` is in force, the same in both files: the lead developer applies the go to this file under the owner's
+  delegation, and before either merge stated the consequence to him in writing ("the old Vicinity logo address stored on-chain (the Meteora
+  partner record) will stop loading"; the status at the top). It is not recorded as the owner naming or specifically accepting this file. Why
+  the protection still holds: no coin depends on that record (the fee claimer's one DBC config, `EZVHCgxKZhvXmUGMXJMEw8tZHiTmoHPyM9mNNQ5u1kSP`,
+  has 0 pools at 14:34 UTC, slot 461293023, and the legacy launchpad has launched 0 coins), the brand is now Citycoin.dev, and the file stays
+  served at `https://citycoin.dev/brand/vicinity-512.png` with unchanged bytes. The DBC IDL committed here (`solana/idls/dynamic_bonding_curve.json`)
   has `create_partner_metadata` and no instruction that updates or closes a partner record, so an update may not be possible with that
   program version (not checked against the deployed DBC); any update is the fee-claimer wallet holder's (the owner's) step.*
 - The post-deploy check checks citycoin.dev: `scripts/check-live.mjs` (default base `https://vicinity.city`, run after every deploy
@@ -459,9 +503,11 @@ has the exact values):
   pull request removes those two rules together with the routes.
   *Status: done in the S55 pull request; `public/_headers` is byte for byte as before S06 (`5150529`): no host rule, no X-Robots-Tag.*
 - *Items 3 to 6 of section 0: item 5 (mail) is settled by the go-live (sender on citycoin.dev; no route sends mail under wallet-only
-  sign-in), item 6 by S55 (the list). That the owner knows items 3 and 4 is not evidenced yet (S55 review finding H3): a blocking pre-merge item
-  of the S55 deploy checklist asks for his written acknowledgement that an old link, bookmark, tracker or Google callback on vicinity.city gets
-  no answer from this site after the deploy.*
+  sign-in), item 6 by S55 (the list). Items 3 and 4 are recorded deviation (c): the S55 review (finding H3) asked for the owner's written
+  acknowledgement; the owner asked for both names to be left blank, and the lead developer states the consequence to him in writing, in the
+  working conversation, before the S55 merge (an old link, bookmark, tracker or the Google callback on vicinity.city gets no answer from this
+  site after the deploy; members sign in again on citycoin.dev with the same wallet). That message is a blocking pre-merge item of the S55
+  deploy checklist, and it is not sent yet.*
 
 **After step 4** (the S55 deploy checklist, implementation-report.md section 11, runs these):
 
@@ -491,8 +537,8 @@ every deploy runs every test: a pull request that only puts `SITE_ORIGINS`, the 
 1. Before it: the owner has not put vicinity.city to its other use, and the deploy token has the `vicinity.city` zone again (`docs/DEPLOY.md`
    step 1). Without the zone, wrangler uploads the new version and then fails to attach the two names: the run goes red and vicinity.city
    stays detached.
-2. The pull request: `git revert --no-commit <the S55 merge commit on main>` (on the branch before the merge, the code commits are `6e7e611`
-   and the review follow-up commit), then `git checkout HEAD -- '*.md'` so the documents keep the S55 record, and a dated line in them that
+2. The pull request: `git revert --no-commit <the S55 merge commit on main>` (on the branch before the merge, the code commits are `e37da6e`
+   (built as `6e7e611`), the review follow-up commit `0647e01` and the commit that put the amendment in force), then `git checkout HEAD -- '*.md'` so the documents keep the S55 record, and a dated line in them that
    says why it was rolled back. The revert changes values only: `SITE_ORIGINS` back to `https://citycoin.dev https://vicinity.city`,
    `{ "pattern": "vicinity.city", "custom_domain": true }` and `{ "pattern": "www.vicinity.city", "custom_domain": true }` back after the
    citycoin.dev route, the two `noindex` host rules back in `public/_headers`; no line of `wrangler.jsonc` is deleted, so `keep_vars` is no
