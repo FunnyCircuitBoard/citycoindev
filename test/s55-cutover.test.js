@@ -10,7 +10,8 @@
 //   - public/_headers carries no X-Robots-Tag rule;
 //   - the post-deploy check (scripts/check-live.mjs) checks the configured canonical origin by default, and the deploy workflow relies on it;
 //   - the link checker never calls vicinity.city, vicinitycity.com or vicinitycity.net official again;
-//   - the policy amendment owner-decision-2026-10-25-golive, the same in docs/citycoin-master/policy.json and src/masterpolicy.js.
+//   - the policy amendment owner-decision-2026-10-25-golive, the same in docs/citycoin-master/policy.json and src/masterpolicy.js, not in force:
+//     the owner's general go is not recorded as his acceptance of the partner logo going dark (S55 review finding H1).
 // Fake wallets and fake data only; nothing here reaches a network.
 import { test, beforeEach, after } from "node:test";
 import assert from "node:assert/strict";
@@ -80,14 +81,19 @@ test("the committed wrangler.jsonc is single-host: SITE_ORIGINS and SITE_ORIGIN 
   assert.deepEqual(pageWalletOnly(V), { walletOnly: true });
   _pagesBuiltForTests(BUILT);
   try { assert.deepEqual([walletOnly(V), walletOnlyRefusals(V)], [true, []]); } finally { _pagesBuiltForTests(null); }
-  // the comment above SITE_ORIGINS says what S55 does, quotes the owner's decision and gives the rollback (values changed, no line deleted)
+  // the comment above SITE_ORIGINS says what S55 does, quotes the owner's decision and gives the rollback: a revert of the S55 code, which puts
+  // the configuration and the tests that pin it back together (values changed, no line deleted), with the deploy token's vicinity.city zone
+  // first (S55 review finding S55-DEPLOY-1: changing the value and the routes alone fails the suite the deploy's build runs)
   const lines = TEXT.split("\n"), at = lines.findIndex((l) => l.trim().startsWith('"SITE_ORIGINS":'));
   let i = at - 1, block = "";
   while (i >= 0 && lines[i].trim().startsWith("//")) block = lines[i--].trim().replace(/^\/\/\s*/, "") + " " + block;
   assert.match(block, /stage S55/);
   assert.ok(block.includes(DECISION), "the owner's decision of 24 Oct 2026, quoted as written");
   assert.match(block, /owner's go of 25 Oct 2026/);
-  assert.match(block, /Rollback of S55, only while the owner has not put vicinity\.city to its other use: change this value back to "https:\/\/citycoin\.dev https:\/\/vicinity\.city" and put both vicinity\.city routes back/);
+  assert.match(block, /Rollback of S55, only while the owner has not put vicinity\.city to its other use: one pull request that reverts the S55 code \(git revert of its merge commit/);
+  assert.match(block, /puts this value back to "https:\/\/citycoin\.dev https:\/\/vicinity\.city", both vicinity\.city routes below, the noindex rules of public\/_headers and the tests that pin each, together/);
+  assert.match(block, /Changing this value and the routes alone fails the tests/);
+  assert.match(block, /the deploy token gets the vicinity\.city zone back/);
   assert.match(block, /never delete the line: keep_vars/);
   assert.equal(TEXT.replace(/\n\s*\/\/\s*/g, " ").split(GO).length - 1, 1, "the owner's go is quoted once (with the go-live settings)");
 });
@@ -262,7 +268,7 @@ test("the link checker never calls vicinity.city, vicinitycity.com or vicinityci
 
 /* ---------------------------------------------------------------- the policy amendment */
 
-test("the policy amendment owner-decision-2026-10-25-golive is in policy.json and src/masterpolicy.js, the same, quoting the owner's go and overriding one file's gate", () => {
+test("the policy amendment owner-decision-2026-10-25-golive is in policy.json and src/masterpolicy.js, the same, quoting the owner's go; not in force until his specific acceptance is quoted", () => {
   const json = JSON.parse(readFileSync(new URL("../docs/citycoin-master/policy.json", import.meta.url), "utf8"));
   const id = "owner-decision-2026-10-25-golive";
   const inJson = json.amendments.find((a) => a.id === id), inModule = MASTER_POLICY.amendments.find((a) => a.id === id);
@@ -276,7 +282,13 @@ test("the policy amendment owner-decision-2026-10-25-golive is in policy.json an
   assert.match(inJson.summary, /2be9mDcnk6rK2XVnNiTBH4JmeWWwFzmUXMSrXMS8si11/);
   assert.match(inJson.summary, /https:\/\/citycoin\.dev\/brand\/vicinity-512\.png with unchanged bytes/);
   assert.match(inJson.summary, /fee-claimer wallet holder's step \(the owner's\)/);
-  assert.match(inJson.overrides, /^release_gates\.legacy_immutable_metadata \(master section 04, BR-02\) for this one file on the old host only/);
+  // S55 review finding H1: the go does not name the file, so the entry records no acceptance the owner did not write and overrides nothing
+  // until his specific written acceptance is quoted in it (a blocking item of the S55 deploy checklist)
+  assert.match(inJson.source, /It is a general instruction: it does not name this file, the partner record or Meteora, so it is not recorded as his acceptance of this file going dark\. His specific written acceptance is open/);
+  assert.match(inJson.summary, /^Not in force: prepared with stage S55, waiting for the owner\./);
+  assert.match(inJson.summary, /only with his specific written acceptance, a blocking item of its deploy checklist: until that acceptance is quoted in this entry, or the record names an address on citycoin\.dev, the gate holds for this file too and S55 does not merge/);
+  for (const f of ["source", "summary", "overrides"]) assert.doesNotMatch(inJson[f], /is his written acceptance|has accepted|accepted in writing/, f);
+  assert.match(inJson.overrides, /^nothing until the owner's specific written acceptance is quoted in this entry; then release_gates\.legacy_immutable_metadata \(master section 04, BR-02\) for this one file on the old host only/);
   // the gate itself is unchanged
   assert.equal(json.policy.release_gates.legacy_immutable_metadata, "exact bytes served as long as existing assets depend on them; never redirected");
   assert.equal(MASTER_POLICY.policy.release_gates.legacy_immutable_metadata, json.policy.release_gates.legacy_immutable_metadata);

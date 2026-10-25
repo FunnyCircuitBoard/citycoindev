@@ -6,7 +6,7 @@
 // go-live), falling back to https://citycoin.dev when SITE_ORIGIN is unset or not a bare https origin the site configuration accepts
 // (rebrand-inventory.md U10; stage S55 removes the vicinity.city routes, so the check after that deploy must not ask vicinity.city).
 // Exit code 1 lists what is missing. Nothing is changed on the site (GET requests only).
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { siteConfig } from "../src/site-config.js";
 import { varsOf } from "./brand/wrangler-vars.mjs";
@@ -61,7 +61,17 @@ export async function checkLive(base, fetchImpl = fetch, log = console.log) {
   return bad;
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+/**
+ * Is this file the script node was started with? Compared as real paths: node resolves the symbolic links of the main module's path for
+ * import.meta.url but leaves process.argv[1] as typed, so a plain comparison is false when the script is started through a linked path,
+ * and the check would then check nothing and exit 0 (S55 review finding S55-DEPLOY-2). Importing the file (the tests) runs nothing.
+ */
+export function startedAsScript(argv1 = process.argv[1], self = fileURLToPath(import.meta.url)) {
+  if (!argv1) return false;
+  try { return realpathSync(argv1) === realpathSync(self); } catch { return false; }
+}
+
+if (startedAsScript()) {
   const base = (process.argv[2] || defaultBase()).replace(/\/$/, "");
   process.exit((await checkLive(base)) ? 1 : 0);
 }

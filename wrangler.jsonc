@@ -114,9 +114,12 @@
     // sign-ups stay bound to the host they were made on (src/hostbind.js): every new one is citycoin.dev's, and any other host that ever
     // reaches this Worker (vicinity.city and its old names included, www.citycoin.dev, a workers.dev address) answers 421 wrong_host on
     // the Worker paths, never a redirect. (From S06 until S55 the value was "https://citycoin.dev https://vicinity.city".)
-    // Rollback of S55, only while the owner has not put vicinity.city to its other use: change this value back to
-    // "https://citycoin.dev https://vicinity.city" and put both vicinity.city routes back below, in one pull request (change the value,
-    // never delete the line: keep_vars would keep the old value in Cloudflare), with the noindex rules of public/_headers.
+    // Rollback of S55, only while the owner has not put vicinity.city to its other use: one pull request that reverts the S55 code (git revert
+    // of its merge commit, docs/citycoin-master/domain-cutover.md section 5). That puts this value back to "https://citycoin.dev https://vicinity.city",
+    // both vicinity.city routes below, the noindex rules of public/_headers and the tests that pin each, together; it changes values and never
+    // deletes a line (never delete the line: keep_vars would keep the old value in Cloudflare). Changing this value and the routes alone fails
+    // the tests, which the build runs before every deploy, so nothing would be uploaded. Before it, the deploy token gets the vicinity.city zone
+    // back (docs/DEPLOY.md step 1), or the deploy uploads the Worker and then fails to attach vicinity.city again.
     "SITE_ORIGINS": "https://citycoin.dev",
     // The production Worker (src/site-config.js localDevAllowed): turns off the local development exemption here; the v5 configuration
     // check wants it for any changed switch. With it, a v5 switch whose only missing input was the environment counts when set alone, here
@@ -186,8 +189,9 @@
   // the owner's decision of 24 Oct 2026 (quoted at SITE_ORIGINS above) and his go of 25 Oct 2026 (quoted with the go-live settings above;
   // docs/citycoin-master/domain-cutover.md section 0 and section 3, step 4). After the deploy Cloudflare sends neither name to this Worker;
   // they are the owner's, for his other use.
-  // Rollback, only while the owner has not reused vicinity.city: put back { "pattern": "vicinity.city", "custom_domain": true } and
-  // { "pattern": "www.vicinity.city", "custom_domain": true } after this entry, together with SITE_ORIGINS above (section 5).
+  // Rollback, only while the owner has not reused vicinity.city: the revert of S55 described at SITE_ORIGINS above (section 5) puts
+  // { "pattern": "vicinity.city", "custom_domain": true } and { "pattern": "www.vicinity.city", "custom_domain": true } back after this entry;
+  // attaching them again needs the vicinity.city zone on the deploy token.
   // www.citycoin.dev: not attached (domain-cutover.md section 2 item 2). vicinitycity.com, vicinitycity.net and their www: never this Worker's.
   "routes": [
     { "pattern": "citycoin.dev", "custom_domain": true }
