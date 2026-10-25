@@ -101,6 +101,17 @@
     // "Coin reviews". Needs COIN_V2_READY on as well. OFF: built and tested dark on 23 Oct 2026. "on" only after the owner's go; anything
     // else than "on" is the site exactly as before (change the value, do not delete the line: keep_vars).
     "COIN_V2_REVIEW": "off",
+    // The hosts this Worker serves in place (src/site-config.js; stage S06, docs/citycoin-master/domain-cutover.md section 2 item 2):
+    // citycoin.dev, attached as a custom domain below in this same deploy, and vicinity.city, which stays canonical (SITE_ORIGIN unset)
+    // until stage S55. With a second host listed, sessions, pairings, hand-offs and sign-ups are bound to the host they were made on
+    // (src/hostbind.js). www.citycoin.dev is not listed and not attached. Owner's go on 25 Oct 2026 ("go ahead and execute all the changes").
+    // To roll back, change the value to "https://vicinity.city" and remove the citycoin.dev route in the same pull request (do not delete
+    // the line: keep_vars would keep the old value).
+    "SITE_ORIGINS": "https://citycoin.dev https://vicinity.city",
+    // The production Worker (src/site-config.js localDevAllowed): turns off the local development exemption here; the v5 configuration
+    // check wants it for any changed switch. `wrangler dev` reads these values too, so localhost is refused (421) there; a local run sets
+    // another DEPLOYMENT_ENV in its own git-ignored .dev.vars.
+    "DEPLOYMENT_ENV": "production",
     // The official Citycoin.dev X account (owner amendment 01; src/maintoken.js officialLinks): supplied by the owner in writing
     // on 24 Oct 2026 ("the twitter handle is @CityCoinDev"); verification record in docs/citycoin-master/amendment-01-new-main-token.md
     // section 4. Shown only where the master switches show official links (MAIN_TOKEN_V5, BRAND=citycoin); with those off the only
@@ -124,10 +135,12 @@
     "run_worker_first": ["/api/*", "/coin-meta/*", "/official-coins.csv"],
     "not_found_handling": "404-page"
   },
-  // vicinity.city is the site; www.vicinity.city forwards to it on the Worker-first paths (src/index.js). Both routes stay until
+  // citycoin.dev (stage S06, listed in SITE_ORIGINS above in the same deploy) serves the same site. vicinity.city is the canonical
+  // site until stage S55; www.vicinity.city forwards to it on the Worker-first paths (src/index.js). Both vicinity routes stay until
   // stage S55 removes them, with no redirect (owner decision of 24 Oct 2026, docs/citycoin-master/domain-cutover.md section 0).
-  // vicinitycity.net and www.vicinitycity.net: not attached; their use is the owner's call (domain-cutover.md section 0).
+  // www.citycoin.dev: not attached (domain-cutover.md section 2 item 2). vicinitycity.net and www.vicinitycity.net: not attached.
   "routes": [
+    { "pattern": "citycoin.dev", "custom_domain": true },
     { "pattern": "vicinity.city", "custom_domain": true },
     { "pattern": "www.vicinity.city", "custom_domain": true }
   ],

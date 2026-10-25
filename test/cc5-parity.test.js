@@ -2,7 +2,8 @@
 // paths (through its real entry, src/index.js default fetch) and its job (the cron's scheduled handler, and the 03:00 pruning run) are run
 // against a fake D1 that records every statement: the production shape with synthetic rows (test/helpers/cc5-d1copy.js; no member data).
 // With every switch at its default, and with the switches as committed in wrangler.jsonc, no statement touches a cc5 object, no table is
-// created, and the Worker's statements are the same either way. Nothing in the Worker imports src/cc5schema.js.
+// created, and the Worker's statements are the same either way. Nothing in the Worker imports src/cc5schema.js. (Since stage S06 the
+// committed site settings turn on the host binding, whose additive migrations add a nullable host column; that is the only object change.)
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -19,6 +20,12 @@ const objectName = (s) => (/^CREATE (?:TABLE|INDEX|UNIQUE INDEX|TRIGGER) IF NOT 
 const CC5_NAMES = [...new Set(Object.values(CC5_GROUPS).flatMap((g) => g.statements).map(objectName))];
 const CC5_WORD = new RegExp(`\\b(${CC5_NAMES.join("|")})\\b|cc5-`, "i");
 const SITE = "https://vicinity.city";
+/** Stage S06: the committed SITE_ORIGINS lists citycoin.dev beside vicinity.city, so the session and challenge host binding counts
+ *  (src/hostbind.js, docs/citycoin-master/domain-cutover.md section 1.2). Its lazy additive migrations (src/store.js HOST_MIGRATIONS and
+ *  HOST_SIGNUP_MIGRATION: not cc5 objects) add a nullable `host` column to each of these tables that the run uses; nothing else may change. */
+const HOST_TABLES = ["sessions", "pairs", "handoffs", "signups"];
+/** The objects with the binding's own column taken back out (the column is appended last by ALTER TABLE ... ADD COLUMN host TEXT). */
+const withoutHostColumn = (objs) => objs.map((o) => (o.type === "table" && HOST_TABLES.includes(o.name) ? { ...o, sql: o.sql.replace(/, host TEXT\)$/, ")") } : o));
 
 /** A tiny seeded generator, so the job's random sampling and the routes' occasional tidy-ups take the same branches every run. */
 function seeded(seed) {
@@ -129,7 +136,11 @@ test("switches at their defaults: the Worker's normal requests and its job issue
     assert.deepEqual(run.seen.filter((s) => CC5_WORD.test(s)), [], `${label}: no cc5 statement`);
     const tables = (objs) => objs.filter((o) => o.type === "table").map((o) => o.name);
     assert.deepEqual(tables(run.after), tables(run.before), `${label}: no new table`);
-    assert.deepEqual(run.after, run.before, `${label}: no object added or changed at all`);
+    // the one change: the host binding's column (stage S06 settings), on the tables the run used, and nothing else at all
+    for (const o of run.before) assert.doesNotMatch(o.sql || "", /\bhost TEXT\b/, `${label}: the production shape has no host column yet (${o.name})`);
+    assert.deepEqual(withoutHostColumn(run.after), run.before, `${label}: no object added or changed but the host binding's own column`);
+    assert.match(run.after.find((o) => o.name === "sessions").sql, /, host TEXT\)$/, `${label}: the binding counts, so new sessions record their host`);
+    assert.ok(run.seen.some((s) => /^ALTER TABLE sessions ADD COLUMN host TEXT$/.test(s.trim())), `${label}: added by the host-binding migration`);
   }
   assert.deepEqual(defaults.seen, committed.seen, "the same statements, in the same order");
   assert.deepEqual(defaults.statuses, committed.statuses, "the same answers");

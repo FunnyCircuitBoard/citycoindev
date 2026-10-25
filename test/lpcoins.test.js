@@ -12,6 +12,7 @@ import { LAYOUT } from "../src/sol/layout.js";
 import { metadataAddress } from "../src/sol/metaplex.js";
 import { metadataUriFor } from "../src/coinmeta.js";
 import { advance, browser, clock, newWorld, person, realClock, useClock } from "./helpers/world.js";
+import { siteConfig } from "../src/site-config.js";
 import { seedCoin } from "./helpers/launchpad.js";
 import { DEMOV, DEMOV_CITY, DEMOV_COIN, DEMOV_POOL, LP_ON, METAPLEX, addr, lpChain, metaplexData } from "./helpers/lpchain.js";
 
@@ -39,13 +40,22 @@ function setField(chain, address, layout, field, value) {
 test("dark: with production-like settings every /api/lp/* and /api/admin/lp/* route answers 404 not_enabled, before any check", async () => {
   const env = { ...newWorld(), ...darkVars() };
   const chain = lpChain();
-  const b = browser(env);
-  for (const [path, method] of [["/api/lp/record", "POST"], ["/api/lp/coin?mint=" + DEMOV, "GET"], ["/api/lp/launch/status?city=1", "GET"], ["/api/lp/launch/tx", "POST"],
-    ["/api/lp/graduate/tx", "POST"], ["/api/lp/founder-claim/tx", "POST"], ["/api/lp/anything", "DELETE"], ["/api/admin/lp/status", "GET"], ["/api/admin/lp/tx", "POST"], ["/api/admin/lp", "GET"]]) {
-    const r = await b.send(path, { method, body: method === "POST" ? {} : undefined, fetchImpl: chain.fetchImpl });
-    assert.equal(r.status, 404, `${method} ${path}`);
-    assert.deepEqual(await r.json(), { ok: false, error: "not_enabled" }, path);
+  // on every host the production settings serve (stage S06: citycoin.dev and vicinity.city, SITE_ORIGINS)
+  const served = siteConfig(darkVars()).origins;
+  assert.ok(served.length >= 1);
+  for (const site of served) {
+    const b = browser(env, { site });
+    for (const [path, method] of [["/api/lp/record", "POST"], ["/api/lp/coin?mint=" + DEMOV, "GET"], ["/api/lp/launch/status?city=1", "GET"], ["/api/lp/launch/tx", "POST"],
+      ["/api/lp/graduate/tx", "POST"], ["/api/lp/founder-claim/tx", "POST"], ["/api/lp/anything", "DELETE"], ["/api/admin/lp/status", "GET"], ["/api/admin/lp/tx", "POST"], ["/api/admin/lp", "GET"]]) {
+      const r = await b.send(path, { method, body: method === "POST" ? {} : undefined, fetchImpl: chain.fetchImpl });
+      assert.equal(r.status, 404, `${site} ${method} ${path}`);
+      assert.deepEqual(await r.json(), { ok: false, error: "not_enabled" }, `${site} ${path}`);
+    }
   }
+  // the world's own test host is outside that allowlist: production refuses it before any route (src/hostbind.js), so it reaches no lp route
+  // either (it was the host this test used before the S06 settings)
+  const other = await browser(env).send("/api/lp/record", { method: "POST", body: {}, fetchImpl: chain.fetchImpl });
+  assert.deepEqual([other.status, (await other.json()).error], [421, "wrong_host"]);
   assert.equal(chain.S.log.length, 0);
 });
 
