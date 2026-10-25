@@ -74,7 +74,7 @@ import { LEGACY_PROOF, SESSION_COOKIE, SESSION_SECONDS } from "./session.js";
 import { accountName, linkLocked, linkNotice, linkWallet, lockedAnswer, maskName } from "./walletlink.js";
 import { addGoogle, findAccount, googleAdded, googleNotice } from "./logins.js";
 import { checkCurrentPassword } from "./pwlogin.js";
-import { NULL_HOST, hostWrite, onThisHost, servedHost, sessionDelete } from "./hostbind.js";
+import { NULL_HOST, hostWrite, mailOrigin, onThisHost, servedHost, sessionDelete } from "./hostbind.js";
 import { walletOnly, walletOnlyHeld } from "./v5policy.js";
 import { adminWallets } from "./roles.js";
 import { ensureIdentitySchema, ensureHostSignupSchema } from "./store.js";
@@ -834,7 +834,7 @@ export async function handlePairFinish(request, env, now = Date.now(), ctx = nul
   const del = await env.DB.prepare("DELETE FROM pairs WHERE id = ? AND wallet IS NOT NULL").bind(p.id).run();
   if (!del.meta?.changes) return json({ ok: false, status: "expired" }, 410); // someone was faster
   const out = await walletProven(env, request, p.wallet, now, session, { link: p.purpose === "link", via: "pair" }); // a login pairing never links
-  if (out.body.ok && out.body.linked && session && session.user) await linkNotice(env, session.user, p.wallet, null, ctx, fetchImpl);
+  if (out.body.ok && out.body.linked && session && session.user) await linkNotice(env, session.user, p.wallet, null, ctx, fetchImpl, mailOrigin(servedHost(env, request)));
   // (wallet-only: the pairing's nonce is spent with it)
   const cookies = p.requester ? [...(out.cookies ? [].concat(out.cookies) : []), clearCookie(PAIR_COOKIE)] : out.cookies;
   return answer({ ...out, cookies, body: out.body.ok ? { ...out.body, status: "done" } : out.body });
@@ -992,7 +992,7 @@ export async function handleGoogleAdd(request, env, now = Date.now()) {
  * this very session and trip, made by an Add in the last 10 minutes (the OAuth cookie's life): the check that Add made (the password rule)
  * is not made again here, the grant says it passed. A new Google sign-in is mailed to the owner (googleNotice).
  */
-async function finishGoogleAdd(env, session, state, when, grant, who, now, clear, ctx, fetchImpl) {
+async function finishGoogleAdd(env, session, state, when, grant, who, now, clear, ctx, fetchImpl, origin) {
   const back = (code) => redirect(`/dashboard?google=${code}#profile`, [clear]);
   if (!session || !session.user) return redirect("/connect?error=login_expired", [clear]);
   if (!v2On(env)) return back("login_unavailable");
@@ -1007,7 +1007,7 @@ async function finishGoogleAdd(env, session, state, when, grant, who, now, clear
   if (r.error) return back(r.error);
   if (r.already) return back("already");
   console.log("google sign-in added"); // no identifiers
-  await googleNotice(env, session.user, ctx, fetchImpl); // "Google sign-in was added": the owner hears of it, whoever added it
+  await googleNotice(env, session.user, ctx, fetchImpl, origin); // "Google sign-in was added": the owner hears of it, whoever added it (its links: the host it was added on)
   return back("linked");
 }
 
@@ -1043,7 +1043,7 @@ export async function handleOAuthCallback(request, env, provider, fetchImpl = fe
 
   await ensureSchema(env.DB);
   const session = await getSession(env, request, now);
-  if (adding) return provider === "google" ? finishGoogleAdd(env, session, state, when, grant, who, now, clear, ctx, fetchImpl) : fail("login_expired");
+  if (adding) return provider === "google" ? finishGoogleAdd(env, session, state, when, grant, who, now, clear, ctx, fetchImpl, mailOrigin(served)) : fail("login_expired");
   const v2 = v2On(env) ? { onNew: marker === "s" ? () => recordIdentity(env, request, provider, who, now) : () => ({ error: "no_account" }) } : null;
   const r = await linkIdentity(env, session, provider, who, now, v2, served);
   // no account for this Google login: the page must speak of the Google account (not of a wallet) and say how to add Google to theirs
@@ -1200,8 +1200,8 @@ function sixDigits() {
   return String(100000 + ((b[0] * 65536 + b[1] * 256 + b[2]) % 900000));
 }
 
-async function sendCodeEmail(env, to, code, fetchImpl, mailer = {}, kind = "signin") {
-  const { subject, text, html } = verificationEmail(code, kind);
+async function sendCodeEmail(env, to, code, fetchImpl, mailer = {}, kind = "signin", origin = undefined) {
+  const { subject, text, html } = verificationEmail(code, kind, origin); // origin: where the code is entered (src/hostbind.js mailOrigin)
   return sendMail(env, { to, subject, text, html }, { fetchImpl, smtpImpl: mailer.smtpImpl || null });
 }
 
@@ -1220,7 +1220,7 @@ async function sendCodeEmail(env, to, code, fetchImpl, mailer = {}, kind = "sign
  * Returns { ok: true } or { ok: false, error: "bad_email" | "email_unavailable" | "too_many" | "too_soon" | "slow_down", status }.
  * ("slow_down" = v2 only: 20 mails to this address in the last 24 hours.)
  */
-export async function sendEmailCode(env, email, { fetchImpl = fetch, now = Date.now(), mailer = {}, kind = "signin", waitUntil = null, noSend = false, codeKey = email } = {}) {
+export async function sendEmailCode(env, email, { fetchImpl = fetch, now = Date.now(), mailer = {}, kind = "signin", waitUntil = null, noSend = false, codeKey = email, origin = undefined } = {}) {
   if (!validEmail(email)) return { ok: false, error: "bad_email", status: 400 };
   if (!emailConfigured(env)) return { ok: false, error: "email_unavailable", status: 503 };
 
@@ -1262,7 +1262,7 @@ export async function sendEmailCode(env, email, { fetchImpl = fetch, now = Date.
     if (dayKey) await refund(env, [dayKey]);
   };
   const deliver = async () => {
-    const sent = await sendCodeEmail(env, email, code, fetchImpl, mailer, kind);
+    const sent = await sendCodeEmail(env, email, code, fetchImpl, mailer, kind, origin);
     if (!sent.ok) await giveBack();
     return sent;
   };
@@ -1303,7 +1303,7 @@ export async function handleEmailStart(request, env, fetchImpl = fetch, now = Da
   const slow = await oldRouteLimit(env, request, OLD_ROUTE.start, now);
   if (slow) return slow;
   const body = await readJson(request);
-  const r = await sendEmailCode(env, cleanEmail(asText(body && body.email)), { fetchImpl, now, mailer });
+  const r = await sendEmailCode(env, cleanEmail(asText(body && body.email)), { fetchImpl, now, mailer, origin: mailOrigin(servedHost(env, request)) });
   if (!r.ok) return json({ ok: false, error: r.error }, r.status);
   return json({ ok: true });
 }

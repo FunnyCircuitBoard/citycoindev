@@ -48,7 +48,7 @@
  */
 import { clearCookie, cookie, getCookie, json, randomToken, readJson, sameSite, sha256 } from "./http.js";
 import { SESSION_COOKIE, SESSION_SECONDS } from "./session.js";
-import { hostWrite, onThisHost, servedHost } from "./hostbind.js";
+import { hostWrite, mailOrigin, onThisHost, servedHost } from "./hostbind.js";
 import { dropSession, getSession, isFresh } from "./auth.js";
 import { checkSigned } from "./signed.js";
 import { ensureHostSchema, ensureOnboardSchema } from "./store.js";
@@ -162,10 +162,10 @@ export async function linkWallet(env, s, wallet, now, via = "page") {
  * e-mail; a Google account without one gets only the dashboard notice. Only the sending runs after the answer (ctx.waitUntil; without a
  * ctx, in tests, it is awaited). A failed mail is logged without the address and never fails the link.
  */
-export async function linkNotice(env, u, wallet, app, ctx = null, fetchImpl = fetch) {
+export async function linkNotice(env, u, wallet, app, ctx = null, fetchImpl = fetch, origin = undefined) {
   const to = u && (u.provider === "email" ? u.provider_id : u.contact_email);
   if (!to || !emailConfigured(env)) return;
-  const { subject, text, html } = walletLinkedEmail(maskWallet(wallet), app);
+  const { subject, text, html } = walletLinkedEmail(maskWallet(wallet), app, origin); // origin: the host the wallet joined on (src/hostbind.js mailOrigin)
   const p = sendMail(env, { to, subject, text, html }, { fetchImpl })
     .then((r) => { if (!r.ok) console.error("wallet link notice not sent", r.error); })
     .catch((e) => console.error("wallet link notice failed", String((e && e.message) || e).slice(0, 80)));
@@ -434,7 +434,7 @@ async function handleCarryClaim(request, env, x) {
   }
   if (session) await dropSession(env, session.id); // the owner's own earlier session here, or a pending proof: replaced by the one just made
   console.log("wallet linked", maskWallet(wallet), "(wallet app)");
-  await linkNotice(env, u.owner, wallet, app, x.ctx, x.fetchImpl);
+  await linkNotice(env, u.owner, wallet, app, x.ctx, x.fetchImpl, mailOrigin(served));
   return json({ ok: true, wallet, ...(app ? { app } : {}), next: "/dashboard?linked=1" }, 200,
     { "Set-Cookie": [cookie(SESSION_COOKIE, token, SESSION_SECONDS), clearCookie(OPENER_COOKIE)] });
 }

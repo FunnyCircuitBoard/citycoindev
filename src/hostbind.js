@@ -84,6 +84,14 @@ export function servedHost(env, request) {
   return { bound: true, refused: false, origin: `https://${entry}`, host: entry, key: entry };
 }
 
+/**
+ * The origin an e-mail names in its links and words (src/mail.js: the code e-mail, the wallet and Google notices), from servedHost's answer.
+ * While the binding counts: the allowlist entry the request is served as, so a sign-up, session or hand-off made on citycoin.dev, which is
+ * found only there, gets a mail that leads there (stage S06 review, finding R3). While it does not: today's https://vicinity.city, whatever
+ * host the request came in on, as the mails have always said.
+ */
+export const mailOrigin = (served) => (served && served.bound && !served.refused && served.origin) || DEFAULT_SITE.origin;
+
 /** May a row recording `rowHost` (NULL: made before the binding, on vicinity.city) be used on this request? Always, while not bound (except
  *  on a refused host, which never reaches a route). */
 export const onThisHost = (served, rowHost) => !served.refused && (!served.bound || (served.key !== null && (rowHost == null ? NULL_HOST : rowHost) === served.key));

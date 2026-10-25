@@ -17,6 +17,7 @@ import { ADDRESSES, PROGRAM_IDS, ata, launchpad as launchpadPdas, programDataAdd
 import { DBC_PROGRAM_SHA256, EXPECTED_POOL_CONFIG } from "../src/sol/dbc-config-data.js";
 import * as IX from "../src/sol/lpadmin-ix.js";
 import { advance, browser, clock, newWorld, person, realClock, useClock } from "./helpers/world.js";
+import { siteConfig } from "../src/site-config.js";
 import { seedCoin, seedSeat } from "./helpers/launchpad.js";
 import { addr, meteoraAsTested } from "./helpers/lpchain.js";
 import { LEGACY_REJECTED } from "../src/coins.js";
@@ -172,17 +173,23 @@ const built = (w, from) => w.chain.S.log.slice(from).filter((l) => l.method === 
 beforeEach(() => { _resetLpKit(); _resetLpAdmin(); realClock(); });
 
 test("dark: with production-like settings every City coins route answers 404 not_enabled and reads nothing", async () => {
-  const env = { ...newWorld(), ...darkVars() };
-  const owner = await person(env);
-  env.ADMIN_WALLETS = owner.w.address;
-  const chain = fakeChain();
-  for (const [path, method] of [["/api/admin/lp", "GET"], ["/api/admin/lp/status?cluster=mainnet", "GET"], ["/api/admin/lp/candidates", "GET"], ["/api/admin/lp/squads?address=x", "GET"],
-    ["/api/admin/lp/tx", "POST"], ["/api/admin/lp/record", "POST"], ["/api/admin/lp/approve/tx", "POST"], ["/api/admin/lp/platform/tx", "POST"]]) {
-    const r = await owner.send(path, { method, body: method === "POST" ? { cluster: "mainnet" } : undefined, fetchImpl: chain.fetchImpl });
-    assert.deepEqual([r.status, (await r.json()).error], [404, "not_enabled"], path);
+  // on every host the production settings serve (stage S06: citycoin.dev and vicinity.city, SITE_ORIGINS); the world's own test host is
+  // outside that allowlist, so production refuses it before any route (src/hostbind.js), and the owner signs in on a served host
+  const served = siteConfig(darkVars()).origins;
+  assert.ok(served.length >= 1);
+  for (const site of served) {
+    const env = { ...newWorld(), ...darkVars() };
+    const owner = await person(env, { site });
+    env.ADMIN_WALLETS = owner.w.address;
+    const chain = fakeChain();
+    for (const [path, method] of [["/api/admin/lp", "GET"], ["/api/admin/lp/status?cluster=mainnet", "GET"], ["/api/admin/lp/candidates", "GET"], ["/api/admin/lp/squads?address=x", "GET"],
+      ["/api/admin/lp/tx", "POST"], ["/api/admin/lp/record", "POST"], ["/api/admin/lp/approve/tx", "POST"], ["/api/admin/lp/platform/tx", "POST"]]) {
+      const r = await owner.send(path, { method, body: method === "POST" ? { cluster: "mainnet" } : undefined, fetchImpl: chain.fetchImpl });
+      assert.deepEqual([r.status, (await r.json()).error], [404, "not_enabled"], `${site} ${path}`);
+    }
+    assert.equal(chain.S.log.length, 0);
+    assert.equal(await env.DB.prepare("SELECT name FROM sqlite_master WHERE name = 'lp_setup'").first(), null, `${site}: no table made while dark`);
   }
-  assert.equal(chain.S.log.length, 0);
-  assert.equal(await env.DB.prepare("SELECT name FROM sqlite_master WHERE name = 'lp_setup'").first(), null, "no table made while dark");
 });
 
 test("the owner only: an admin or a moderator gets 403, signed out 401; a stale proof gets reprove; reading needs no fresh proof", async () => {

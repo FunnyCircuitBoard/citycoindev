@@ -22,6 +22,7 @@ import { decodeCoin, decodeConfig } from "../src/sol/dbc.js";
 import { quoteBuy } from "../src/sol/quote.js";
 import { ADDRESSES, PROGRAM_IDS, ata, launchpad as launchpadPdas } from "../src/sol/pda.js";
 import { MINT, browser, chain as mainChain, newWorld, person, realClock, setHolding, useClock, advance } from "./helpers/world.js";
+import { siteConfig } from "../src/site-config.js";
 import { DEMOV, DEMOV_COIN, DEMOV_CITY, DEMOV_POOL, DEV, LP_ON, METAPLEX, PROGRAM, SOL_CONFIG, addr, lpChain, metaplexData, meteoraAsTested } from "./helpers/lpchain.js";
 import { metadataAddress } from "../src/sol/metaplex.js";
 import { metadataUriFor } from "../src/coinmeta.js";
@@ -110,15 +111,21 @@ test("the discriminators and account lists are the IDLs' own", async () => {
 });
 
 test("dark: with production-like settings every founder route answers 404 not_enabled and reads nothing", async () => {
-  const env = { ...newWorld(), ...darkVars() };
-  const p = await person(env);
-  const lp = lpChain();
-  for (const [path, method] of [["/api/lp/launch/status", "GET"], ["/api/lp/launch/status?city=1&cluster=mainnet", "GET"], ["/api/lp/launch/tx", "POST"], ["/api/lp/graduate/status?mint=" + DEMOV, "GET"],
-    ["/api/lp/graduate/tx", "POST"], ["/api/lp/founder-claim/tx", "POST"]]) {
-    const r = await p.send(path, { method, body: method === "POST" ? { cluster: "mainnet" } : undefined, fetchImpl: lp.fetchImpl });
-    assert.deepEqual([r.status, await r.json()], [404, { ok: false, error: "not_enabled" }], path);
+  // on every host the production settings serve (stage S06: citycoin.dev and vicinity.city, SITE_ORIGINS); the world's own test host is
+  // outside that allowlist, so production refuses it before any route (src/hostbind.js), and the member signs in on a served host
+  const served = siteConfig(darkVars()).origins;
+  assert.ok(served.length >= 1);
+  for (const site of served) {
+    const env = { ...newWorld(), ...darkVars() };
+    const p = await person(env, { site });
+    const lp = lpChain();
+    for (const [path, method] of [["/api/lp/launch/status", "GET"], ["/api/lp/launch/status?city=1&cluster=mainnet", "GET"], ["/api/lp/launch/tx", "POST"], ["/api/lp/graduate/status?mint=" + DEMOV, "GET"],
+      ["/api/lp/graduate/tx", "POST"], ["/api/lp/founder-claim/tx", "POST"]]) {
+      const r = await p.send(path, { method, body: method === "POST" ? { cluster: "mainnet" } : undefined, fetchImpl: lp.fetchImpl });
+      assert.deepEqual([r.status, await r.json()], [404, { ok: false, error: "not_enabled" }], `${site} ${path}`);
+    }
+    assert.equal(lp.S.log.length, 0);
   }
-  assert.equal(lp.S.log.length, 0);
 });
 
 test("/api/official says cityCoins only while the settings are there (the pages ask /api/lp/* only then); production-like: no key, exactly as before", async () => {

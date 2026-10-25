@@ -80,10 +80,11 @@ export async function wallet() {
   const sign = async (text) => Buffer.from(await crypto.subtle.sign({ name: "Ed25519" }, kp.privateKey, new TextEncoder().encode(text))).toString("base64");
   return { address, sign };
 }
-/** A fresh signed login message, with a random nonce like the real page gets from /api/message (a signed message works once). */
-export const loginBody = async (w, pin) => {
+/** A fresh signed login message, with a random nonce like the real page gets from /api/message (a signed message works once). It names
+ *  the world's host, or `host` for a browser on another site (a signed text is accepted only on the host it names, src/signed.js). */
+export const loginBody = async (w, pin, host = HOST) => {
   const nonce = base58Encode(crypto.getRandomValues(new Uint8Array(16)));
-  const message = buildMessage({ host: HOST, address: w.address, nonce, issuedAt: new Date(Date.now()).toISOString(), statement: statementFor("login", { pin }) });
+  const message = buildMessage({ host, address: w.address, nonce, issuedAt: new Date(Date.now()).toISOString(), statement: statementFor("login", { pin }) });
   return { address: w.address, message, signature: await w.sign(message) };
 };
 /** A fresh signed LINK message naming the account (@handle), with the check number when a wallet app approves for another device. */
@@ -98,32 +99,36 @@ export const linkBody = async (w, handle, pin) => {
  *   { ip, cf }  the connection this browser comes from, like Cloudflare reports it: cf-connecting-ip, and request.cf
  *               (country, asn, asOrganization, latitude, longitude). Both are changeable through `net` (a person who moves
  *               from Wi-Fi to mobile data), and per call: send(path, { ip, cf }). Without them, requests look like local tests.
+ *   { site }    the origin the browser is on and sends its Origin from (default the world's own, https://vicinity.test). A test that runs
+ *               with the production settings uses a host they serve (stage S06: https://vicinity.city or https://citycoin.dev): with
+ *               SITE_ORIGINS listing a second host, any other host is refused before any route (src/hostbind.js, 421 wrong_host).
  *   send(path, { method, body, fetchImpl, ctx, origin })  origin: null sends none, a string sends that one.
  *   net.tap     set it to a function to see a copy of every answer this browser gets.
  */
-export function browser(env, { ip, cf } = {}) {
+export function browser(env, { ip, cf, site = ORIGIN } = {}) {
   const jar = new Map();
   const net = { ip, cf, tap: null }; // tap: async ({ path, method, response }) called with a copy of every answer (to look for what must never be in one)
-  const send = async (path, { method = "GET", body, fetchImpl = chain(), ctx = null, origin = ORIGIN, ip: ipNow = net.ip, cf: cfNow = net.cf } = {}) => {
+  const send = async (path, { method = "GET", body, fetchImpl = chain(), ctx = null, origin = site, ip: ipNow = net.ip, cf: cfNow = net.cf } = {}) => {
     const headers = new Headers();
     if (origin) headers.set("origin", origin);
     if (jar.size) headers.set("cookie", [...jar].map(([k, v]) => `${k}=${v}`).join("; "));
     if (ipNow) headers.set("cf-connecting-ip", ipNow);
-    const request = new Request(ORIGIN + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+    const request = new Request(site + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
     if (cfNow) Object.defineProperty(request, "cf", { value: cfNow });
     const res = await handleApi(request, env, fetchImpl, ctx);
     if (net.tap) await net.tap({ path, method, response: res.clone() });
     for (const c of res.headers.getSetCookie()) { const [pair] = c.split("; "); const i = pair.indexOf("="); jar.set(pair.slice(0, i), pair.slice(i + 1)); }
     return res;
   };
-  return { send, jar, net, has: (name) => Boolean(jar.get(name)), get: async (p) => (await send(p)).json(), post: async (p, body = {}) => (await send(p, { method: "POST", body })).json() };
+  return { send, jar, net, site, has: (name) => Boolean(jar.get(name)), get: async (p) => (await send(p)).json(), post: async (p, body = {}) => (await send(p, { method: "POST", body })).json() };
 }
 
 let nextId = 1;
-/** A signed-in person (wallet + Google), optionally with a home community (set via a real location attestation). */
-export async function person(env, { home, holds } = {}) {
-  const w = await wallet(), b = browser(env);
-  await b.post("/api/auth/wallet", await loginBody(w));
+/** A signed-in person (wallet + Google), optionally with a home community (set via a real location attestation), on the world's host or
+ *  on `site` (browser() above). */
+export async function person(env, { home, holds, site } = {}) {
+  const w = await wallet(), b = browser(env, { site });
+  await b.post("/api/auth/wallet", await loginBody(w, undefined, new URL(b.site).host));
   const start = await b.send("/api/auth/google/start");
   const state = new URL(start.headers.get("location")).searchParams.get("state");
   const id = "g" + nextId++;
@@ -144,8 +149,9 @@ export async function attest(p, point, purpose) {
 }
 /** Prove the wallet again (sensitive actions need it within 30 minutes); signs in again if the 30-day session ran out. */
 export async function reprove(p) {
-  const r = await p.post("/api/auth/reprove", await loginBody(p.w));
-  return r.error === "sign_in" ? p.post("/api/auth/wallet", await loginBody(p.w)) : r;
+  const host = p.site ? new URL(p.site).host : HOST;
+  const r = await p.post("/api/auth/reprove", await loginBody(p.w, undefined, host));
+  return r.error === "sign_in" ? p.post("/api/auth/wallet", await loginBody(p.w, undefined, host)) : r;
 }
 
 /** Run the scheduled job. sample: true = take a balance sample this time. */

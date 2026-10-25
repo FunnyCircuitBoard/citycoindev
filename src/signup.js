@@ -40,7 +40,7 @@ import { walletOnly } from "./v5policy.js";
 import { TERMS_VERSION, asText, endSignup, findHandoff, getSignup, guardV2, netOf, nextStep, startSignup, touchSignup } from "./signup-core.js";
 import { finishCore, sameLocationNetwork } from "./signup-finish.js";
 import { ensureHostSchema } from "./store.js";
-import { hostWrite, servedHost } from "./hostbind.js";
+import { hostWrite, mailOrigin, servedHost } from "./hostbind.js";
 import { handleEmailLogin, handleReset, handleResetStart, handleSetPassword } from "./pwlogin.js";
 
 export { sameLocationNetwork }; // (tested and used from here before the finish moved to src/signup-finish.js)
@@ -339,7 +339,8 @@ async function handleEmail(request, env, x) {
   const r = await env.DB.prepare(`UPDATE signups SET pending_email = ?, pending_pw_hash = ?, provider = NULL, provider_id = NULL, identity_name = NULL, identity_at = NULL
       WHERE id = ? AND terms_version IS NOT NULL AND expires_at > ?`).bind(email, hash, c.row.id, iso(x.now)).run();
   if (!r.meta.changes) return json({ ok: false, error: "no_signup" }, 401);
-  const sent = await sendEmailCode(env, email, { fetchImpl: x.fetchImpl, now: x.now, kind: "signup" });
+  // the code is entered where the sign-up lives (signups.host while the host binding counts): the mail names that origin (src/hostbind.js)
+  const sent = await sendEmailCode(env, email, { fetchImpl: x.fetchImpl, now: x.now, kind: "signup", origin: mailOrigin(servedHost(env, request)) });
   if (!sent.ok) return json({ ok: false, error: sent.error }, sent.status);
   return c.reply({ ok: true });
 }

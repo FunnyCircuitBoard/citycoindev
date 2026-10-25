@@ -5,9 +5,17 @@ Master change order v5, section 04 (BR-02) and section 05 (BR-03). Started in st
 section 2. All three were merged in PR #97 (`2608bd9`) with their switches off. On 24 October 2026 the owner decided that the old names
 are not forwarded (section 0): stage S56 (the redirects) is dropped, and the cutover now finishes in S55. Each later stage adds its part.
 
-**Status on 24 October 2026: nothing here is applied.** No DNS record, Cloudflare setting, route, custom domain or switch was changed.
-citycoin.dev is registered on the same Cloudflare nameservers as vicinity.city and is **not attached** to the Worker: the Worker's routes
-are `vicinity.city` and `www.vicinity.city` only (wrangler.jsonc `routes`). Nothing in the code assumes it is attached.
+**Status on 25 October 2026: step 2 (stage S06) is prepared in a configuration pull request, not merged, on the owner's go of the same
+day** ("Don't wait for my permission just go ahead and execute all the changes"). It attaches citycoin.dev as a custom domain of this
+Worker and lists it in `SITE_ORIGINS` in the same `wrangler.jsonc`, with `DEPLOYMENT_ENV=production` (section 2, item 2; section 3,
+step 2). Until that pull request is merged and deployed nothing here is applied: no DNS record, Cloudflare setting, route, custom domain
+or switch was changed, citycoin.dev (registered on the same Cloudflare nameservers as vicinity.city, `pearl` and `tim`, with no DNS
+record) is **not attached**, and the live Worker's routes are `vicinity.city` and `www.vicinity.city` only. The deploy of the merge is
+what attaches it: Cloudflare then creates the DNS record and the certificate for the custom domain. The S06 review (same day) added three
+Worker fixes for the two-host period to that pull request (citycoin.dev on the link checker's official list, e-mails that name the host
+they were asked on, `noindex` on citycoin.dev's pages) and found two owner steps that must come **before** the merge: the deploy token
+must be given the citycoin.dev zone (section 3, step 1: as `docs/DEPLOY.md` set it up it covers vicinity.city only, so the attach would
+fail), and the Google console should list citycoin.dev's return address (section 1.3).
 
 ## 0. The owner's decision on the old names (24 October 2026)
 
@@ -71,7 +79,9 @@ What stops answering once vicinity.city is removed (section 3, step 4), for the 
    the mail provider verifies it, or mail notices stop (in-app only), before the owner puts vicinity.city to another use.
 6. **The link checker** calls `vicinity.city`, `vicinitycity.com` and `vicinitycity.net` official (`src/official.js` `websites`,
    rebrand-inventory.md C03). They come off that list, and citycoin.dev goes on, before the owner puts either name to its other use;
-   otherwise the checker would vouch for a site that is no longer this one. That is a code change; its pull request is not written.
+   otherwise the checker would vouch for a site that is no longer this one. citycoin.dev goes on in the S06 pull request (review finding
+R1: from the attach on, the checker on citycoin.dev would otherwise call citycoin.dev "not on our official list"); the old names coming off
+is still a later code change.
 
 ## 1. What stage S03 built (dark)
 
@@ -190,13 +200,20 @@ sessions, pairings and hand-offs would get host NULL, which later reads as vicin
 vicinity.city if copied), and its challenge text, QR links and Google return address would come from its `Host` header. With the rule,
 such a window answers 421 on the Worker paths and makes no row; its pages still come from the static assets, so it is still a half-working
 site: keep the order in section 2. Other hosts outside the allowlist keep today's in-place serving while unset (refusing all of them would
-change today's answers, which is the owner's call; Cloudflare routes none of them to this Worker).
+change today's answers, which is the owner's call; Cloudflare routes none of them to this Worker). From the S06 configuration on
+(section 3, step 2) `SITE_ORIGINS` lists citycoin.dev, so this rule no longer applies to it: citycoin.dev is served, bound to its host
+(section 1.2), and www.citycoin.dev, never listed, is refused like any host outside the allowlist.
 
 **Owner actions it implies (none taken here).** Google sign-in on citycoin.dev works only if the Google OAuth console lists
-`https://citycoin.dev/api/auth/google/callback` (external E12; master section 05 keeps Google out of the new dashboard login path, so add it
-only if the legacy window needs it). Without it Google refuses the trip (`redirect_uri_mismatch`): it fails safely and signs nobody in.
+`https://citycoin.dev/api/auth/google/callback` (external E12): on citycoin.dev the Worker sends Google that return address (it is built
+on the host the request is served as, section 1.2). With `SIGNUP_FLOW=v2` live and `WALLET_ONLY` off, Google is one of the site's main
+ways to sign up and sign in, so this is a **before-the-merge owner step of S06** (implementation-report.md, S06 deploy checklist, item 2;
+adding it early is harmless). Without it every Google tap on citycoin.dev (Continue with Google, Log in with Google, the Profile's Add)
+ends on Google's "Error 400: redirect_uri_mismatch" page: nobody is signed in by mistake, but Google sign-in does not work on citycoin.dev,
+and a member who signs in only with Google (signed out there by design: their session is vicinity.city's) cannot sign in there with it.
+Master section 05 keeps Google out of the new wallet-only login path (S15), so the entry can be deleted with the client then (E12).
 
-## 2. The Cloudflare settings (none changed yet)
+## 2. The Cloudflare settings (item 2 prepared in the S06 pull request, not merged; none changed yet)
 
 1. **`run_worker_first` stays the list.** It was to become `true` only so that the Worker could redirect old-host pages under
    `HOST_REDIRECT` (S56). With S56 dropped (section 0) no stage needs it: `wrangler.jsonc` keeps
@@ -227,8 +244,38 @@ only if the legacy window needs it). Without it Google refuses the trip (`redire
      a host, running other code, could set a `Domain=citycoin.dev` `vs` or `vsu` cookie and log a visitor into the setter's own account or
      continue the setter's sign-up. The same holds for any host under vicinity.city. Use a separate domain for previews (S05).
    - Set `DEPLOYMENT_ENV=production` with it (the v5 check wants an environment for any changed switch anyway): it also turns off the local
-     development exemption (section 1.2) on the production Worker.
+     development exemption (section 1.2) on the production Worker. `wrangler dev` reads the same `wrangler.jsonc` values and presents every
+     local visit under the first route's name, `http://citycoin.dev` from S06 on (`http://vicinity.city` before): with `production` that is
+     served as `https://citycoin.dev`, so pages and reads work, the wallet challenge names citycoin.dev, and every write from the browser
+     answers `403 wrong_origin` (its Origin, `http://localhost:8787`, is not `https://citycoin.dev`; measured with wrangler 4.137
+     `wrangler dev --local`, no network). It answers 421
+     only when started with `--local-upstream localhost:8787`. A local copy that signs in and saves: `DEPLOYMENT_ENV=test` in its
+     git-ignored `.dev.vars` (`.dev.vars.example`) and `npm run dev -- --local-upstream localhost:8787` (README, "Run it locally"). (Before
+     S06 a browser on `http://localhost:8787` got `403 wrong_origin` on writes too: its Origin's host is not the presented route's name.)
    Until then no request for citycoin.dev reaches the Worker. `HOST_REDIRECT` stays unset in every step (section 0).
+
+   **Status (25 October 2026): prepared, not merged.** The S06 configuration pull request (branch `cc/s06` on main `5150529`) does exactly
+   this in `wrangler.jsonc`: `routes` gains `{ "pattern": "citycoin.dev", "custom_domain": true }` before the two vicinity.city entries;
+   `vars` gain `SITE_ORIGINS` = `https://citycoin.dev https://vicinity.city` and `DEPLOYMENT_ENV` = `production`; `SITE_ORIGIN` stays unset
+   (vicinity.city canonical until S55); www.citycoin.dev is neither listed nor attached, and no zone redirect is made (it keeps not
+   resolving); `HOST_REDIRECT` stays unset; `run_worker_first` stays the list. The S06 review added three Worker fixes for the two-host
+   period: citycoin.dev on the link checker's official list (`src/official.js`), the code e-mail and the wallet and Google notices name the
+   host the request was served as (`src/mail.js`, `src/hostbind.js` `mailOrigin`), and citycoin.dev's pages and files carry
+   `X-Robots-Tag: noindex` (a host rule in `public/_headers`; the static-assets engine matches a rule that starts with `https://` against
+   `https://<host><path>`, checked with wrangler 4.137's asset worker: three valid rules, the header on citycoin.dev only).
+
+   **The deploy token (external E1, section 3 step 1).** As `docs/DEPLOY.md` step 1 set it up (template *Edit Cloudflare Workers*, zone
+   resources `vicinity.city`), `CLOUDFLARE_API_TOKEN` does not cover the citycoin.dev zone, unless the owner widened it since (that can only
+   be read in the Cloudflare dashboard, or from the deploy log). So the owner gives it the zone **before the merge**. What a deploy does
+   without it (read in wrangler 4.137, `node_modules/wrangler/wrangler-dist/cli.js`): `npm run build`, every test included, passes; the
+   assets are uploaded and the new Worker version is deployed at 100% before the routes and domains are handled, so `SITE_ORIGINS`,
+   `DEPLOYMENT_ENV` and this pull request's code **are live** on vicinity.city; then the zone lookup for citycoin.dev finds nothing ("Could
+   not find zone for `citycoin.dev`"), or the custom-domain request is refused, and wrangler exits 1: the run goes red, its live check does
+   not run, and citycoin.dev still gets no DNS record (the owner's complaint stays). vicinity.city keeps serving: a failed run does not
+   detach its custom domains, and its answers are those of the new version, which is harmless (members keep their sessions, host NULL reads
+   as vicinity.city; new rows record vicinity.city; the hosts the binding refuses are hosts Cloudflare does not route here). Every later push
+   to main then deploys its Worker and fails at the same step, with its live check skipped, until the token gets the zone or the route is
+   removed. After such a run: check `https://vicinity.city/` by hand, give the token the zone, and run the workflow again.
 3. **Plain http.** No zone change is needed: `.dev` is on the HSTS preload list, so browsers never ask citycoin.dev over http.
 4. **Remove the vicinity.city routes** (stage S55, section 3 step 4): the `vicinity.city` and `www.vicinity.city` entries leave
    wrangler.jsonc `routes` in the configuration pull request that makes citycoin.dev canonical, with no redirect (section 0). They are not
@@ -247,16 +294,25 @@ only if the legacy window needs it). Without it Google refuses the trip (`redire
    Worker and its D1 database `vicinity-countdown` (it holds the countdown's "Rep your city" answers) are for a later cleanup, at the
    owner's word. No forward from vicinitycity.com to citycoin.dev is added (rebrand-inventory.md U11 is dropped).
 
-## 3. Order of the cutover (owner decision of 24 October 2026; none of it is applied)
+## 3. Order of the cutover (owner decision of 24 October 2026; step 2 prepared in a pull request on 25 October 2026, none of it applied)
 
 Already merged with nothing switched on: S03 (section 1, not to be switched on) and S04 (sessions, hand-offs, hand-off links, QR codes
 and wallet challenges bound to their host, counting from step 2 on, section 1.2). S05, the preview environment, is where steps 2 and 4
 are rehearsed first.
 
 1. **The owner gives the GitHub deploy token the citycoin.dev zone** (`CLOUDFLARE_API_TOKEN`, external E1). Nothing on the site changes.
+   *Status (25 Oct 2026): required before the S06 merge; not confirmed.* The citycoin.dev zone is on the same Cloudflare account as
+   vicinity.city. The token as `docs/DEPLOY.md` step 1 made it names the vicinity.city zone only (DEPLOY.md now names both zones); whether
+   the owner widened it since can only be read in the Cloudflare dashboard, or from the S06 deploy log. The owner edits the token (Cloudflare,
+   My Profile, API Tokens, the deploy token, Edit): zone resources the citycoin.dev zone too (or all zones of the account), with the
+   template's permissions, and checks that the zone shows Active. Without it the S06 deploy fails at the attach (section 2, item 2, status).
 2. **S06, a configuration pull request, attaches citycoin.dev** to this Worker and lists it in `SITE_ORIGINS` in the same pull request
    (section 2, item 2), with `DEPLOYMENT_ENV=production`. www.citycoin.dev answers with the apex through the zone redirect, or stays
    unattached; never listed. vicinity.city keeps serving and stays canonical (`SITE_ORIGIN` unset). `HOST_REDIRECT` stays unset.
+   *Status (25 Oct 2026): prepared, not merged* (branch `cc/s06`, on the owner's go of 25 Oct 2026; section 2, item 2, status). www.citycoin.dev
+   stays unattached. The pull request also carries the S06 review's three Worker fixes (section 2, item 2, status). Before the merge: step
+   1, and the Google console entry (section 1.3). The deploy of the merge attaches the domain; then the checks of section 4, "After step 2",
+   are run. If the attach fails for want of the token's zone (step 1), see the status under section 2, item 2.
 3. **Checks on citycoin.dev** while both hosts serve (section 4, "After step 2").
 4. **S55, a configuration pull request, makes citycoin.dev the canonical origin and removes the vicinity.city routes**:
    `SITE_ORIGIN=https://citycoin.dev`, `SITE_ORIGINS=https://citycoin.dev`, and the `vicinity.city` and `www.vicinity.city` entries
@@ -266,7 +322,7 @@ are rehearsed first.
 5. **The owner removes the vicinitycity.com forward** (section 2, item 6): any time, before or after the other steps; it is independent
    of the site.
 
-## 4. Checks (to run at each step; none run yet)
+## 4. Checks (to run at each step; none run yet: "After step 2" follows the deploy of the S06 merge)
 
 **After step 2** (both hosts serve):
 
@@ -279,7 +335,16 @@ are rehearsed first.
   signed out there (`/api/me` says `signedIn: false`); a POST with `Origin: https://vicinity.city` sent to citycoin.dev answers 403.
 - www.citycoin.dev: with the zone redirect, `curl -sI "https://www.citycoin.dev/launchpad?tab=new"` answers a redirect to
   `https://citycoin.dev/launchpad?tab=new`; without it the name does not resolve.
-- vicinity.city answers exactly as before: the same pages, APIs and redirects as a snapshot taken before the deploy.
+- `node scripts/check-live.mjs https://citycoin.dev` passes (the deploy workflow runs it only for vicinity.city; retry while the
+  certificate is being issued).
+- `curl -sI https://citycoin.dev/` carries `x-robots-tag: noindex`; `curl -sI https://vicinity.city/` carries none.
+- On citycoin.dev, "Check a link" (`/api/check?q=citycoin.dev`) answers official; an e-mail sign-up's code e-mail asked there says "Enter it
+  at https://citycoin.dev/connect"; with the Google console entry (section 1.3) "Continue with Google" comes back signed in, without it
+  Google shows `redirect_uri_mismatch`.
+- vicinity.city answers exactly as before: the same pages, APIs and redirects as a snapshot taken before the deploy, except
+  `/api/official` (its `websites` list names citycoin.dev, `updated` 2026-10-25), the checker's verdict for citycoin.dev, and the exact
+  Origin rule of section 1.2 (a write whose Origin is spelled `http://vicinity.city`, `https://vicinity.city:443` or
+  `https://VICINITY.CITY` now answers 403; browsers never send those spellings). Its e-mails are byte for byte as before.
 - The synthetic probes of S54 are green on both hosts.
 
 **Before step 4:**
@@ -297,6 +362,8 @@ are rehearsed first.
   by `.github/workflows/deploy.yml`) takes its base from `SITE_ORIGIN` (rebrand-inventory.md U10, stage S54). Otherwise the S55
   deploy removes the vicinity.city routes and then fails its own live check, leaving a failed run with the site already changed.
 - Items 3 to 6 of section 0 are known to the owner; the mail sender and the link checker's list (items 5 and 6) are settled.
+- The S55 pull request removes the `https://citycoin.dev/*` rule (`X-Robots-Tag: noindex`) from `public/_headers`, or the canonical site
+  stays out of search engines.
 
 **After step 4:**
 
@@ -317,6 +384,8 @@ values, then deploying; members' vicinity.city sessions are then still valid unt
 has not yet put vicinity.city to its other use. Once he has, there is no way back to vicinity.city, only fixes on citycoin.dev.
 
 The host binding (section 1.2) rolls back with `SITE_ORIGINS`: set it back to `https://vicinity.city` (or blank both settings) and deploy.
+Change the value in `wrangler.jsonc`; do not delete the line, and do not count on a plain revert of the S06 merge, which deletes it:
+`keep_vars` keeps a setting that a deploy no longer names, so the old value would stay.
 Every session, pairing, hand-off and sign-up row is then found by its token alone again, on any host, as today; the `host` columns stay,
 nullable and unread. citycoin.dev then answers 421 on every Worker path (section 1.3: never served unbound) while its pages still load from
 the assets, so detach citycoin.dev in the same rollback. A member's citycoin.dev session row stays until it expires. This rollback applies

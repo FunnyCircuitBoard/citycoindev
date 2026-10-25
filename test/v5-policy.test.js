@@ -24,8 +24,12 @@ import { pagesAsCommitted, pagesBuiltWithSwitch } from "./helpers/mainswitch.js"
 
 const POLICY_JSON = JSON.parse(readFileSync(new URL("../docs/citycoin-master/policy.json", import.meta.url), "utf8"));
 const P = MASTER_POLICY.policy;
-// production settings exactly as wrangler.jsonc ships them (no v5 switch, no v5 setting), plus the test chain
+// production settings exactly as wrangler.jsonc ships them (no v5 switch; since stage S06 three v5 inputs: the environment, SITE_ORIGINS and
+// the official X link), plus the test chain
 const LIVE = { ...settingsFrom({ wranglerPath: new URL("../wrangler.jsonc", import.meta.url), env: {} }), SOLANA_RPC_URL: "https://rpc.test" };
+// spread over the committed settings: the environment taken out again, as main had none before stage S06 (a switch's refusal for want of
+// an environment, ENVIRONMENT_UNSET, is shown with it)
+const NO_ENVIRONMENT = { [ENVIRONMENT_SETTING]: "" };
 const FAKE_MINT = "FakeMainTokenMint111111111111111111111111111"; // a clearly fake fixture with a valid key shape
 const FAKE_X = "https://x.com/ZqFakeTestX", FAKE_TG = "https://t.me/zq_fake_test_tg";
 const LEGACY_MINT = "2aVkhRfAEm44tMhFo8oamWvumGGvweFqnUwukRMBkray", LEGACY_X = "https://x.com/VicinityCitySOL";
@@ -47,20 +51,26 @@ const policyLines = () => errors.filter((e) => e.startsWith("policy config refus
 /* ---------------------------------------------------------------- with the switch off: today's site */
 
 test("the default: today's settings describe the policy's own default deployment, which validates; the fast answer equals the full check", () => {
-  // the one v5 input today's settings carry: the official X link the owner supplied on 24 Oct 2026 (amendment 01), shown only while a
-  // master switch counts; every switch stays at its default
+  // the v5 inputs today's settings carry: the official X link the owner supplied on 24 Oct 2026 (amendment 01), shown only while a master
+  // switch counts, and since stage S06 (owner's go of 25 Oct 2026) the production environment and the two hosts the Worker serves, with
+  // vicinity.city still canonical (SITE_ORIGIN unset reads as https://vicinity.city); every switch stays at its default
   assert.equal(LIVE.OFFICIAL_X_URL, "https://x.com/CityCoinDev");
+  assert.deepEqual([LIVE[ENVIRONMENT_SETTING], LIVE.SITE_ORIGINS, LIVE.SITE_ORIGIN], ["production", "https://citycoin.dev https://vicinity.city", undefined]);
   const withX = { ...MASTER_POLICY.deployment, inputs: { ...MASTER_POLICY.deployment.inputs, OFFICIAL_X_URL: LIVE.OFFICIAL_X_URL } };
-  for (const env of [{}, LIVE, { ...LIVE, PUBLIC_V5: "off" }, { ...LIVE, PUBLIC_V5: "", MAIN_TOKEN_V5: "  " }, { ...LIVE, [ENVIRONMENT_SETTING]: "", SITE_ORIGINS: [] },
-    { ...LIVE, LEGACY_SEATS: "On", LEGACY_LAUNCH: "on", MAIN_TOKEN_V5: "OFF " }]) {
-    assert.deepEqual(deploymentFromEnv(env), env.OFFICIAL_X_URL ? withX : MASTER_POLICY.deployment, JSON.stringify(env).slice(0, 80));
+  const s06 = { ...withX, environment: "production",
+    inputs: { ...withX.inputs, SITE_ORIGIN: "https://vicinity.city", SITE_ORIGINS: ["https://citycoin.dev", "https://vicinity.city"] } };
+  for (const [env, want] of [[{}, MASTER_POLICY.deployment], [LIVE, s06], [{ ...LIVE, PUBLIC_V5: "off" }, s06], [{ ...LIVE, PUBLIC_V5: "", MAIN_TOKEN_V5: "  " }, s06],
+    [{ ...LIVE, ...NO_ENVIRONMENT, SITE_ORIGINS: [] }, withX], [{ ...LIVE, LEGACY_SEATS: "On", LEGACY_LAUNCH: "on", MAIN_TOKEN_V5: "OFF " }, s06]]) {
+    assert.deepEqual(deploymentFromEnv(env), want, JSON.stringify(env).slice(0, 80));
     assert.deepEqual(validatePolicy({ ...MASTER_POLICY, deployment: deploymentFromEnv(env) }), { ok: true, errors: [] });
-    assert.deepEqual(policyConfig(env), { ok: true, errors: [], environment: "unset" });
+    assert.deepEqual(policyConfig(env), { ok: true, errors: [], environment: want.environment });
     assert.equal(publicV5(env), false);
   }
-  // none of today's settings is a v5 switch, and the only v5 input is the official X link: the check reads only names the policy defines
+  // none of today's settings is a v5 switch; the v5 inputs are the environment, SITE_ORIGINS and the official X link: the check reads only
+  // names the policy defines
   const read = new Set([...Object.keys(MASTER_POLICY.deployment.flags), ENVIRONMENT_SETTING, ...INPUT_SETTINGS, ...Object.keys(MASTER_POLICY.deployment.inputs.secrets_present)]);
-  assert.deepEqual(Object.keys(LIVE).filter((k) => read.has(k)), ["OFFICIAL_X_URL"]);
+  assert.deepEqual(Object.keys(LIVE).filter((k) => Object.hasOwn(MASTER_POLICY.deployment.flags, k)), [], "no v5 switch is set");
+  assert.deepEqual(Object.keys(LIVE).filter((k) => read.has(k)).sort(), [ENVIRONMENT_SETTING, "OFFICIAL_X_URL", "SITE_ORIGINS"]);
   assert.deepEqual(checkPolicyConfig(LIVE), { ok: true, codes: [] });
   assert.deepEqual(errors, [], "nothing is logged");
 });
@@ -75,7 +85,10 @@ test("switch off (or on with a refused configuration): GET /api/policy is today'
   assert.equal(body.snapshotCutoff, snapshotCutoff(env));
   assert.equal(body.launched, Boolean(tokenMint(env)));
   // (MAIN_TOKEN_V5 is left out: its own effect on `launched` is stage S02A's, test/main-token-consumers.test.js)
-  for (const extra of [{ PUBLIC_V5: "off" }, { PUBLIC_V5: "yes" }, { PUBLIC_V5: "on" }, { PUBLIC_V5: "on", [ENVIRONMENT_SETTING]: "prod" },
+  // the switch on with no environment named is refused (ENVIRONMENT_UNSET); since stage S06 the committed settings name one, so there the
+  // environment is taken out to show that refusal, and the switch alone is accepted (the S07 switch's only missing input was the environment)
+  assert.equal(publicV5({ ...LIVE, PUBLIC_V5: "on" }), true, "as committed, PUBLIC_V5=on alone would count");
+  for (const extra of [{ PUBLIC_V5: "off" }, { PUBLIC_V5: "yes" }, { PUBLIC_V5: "on", ...NO_ENVIRONMENT }, { PUBLIC_V5: "on", [ENVIRONMENT_SETTING]: "prod" },
     { ...ON, MAIN_TOKEN_MINT: "not-a-mint" }, { ...ON, OFFICIAL_X_URL: LEGACY_X }, { ...ON, LAUNCH_V5: "on" }, { ...ON, SELECTION_V5: "shadow" }]) {
     assert.deepEqual(await call({ ...env, ...extra }, "/api/policy"), today, JSON.stringify(extra));
   }
@@ -90,8 +103,10 @@ test("switch off (or on with a refused configuration): /api/policy/master is an 
   for (const method of ["GET", "POST", "HEAD", "PUT", "DELETE"]) {
     const unknown = await call(env, "/api/no-such-route", { method });
     assert.equal(unknown.status, 404);
-    for (const extra of [{}, { PUBLIC_V5: "off" }, { PUBLIC_V5: "on" }, { PUBLIC_V5: "on", [ENVIRONMENT_SETTING]: "prod" }, { ...ON, MAIN_TOKEN_V5: "on" },
-      { ...ON, OFFICIAL_TELEGRAM_URL: "https://t.me/+invite" }, { ...ON, SITE_ORIGIN: "https://citycoin.dev" }]) {
+    // each refused: no environment (taken out of the committed one, stage S06), an unknown one, the main token switch without its inputs, a
+    // malformed link, a canonical origin SITE_ORIGINS does not list (SITE_ORIGIN_NOT_ALLOWED; the committed list names citycoin.dev since S06)
+    for (const extra of [{}, { PUBLIC_V5: "off" }, { PUBLIC_V5: "on", ...NO_ENVIRONMENT }, { PUBLIC_V5: "on", [ENVIRONMENT_SETTING]: "prod" }, { ...ON, MAIN_TOKEN_V5: "on" },
+      { ...ON, OFFICIAL_TELEGRAM_URL: "https://t.me/+invite" }, { ...ON, SITE_ORIGIN: "https://citycoin.dev", SITE_ORIGINS: "https://vicinity.city" }]) {
       assert.deepEqual(await call({ ...env, ...extra }, "/api/policy/master", { method }), unknown, `${method} ${JSON.stringify(extra)}`);
     }
   }
@@ -109,9 +124,11 @@ test("the job start runs the check: nothing logged with today's settings, and th
   };
   const today = await run({});
   assert.deepEqual(policyLines(), [], "today's settings: not a line");
-  assert.deepEqual(await run({ PUBLIC_V5: "on" }), today, "the job does not depend on the switch");
+  // refused for want of an environment: the committed one (stage S06) taken out
+  assert.deepEqual(await run({ PUBLIC_V5: "on", ...NO_ENVIRONMENT }), today, "the job does not depend on the switch");
   assert.deepEqual(policyLines(), ["policy config refused ENVIRONMENT_UNSET deployment.environment"], "a refused configuration: one line per isolate, over two runs");
   assert.deepEqual(await run(ON), today);
+  assert.deepEqual(await run({ PUBLIC_V5: "on" }), today, "the switch alone, accepted with the committed environment");
   assert.equal(policyLines().length, 1, "an accepted configuration adds nothing");
 });
 
@@ -205,7 +222,7 @@ test("the site origins are read as src/site-config.js reads them: whatever it re
 });
 
 test("the Worker's first request runs the check once per isolate; the answer is unchanged", async () => {
-  const env = W.newWorld({ ...LIVE, PUBLIC_V5: "on" }); // refused: no environment named
+  const env = W.newWorld({ ...LIVE, PUBLIC_V5: "on", ...NO_ENVIRONMENT }); // refused: no environment named (the committed one, stage S06, taken out)
   const a = await answer(await worker.fetch(new Request("https://vicinity.city/api/health"), env, { waitUntil() {} }));
   const b = await answer(await worker.fetch(new Request("https://vicinity.city/api/health"), env, { waitUntil() {} }));
   assert.deepEqual(a, b);

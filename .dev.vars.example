@@ -1,2 +1,8 @@
-# Copy this file to .dev.vars for local secrets. Never commit .dev.vars.
-# (No secrets are needed yet at Milestone 1.)
+# Copy this file to .dev.vars for local secrets and settings. Never commit .dev.vars.
+# (No secrets are needed to run the site locally.)
+
+# wrangler.jsonc sets DEPLOYMENT_ENV=production (stage S06): the production Worker refuses this computer's host names, and `wrangler dev`
+# presents every local visit as http://citycoin.dev (the first route), served as https://citycoin.dev, so every write from a browser would answer
+# 403 wrong_origin. With this line, and `npm run dev -- --local-upstream localhost:8787`, the local copy at http://localhost:8787 signs in
+# and saves as itself (README, "Run it locally"). "test" is an environment the v5 configuration check accepts.
+DEPLOYMENT_ENV=test

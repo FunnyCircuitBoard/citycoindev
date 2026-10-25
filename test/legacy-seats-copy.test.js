@@ -46,7 +46,14 @@ test("the build reads the freeze from wrangler.jsonc only: unset is today's page
   assert.match(src, /^\/\/ legacySeats "frozen": built with LEGACY_SEATS=frozen \(no old founder copy\); src\/v5policy\.js holds the freeze if the Worker's setting differs\.$/m);
   assert.match(src, /export const PAGES_BUILT = Object\.freeze\(\{ mainTokenV5: false, brand: "", pagesReachWorker: false, legacySeats: "frozen" \}\);/);
   assert.equal(src.split("\n").length, pagesBuiltSource().split("\n").length + 1);
-  assert.throws(() => pagesBuiltSource({ ...deployedVars(), LEGACY_SEATS: "frozen" }), /LEGACY_SEATS_POLICY_REFUSED/);
+  // the record is never written for a freeze the Worker would refuse: a configuration of the test's own, the committed settings without an
+  // environment (wrangler.jsonc names DEPLOYMENT_ENV=production since stage S06, so the committed file alone no longer shows the refusal)
+  const { DEPLOYMENT_ENV, ...noEnvironment } = deployedVars();
+  assert.equal(DEPLOYMENT_ENV, "production", "stage S06: the production Worker names its environment");
+  assert.throws(() => pagesBuiltSource({ ...noEnvironment, LEGACY_SEATS: "frozen" }), /LEGACY_SEATS_POLICY_REFUSED/);
+  assert.throws(() => pagesBuiltSource({ ...deployedVars(), LEGACY_SEATS: "frozen", DEPLOYMENT_ENV: "staging" }), /LEGACY_SEATS_POLICY_REFUSED/);
+  // with the committed environment the freeze's own input is there: setting LEGACY_SEATS=frozen alone builds the frozen record
+  assert.equal(pagesBuiltSource({ ...deployedVars(), LEGACY_SEATS: "frozen" }), src);
 });
 
 test("the frozen copy: every passage applies once; only the pages it names change; a source edited without its frozen copy stops the build", () => {

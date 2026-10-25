@@ -45,7 +45,7 @@
  */
 import { clearCookie, cookie, getCookie, json, randomToken, readJson, redirect, sha256 } from "./http.js";
 import { LEGACY_PROOF, SESSION_COOKIE } from "./session.js";
-import { NULL_HOST, onThisHost, servedHost } from "./hostbind.js";
+import { NULL_HOST, mailOrigin, onThisHost, servedHost } from "./hostbind.js";
 import { ensureHostSchema, ensureLegacySchema } from "./store.js";
 import { IDENTITY_POLICY, legacyLink } from "./v5policy.js";
 import { OAUTH_COOKIE, PROVIDERS, cleanEmail, consumeEmailCode, guard, oauthStart, sendEmailCode, validEmail } from "./auth.js";
@@ -209,7 +209,7 @@ export async function handleLegacyEmailStart(request, env, body, fetchImpl = fet
     const user = await env.DB.prepare("SELECT id FROM users WHERE provider = 'email' AND provider_id = ?").bind(email).first();
     const pending = [];
     const waitUntil = (pr) => (ctx && ctx.waitUntil ? ctx.waitUntil(pr) : pending.push(pr));
-    const sent = await sendEmailCode(env, email, { fetchImpl, now, kind: "signin", codeKey: legacyCodeKey(email), waitUntil, noSend: !user });
+    const sent = await sendEmailCode(env, email, { fetchImpl, now, kind: "signin", codeKey: legacyCodeKey(email), waitUntil, noSend: !user, origin: mailOrigin(servedHost(env, request)) });
     await Promise.all(pending); // (only without a ctx, in tests: the mail has gone when the answer leaves)
     if (!sent.ok) return json({ ok: false, error: sent.error }, sent.status);
     return json({ ok: true });
