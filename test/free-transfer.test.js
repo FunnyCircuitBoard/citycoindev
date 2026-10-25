@@ -31,6 +31,7 @@ import { ADDRESSES, PROGRAM_IDS, ata } from "../src/sol/pda.js";
 import { LEGACY_BRAND, brandOf } from "../src/brand.js";
 import { SAME, brandWords, wordsOf } from "../src/brandwords.js";
 import { MASTER_POLICY } from "../src/masterpolicy.js";
+import { _pagesBuiltForTests } from "../src/v5policy.js";
 import { NETWORK_FEE_LAMPORTS, accountOf, planSend } from "../src/walletsend.js";
 import { newWorld, person, wallet, useClock, realClock } from "./helpers/world.js";
 import { ALT_KEY, RECORDED_TAKER, REAL_VIC, SOL, USDC, fakeWorld, rewriteBuild, fakeOut } from "./helpers/jupfake.js";
@@ -351,6 +352,23 @@ test("S39: the Send fee line names the product through src/brandwords.js: \"No V
     assert.equal(d.summary.lines[1], `No ${brandOf(env).productName} fee. Network fee about 0.000006 SOL.`, String(BRAND));
     if (!BRAND) assert.equal(d.summary.lines[1], "No Vicinity fee. Network fee about 0.000006 SOL.");
   }
+  // and with the Citycoin.dev pages (the build stand-in: pages built with BRAND=citycoin, always with the freeze): the route's own line names
+  // Citycoin.dev (rebrand second check S39-ROUTE-COVERAGE: the words went through handleSendBuild, not only planSend)
+  _pagesBuiltForTests({ brand: "citycoin", legacySeats: "frozen" });
+  try {
+    _resetRelay();
+    const W = fakeWorld({ rpc: {} });
+    const env = newWorld({ WALLET_SEND: "on", VICINITY_MINT: REAL_VIC, SOLANA_RPC_URL: "https://rpc.test", BRAND: "citycoin", LEGACY_SEATS: "frozen", DEPLOYMENT_ENV: "test" });
+    const me = await person(env);
+    W.rpc.accounts[me.w.address] = sys(2_000_000_000);
+    W.rpc.accounts[to] = sys(1_000_000_000);
+    const r = await me.send("/api/wallet/send/build", { method: "POST", body: { to, asset: "SOL", amount: "0.5" }, fetchImpl: W.fetch, ip: "10.9.9.9" });
+    const d = await r.json();
+    assert.equal(r.status, 200, JSON.stringify(d));
+    assert.equal(brandOf(env).key, "citycoin");
+    assert.equal(d.summary.lines[1], "No Citycoin.dev fee. Network fee about 0.000006 SOL.");
+    assert.doesNotMatch(JSON.stringify(d.summary), /vicinity/i);
+  } finally { _pagesBuiltForTests(null); }
   // and the route hands planSend the words of the deployment's label set (src/brandwords.js brandWords: src/brand.js brandOf, so a BRAND
   // the deployed pages were not built with keeps today's words, as the loop above shows); pinned by its source, as
   // test/brand-adapters.test.js pins the mail sender's
