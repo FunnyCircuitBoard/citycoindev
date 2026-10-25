@@ -52,9 +52,9 @@ import { ensureLimitsSchema, ensureLogoSchema, ensureSchema } from "./store.js";
 import { designFrozen } from "./lpcoins.js";
 import { cityOfTicker, tickerOf } from "./tickers.js";
 import { coinDefaults } from "./coindefaults.js";
-import { TEMPLATE_VERSION, coinSvg, sha256Hex } from "./coinart.js";
+import { coinSvg, sha256Hex } from "./coinart.js";
 import { TAKEDOWN, approvedBasis, approvedDescription, approvedRequest, artBySvg, artBytes, artPath, chosenOf, cityDescription, ensureReadySchema, takenDownAt } from "./coinart-store.js";
-import { canonicalContent, choiceStatements, coinState, ensureArt, founderAnswer, renderPng, svgOf, symbolTaken, versionLabel } from "./coinready.js";
+import { canonicalContent, choiceStatements, coinState, ensureArt, founderAnswer, renderPng, svgOf, symbolTaken, templateOf, versionLabel } from "./coinready.js";
 import { nameProblem } from "./lpadmin.js";
 import { checkName, checkSymbol } from "./coinmeta.js";
 import { HAS_ADDRESS, cleanText } from "./text.js";
@@ -65,6 +65,7 @@ import { notify, pictureReason } from "./notify.js";
 import { coinV2ReviewOn } from "./flags.js";
 import { LEGACY_LAUNCH_LINE, REVIEW_OPEN, launchClosed } from "./legacylaunch.js";
 import { legacyLaunchClosed } from "./v5policy.js";
+import { SAME, brandWords } from "./brandwords.js";
 
 /* ---------------------------------------------------------------- the words */
 /** Per account, counted atomically BEFORE the work (src/limits.js). */
@@ -97,7 +98,7 @@ export const STATUS_LABEL = Object.freeze({ draft: "Draft", pending: "Pending", 
  * approves each city on the blockchain on its own (src/lpadmin.js); the owner's daily round was deleted in stage S23, so no time and no
  * round is promised.
  */
-const registryWords = (symbol) => `Your new ticker $${symbol} is approved. It goes into the Vicinity city list once an admin adds it in a site update; then the owner can approve your coin on the blockchain.`;
+const registryWords = (symbol, bw = SAME) => bw`Your new ticker $${symbol} is approved. It goes into the Vicinity city list once an admin adds it in a site update; then the owner can approve your coin on the blockchain.`;
 /** The launch pause after the coin changed under an approval on chain (src/coinready.js GATES.approved_changed says the same). */
 export const APPROVAL_CHANGED = "Your coin changed after the owner approved it on the blockchain, so it can't launch until the owner approves it again as it is now.";
 const ERRORS = Object.freeze({
@@ -130,7 +131,8 @@ const ERRORS = Object.freeze({
   list_unavailable: "The city list couldn't be read just now. Try again in a minute.",
   wrong_origin: "This request didn't come from the Vicinity site.",
 });
-const fail = (error, status, extra = {}) => json({ ok: false, error, ...(ERRORS[error] ? { message: ERRORS[error] } : {}), ...extra }, status, { "Cache-Control": "no-store" });
+/** A refusal in the founder's words; `bw`: the product's name in them (src/brandwords.js; today's words by default). */
+const fail = (error, status, extra = {}, bw = SAME) => json({ ok: false, error, ...(ERRORS[error] ? { message: bw.say(ERRORS[error]) } : {}), ...extra }, status, { "Cache-Control": "no-store" });
 const NAME_RE = /^[\p{L}\p{N}][\p{L}\p{N} .'’&-]*$/u; // src/coins.js, the founder name rule
 const LINKISH = /https?:|www\.|\.[a-z]{2,}(\/|\b)/i;
 const PITCH_BAD = /https?:|www\.|[1-9A-HJ-NP-Za-km-z]{32,44}/; // src/coinmeta.js: the JSON builder's own refusal
@@ -277,8 +279,8 @@ const UNEXPLAINED = "We couldn't explain this check just now. Nothing changed. T
  * cannot load never breaks the founder's card or the queue (LAZY-ERR-1): the issues keep their codes with a plain sentence, and the
  * rules version is null, which no stored screening has (rules_version is NOT NULL), so nothing is ever current or sendable.
  */
-async function explained(issues, cityName) {
-  try { return (await screening()).explained(issues, cityName); } catch {
+async function explained(issues, cityName, bw = SAME) {
+  try { return (await screening()).explained(issues, cityName, bw); } catch {
     return (issues || []).map((x) => ({ code: x.code, severity: x.severity, start: x.start, end: x.end, message: UNEXPLAINED }));
   }
 }
@@ -288,8 +290,9 @@ async function rulesVersion() {
 
 /** The template picture of a coin with this ticker and name, if it was ever drawn: its sha256, or null. */
 async function templateArt(env, symbol, name) {
-  const svg = coinSvg({ ticker: symbol, city: name, templateVersion: TEMPLATE_VERSION });
-  const row = await artBySvg(env.DB, await sha256Hex(svg), TEMPLATE_VERSION, { fresh: true });
+  const tv = templateOf(env);
+  const svg = coinSvg({ ticker: symbol, city: name, templateVersion: tv });
+  const row = await artBySvg(env.DB, await sha256Hex(svg), tv, { fresh: true });
   return { svg, svgSha: await sha256Hex(svg), sha: row ? row.sha256 : null };
 }
 
@@ -305,13 +308,15 @@ async function basisOf(env, { cityId, seat, d, now, draw = false }) {
       templateColumn: c.template_version, hash: c.content_hash, content: c.content_json, isDefaults: c.origin === "default", version: c, choice: c };
   }
   const art = draw ? await ensureArt(env, d, now) : await storedArtOf(env, d);
-  if (!art) return { name: d.name, symbol: d.ticker, description: d.description, art: null, template: TEMPLATE_VERSION, templateColumn: TEMPLATE_VERSION, hash: null, content: null, isDefaults: true, choice: null };
-  const content = canonicalContent({ city: d.city, name: d.name, symbol: d.ticker, description: d.description, artSha256: art.sha256, templateVersion: TEMPLATE_VERSION });
-  return { name: d.name, symbol: d.ticker, description: d.description, art: art.sha256, template: TEMPLATE_VERSION, templateColumn: TEMPLATE_VERSION,
+  const tv = templateOf(env);
+  if (!art) return { name: d.name, symbol: d.ticker, description: d.description, art: null, template: tv, templateColumn: tv, hash: null, content: null, isDefaults: true, choice: null };
+  const content = canonicalContent({ city: d.city, name: d.name, symbol: d.ticker, description: d.description, artSha256: art.sha256, templateVersion: tv });
+  return { name: d.name, symbol: d.ticker, description: d.description, art: art.sha256, template: tv, templateColumn: tv,
     hash: await sha256Hex(content), content, isDefaults: true, choice: null };
 }
 async function storedArtOf(env, d) {
-  const row = await artBySvg(env.DB, await sha256Hex(svgOf(d)), TEMPLATE_VERSION);
+  const tv = templateOf(env);
+  const row = await artBySvg(env.DB, await sha256Hex(svgOf(d, tv)), tv);
   return row ? { sha256: row.sha256 } : null;
 }
 
@@ -323,7 +328,7 @@ async function storedArtOf(env, d) {
  * name; content the metadata JSON would refuse.
  */
 async function selectionProblem(env, cityId, { c = undefined, d = null, country = null, pending = true } = {}) {
-  const db = env.DB;
+  const db = env.DB, bw = brandWords(env);
   const pend = pending ? await pendingRequest(db, cityId) : null;
   if (pend) return pend.kind === "change"
     ? { code: "paused_request", message: "Launch is paused while your change request is reviewed. Cancelling the request ends the pause." }
@@ -333,7 +338,7 @@ async function selectionProblem(env, cityId, { c = undefined, d = null, country 
   if (!d) d = await coinDefaults(env, cityId, country || (c.content.city && c.content.city.country));
   const key = { name: c.name, symbol: c.symbol, art: c.art_sha256 };
   let reviewed = false, basis = null;
-  if (d.ok && c.name === d.name && c.symbol === d.ticker && c.template_version === TEMPLATE_VERSION) {
+  if (d.ok && c.name === d.name && c.symbol === d.ticker && c.template_version === templateOf(env)) {
     const t = await storedArtOf(env, d);
     reviewed = Boolean(t && t.sha256 === c.art_sha256);
   }
@@ -341,10 +346,10 @@ async function selectionProblem(env, cityId, { c = undefined, d = null, country 
     basis = (await approvedBasis(db, cityId, key)) || null;
     const exact = await approvedRequest(db, cityId, c.content_hash);
     if (!basis && !(exact && exact.kind === "change")) {
-      return { code: "not_reviewed", message: "Your coin has a picture, ticker or name that no reviewer approved. Reset it to the Vicinity defaults, or request the change." };
+      return { code: "not_reviewed", message: bw`Your coin has a picture, ticker or name that no reviewer approved. Reset it to the Vicinity defaults, or request the change.` };
     }
     if (!d.ok || c.symbol !== d.ticker) {
-      return { code: "registry_waiting", message: registryWords(c.symbol) };
+      return { code: "registry_waiting", message: registryWords(c.symbol, bw) };
     }
   }
   // the founder's own description is screened again under the current rules, unless a person approved exactly that text as this city's
@@ -352,16 +357,16 @@ async function selectionProblem(env, cityId, { c = undefined, d = null, country 
   // ticker and name (DESIGN 4.4: a pass under older rules is not enough)
   if (c.description !== cityDescription(c.content.city) && !(await approvedDescription(db, cityId, c.description))) {
     // an admin took this text down (src/cointakedown.js): only a person's review decided since brings it back (approvedDescription above)
-    if (await takenDownAt(db, cityId, c.description)) return { code: "description_recheck", message: "Your description was taken down by Vicinity. Use the default description, or write a new one." };
+    if (await takenDownAt(db, cityId, c.description)) return { code: "description_recheck", message: bw`Your description was taken down by Vicinity. Use the default description, or write a new one.` };
     const r = await screenText(c.description, d.ok ? await screenCtx(env, d, c) : { city: c.content.city, ticker: c.symbol, name: c.name });
     if (r.result === "error") return { code: "description_unchecked", message: "We couldn't re-check your description just now. Try again in a minute, or use the default description." };
     // a founder's own words pass only through a person's review now (src/screen.js "review"): one chosen before that is reviewed too
     if (r.result !== "pass") return { code: "description_recheck", message: "A person reads every description a founder writes before it can launch, and yours wasn't reviewed. Check it again and send it for review, or use the default description." };
   }
   if (nameProblem(c.name) || checkName(c.name) || checkSymbol(c.symbol) || PITCH_BAD.test(c.description || "")) {
-    return { code: "bad_content", message: "Your coin's name, ticker or description can't be written into a coin as it is. Reset it to the Vicinity defaults." };
+    return { code: "bad_content", message: bw`Your coin's name, ticker or description can't be written into a coin as it is. Reset it to the Vicinity defaults.` };
   }
-  if (!(await artBytes(db, c.art_sha256))) return { code: "art_missing", message: "Your coin's picture couldn't be read. Reset it to the Vicinity defaults, or try again in a minute." };
+  if (!(await artBytes(db, c.art_sha256))) return { code: "art_missing", message: bw`Your coin's picture couldn't be read. Reset it to the Vicinity defaults, or try again in a minute.` };
   return null;
 }
 
@@ -371,13 +376,13 @@ async function selectionProblem(env, cityId, { c = undefined, d = null, country 
  * city's approved change still waiting for the city list, not requested by another city right now, not a pair or Vicinity's own.
  */
 export async function tickerProblem(env, cityId, symbol, fetchImpl = fetch, { chain = true, exceptRequest = null } = {}) {
-  const taken = (why) => ({ code: "ticker_taken", message: why });
+  const taken = (why) => ({ code: "ticker_taken", message: why }), bw = brandWords(env);
   if (typeof symbol !== "string" || checkSymbol(symbol)) return { code: "bad_ticker", message: ERRORS.bad_ticker };
   if (RESERVED_TICKERS.has(symbol)) return taken(`$${symbol} is reserved. Pick another ticker.`);
   const own = await tickerOf(env, cityId);
   if (own && own.ticker === symbol) return { code: "same_ticker", message: `$${symbol} is already your city's ticker.` };
   const other = await cityOfTicker(env, symbol);
-  if (other && other !== String(cityId)) return taken(`$${symbol} belongs to another city in the Vicinity city list.`);
+  if (other && other !== String(cityId)) return taken(bw`$${symbol} belongs to another city in the Vicinity city list.`);
   const t = await symbolTaken(env, cityId, symbol, fetchImpl, { chain });
   if (t === "unknown") return { code: "ticker_unchecked", message: "We couldn't confirm that this ticker isn't already launched for another city. Try again in a minute." };
   if (t) return taken(`$${symbol} is already launched, approved or chosen for another city.`);
@@ -389,13 +394,13 @@ export async function tickerProblem(env, cityId, symbol, fetchImpl = fetch, { ch
 }
 
 /** The founder's words for an admin's takedown that made the coin what it is now (the newest rows first), or null. */
-function takenDownWords(rows) {
+function takenDownWords(rows, bw = SAME) {
   if (!rows.length) return null;
   const name = rows.some((x) => x.target === "name"), text = rows.some((x) => x.target === "description");
   let why = "other";
   try { why = (JSON.parse(rows[0].issues_json || "[]")[0] || {}).reason || "other"; } catch { /* the rule's words for "other" */ }
   const what = name && text ? "coin name and description" : name ? "coin name" : "description";
-  return { at: rows[0].created_at, message: `Vicinity took down your ${what} (${pictureReason(why)}). Your coin uses Vicinity's ${name ? "coin for your city" : "own description"} now. If you send the same words again, a person reviews them first.` };
+  return { at: rows[0].created_at, message: bw`Vicinity took down your ${what} (${pictureReason(why)}). Your coin uses Vicinity's ${name ? "coin for your city" : "own description"} now. If you send the same words again, a person reviews them first.` };
 }
 /**
  * The founder's card: the request, the description and what holds the launch (only with COIN_V2_REVIEW on: src/coinready.js founderAnswer).
@@ -430,9 +435,9 @@ export async function reviewState(env, { seat, cityId, view }) {
       description: sel.description, art: artPath(sel.art_sha256), descriptionSource: descSource, upload: sel.template_version === "upload" } : null,
     request: req ? await requestView(env, req, { d, sel, gate: view && view.gate, closed }) : null,
     description: {
-      source: descSource, text: sel ? sel.description : d.ok ? d.description : null, takenDown: takenDownWords(downRows),
+      source: descSource, text: sel ? sel.description : d.ok ? d.description : null, takenDown: takenDownWords(downRows, brandWords(env)),
       screening: lastShown && !closed ? { id: last.id, result: last.result, text: last.text, at: last.created_at, current: last.rules_version === (await rulesVersion()),
-        issues: await explained(JSON.parse(last.issues_json || "[]"), d.ok ? d.city.name : seat.city_name) } : null,
+        issues: await explained(JSON.parse(last.issues_json || "[]"), d.ok ? d.city.name : seat.city_name, brandWords(env)) } : null,
     },
     hold: closed ? null : problem,
     can: {
@@ -459,7 +464,7 @@ async function cardRequest(db, cityId, seatId, sel) {
 }
 /** A request as the founder sees it: its status in words, the version, what it changes, the reviewer's reason and note. */
 async function requestView(env, r, { d, sel, gate = null, closed = false }) {
-  const db = env.DB;
+  const db = env.DB, bw = brandWords(env);
   const v = await versionById(db, r.version_id);
   const base = (await versionByHash(db, r.city_id, r.base_hash)) || (sel ? { name: sel.name, symbol: sel.symbol, art_sha256: sel.art_sha256, description: sel.description } : d.ok ? { name: d.name, symbol: d.ticker, art_sha256: null, description: d.description } : null);
   const proposed = v ? { name: v.name, symbol: v.symbol, description: v.description, art: await artUrl(env, r, v.art_sha256) }
@@ -487,15 +492,15 @@ async function requestView(env, r, { d, sel, gate = null, closed = false }) {
     draft: "Your draft is private. Your coin stays as it is until a reviewer approves the change. Submitting pauses your launch until they decide.",
     pending: `Version ${versionLabel(r.content_hash)} · a reviewer checks exactly this version. Launch is paused until they decide.`,
     approved: r.kind === "change"
-      ? `Version ${versionLabel(r.content_hash)} was approved. It is now your coin.${registry === "waiting" ? ` ${registryWords(v.symbol)}` : onChain ? " It is approved on the blockchain too."
+      ? `Version ${versionLabel(r.content_hash)} was approved. It is now your coin.${registry === "waiting" ? ` ${registryWords(v.symbol, bw)}` : onChain ? " It is approved on the blockchain too."
         : beingApproved ? " The owner is approving it on the blockchain right now." : " It launches after the owner approves it on the blockchain."}`
       : `Your description (version ${versionLabel(r.content_hash)}) was approved. It is now your coin's description.`,
-    changes_needed: `Changes needed: ${REASONS[r.reason_code] || REASONS.other}${r.note ? ` Note from the reviewer: ${r.note}` : ""} Your coin stays as it was.`,
+    changes_needed: `Changes needed: ${bw.say(REASONS[r.reason_code] || REASONS.other)}${r.note ? ` Note from the reviewer: ${r.note}` : ""} Your coin stays as it was.`,
   };
   return {
     id: r.id, kind: r.kind, status: r.status, label: STATUS_LABEL[r.status] || r.status, message: words[r.status] || "",
     version: versionLabel(r.content_hash), contentHash: r.content_hash || null, submittedAt: r.submitted_at, decidedAt: r.decided_at,
-    reasonCode: r.status === "changes_needed" ? r.reason_code : null, reason: r.status === "changes_needed" ? REASONS[r.reason_code] || REASONS.other : null,
+    reasonCode: r.status === "changes_needed" ? r.reason_code : null, reason: r.status === "changes_needed" ? bw.say(REASONS[r.reason_code] || REASONS.other) : null,
     note: r.status === "changes_needed" ? r.note || null : null, diff, proposed, registryState: registry,
     draft: r.status === "draft" ? { name: r.draft_name, symbol: r.draft_symbol, picture: r.draft_picture || "keep", art: proposed.art, reason: r.draft_reason || "", updatedAt: r.draft_updated_at } : null,
     nameIssues: r.name_screening ? JSON.parse(r.name_screening) : [],
@@ -522,7 +527,7 @@ async function counted(env, kind, userId, now) {
  */
 async function founderPost(request, env, now, fetchImpl, kind, { max = 2048 } = {}) {
   if (!env.DB) return { error: fail("unavailable", 503) };
-  if (!sameSite(request, env)) return { error: fail("wrong_origin", 403) };
+  if (!sameSite(request, env)) return { error: fail("wrong_origin", 403, {}, brandWords(env)) };
   const a = await access(request, env, now, { write: true, fresh: true });
   if (a.error) return a;
   const body = await readJson(request, max);
@@ -563,7 +568,7 @@ async function notFrozen(env, w, fetchImpl, now) {
   if (f === "held") return fail("held", 409);
   if (f === "approved") {
     const c = await chosenOf(env.DB, w.cityId, { fresh: true });
-    if (!(c && c.current && c.approved_hash && c.seat_id === w.seat.id)) return fail("approved_on_chain", 409);
+    if (!(c && c.current && c.approved_hash && c.seat_id === w.seat.id)) return fail("approved_on_chain", 409, {}, brandWords(env));
   }
   return null;
 }
@@ -639,7 +644,7 @@ async function draftArt(env, { w, req, base, name, symbol, picture, image, now }
   }
   if (picture === "keep" && base.art && base.templateColumn === "upload") return { picture, mediaId: null, sha: base.art };
   // the Vicinity design, drawn with the proposed ticker and name (once per ticker and name: the same drawing is found again)
-  if (base.art && base.templateColumn === TEMPLATE_VERSION && name === base.name && symbol === base.symbol) return { picture: "vicinity", mediaId: null, sha: base.art };
+  if (base.art && base.templateColumn === templateOf(env) && name === base.name && symbol === base.symbol) return { picture: "vicinity", mediaId: null, sha: base.art };
   const t = await templateArt(env, symbol, name);
   if (t.sha) return { picture: "vicinity", mediaId: null, sha: t.sha };
   // drawn for this draft before, with this very ticker and name: kept (submitting draws it again and compares)
@@ -708,7 +713,7 @@ async function submitRoute(request, env, fetchImpl, now) {
   if (why.issues.some((x) => x.code === "length")) return fail("bad_reason", 400);
   if (why.result === "block") return fail("reason_refused", 400);
   // the picture: exactly the bytes the draft names (the founder's upload, or the drawing kept for it), or the coin's own
-  let art = req.draft_art_sha256, template = TEMPLATE_VERSION, column = TEMPLATE_VERSION;
+  let art = req.draft_art_sha256, template = templateOf(env), column = template;
   if (req.draft_picture === "upload") {
     const m = await db.prepare("SELECT type, bytes FROM media WHERE id = ? AND user_id = ?").bind(req.draft_media_id, w.u.id).first();
     if (!m || m.type !== "image/png" || !squarePng(toBytes(m.bytes)) || (await sha256Hex(toBytes(m.bytes))) !== art) return fail("bad_image", 400);
@@ -738,15 +743,15 @@ async function submitRoute(request, env, fetchImpl, now) {
     if (nameProblem(name) || checkName(name) || !NAME_RE.test(name) || LINKISH.test(name) || HAS_ADDRESS.test(name)) return fail("bad_name", 400);
     const s = await screenBy("screenName", name, own);
     if (s.result === "error") return fail("screening_error", 503);
-    if (s.result === "block") return fail("name_refused", 409, { issues: await explained(s.issues, w.d.city.name) });
-    nameIssues = await explained(s.issues, w.d.city.name);
+    if (s.result === "block") return fail("name_refused", 409, { issues: await explained(s.issues, w.d.city.name, brandWords(env)) });
+    nameIssues = await explained(s.issues, w.d.city.name, brandWords(env));
   }
   if (symbol !== base.symbol) {
     // a ticker is read like a word too: a slur (spelled any way) refuses it, anything else the lists find is shown to the reviewer
     const s = await screenBy("screenTicker", symbol, own);
     if (s.result === "error") return fail("screening_error", 503);
-    if (s.result === "block") return fail("ticker_refused", 409, { issues: await explained(s.issues, w.d.city.name) });
-    nameIssues = [...nameIssues, ...(await explained(s.issues, w.d.city.name)).map((x) => ({ ...x, field: "ticker" }))];
+    if (s.result === "block") return fail("ticker_refused", 409, { issues: await explained(s.issues, w.d.city.name, brandWords(env)) });
+    nameIssues = [...nameIssues, ...(await explained(s.issues, w.d.city.name, brandWords(env))).map((x) => ({ ...x, field: "ticker" }))];
   }
   if (symbol !== base.symbol && symbol !== w.d.ticker) {
     const t = await tickerProblem(env, w.cityId, symbol, fetchImpl);
@@ -759,7 +764,7 @@ async function submitRoute(request, env, fetchImpl, now) {
   // the version the founder started from is kept too, so the reviewer sees "now" and "proposed" side by side
   if (base.content && !base.choice) {
     stmts.push(db.prepare(`INSERT OR IGNORE INTO coin_versions (city_id, origin, content_json, content_hash, name, symbol, description, art_sha256, template_version, created_by, created_at)
-      VALUES (?, 'default', ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(w.cityId, base.content, base.hash, base.name, base.symbol, base.description, base.art, TEMPLATE_VERSION, w.u.id, at));
+      VALUES (?, 'default', ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(w.cityId, base.content, base.hash, base.name, base.symbol, base.description, base.art, base.templateColumn, w.u.id, at));
   }
   stmts.push(db.prepare(`INSERT OR IGNORE INTO coin_versions (city_id, origin, content_json, content_hash, name, symbol, description, art_sha256, template_version, created_by, created_at)
       VALUES (?, 'change', ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(w.cityId, content, hash, name, symbol, base.description, art, column, w.u.id, at));
@@ -843,7 +848,7 @@ async function withDescription(env, w, base, text) {
   return { content, hash: await sha256Hex(content), name: base.name, symbol: base.symbol, description: text, artSha: base.art, templateVersion: base.templateColumn };
 }
 const defaultsStmt = (db, w, base, at) => db.prepare(`INSERT OR IGNORE INTO coin_versions (city_id, origin, content_json, content_hash, name, symbol, description, art_sha256, template_version, created_by, created_at)
-  VALUES (?, 'default', ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(w.cityId, base.content, base.hash, base.name, base.symbol, base.description, base.art, TEMPLATE_VERSION, w.u.id, at);
+  VALUES (?, 'default', ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(w.cityId, base.content, base.hash, base.name, base.symbol, base.description, base.art, base.templateColumn, w.u.id, at);
 
 /** POST /api/coins/review/reset { cityId }: back to Vicinity's defaults (the ready-made coin as the city list gives it now). */
 async function resetRoute(request, env, fetchImpl, now) {
@@ -852,13 +857,13 @@ async function resetRoute(request, env, fetchImpl, now) {
   if (await pendingRequest(env.DB, w.cityId)) return fail("request_pending", 409);
   const frozen = await notFrozen(env, w, fetchImpl, now);
   if (frozen) return frozen;
-  const art = await ensureArt(env, w.d, now);
-  const content = canonicalContent({ city: w.d.city, name: w.d.name, symbol: w.d.ticker, description: w.d.description, artSha256: art.sha256, templateVersion: TEMPLATE_VERSION });
+  const art = await ensureArt(env, w.d, now), tv = templateOf(env), bw = brandWords(env);
+  const content = canonicalContent({ city: w.d.city, name: w.d.name, symbol: w.d.ticker, description: w.d.description, artSha256: art.sha256, templateVersion: tv });
   const hash = await sha256Hex(content);
   const c = await chosenOf(env.DB, w.cityId, { fresh: true });
   if (c && c.current && c.content_hash === hash && c.seat_id === w.seat.id) return answer(env, w, fetchImpl, now, { already: true });
-  const s = await select(env, { w, now, v: { content, hash, name: w.d.name, symbol: w.d.ticker, description: w.d.description, artSha: art.sha256, templateVersion: TEMPLATE_VERSION, origin: "default" },
-    log: { actorId: w.u.id, role: "founder", action: "coin_design", reason: "design", note: `${w.seat.city_name}: back to the Vicinity coin $${w.d.ticker} "${w.d.name}", version ${versionLabel(hash)}` } });
+  const s = await select(env, { w, now, v: { content, hash, name: w.d.name, symbol: w.d.ticker, description: w.d.description, artSha: art.sha256, templateVersion: tv, origin: "default" },
+    log: { actorId: w.u.id, role: "founder", action: "coin_design", reason: "design", note: bw`${w.seat.city_name}: back to the Vicinity coin $${w.d.ticker} "${w.d.name}", version ${versionLabel(hash)}` } });
   if (s.error) return s.error;
   return answer(env, w, fetchImpl, now, { reset: true });
 }
@@ -894,13 +899,13 @@ async function descriptionRoute(request, env, fetchImpl, now) {
     if (r.result === "error") { await row.run(); return fail("screening_error", 503); }
     await db.batch([row, dismissDescriptionCards(db, w, at)]); // a new text replaces the one that needed changes
     const id = (await db.prepare("SELECT id FROM coin_screenings WHERE city_id = ? AND user_id = ? AND created_at = ? ORDER BY id DESC LIMIT 1").bind(w.cityId, w.u.id, at).first()).id;
-    return answer(env, w, fetchImpl, now, { screening: { id, result: r.result, text: r.text, issues: await explained(r.issues, w.d.city.name) } });
+    return answer(env, w, fetchImpl, now, { screening: { id, result: r.result, text: r.text, issues: await explained(r.issues, w.d.city.name, brandWords(env)) } });
   }
   if (r.text === base.description) { await db.batch([row, dismissDescriptionCards(db, w, at)]); return answer(env, w, fetchImpl, now, { screening: { result: "pass", text: r.text, issues: [] }, already: true }); }
   const v = await withDescription(env, w, base, r.text);
   const s = await select(env, { w, now, v: { ...v, origin: base.isDefaults && r.text === w.d.description ? "default" : "description" },
     before: [row, dismissDescriptionCards(db, w, at), ...(base.isDefaults && base.content && !base.choice ? [defaultsStmt(db, w, base, at)] : [])],
-    log: { actorId: w.u.id, role: "founder", action: "coin_description", reason: "screened", note: `${w.seat.city_name}: ${r.text === w.d.description ? "Vicinity's own description again" : "a description that passed the checks"}, version ${versionLabel(v.hash)}` } });
+    log: { actorId: w.u.id, role: "founder", action: "coin_description", reason: "screened", note: `${w.seat.city_name}: ${r.text === w.d.description ? brandWords(env).say("Vicinity's own description again") : "a description that passed the checks"}, version ${versionLabel(v.hash)}` } });
   if (s.error) return s.error;
   return answer(env, w, fetchImpl, now, { screening: { result: "pass", text: r.text, issues: [] }, used: true });
 }
@@ -959,7 +964,7 @@ async function describeDefaultRoute(request, env, fetchImpl, now) {
     return answer(env, w, fetchImpl, now, { already: true });
   }
   const v = await withDescription(env, w, base, w.d.description);
-  const onDefaults = base.name === w.d.name && base.symbol === w.d.ticker && base.templateColumn === TEMPLATE_VERSION && (await storedArtOf(env, w.d) || {}).sha256 === base.art;
+  const onDefaults = base.name === w.d.name && base.symbol === w.d.ticker && base.templateColumn === templateOf(env) && (await storedArtOf(env, w.d) || {}).sha256 === base.art;
   const s = await select(env, { w, now, before, v: { ...v, origin: onDefaults ? "default" : "description" },
     log: { actorId: w.u.id, role: "founder", action: "coin_description", reason: "default", note: `${w.seat.city_name}: back to the default description, version ${versionLabel(v.hash)}` } });
   if (s.error) return s.error;
@@ -1014,7 +1019,7 @@ export async function listReviews(env, now = Date.now(), fetchImpl = fetch) {
   for (const r of rows) reviews.push(await reviewRow(env, r, now, fetchImpl));
   const waiting = reviews.filter((x) => x.status === "approved" && x.registryState === "waiting").map((x) => ({ id: x.id, city: x.city, ticker: x.proposed.symbol, registryPatch: x.registryPatch }));
   return { ok: true, reviews, pending: reviews.filter((x) => x.status === "pending").length, waitingRegistry: waiting, inUse: await founderContent(db),
-    reasons: Object.entries(REASONS).map(([code, text]) => ({ code, text, kinds: REASON_KINDS[code] })) };
+    reasons: Object.entries(REASONS).map(([code, text]) => ({ code, text: brandWords(env).say(text), kinds: REASON_KINDS[code] })) };
 }
 /**
  * What of the founders' own is public on a coin now, launched or not (the newest first, at most 200): a description that passed the
@@ -1041,7 +1046,7 @@ async function founderContent(db) {
   return out;
 }
 async function reviewRow(env, r, now, fetchImpl) {
-  const db = env.DB;
+  const db = env.DB, bw = brandWords(env);
   const v = await versionById(db, r.version_id);
   const base = await versionByHash(db, r.city_id, r.base_hash);
   const content = v ? JSON.parse(v.content_json) : null;
@@ -1077,7 +1082,7 @@ async function reviewRow(env, r, now, fetchImpl) {
     if (r.kind === "description" && r.screening_id) {
       const sc = await db.prepare("SELECT issues_json, text FROM coin_screenings WHERE id = ?").bind(r.screening_id).first();
       if (sc) {
-        const issues = await explained(JSON.parse(sc.issues_json || "[]"), city && city.name);
+        const issues = await explained(JSON.parse(sc.issues_json || "[]"), city && city.name, bw);
         // "review" alone: the checks found nothing, which proves nothing about ordinary words (src/screen.js): read it all. One
         // sentence says so; the "review" issue's own sentence (written for the founder) would only say "found nothing" again (COPY-2)
         const plain = issues.every((x) => x.code === "review");
@@ -1091,7 +1096,7 @@ async function reviewRow(env, r, now, fetchImpl) {
     for (const x of (downs && downs.results) || []) {
       const hit = x.target === "name" ? x.text === v.name : x.text === v.description;
       if (hit && !checks.some((k) => k.check === `taken_down_${x.target}`)) {
-        checks.push({ check: `taken_down_${x.target}`, ok: false, text: `Vicinity took this ${x.target === "name" ? "coin name" : "description"} down on ${String(x.created_at).slice(0, 10)}. Approving it puts it back on the coin.` });
+        checks.push({ check: `taken_down_${x.target}`, ok: false, text: bw`Vicinity took this ${x.target === "name" ? "coin name" : "description"} down on ${String(x.created_at).slice(0, 10)}. Approving it puts it back on the coin.` });
       }
     }
   }
@@ -1104,7 +1109,7 @@ async function reviewRow(env, r, now, fetchImpl) {
     current: base ? { name: base.name, symbol: base.symbol, description: base.description, art: artPath(base.art_sha256) } : null,
     proposed: v ? { name: v.name, symbol: v.symbol, description: v.description, art: proposedArt, upload: v.template_version === "upload" } : null,
     diff, checks, why: r.draft_reason || null,
-    decision: r.status === "pending" ? null : { reasonCode: r.reason_code || null, reason: r.reason_code ? REASONS[r.reason_code] || REASONS.other : null, note: r.note || null },
+    decision: r.status === "pending" ? null : { reasonCode: r.reason_code || null, reason: r.reason_code ? bw.say(REASONS[r.reason_code] || REASONS.other) : null, note: r.note || null },
     registryState: registry, registryPatch: registry === "waiting" && v ? { [String(r.city_id)]: v.symbol } : null,
   };
 }
@@ -1135,7 +1140,7 @@ export async function reviewArt(env, url) {
  * admin guard's { user, wallet, role, db, now, env }.
  */
 export async function decideReview(env, ctx, body, fetchImpl = fetch) {
-  const db = env.DB, now = ctx.now;
+  const db = env.DB, now = ctx.now, bw = brandWords(env);
   await ensureReviewSchema(db);
   if (!body || typeof body !== "object") return { status: 400, error: "bad_request" };
   const id = Number(body.id), action = body.action;
@@ -1179,7 +1184,7 @@ export async function decideReview(env, ctx, body, fetchImpl = fetch) {
     ]);
     if (!res[0].meta.changes) return { status: 409, error: "not_pending", message: "This request was decided, cancelled or withdrawn meanwhile. Reload." };
     await notify(env, { to: r.user_id, kind: "founder", ref: r.city_id, href: "/dashboard#founder", now,
-      text: `Your ${what} needs changes: ${REASONS[code]}` });
+      text: `Your ${what} needs changes: ${bw.say(REASONS[code])}` });
     return { ok: true, id, status: "changes_needed" };
   }
 
@@ -1205,9 +1210,10 @@ export async function decideReview(env, ctx, body, fetchImpl = fetch) {
     if (!m || !IMAGE_TYPES.has(m.type) || (await sha256Hex(bytes)) !== v.art_sha256 || (upload && (m.type !== "image/png" || !squarePng(bytes)))) {
       return { status: 409, error: "art_changed", message: "The proposed picture can't be read as it was sent. Ask the founder to send it again." };
     }
-    const svgSha = upload ? `upload:${v.art_sha256}` : await sha256Hex(coinSvg({ ticker: v.symbol, city: v.name, templateVersion: TEMPLATE_VERSION }));
+    const tv = templateOf(env);
+    const svgSha = upload ? `upload:${v.art_sha256}` : await sha256Hex(coinSvg({ ticker: v.symbol, city: v.name, templateVersion: tv }));
     before.push(db.prepare("INSERT OR IGNORE INTO coin_art (sha256, svg_sha256, template_version, type, bytes, created_at) VALUES (?, ?, ?, ?, ?, ?)")
-      .bind(v.art_sha256, svgSha, upload ? "upload" : TEMPLATE_VERSION, m.type, bytes, at));
+      .bind(v.art_sha256, svgSha, upload ? "upload" : tv, m.type, bytes, at));
   }
   const registry = v.symbol !== d.ticker ? "waiting" : null;
   before.push(db.prepare(`UPDATE coin_requests SET status = 'approved', decided_hash = content_hash, decided_at = ?, decided_by = ?, registry_state = ?, closed_at = ?, updated_at = ?
@@ -1227,7 +1233,7 @@ export async function decideReview(env, ctx, body, fetchImpl = fetch) {
   }
   await notify(env, { to: r.user_id, kind: "founder", ref: r.city_id, href: "/dashboard#founder", now,
     text: r.kind === "change"
-      ? (registry ? `Your coin change was approved. $${v.symbol} goes into the Vicinity city list once an admin adds it; then the owner can approve your coin on the blockchain.` : "Your coin change was approved. It is your coin now.")
+      ? (registry ? bw`Your coin change was approved. $${v.symbol} goes into the Vicinity city list once an admin adds it; then the owner can approve your coin on the blockchain.` : "Your coin change was approved. It is your coin now.")
       : "Your description was approved." });
   return { ok: true, id, status: "approved", ...(registry ? { registryPatch: { [String(r.city_id)]: v.symbol } } : {}) };
 }
@@ -1291,7 +1297,7 @@ export async function reviewPause(env, cityId) {
  * review paths made is looked at (checked as with it on, but no request pauses anything any more): see launchHold.
  */
 export async function candidateProblem(env, cityId, country) {
-  const on = coinV2ReviewOn(env);
+  const on = coinV2ReviewOn(env), bw = brandWords(env);
   if (on) {
     const pend = await pendingRequest(env.DB, cityId);
     if (pend) return `The founder's ${pend.kind === "change" ? "change request" : "description"} waits for review (admin → Moderation → Coin reviews). Nothing is approved until it is decided.`;
@@ -1301,7 +1307,7 @@ export async function candidateProblem(env, cityId, country) {
   }
   const p = await selectionProblem(env, cityId, { country, pending: false });
   if (!p) return null;
-  if (p.code === "registry_waiting") return `The founder's new ticker $${(await chosenOf(env.DB, cityId, { fresh: true }) || {}).symbol || ""} is approved and waits for the Vicinity city list (scripts/cities/ticker-overrides.json in a pull request, then a deploy); nothing is approved until the list carries it.`;
+  if (p.code === "registry_waiting") return bw`The founder's new ticker $${(await chosenOf(env.DB, cityId, { fresh: true }) || {}).symbol || ""} is approved and waits for the Vicinity city list (scripts/cities/ticker-overrides.json in a pull request, then a deploy); nothing is approved until the list carries it.`;
   return `The founder's coin can't be approved as it is: ${p.message}`;
 }
 
@@ -1312,6 +1318,7 @@ export async function registryStep(env, now = Date.now()) {
   const rows = await rd(() => env.DB.prepare(`SELECT r.id, r.city_id, r.user_id, v.symbol FROM coin_requests r JOIN coin_versions v ON v.id = r.version_id
       WHERE r.status = 'approved' AND r.registry_state = 'waiting' LIMIT 50`).all());
   let live = 0;
+  const bw = brandWords(env);
   for (const r of (rows && rows.results) || []) {
     const t = await tickerOf(env, r.city_id);
     if (!t || t.ticker !== r.symbol) continue;
@@ -1320,7 +1327,7 @@ export async function registryStep(env, now = Date.now()) {
     live++;
     // (the legacy launch path closed, stage S23: no launch is promised; the neutral line instead. Review findings S23-OFF-5, SEC-S23-2)
     const next = legacyLaunchClosed(env) ? LEGACY_LAUNCH_LINE : "Your coin launches after the owner's approval on the blockchain.";
-    await notify(env, { to: r.user_id, kind: "founder", ref: r.city_id, href: "/dashboard#founder", now, text: `Your new ticker $${r.symbol} is in the Vicinity city list now. ${next}` });
+    await notify(env, { to: r.user_id, kind: "founder", ref: r.city_id, href: "/dashboard#founder", now, text: `${bw`Your new ticker $${r.symbol} is in the Vicinity city list now.`} ${next}` });
   }
   return { live };
 }

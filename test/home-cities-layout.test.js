@@ -3,8 +3,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { sourceAs } from "../scripts/pages/build.mjs";
 
-const read = (p) => readFileSync(new URL("../" + p, import.meta.url), "utf8").replace(/\r\n/g, "\n");
+// a page source as today's build reads it (BRAND unset: its brand blocks and {{label}} fills resolved; scripts/pages/build.mjs sourceAs)
+const read = (p) => { const t = readFileSync(new URL("../" + p, import.meta.url), "utf8").replace(/\r\n/g, "\n"); return p.startsWith("scripts/pages/src/") ? sourceAs(p, t) : t; };
 const css = read("public/style.css");
 const both = (name) => [["public", read(`public/${name}.html`)], ["src", read(`scripts/pages/src/${name}.html`)]];
 /** The body of the first `@media (max-width: <px>px) { ... }` block holding `needle` (balanced braces). */

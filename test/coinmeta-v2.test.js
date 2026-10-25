@@ -448,7 +448,7 @@ test("not wired: no Worker path reaches src/coinmeta-v2.js, src/coinart-t2.js or
   }
 });
 
-test("no existing module's output changed: the legacy coin JSON, default description, content v1, picture template, picture URLs and character ranges are what edabab5 gave", () => {
+test("no existing module's output changed: the legacy coin JSON, default description, content v1, picture template t1, picture URLs and character ranges are what edabab5 gave", () => {
   const MINT0 = "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU";
   const now = {};
   now.coinmeta = {
@@ -478,12 +478,16 @@ test("no existing module's output changed: the legacy coin JSON, default descrip
     READY.canonicalContent({ city: { id: "1140026", name: "Herāt", region: "Herat", country: "AF", countryName: "Afghanistan" }, name: "Herāt", symbol: "HERAT", description: "The city coin of Herāt, Herat, Afghanistan.", artSha256: "e".repeat(64), templateVersion: "t1" }),
   ];
   now.coinready = { PREVIEW_LABEL: READY.PREVIEW_LABEL, canonicalContent: contents, contentHashes: contents.map(sha), versionLabel: READY.versionLabel(sha(contents[0])) };
-  now.coinart = { TEMPLATES: ART.TEMPLATES, TEMPLATE_VERSION: ART.TEMPLATE_VERSION, FONT_SHA256: ART.FONT_SHA256, RESVG_VERSION: ART.RESVG_VERSION, ART_SIZE: ART.ART_SIZE,
+  // t1 as edabab5 had it (the rebrand stage adds the Citycoin.dev label set's own template beside it, never an id of S22's: test/coinart.test.js
+  // and test/coinart-t2.test.js check that)
+  now.coinart = { TEMPLATES: { t1: ART.TEMPLATES.t1 }, TEMPLATE_VERSION: ART.TEMPLATE_VERSION, FONT_SHA256: ART.FONT_SHA256, RESVG_VERSION: ART.RESVG_VERSION, ART_SIZE: ART.ART_SIZE,
     artText: ["Herāt", "Ḑaugavpils", "  São   Paulo ", "Straße", "北京"].map((n) => ART.artText(n)) };
   now.coinartStore = { artPath: STORE.artPath("f".repeat(64)), artUrl: STORE.artUrl("f".repeat(64)), READY_MIGRATION: STORE.READY_MIGRATION, APPROVED_MIGRATION: STORE.APPROVED_MIGRATION };
   now.text = { FORMAT_CHARS, BLANK_CHARS };
   const { t1Registry, recordedAt, ...was } = LEGACY;
   assert.match(recordedAt, /^edabab5 /);
   assert.equal(t1Registry.coins, 8033, "the t1 digest is checked in test/coinart-t2.test.js");
+  assert.deepEqual(Object.keys(was.coinart.TEMPLATES), ["t1"], "edabab5's templates: t1 alone, compared above as it is now");
+  assert.ok(!Object.hasOwn(ART.TEMPLATES, "t2"), "no S22 id in src/coinart.js");
   assert.deepEqual(JSON.parse(JSON.stringify(now)), was);
 });

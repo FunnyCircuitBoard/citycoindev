@@ -5,7 +5,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { FONT_SHA256, TEMPLATES, TEMPLATE_VERSION, artText, coinSvg, fitCoin, sha256Hex, textWidth } from "../src/coinart.js";
+import { BRAND_TEMPLATES, FONT_SHA256, TEMPLATES, TEMPLATE_VERSION, artText, coinSvg, fitCoin, sha256Hex, templateFor, textWidth } from "../src/coinart.js";
+import { CITYCOIN_BRAND, LEGACY_BRAND } from "../src/brand.js";
 import METRICS from "../src/coinart-metrics.js";
 import { metricsSource } from "../scripts/coin-art/metrics.mjs";
 import { readTtf } from "../scripts/coin-art/ttf.mjs";
@@ -185,5 +186,67 @@ test("a later painted version layers the same text on the owner's blank coin, an
   const png = await (await nodeRenderer())(svg);
   assert.equal(new DataView(png.buffer, png.byteOffset).getUint32(16), 512);
   assert.equal(await sha256Hex(coinSvg({ ticker: "UTICA", city: "Utica" })), before, "t1 is untouched");
-  assert.deepEqual(Object.keys(TEMPLATES), ["t1"], "only t1 is published");
+  assert.deepEqual(Object.keys(TEMPLATES), ["t1", "t1c"], "t1 and the Citycoin.dev label set's t1c are published");
+});
+
+// t1c (the label migration, area c): t1 with the product's name on the bottom arc, nothing else. Pinned like t1 (UTICA, NYC). Its id is
+// not "t2": stage S22 (merged in PR #102) gave "t2" to a different picture, the new program's coin art (src/coinart-t2.js, not wired), and
+// a template id is stored with every picture and in every coin version, so one id may never name two pictures (final check finding 1).
+const GOLDEN_T1C = {
+  5142056: { svg: "a21dc7062e094b2cc71bcae37ac63361573c651d865980fa422139a026c5ef95", png: "d510e858bcf7592fc46e336a1b3ca225e349c22ff3c938ecf664ce1ab21862f7" },
+  5128581: { svg: "e438a80ad2220c138a9fbf81c4362f4256b0c579abf5163edede0e124a00dcf4", png: "0a44a91a32b9a19aefbff07698ebe6c3068b74bebab45cd4f00c334cb1d27244" },
+};
+
+test("t1c (BRAND=citycoin) is t1 with only the arc words changed, pinned by its own hashes; today's label set keeps t1 for new coins", async () => {
+  const { arc: arc1, version: v1, ...rest1 } = TEMPLATES.t1;
+  const { arc: arc2, version: v2, ...rest2 } = TEMPLATES.t1c;
+  assert.deepEqual([v1, v2], ["t1", "t1c"]);
+  assert.deepEqual(rest2, rest1, "every number, colour, font and the renderer are t1's");
+  assert.deepEqual({ ...arc2, text: arc1.text }, { ...arc1 }, "the arc sits where t1's does");
+  assert.equal(arc2.text, "CITYCOIN.DEV");
+  assert.doesNotMatch(JSON.stringify(TEMPLATES.t1c), /vicinity/i);
+  assert.ok(Object.isFrozen(TEMPLATES.t1c) && Object.isFrozen(TEMPLATES.t1c.arc));
+  assert.equal(TEMPLATE_VERSION, "t1", "the default stays t1");
+  assert.deepEqual({ ...BRAND_TEMPLATES }, { "": "t1", citycoin: "t1c" });
+  assert.equal(templateFor(LEGACY_BRAND), "t1");
+  assert.equal(templateFor(CITYCOIN_BRAND), "t1c");
+  for (const b of [null, undefined, {}, { key: "other" }, { key: 5 }]) assert.equal(templateFor(b), "t1", "anything else is today's t1");
+  assert.throws(() => coinSvg({ ticker: "UTICA", city: "Utica", templateVersion: "t2" }), /unknown template version t2/, "no t2 here: S22's id");
+  const render = await nodeRenderer();
+  for (const [id, g] of Object.entries(GOLDEN_T1C)) {
+    const r = byId(id);
+    const one = coinSvg({ ticker: r.ticker, city: r.name }), two = coinSvg({ ticker: r.ticker, city: r.name, templateVersion: "t1c" });
+    assert.equal(await sha256Hex(one), GOLDEN[id].svg, "t1 is untouched");
+    assert.equal(await sha256Hex(two), g.svg, `${r.ticker} t1c SVG`);
+    const l1 = one.split("\n"), l2 = two.split("\n");
+    assert.equal(l1.length, l2.length);
+    const diff = l1.map((l, i) => [l, l2[i]]).filter(([a, b]) => a !== b);
+    assert.equal(diff.length, 1, "one line differs: the arc's words");
+    assert.match(diff[0][0], />VICINITY CITY</);
+    assert.equal(diff[0][1], diff[0][0].replace(">VICINITY CITY<", ">CITYCOIN.DEV<"));
+    assert.doesNotMatch(two, /vicinity/i);
+    const png = await render(two);
+    assert.ok(png.length < 150_000);
+    assert.equal(sha(png), g.png, `${r.ticker} t1c PNG`);
+  }
+});
+
+test("one template id, one picture: no id of src/coinart.js but t1 is one of stage S22's (t2, or t3, which S22 keeps for its next version), every id follows the format, and S22's t2 is a different picture from t1c", async () => {
+  const { ART_TEMPLATES, artSvg, artTemplate } = await import("../src/coinart-t2.js");
+  const ids = Object.keys(TEMPLATES);
+  for (const id of ids) {
+    assert.match(id, /^t[1-9][0-9]*[a-z]?$/, `${id}: "t", the version's number, and a letter only for a variant of that version`);
+    assert.equal(TEMPLATES[id].version, id, `${id} names itself`);
+    if (id === "t1") continue;
+    assert.ok(!Object.hasOwn(ART_TEMPLATES, id) && id !== "t3", `${id} is not one of S22's ids (t2 now, t3 kept for its next version)`);
+    assert.throws(() => artTemplate(id), /unknown template version/, `${id}: S22's registry does not take it (not wired, not edited)`);
+  }
+  assert.equal(ART_TEMPLATES.t1, TEMPLATES.t1, "t1 is the one id both modules share, the same frozen object");
+  // the two pictures are different: the same coin in S22's t2 and in t1c has different SVG bytes, so they could never share an id
+  for (const id of Object.keys(GOLDEN_T1C)) {
+    const r = byId(id);
+    const t2 = artSvg({ ticker: r.ticker, city: r.name, templateVersion: "t2" }), t1c = coinSvg({ ticker: r.ticker, city: r.name, templateVersion: "t1c" });
+    assert.notEqual(await sha256Hex(t2), await sha256Hex(t1c), `${r.ticker}: S22's t2 is not t1c`);
+    assert.equal(await sha256Hex(t1c), GOLDEN_T1C[id].svg);
+  }
 });

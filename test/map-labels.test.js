@@ -281,7 +281,7 @@ test("active: the card's fourth line for an active city, and a founded city's li
   const ctx = { focusEl, $: (s) => els[s], document: { createTextNode: (t) => ({ textContent: t }) }, el: (tag, c, t) => ({ textContent: t || "", href: "" }),
     byId: new Map([[city.id, city]]), claims: new Map(), windows: new Map(), members: new Map(), memberCount: new Map([[city.id, 12]]), holderCount: new Map([[city.id, 7]]), joined: new Set(),
     ov: { failed: false }, compact: new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }), fmt: (n) => Number(n).toLocaleString("en-US"), placeOf: () => "New York, United States",
-    tickerOf: () => "SYRACUSE", founderMin: () => 240000, until: () => "1h", toLonLat: () => [0, 0], nearestCommunities: () => [], fcx: 0, fcy: 0,
+    tickerOf: () => "SYRACUSE", UNIT: "$VICINITY", founderMin: () => 240000, until: () => "1h", toLonLat: () => [0, 0], nearestCommunities: () => [], fcx: 0, fcy: 0,
     FOCUS_TAG: { open: ["tag tag--open", "Open"], active: ["tag tag--active", "Active"], founded: ["tag tag--no", "Founded"] }, STATUS_WORD: { open: "Open", active: "Active", founded: "Founded" },
     setTimeout: (f) => { f(); return 1; }, clearTimeout() {}, Date: { now: () => 0 }, seatsFrozen: () => false };
   vm.createContext(ctx);

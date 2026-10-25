@@ -5,12 +5,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
-import { buildPages } from "../scripts/pages/build.mjs";
+import { buildPages, sourceAs } from "../scripts/pages/build.mjs";
 
 const read = (f) => readFileSync(new URL(`../public/${f}`, import.meta.url), "utf8");
 const src = read("launchpad.js");
 const html = read("launchpad.html");
-const srcHtml = readFileSync(new URL("../scripts/pages/src/launchpad.html", import.meta.url), "utf8");
+const srcHtml = sourceAs("launchpad.html", readFileSync(new URL("../scripts/pages/src/launchpad.html", import.meta.url), "utf8")); // as today's build reads it (BRAND unset)
 const css = read("style.css");
 const START = "// City coins (switched on with LAUNCHPAD_V2=on)";
 assert.ok(src.includes(START), "the city-coins part of launchpad.js starts with its banner");

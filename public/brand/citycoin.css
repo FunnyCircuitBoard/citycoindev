@@ -1,0 +1,17 @@
+/* Citycoin.dev: what the pages built with BRAND=citycoin add to the shared styles (scripts/pages/build.mjs LOOKS.citycoin links this file
+   last, so it wins over style.css and polish.css). Pages built with BRAND unset never load it.
+   - the header's lockup: one file per theme (citycoin-lockup-dark.svg on the dark theme, citycoin-lockup.svg on the light one), at the
+     lockup's 140 px minimum or wider (docs/citycoin-master/brand/README.md, "Clear space and minimum sizes")
+   - the phone tab bar has four tabs (no Token tab while the main token is not live)
+   - the member pass's mark: the Citycoin.dev icon in place of the map pin
+   - .cc-off: a part of a page that belongs to a feature that is not live under this brand (the main token's holding, rank and Buy card).
+     Its markup stays, so the page's scripts still find their elements, but nothing shows it, whatever a script does with `hidden`. */
+:root[data-brand="citycoin"] .brand { gap: 0; }
+:root[data-brand="citycoin"] .brand__lockup { display: block; width: auto; height: 28px; }
+:root[data-brand="citycoin"] .brand__lockup--light { display: none; }
+:root[data-brand="citycoin"][data-theme="light"] .brand__lockup--light { display: block; }
+:root[data-brand="citycoin"][data-theme="light"] .brand__lockup--dark { display: none; }
+@media (max-width: 400px) { :root[data-brand="citycoin"] .brand__lockup { height: 26px; } }
+:root[data-brand="citycoin"] .tabbar { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+:root[data-brand="citycoin"] .cc-off { display: none !important; }
+:root[data-brand="citycoin"] .pass__mark { background: url("/brand/favicon.svg") center / contain no-repeat; border-radius: 0; transform: none; box-shadow: none; }

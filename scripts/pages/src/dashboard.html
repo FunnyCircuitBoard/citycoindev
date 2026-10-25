@@ -1,4 +1,4 @@
-<!--{"title": "Dashboard", "description": "Your live Vicinity dashboard: rank among all holders, your city and country, badges, the path to founding your city, elections, and local and national memes, check-ins and discussions.", "page": "dashboard", "scripts": ["wallets", "swap", "dashboard-roles", "lp-sign", "lp-launch", "dashboard"], "styles": ["onboard", "swap", "lp-launch", "polish-dash"]}-->
+<!--{"title": "Dashboard", "description": "Your live {{productName}} dashboard: rank among all holders, your city and country, badges, the path to founding your city, elections, and local and national memes, check-ins and discussions.", "page": "dashboard", "scripts": ["wallets", "swap", "dashboard-roles", "lp-sign", "lp-launch", "dashboard"], "styles": ["onboard", "swap", "lp-launch", "polish-dash"], "brand": {"citycoin": {"description": "Your live {{productName}} dashboard: your city and country, badges, the path to founding your city, elections, and local and national memes, check-ins and discussions."}}}-->
     <!-- signed out -->
     <section class="dash-out is-pending" id="dash-out" hidden>
       <div class="wrap teaser">
@@ -11,13 +11,13 @@
         </div>
         <!-- a snapshot of a member's Home tab with made-up sample values, drawn in HTML (sharp, themed, no image). Read as one picture.
              No ids, no links and no classes the dashboard scripts look up: the real dashboard below never confuses it with its own cards. -->
-        <div class="teaser__preview dpv" role="img" aria-label="Example of a member's dashboard, with sample data: the Vicinity Pass, how much they hold and their rank among all holders, their city with the path to founding it, and what to do next.">
+        <div class="teaser__preview dpv" role="img" aria-label="Example of a member's dashboard, with sample data: <!--@if citycoin-->the {{productName}} Pass, their city<!--@else-->the Vicinity Pass, how much they hold and their rank among all holders, their city<!--@end--> with the path to founding it, and what to do next.">
           <div class="dpv__frame" aria-hidden="true">
             <div class="dpv__top"><span class="dpv__tag">Preview · example data</span><span class="dpv__what">What members see</span></div>
             <div class="dpv__tabs"><span class="is-on">Home</span><span>City</span><span>Feed</span><span>Rankings</span><span>Founder</span></div>
             <div class="dpv__pass">
               <span class="dpv__shine"></span>
-              <div class="dpv__row"><span class="dpv__brand"><span class="dpv__mark"></span>Vicinity Pass</span><span class="dpv__pill">Holder</span></div>
+              <div class="dpv__row"><span class="dpv__brand"><span class="dpv__mark"></span>{{productName}} Pass</span><span class="dpv__pill"><!--@if citycoin-->Member<!--@else-->Holder<!--@end--></span></div>
               <div class="dpv__who">
                 <span class="dpv__avatar">U</span>
                 <span class="dpv__id"><span class="dpv__name">@UticaSam</span><span class="dpv__home"><svg class="dpv__pin" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg>Utica, United States</span></span>
@@ -25,6 +25,7 @@
               </div>
               <div class="dpv__row dpv__foot"><span>Google</span><span class="dpv__live"><span class="dpv__dot"></span>live</span></div>
             </div>
+<!--@if !citycoin-->
             <div class="dpv__standing">
               <span class="dpv__label"><span class="ico ico--sm dpv__ico"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v9M9.5 9.5h3.75a1.75 1.75 0 0 1 0 3.5h-2.5a1.75 1.75 0 0 0 0 3.5h3.75"/></svg></span>You hold</span>
               <span class="dpv__amt"><span class="dpv__num" data-dpv-to="250000" data-dpv-fmt="compact">250K</span><span class="dpv__unit">$VICINITY</span></span>
@@ -36,6 +37,7 @@
                 <span class="dpv__chip"><span class="dpv__cnum">#41</span><span class="dpv__clabel">in the US</span></span>
               </span>
             </div>
+<!--@end-->
             <div class="dpv__city">
               <div class="dpv__city-head">
                 <span class="dpv__disc">UTICA</span>
@@ -107,7 +109,7 @@
           <div class="welcome__disc" aria-hidden="true"><span id="welcome-disc">—</span></div>
           <div class="welcome__text">
             <p class="kicker">You are in</p>
-            <h2 id="welcome-title">Welcome to Vicinity.</h2>
+            <h2 id="welcome-title">Welcome to {{productName}}.</h2>
             <p id="welcome-line">Your dashboard is live.</p>
           </div>
           <div class="ring welcome__ring" id="welcome-ring" role="img" aria-label="Profile 2 of 3 complete: location and account done, wallet not linked">
@@ -120,14 +122,14 @@
           <div class="pass" id="pass">
             <span class="pass__shine" aria-hidden="true"></span>
             <div class="pass__top">
-              <span class="pass__brand"><span class="pass__mark" aria-hidden="true"></span>Vicinity Pass</span>
+              <span class="pass__brand"><span class="pass__mark" aria-hidden="true"></span>{{productName}} Pass</span>
               <span class="ring-row">
                 <span class="ring ring--sm ring--pass" id="pass-ring" role="img" aria-label="Profile 2 of 3 complete: location and account done, wallet not linked" hidden><svg class="ring__svg" viewBox="0 0 64 64" aria-hidden="true" focusable="false"><circle class="ring__track" cx="32" cy="32" r="26"/><circle class="ring__arc" cx="32" cy="32" r="26"/><text class="ring__num" x="32" y="39" text-anchor="middle" id="pass-ring-num">2/3</text></svg></span>
                 <span class="role-pill" id="me-role">Member</span>
               </span>
             </div>
             <div class="pass__who">
-              <div class="idcard__avatar" id="me-avatar" aria-hidden="true">V</div>
+              <div class="idcard__avatar" id="me-avatar" aria-hidden="true"><!--@if citycoin-->C<!--@else-->V<!--@end--></div>
               <div class="pass__id">
                 <p class="pass__name"><strong data-me-name>—</strong></p>
                 <p class="pass__home"><svg class="pass__pin" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg><span id="me-home">—</span></p>
@@ -141,18 +143,18 @@
               <span class="live-note"><span class="live-dot" aria-hidden="true"></span> <span id="me-checked">live</span></span>
             </div>
           </div>
-          <section class="standing" id="standing" aria-label="Your holding and rank">
+          <section class="standing<!--@if citycoin--> cc-off<!--@end-->" id="standing" aria-label="Your holding and rank">
             <div class="standing__hold">
               <span class="standing__label">You hold</span>
-              <p class="standing__row"><strong class="standing__num" id="d-amount">—</strong> <span class="standing__unit">$VICINITY<span class="standing__usd" id="d-worth" hidden></span></span></p>
-              <span class="standing__exact" id="d-amount-sub">$VICINITY</span>
+              <p class="standing__row"><strong class="standing__num" id="d-amount">—</strong> <span class="standing__unit"><!--@if citycoin-->tokens<!--@else-->$VICINITY<!--@end--><span class="standing__usd" id="d-worth" hidden></span></span></p>
+              <span class="standing__exact" id="d-amount-sub"><!--@if citycoin-->tokens<!--@else-->$VICINITY<!--@end--></span>
             </div>
             <ul class="standing__ranks">
               <li class="rank-chip"><strong id="d-rank">—</strong><span class="rank-chip__label" id="d-rank-sub"></span></li>
               <li class="rank-chip"><strong id="d-crank">—</strong><span class="rank-chip__label">in <span id="d-city-label">your city</span></span><span class="rank-chip__sub" id="d-crank-sub"></span></li>
               <li class="rank-chip"><strong id="d-nrank">—</strong><span class="rank-chip__label">in <span id="d-country-label">your country</span></span><span class="rank-chip__sub" id="d-nrank-sub"></span></li>
             </ul>
-            <p class="standing__empty" hidden><span class="standing__why"></span> <a class="btn btn--glass btn--sm standing__go" href="#home" data-go="#trade" hidden>Get $VICINITY</a></p>
+            <p class="standing__empty" hidden><span class="standing__why"></span> <a class="btn btn--glass btn--sm standing__go" href="#home" data-go="#trade" hidden><!--@if citycoin-->Get tokens<!--@else-->Get $VICINITY<!--@end--></a></p>
           </section>
         </div>
 
@@ -163,9 +165,11 @@
         <section class="wcard" id="wallet-card" aria-labelledby="wcard-title" hidden>
           <p class="kicker" id="wcard-kicker">Complete your profile · 2 of 3</p>
           <h2 id="wcard-title">Connect your wallet</h2>
-          <p class="wcard__lead" id="wcard-lead">Free: one signature, not a transaction. Vicinity never asks for your recovery phrase or private key.</p>
+          <p class="wcard__lead" id="wcard-lead">Free: one signature, not a transaction. {{productName}} never asks for your recovery phrase or private key.</p>
           <ul class="wcard__perks" id="wcard-perks">
+<!--@if !citycoin-->
             <li>Your $VICINITY balance and your rank among all holders</li>
+<!--@end-->
             <li>The founder path for <span id="wcard-city">your city</span> and your city coin</li>
             <li>Your badges</li>
           </ul>
@@ -194,24 +198,24 @@
             <!-- member profiles (PROFILES=on only): only $VICINITY and city coins, with live values -->
             <section class="card portfolio-card" id="portfolio" aria-labelledby="pf-title" hidden>
               <div class="portfolio-card__head">
-                <div><p class="kicker">Portfolio · live values</p><h2 class="h2--sm" id="pf-title">Your Vicinity coins</h2></div>
+                <div><p class="kicker">Portfolio · live values</p><h2 class="h2--sm" id="pf-title">Your <!--@if citycoin-->city<!--@else-->Vicinity<!--@end--> coins</h2></div>
                 <div class="pf__meta"><span class="tiny muted" id="pf-updated"></span><button class="link-btn pf__refresh" type="button" id="pf-refresh">Refresh</button></div>
               </div>
               <p class="pf-sum" id="pf-total" hidden></p>
               <details class="fold pf-fold">
                 <summary>Breakdown <span class="fold__meta">Each coin, its amount and its value</span></summary>
-                <p class="small muted">Only $VICINITY and city coins are counted here. Anything else in your wallet is never shown.</p>
+                <p class="small muted">Only <!--@if !citycoin-->$VICINITY and <!--@end-->city coins are counted here. Anything else in your wallet is never shown.</p>
                 <div class="pf" id="pf-body"><p class="muted small">Loading your coins…</p></div>
               </details>
               <p class="inline-err" id="pf-msg" role="alert" hidden></p>
               <p class="tiny muted pf__net"><span id="pf-net" hidden></span><a href="/profile" id="pf-net-me">Your profile page</a><a href="/profile" id="pf-net-find">Find members</a></p>
             </section>
 
-            <section class="card trade" id="trade" aria-labelledby="trade-title">
+            <section class="card trade<!--@if citycoin--> cc-off<!--@end-->" id="trade" aria-labelledby="trade-title">
               <div class="trade__head"><p class="kicker">Buy &amp; swap</p><span class="tag" id="trade-state">Opens at launch</span></div>
               <h2 class="h2--sm" id="trade-title">Grow your stack.</h2>
               <div class="seg seg--sm trade__tabs" role="tablist" aria-label="What to do">
-                <button type="button" role="tab" data-route="vic" aria-selected="true">$VICINITY</button>
+                <button type="button" role="tab" data-route="vic" aria-selected="true"><!--@if citycoin-->Main token<!--@else-->$VICINITY<!--@end--></button>
                 <button type="button" role="tab" data-route="city" aria-selected="false"><span data-city-tk>$CITY</span></button>
                 <button type="button" role="tab" data-route="swap" aria-selected="false">Swap</button>
               </div>
@@ -224,14 +228,14 @@
                 <button class="swapbox__flip" type="button" id="tr-flip" aria-label="Switch direction">⇅</button>
                 <div class="swapbox__row">
                   <span class="swapbox__label">You get · estimate</span>
-                  <div class="swapbox__line"><output class="swapbox__amt" id="tr-out" for="tr-amt">—</output><span class="token-chip" id="tr-outk"><span class="token-chip__dot" aria-hidden="true"></span><span>$VICINITY</span></span></div>
+                  <div class="swapbox__line"><output class="swapbox__amt" id="tr-out" for="tr-amt">—</output><span class="token-chip" id="tr-outk"><span class="token-chip__dot" aria-hidden="true"></span><span><!--@if citycoin-->Main token<!--@else-->$VICINITY<!--@end--></span></span></div>
                   <span class="swapbox__usd" id="tr-rate"></span>
                 </div>
               </div>
               <p class="trade__lock" hidden><span class="trade__lock-text">Buying needs a wallet</span> <a class="btn btn--glass btn--sm" href="/connect?mode=link">Connect wallet</a></p>
               <a class="btn btn--primary btn--block" id="tr-go" href="/token#buy">How to get ready →</a>
               <a class="btn btn--glass btn--block btn--sm trade__alt" id="tr-go-2" href="/token#buy" hidden>or on Raydium ↗</a>
-              <p class="tiny muted trade__note" id="tr-note">You sign every swap in your own wallet on Jupiter or Raydium. Vicinity never touches your funds.</p>
+              <p class="tiny muted trade__note" id="tr-note">You sign every swap in your own wallet on Jupiter or Raydium. {{productName}} never touches your funds.</p>
             </section>
 
             <section class="card" id="national">
@@ -325,7 +329,7 @@
                 </div>
                 <p class="studio-step" id="studio-step-2" hidden>Step 2 · Trading pair</p>
                 <p class="fieldset__label">Paired with<span data-launchlab-copy>, on Raydium LaunchLab</span></p>
-                <p class="tiny muted" data-lp-only hidden>City coins launch on the Vicinity launchpad paired with SOL for now: pick SOL to launch.</p>
+                <p class="tiny muted" data-lp-only hidden>City coins launch on the {{productName}} launchpad paired with SOL for now: pick SOL to launch.</p>
                 <div class="pair-pick" role="radiogroup" aria-label="Paired with">
                   <label class="pair-opt"><input type="radio" name="cs-pair" value="SOL" checked><span class="pair-opt__icon" aria-hidden="true">◎</span><strong>SOL</strong><em>Solana's own coin. What most traders hold.</em></label>
                   <label class="pair-opt"><input type="radio" name="cs-pair" value="USDC"><span class="pair-opt__icon" aria-hidden="true">$</span><strong>USDC</strong><em>A digital dollar. Prices read in dollars.</em></label>
@@ -344,7 +348,7 @@
                 <div class="coin-studio__logo">
                   <label class="btn btn--glass btn--sm"><input type="file" id="cs-logo" accept="image/*" class="sr-only"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="m4 17 5-4.5 4 3.5 2.5-2 4.5 3.5"/></svg>Upload logo</label>
                   <button class="link-btn" type="button" id="cs-logo-remove" hidden>Remove logo</button>
-                  <span class="tiny muted">Square works best: it's cropped to a circle and shrunk in your browser. An admin checks every picture before anyone else sees it; until then the coin shows its initials on the site and the Vicinity badge in wallets.</span>
+                  <span class="tiny muted">Square works best: it's cropped to a circle and shrunk in your browser. An admin checks every picture before anyone else sees it; until then the coin shows its initials on the site and the {{productName}} badge in wallets.</span>
                 </div>
                 <div class="coin-studio__actions">
                   <button class="btn btn--primary" type="submit" id="cs-save">Save design</button>
@@ -365,7 +369,7 @@
                  launchpad's settings are on (GET /api/lp/launch/status answers); the tabbed dashboard moves it into the Founder tab -->
             <section class="card lp-launch" id="lp-launch" aria-labelledby="lp-launch-title" hidden>
               <div class="lp-launch__head">
-                <div><p class="kicker"><span class="ico ico--sm" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 16V8M8.5 11.5 12 8l3.5 3.5"/></svg></span>City coin · Vicinity launchpad</p><h2 class="h2--sm" id="lp-launch-title">Launch your city coin</h2></div>
+                <div><p class="kicker"><span class="ico ico--sm" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 16V8M8.5 11.5 12 8l3.5 3.5"/></svg></span>City coin · {{productName}} launchpad</p><h2 class="h2--sm" id="lp-launch-title">Launch your city coin</h2></div>
                 <span class="tag" data-lp-state>Checking…</span>
               </div>
               <p class="lp-net" data-lp-net hidden></p>
@@ -377,11 +381,11 @@
                  moves it into the Founder tab. Every value is set with textContent. -->
             <section class="card coin-ready" id="coin-ready" aria-labelledby="coin-ready-title" hidden>
               <div class="coin-ready__head">
-                <div><p class="kicker">City coin · made by Vicinity</p><h2 class="h2--sm" id="coin-ready-title">Your city coin</h2></div>
+                <div><p class="kicker">City coin · made by {{productName}}</p><h2 class="h2--sm" id="coin-ready-title">Your city coin</h2></div>
                 <span class="tag" id="cr-state" tabindex="-1">Checking…</span>
               </div>
               <p class="coin-ready__place small" id="cr-place"></p>
-              <p class="small coin-ready__caption"><span class="ico ico--sm" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10.5" width="14" height="9.5" rx="2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg></span>Set by Vicinity. Every city coin uses the same Vicinity design, filled in from the Vicinity city list, so nothing here can be edited.</p>
+              <p class="small coin-ready__caption"><span class="ico ico--sm" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10.5" width="14" height="9.5" rx="2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg></span>Set by {{productName}}. Every city coin uses the same {{productName}} design, filled in from the {{productName}} city list, so nothing here can be edited.</p>
               <div class="coin-ready__body">
                 <figure class="coin-ready__art">
                   <img id="cr-art" width="240" height="240" alt="" hidden>
@@ -397,7 +401,7 @@
                   <div class="coin-ready__wide"><dt>Description</dt><dd id="cr-desc">—</dd></div>
                 </dl>
               </div>
-              <p class="tiny muted coin-ready__src">The ticker, the name and the place come from the Vicinity city list.</p>
+              <p class="tiny muted coin-ready__src">The ticker, the name and the place come from the {{productName}} city list.</p>
               <p class="tiny muted coin-ready__version" id="cr-version"></p>
               <p class="small coin-ready__gate" id="cr-gate" role="status" hidden></p>
               <div class="coin-ready__actions">
@@ -504,16 +508,16 @@
                   <svg viewBox="0 0 29 29" width="180" height="180" role="img" aria-label="QR code of your wallet address" shape-rendering="crispEdges" focusable="false"><path id="wt-qr-path" fill="currentColor" d=""/></svg>
                 </figure>
               </div>
-              <p class="small">Solana mainnet only. Send SOL, $VICINITY or Vicinity city coins to this address from another wallet or an exchange.</p>
+              <p class="small">Solana mainnet only. Send SOL<!--@if citycoin--> or {{productName}}<!--@else-->, $VICINITY or Vicinity<!--@end--> city coins to this address from another wallet or an exchange.</p>
               <p class="small muted">Anything else sent here is still yours, but this page does not show it.</p>
             </section>
             <section class="card wtab" id="wt-balances" aria-labelledby="wt-balances-title" hidden>
               <div class="dv2-head"><div><p class="kicker">Balances</p><h2 class="h2--sm" id="wt-balances-title">What this wallet holds</h2></div></div>
               <p class="small muted" id="wt-loading">Reading your balances…</p>
               <ul class="wtab-rows" id="wt-rows" hidden></ul>
-              <div class="empty wtab-empty" id="wt-empty" hidden><strong>Nothing here yet</strong><span>Send SOL, $VICINITY or a Vicinity city coin to the address above and it shows here.</span></div>
+              <div class="empty wtab-empty" id="wt-empty" hidden><strong>Nothing here yet</strong><span>Send SOL<!--@if citycoin--> or a {{productName}}<!--@else-->, $VICINITY or a Vicinity<!--@end--> city coin to the address above and it shows here.</span></div>
               <p class="tiny muted wtab-read" id="wt-read" hidden><span id="wt-read-text"></span> <button class="link-btn wtab-refresh" type="button" id="wt-refresh">Refresh</button></p>
-              <div class="dv2-actions"><a class="btn btn--primary btn--sm" id="wt-buy" href="#home" data-go="#trade">Buy &amp; swap</a></div>
+              <div class="dv2-actions"><a class="btn btn--primary btn--sm<!--@if citycoin--> cc-off<!--@end-->" id="wt-buy" href="#home" data-go="#trade">Buy &amp; swap</a></div>
             </section>
           </section>
 
@@ -562,7 +566,13 @@
           </section>
 
           <section class="dpanel" id="panel-rankings" role="tabpanel" aria-labelledby="tab-rankings" tabindex="0" hidden>
-            <section class="card rk" id="rankings-card" aria-labelledby="rk-title">
+<!--@if citycoin-->
+            <section class="card" id="rankings-soon" aria-labelledby="rk-soon-title">
+              <div class="dv2-head"><div><p class="kicker">Rankings</p><h2 class="h2--sm" id="rk-soon-title">Where you stand</h2></div></div>
+              <p class="small muted">The {{productName}} token is not live yet, so there are no rankings yet.</p>
+            </section>
+<!--@end-->
+            <section class="card rk<!--@if citycoin--> cc-off<!--@end-->" id="rankings-card" aria-labelledby="rk-title">
               <div class="dv2-head"><div><p class="kicker">Rankings · checked live</p><h2 class="h2--sm" id="rk-title">Where you stand</h2></div><span class="tag" id="rk-state">Live at launch</span></div>
               <div class="tiles tiles--3" id="rk-tiles">
                 <div class="tile" id="rk-global"><span class="tile__label">All holders</span><strong class="tile__num" id="rk-global-rank">—</strong><span class="tile__sub" id="rk-global-sub">live at launch</span><span class="tile__note" id="rk-global-gap" hidden></span></div>
@@ -574,7 +584,7 @@
                 <strong>You're not ranked yet</strong>
                 <span class="rk-empty__why"></span>
                 <a class="btn btn--glass btn--sm rk-empty__link" href="/connect?mode=link" hidden>Link wallet</a>
-                <a class="btn btn--glass btn--sm rk-empty__go" href="#home" data-go="#trade" hidden>Get $VICINITY</a>
+                <a class="btn btn--glass btn--sm rk-empty__go" href="#home" data-go="#trade" hidden><!--@if citycoin-->Get tokens<!--@else-->Get $VICINITY<!--@end--></a>
               </div>
               <p class="small muted" id="rk-note"></p>
               <div class="dv2-actions">
@@ -642,7 +652,7 @@
         <details class="fold profile__row">
           <summary><span class="fold__label" id="profile-username-h">Username</span> <span class="fold__meta" id="profile-username-meta"></span></summary>
           <div class="profile__body">
-            <p class="small muted">Your public name everywhere on Vicinity. Every username is unique — once someone takes one, it's theirs.</p>
+            <p class="small muted">Your public name everywhere on {{productName}}. Every username is unique — once someone takes one, it's theirs.</p>
             <form id="username-form" class="inline-form" novalidate>
               <input id="username-input" maxlength="20" spellcheck="false" autocomplete="off" placeholder="Pick a username" aria-label="New username">
               <button class="btn btn--primary btn--sm" type="submit">Save</button>
@@ -655,7 +665,7 @@
         <details class="fold profile__row" id="bio-sec" hidden>
           <summary><span class="fold__label" id="profile-bio-h">Bio</span> <span class="fold__meta" id="profile-bio-meta"></span></summary>
           <div class="profile__body">
-            <p class="small muted">One line about you, up to 100 characters. It shows on your Vicinity Pass and on your profile. No links, wallet addresses, e-mail addresses or phone numbers.</p>
+            <p class="small muted">One line about you, up to 100 characters. It shows on your {{productName}} Pass and on your profile. No links, wallet addresses, e-mail addresses or phone numbers.</p>
             <form id="bio-form" class="bio-form" novalidate>
               <label class="sr-only" for="bio-input">Your bio</label>
               <textarea id="bio-input" rows="2" autocomplete="off" spellcheck="true" placeholder="Say something about you" aria-describedby="bio-count bio-hint"></textarea>
@@ -668,7 +678,7 @@
         <details class="fold profile__row" id="profile-net-sec" hidden>
           <summary><span class="fold__label" id="profile-net-h">Member profiles</span> <span class="fold__meta">What other members see</span></summary>
           <div class="profile__body">
-            <p class="small">Other signed-in members can now open your profile and see your username, home community, bio, wallet address and your $VICINITY and city-coin balances. They can follow you, and you can block anyone. There is no messaging.</p>
+            <p class="small">Other signed-in members can now open your profile and see your username, home community, bio, wallet address and your <!--@if !citycoin-->$VICINITY and <!--@end-->city-coin balances. They can follow you, and you can block anyone. There is no messaging.</p>
             <p class="small" id="profile-net" hidden></p>
             <ul class="link-list"><li><a href="/profile" id="profile-net-link">Open your profile page</a></li><li><a href="/profile">Find members</a></li></ul>
           </div>
@@ -682,7 +692,7 @@
               <div><dt>Signed in with</dt><dd id="profile-provider">—</dd></div>
               <div><dt>Home</dt><dd id="profile-home">—</dd></div>
             </dl>
-            <p class="small callout" id="profile-public-note" hidden>Other signed-in members can see your username, community, bio, wallet address and your $VICINITY and city-coin balances.</p>
+            <p class="small callout" id="profile-public-note" hidden>Other signed-in members can see your username, community, bio, wallet address and your <!--@if !citycoin-->$VICINITY and <!--@end-->city-coin balances.</p>
           </div>
         </details>
 
@@ -816,31 +826,31 @@
         </div>
         <div class="roles-table">
           <details class="card role-row" data-role="holder" open>
-            <summary class="role-row__head"><span class="role__icon ico ico--ok" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" focusable="false"><circle cx="12" cy="15" r="5"/><path d="M8.5 10.5 6 3.5h4l2 5 2-5h4l-2.5 7"/></svg></span><div><h3>Holder</h3><p class="tiny muted">Holds any $VICINITY · vote ×1</p></div><span class="role-row__chev" aria-hidden="true"></span></summary>
+            <summary class="role-row__head"><span class="role__icon ico ico--ok" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" focusable="false"><circle cx="12" cy="15" r="5"/><path d="M8.5 10.5 6 3.5h4l2 5 2-5h4l-2.5 7"/></svg></span><div><h3>Holder</h3><p class="tiny muted"><!--@if citycoin-->Holds the {{productName}} token · vote ×1<!--@else-->Holds any $VICINITY · vote ×1<!--@end--></p></div><span class="role-row__chev" aria-hidden="true"></span></summary>
             <div class="role-row__body">
             <div><p class="role-row__when">Any time</p><ul><li>Verify your wallet and set your home community.</li><li>Post memes, check-ins and discussions in your city and country.</li><li>Report spam and scams: 5 reports hide a post until a moderator reviews it.</li></ul></div>
-            <div><p class="role-row__when">Since $VICINITY launched</p><ul><li>Only holders can post and vote.</li><li>Endorse who should found your city, and elect your Country Manager: one person, one vote.</li><li>Founding Supporters are the holders by 14-day average balance at the snapshot. Its rules are published; no date is set yet and no benefit is promised.</li></ul></div>
+            <div><p class="role-row__when"><!--@if citycoin-->Once the {{productName}} token is live<!--@else-->Since $VICINITY launched<!--@end--></p><ul><li>Only holders can post and vote.</li><li>Endorse who should found your city, and elect your Country Manager: one person, one vote.</li><li>Founding Supporters are the holders by 14-day average balance at the snapshot. Its rules are published; no date is set yet and no benefit is promised.</li></ul></div>
             </div>
           </details>
           <details class="card role-row" data-role="founder">
             <summary class="role-row__head"><span class="role__icon ico ico--gold" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M4 17.5 3 8l5 4 4-6.5 4 6.5 5-4-1 9.5z"/><path d="M4.5 20.5h15"/></svg></span><div><h3>City Founder</h3><p class="tiny muted">Chosen by the city · vote ×2</p></div><span class="role-row__chev" aria-hidden="true"></span></summary>
             <div class="role-row__body">
             <div><p class="role-row__when">Any time</p><ul><li>Set your home community (it must be set 7 days before you apply).</li><li>Bring your locals in: they'll endorse the founder.</li><li>Hold the founder amount for 7 days straight: balances are checked at random times.</li></ul></div>
-            <div><p class="role-row__when">Since $VICINITY launched</p><ul><li>Apply from inside the city. The first qualified claimer becomes Seed Steward at once: a 90-day probation, confirmed early by 50 verified local holders, and locals can challenge (10 endorsements force an election).</li><li>If several claim together, a 72-hour window scores them: 50% local endorsements, 30% contribution, 20% holdings (capped at 2×). Then 48 hours for objections.</li><li>Your bar is set by city size (100K to 1M $VICINITY). Friends can found together: 3 to 5 verified locals can pool as a squad.</li><li>Moderate the city's feed (hides need a second person). Drop below the amount and moderation pauses; 7 days to fix it (48 hours for a Seed Steward) or the seat reopens.</li><li data-coin-designed>Design the city's coin: name, logo, colour and a short pitch; it launches paired with SOL. Public, logged, and locked once it launches.</li><li data-coin-ready hidden>Choose the city's coin: made by Vicinity from the city list (its ticker, name and picture); it launches paired with SOL once Vicinity's owner approves it on the blockchain. Public, logged, and fixed once it launches.</li><li>At the Launchpad: first right to launch the city's one official coin.</li></ul></div>
+            <div><p class="role-row__when"><!--@if citycoin-->Once the {{productName}} token is live<!--@else-->Since $VICINITY launched<!--@end--></p><ul><li>Apply from inside the city. The first qualified claimer becomes Seed Steward at once: a 90-day probation, confirmed early by 50 verified local holders, and locals can challenge (10 endorsements force an election).</li><li>If several claim together, a 72-hour window scores them: 50% local endorsements, 30% contribution, 20% holdings (capped at 2×). Then 48 hours for objections.</li><li>Your bar is set by city size<!--@if !citycoin--> (100K to 1M $VICINITY)<!--@end-->. Friends can found together: 3 to 5 verified locals can pool as a squad.</li><li>Moderate the city's feed (hides need a second person). Drop below the amount and moderation pauses; 7 days to fix it (48 hours for a Seed Steward) or the seat reopens.</li><li data-coin-designed>Design the city's coin: name, logo, colour and a short pitch; it launches paired with SOL. Public, logged, and locked once it launches.</li><li data-coin-ready hidden>Choose the city's coin: made by {{productName}} from the city list (its ticker, name and picture); it launches paired with SOL once {{productName}}'s owner approves it on the blockchain. Public, logged, and fixed once it launches.</li><li>At the Launchpad: first right to launch the city's one official coin.</li></ul></div>
             </div>
           </details>
           <details class="card role-row" data-role="manager">
             <summary class="role-row__head"><span class="role__icon ico ico--gold" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.4 3.5 5.3 3.5 8.5s-1.1 6.1-3.5 8.5c-2.4-2.4-3.5-5.3-3.5-8.5s1.1-6.1 3.5-8.5z"/></svg></span><div><h3>Country Manager</h3><p class="tiny muted">Elected for 90 days · vote ×3</p></div><span class="role-row__chev" aria-hidden="true"></span></summary>
             <div class="role-row__body">
             <div><p class="role-row__when">Any time</p><ul><li>The seat opens once the country has founders with 30+ days of service. Until then the Admin covers it.</li></ul></div>
-            <div><p class="role-row__when">Since $VICINITY launched</p><ul><li>Elected by the country's verified locals: 50% votes, 30% service, 20% holdings (capped). 90-day terms, at most two in a row.</li><li>Hide posts in the country, propose bans (another person must approve), advise on "add my town" requests.</li><li>Powers pause the moment their founder seat is in grace.</li></ul></div>
+            <div><p class="role-row__when"><!--@if citycoin-->Once the {{productName}} token is live<!--@else-->Since $VICINITY launched<!--@end--></p><ul><li>Elected by the country's verified locals: 50% votes, 30% service, 20% holdings (capped). 90-day terms, at most two in a row.</li><li>Hide posts in the country, propose bans (another person must approve), advise on "add my town" requests.</li><li>Powers pause the moment their founder seat is in grace.</li></ul></div>
             </div>
           </details>
           <details class="card role-row" data-role="admin">
-            <summary class="role-row__head"><span class="role__icon ico ico--muted" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M12 3 5 6v5.5c0 4.2 2.9 7.9 7 9.5 4.1-1.6 7-5.3 7-9.5V6l-7-3z"/></svg></span><div><h3>Admin</h3><p class="tiny muted">The Vicinity team · team wallets are public</p></div><span class="role-row__chev" aria-hidden="true"></span></summary>
+            <summary class="role-row__head"><span class="role__icon ico ico--muted" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M12 3 5 6v5.5c0 4.2 2.9 7.9 7 9.5 4.1-1.6 7-5.3 7-9.5V6l-7-3z"/></svg></span><div><h3>Admin</h3><p class="tiny muted"><!--@if citycoin-->The {{productName}} team<!--@else-->The Vicinity team · team wallets are public<!--@end--></p></div><span class="role-row__chev" aria-hidden="true"></span></summary>
             <div class="role-row__body">
             <div><p class="role-row__when">Any time</p><ul><li>Decides "add my town" requests, objections to founders and appeals they weren't part of.</li><li>Moderates everywhere, under the same two-person rules.</li><li>Publishes team wallets, the snapshot time and every rule change first.</li></ul></div>
-            <div><p class="role-row__when">Since $VICINITY launched</p><ul><li>Published the only official contract address: it is on the <a href="/token">Token page</a>.</li><li>Can never move anyone's tokens, mint, change a launched city's coin, or change rules silently.</li></ul></div>
+            <div><p class="role-row__when"><!--@if citycoin-->Once the {{productName}} token is live<!--@else-->Since $VICINITY launched<!--@end--></p><ul><!--@if citycoin--><li>Publishes the only official contract address once the token is live.</li><!--@else--><li>Published the only official contract address: it is on the <a href="/token">Token page</a>.</li><!--@end--><li>Can never move anyone's tokens, mint, change a launched city's coin, or change rules silently.</li></ul></div>
             </div>
           </details>
         </div>

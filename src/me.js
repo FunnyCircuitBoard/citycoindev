@@ -29,6 +29,7 @@ import { legacyNotice } from "./legacy.js";
 import { unreadCount } from "./notify.js";
 import { countsOf } from "./profile-core.js";
 import { googleAdded, removeGoogle } from "./logins.js";
+import { SAME, brandWords } from "./brandwords.js";
 
 const HOME_LOCK_DAYS = 7; // a home community can be changed once a week
 const mask = (w) => (w ? `${w.slice(0, 5)}*****${w.slice(-3)}` : null);
@@ -42,20 +43,24 @@ export const publicUser = (u) => ({
 
 /** Badges that depend on holding: these can be lost by selling. */
 const HOLDING_BADGES = new Set(["holder", "founder_ready", "whale", "top100", "top10", "city_founder", "country_manager"]);
+/** The badges that measure a holding of the token itself (an amount, a holder rank): none while a label set's own token is not live. */
+const TOKEN_BADGES = new Set(["holder", "founder_ready", "whale", "top100", "top10"]);
 
 // `unit`: what the holding badges are measured in, in words: "$VICINITY" (today), or "main tokens" with MAIN_TOKEN_V5 on (owner amendment
-// 01: they measure the configured main token, never $VICINITY). "Early member" stays history: joined before $VICINITY launched.
+// 01: they measure the configured main token, never $VICINITY), or the label set's token under a label set other than today's without it
+// (unitOf). "Early member" stays history: joined before $VICINITY launched (under another label set it says so without the old name).
 // `legacyFrozen` (the legacy seats frozen, stage S16; src/v5policy.js legacySeats): the seven-day "Founder-ready" badge is gone (nobody qualifies
 // or applies any more), and the founder and manager badges keep their names and their holders but describe a record, not today's seat rules.
-export function badgesFor({ u, launched, amount, position, seat, manager, admin, checkins, posts, tenure, threshold, unit = "$VICINITY", legacyFrozen = false }) {
+// `bw`: the product's name in the words (src/brandwords.js; today's words by default).
+export function badgesFor({ u, launched, amount, position, seat, manager, admin, checkins, posts, tenure, threshold, unit = "$VICINITY", legacyFrozen = false, bw = SAME }) {
   const pct = (v, of) => Math.max(0, Math.min(1, v / of));
   const T = threshold || POLICY.founder.ladder.base;
   const list = [
-    { id: "early", icon: "🌱", name: "Early member", detail: "Joined before $VICINITY launched. This one can never be earned again.", earned: Boolean(u.early) },
+    { id: "early", icon: "🌱", name: "Early member", detail: bw.on ? "One of the first members. This one can never be earned again." : "Joined before $VICINITY launched. This one can never be earned again.", earned: Boolean(u.early) },
     { id: "verified", icon: "✅", name: "Verified account", detail: "A verified Google login or e-mail.", earned: true },
     { id: "wallet", icon: "🔗", name: "Wallet linked", detail: "A Solana wallet linked to your account with one free signature. It unlocks holdings, rank, badges and the founder path.", earned: Boolean(u.wallet) },
     { id: "local", icon: "📍", name: "Local", detail: "Home community confirmed by location.", earned: Boolean(u.home_city) },
-    { id: "holder", icon: "🏅", name: "Holder", detail: launched ? `Hold any ${unit}.` : `Hold ${unit} once it launches.`, earned: amount > 0, progress: amount > 0 ? 1 : 0 },
+    { id: "holder", icon: "🏅", name: "Holder", detail: launched ? `Hold any ${unit}.` : bw.on ? `Hold ${unit} once the token is live.` : `Hold ${unit} once it launches.`, earned: amount > 0, progress: amount > 0 ? 1 : 0 },
     { id: "founder_ready", icon: "🔑", name: "Founder-ready", detail: `Held ${T.toLocaleString("en-US")}+ ${unit} for ${POLICY.founder.qualifyingDays} days: may apply to found your city.`,
       earned: Boolean(tenure && tenure.qualified && amount >= T), progress: tenure ? pct(tenure.days, tenure.needed) : 0 },
     { id: "whale", icon: "🐋", name: "Big holder", detail: `Hold 10,000,000+ ${unit}.`, earned: amount >= 10_000_000, progress: pct(amount, 10_000_000) },
@@ -70,7 +75,10 @@ export function badgesFor({ u, launched, amount, position, seat, manager, admin,
     { id: "voice", icon: "💬", name: "Local voice", detail: "Posted in your city or country feed.", earned: posts > 0 },
     { id: "streak", icon: "🔥", name: "On the streets", detail: "Checked in on 3 different days.", earned: checkins >= 3, progress: pct(checkins, 3) },
   ];
-  if (admin) list.unshift({ id: "admin", icon: "⚙️", name: "Admin", detail: "Runs Vicinity, within the published rules.", earned: true });
+  if (admin) list.unshift({ id: "admin", icon: "⚙️", name: "Admin", detail: bw`Runs Vicinity, within the published rules.`, earned: true });
+  // a label set other than today's with no live token (src/official.js legacyHidden, MAIN_TOKEN_V5 not counting): no holding is measured, so
+  // no badge describes a holding, an amount or a holder rank of a token that has no supply yet (review finding F3); they come back with it
+  if (bw.on && !launched) for (let i = list.length - 1; i >= 0; i--) if (TOKEN_BADGES.has(list[i].id)) list.splice(i, 1);
   if (!legacyFrozen) return list;
   // (and the wallet badge no longer promises a founder path: the dashboards built with the freeze show none)
   const recorded = { city_founder: "A founder seat on record.", country_manager: "A country manager term on record.",
@@ -80,6 +88,10 @@ export function badgesFor({ u, launched, amount, position, seat, manager, admin,
 
 /** The founder path's answer while the legacy seats are frozen (stage S16): no qualification is worked out and nothing is offered. */
 const FROZEN_ELIGIBILITY = Object.freeze({ ok: false, error: "seats_frozen", whyNot: null, threshold: null, tenure: null, homeReadyAt: null, cooldownUntil: null, challenging: null });
+
+/** The holding badges' unit for an environment (see badgesFor): the main token's under MAIN_TOKEN_V5, the label set's token under a label set
+ *  other than today's without it (the legacy token is shown nowhere then: src/official.js legacyHidden), else today's "$VICINITY". */
+export const unitOf = (env, bw = brandWords(env)) => (mainTokenV5(env) ? "main tokens" : bw.on ? `${bw.brand.productName} tokens` : "$VICINITY");
 
 
 /**
@@ -169,10 +181,14 @@ async function liveStatus(env, s, fetchImpl, now) {
   const act = await db.prepare(
     `SELECT COUNT(*) AS posts, COUNT(DISTINCT CASE WHEN kind = 'checkin' THEN substr(created_at, 1, 10) END) AS days FROM posts WHERE user_id = ? AND hidden = 0${alive}`,
   ).bind(u.id).first();
-  const badges = badgesFor({ u, launched, amount, position, seat, manager: isManager, admin, checkins: act?.days || 0, posts: act?.posts || 0, tenure: elig.tenure, threshold: elig.threshold, unit: mainTokenV5(env) ? "main tokens" : "$VICINITY", legacyFrozen: frozen });
+  const bw = brandWords(env);
+  const badges = badgesFor({ u, launched, amount, position, seat, manager: isManager, admin, checkins: act?.days || 0, posts: act?.posts || 0, tenure: elig.tenure, threshold: elig.threshold, unit: unitOf(env, bw), legacyFrozen: frozen, bw });
   const earned = badges.filter((b) => b.earned).map((b) => b.id);
   let lost = [];
   try { lost = JSON.parse(u.badges || "[]").filter((id) => HOLDING_BADGES.has(id) && !earned.includes(id)); } catch {}
+  // a label set other than today's without a live token (src/official.js legacyHidden): no holding is measured, so none was lost (a badge
+  // earned with $VICINITY is never reported as sold)
+  if (bw.on && !launched) lost = [];
   if (team) lost = lost.filter((id) => id !== "top10" && id !== "top100"); // not ranked, so not a top holder: nothing was sold
   if (frozen) lost = lost.filter((id) => id !== "founder_ready"); // retired with the legacy seats, not lost by selling
   if (JSON.stringify(earned) !== (u.badges || "")) await db.prepare("UPDATE users SET badges = ? WHERE id = ?").bind(JSON.stringify(earned), u.id).run();

@@ -648,6 +648,13 @@ const sendMe = (kp, over = {}) => ({ ...memberMe({ wallet: kp.address, launched:
 const type = async (p, e, v) => { e.value = v; e.dispatchEvent(newEvent("input")); await p.flush(); };
 /** Real time for the browser's own crypto (the signature the signing module checks runs on a thread): a few short waits, the page flushed after each. */
 const settle = async (p) => { for (let i = 0; i < 12; i++) { await new Promise((r) => setTimeout(r, 5)); await p.flush(); } };
+/** settle until `done()` holds, then settle once more (bounded: about 4 s of real time). For a step whose real work (the signature check in
+ *  the page's crypto) can outlast settle's fixed 60 ms on a busy machine, which made the relay assertion fail now and then (review F11). */
+const settleUntil = async (p, done, max = 800) => {
+  await settle(p);
+  for (let i = 0; i < max && !done(); i++) { await new Promise((r) => setTimeout(r, 5)); await p.flush(); }
+  await settle(p);
+};
 const navigatorOf = (ua, clipboard = {}) => ({ userAgent: ua, maxTouchPoints: /iPhone|Android/.test(ua) ? 5 : 0, clipboard: { writeText: async () => {}, ...clipboard } });
 /** Open the dashboard with the switch on, go to the Wallet tab and open the Send sheet. */
 async function openSheet({ kp, server, wallets = [], ua = UA.desktop, clipboard = {}, me = null } = {}) {
@@ -781,7 +788,7 @@ test("page: Review shows the Worker's summary word for word, the full address wi
   // the tap: the wallet signs inside it; this wallet only signs, so the site's relay sends, with the build's ticket and last valid block
   await p.tap(ui.go);
   assert.equal(w.calls.filter((c) => c[0] === "sign").length, 1, "the wallet was asked inside the tap");
-  await settle(p); // the signature check and the relay's answer
+  await settleUntil(p, () => S.calls("/api/wallet/send/relay").length > 0); // the signature check and the relay's answer
   const signs = w.calls.filter((c) => c[0] === "sign");
   assert.equal(signs.length, 1); assert.equal(signs[0][2], "solana:mainnet");
   const relays = S.calls("/api/wallet/send/relay");

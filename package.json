@@ -8,7 +8,7 @@
     "dev": "wrangler dev",
     "build": "node scripts/copy-assets.mjs && node scripts/pages/build.mjs && npm test",
     "deploy": "wrangler deploy",
-    "test": "node --test test/*.test.js",
+    "test": "node --import ./test/helpers/today-build.mjs --test test/*.test.js",
     "check:live": "node scripts/check-live.mjs",
     "mainnet:preflight": "node scripts/mainnet-preflight.mjs",
     "check:boundaries": "node scripts/boundaries/check-overlaps.mjs",

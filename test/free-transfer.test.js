@@ -12,7 +12,8 @@
 //     account of a watched mint the route does not trade (review finding SEC-1). Jupiter answers that add a fee (in the swap's optional slot,
 //     its data, a transfer beside it, a Token-2022 transfer with fee, or the shared-accounts layout's data) are refused before anything is
 //     simulated.
-//   * The Send summary's fee line names the product from src/brand.js: "No Vicinity fee." with BRAND unset, byte for byte.
+//   * The Send summary's fee line names the product through src/brandwords.js (the words of the deployment's label set, src/brand.js
+//     brandOf): "No Vicinity fee." with BRAND unset, byte for byte.
 // Against the fake Jupiter and fake RPC of test/helpers/jupfake.js (the recorded answers of 9 Oct 2026 rewritten for the asking wallet).
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -28,6 +29,7 @@ import { decodeLookupTable } from "../src/sol/dbc.js";
 import { fromBase64, readU16, readU64, toBase64 } from "../src/sol/bytes.js";
 import { ADDRESSES, PROGRAM_IDS, ata } from "../src/sol/pda.js";
 import { LEGACY_BRAND, brandOf } from "../src/brand.js";
+import { SAME, brandWords, wordsOf } from "../src/brandwords.js";
 import { MASTER_POLICY } from "../src/masterpolicy.js";
 import { NETWORK_FEE_LAMPORTS, accountOf, planSend } from "../src/walletsend.js";
 import { newWorld, person, wallet, useClock, realClock } from "./helpers/world.js";
@@ -319,21 +321,23 @@ test("S39: a Jupiter answer that adds a platform fee is refused before anything 
 
 /* ---------------------------------------------------------------- the Send line */
 const sys = (lamports) => ({ owner: SYSTEM, lamports, data: ["", "base64"] });
-test("S39: the Send fee line names the product from src/brand.js: \"No Vicinity fee.\" with BRAND unset, byte for byte; a Citycoin.dev label set says \"No Citycoin.dev fee.\"; the instructions never change", async () => {
+test("S39: the Send fee line names the product through src/brandwords.js: \"No Vicinity fee.\" with BRAND unset, byte for byte; a Citycoin.dev label set says \"No Citycoin.dev fee.\"; the instructions never change", async () => {
   const sender = (await wallet()).address, to = (await wallet()).address;
   const args = { sender, to, asset: { id: "SOL", label: "SOL", decimals: 9 }, amount: "0.5", chain: { sender: accountOf(sys(2_000_000_000)), to: accountOf(sys(1_000_000_000)) }, cuPrice: 100_000n };
   const today = await planSend(args);
   assert.equal(today.summary.lines[1], "No Vicinity fee. Network fee about 0.000006 SOL.");
-  assert.deepEqual(await planSend({ ...args, brand: LEGACY_BRAND }), today);
-  assert.deepEqual(await planSend({ ...args, brand: brandOf({}) }), today);
+  assert.deepEqual(await planSend({ ...args, bw: SAME }), today);
+  assert.deepEqual(await planSend({ ...args, bw: brandWords({}) }), today);
+  assert.deepEqual(await planSend({ ...args, bw: wordsOf(LEGACY_BRAND) }), today);
   // the Citycoin.dev name (master policy pairs_and_branding.product_name) in a label set of src/brand.js's shape
   const citycoin = { ...LEGACY_BRAND, key: "citycoin", productName: MASTER_POLICY.policy.pairs_and_branding.product_name };
-  const cc = await planSend({ ...args, brand: citycoin });
+  const cc = await planSend({ ...args, bw: wordsOf(citycoin) });
   assert.equal(cc.summary.lines[1], "No Citycoin.dev fee. Network fee about 0.000006 SOL.");
   assert.deepEqual({ ...cc, summary: { ...cc.summary, lines: null } }, { ...today, summary: { ...today.summary, lines: null } }, "the words only: the same instructions, fee and amounts");
   assert.equal(today.fee, NETWORK_FEE_LAMPORTS + 1000n, "the network's fee and the priority fee, nothing for the platform");
-  // through the route: the line is the deployment's label set's (BRAND unset: today's, byte for byte; a BRAND that names no label set here,
-  // like "citycoin" before the label migration adds one, stays today's: src/brand.js BRAND_UNKNOWN)
+  // through the route: the line is the deployment's label set's (BRAND unset: today's, byte for byte; BRAND=citycoin with today's pages
+  // stays today's, src/brand.js BRAND_PAGES_MISMATCH: the Citycoin.dev words come only with pages built for them; a BRAND that names no
+  // label set stays today's, BRAND_UNKNOWN)
   for (const BRAND of [undefined, "", "citycoin", "nope"]) {
     _resetRelay();
     const W = fakeWorld({ rpc: {} });
@@ -347,7 +351,8 @@ test("S39: the Send fee line names the product from src/brand.js: \"No Vicinity 
     assert.equal(d.summary.lines[1], `No ${brandOf(env).productName} fee. Network fee about 0.000006 SOL.`, String(BRAND));
     if (!BRAND) assert.equal(d.summary.lines[1], "No Vicinity fee. Network fee about 0.000006 SOL.");
   }
-  // and the route hands planSend the deployment's label set (no BRAND value names a second set before the label migration, so this is pinned
-  // by its source, as test/brand-adapters.test.js pins the mail sender's)
-  assert.match(readFileSync(new URL("../src/walletsend.js", import.meta.url), "utf8"), /const plan = await planSend\(\{[^\n]*, brand: brandOf\(env\) \}\);/);
+  // and the route hands planSend the words of the deployment's label set (src/brandwords.js brandWords: src/brand.js brandOf, so a BRAND
+  // the deployed pages were not built with keeps today's words, as the loop above shows); pinned by its source, as
+  // test/brand-adapters.test.js pins the mail sender's
+  assert.match(readFileSync(new URL("../src/walletsend.js", import.meta.url), "utf8"), /const plan = await planSend\(\{[^\n]*, bw: brandWords\(env\) \}\);/);
 });

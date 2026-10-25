@@ -351,18 +351,20 @@ async function moderatorRow(me, answer) {
   const from = js.indexOf("  const modCache = new Map();"), to = js.indexOf("  /* =================== empty land", from);
   assert.ok(from > 0 && to > from);
   const frozenLine = js.match(/^ {2}const seatsFrozen = \(\) => .*$/m)[0];
+  // the page's label set (today's page: no data-brand on <html>, so BRAND is null), as the script reads it
+  const brandLines = ["BRAND", "brand", "UNIT"].map((n) => js.match(new RegExp(`^ {2}const ${n} = .*$`, "m"))[0]).join("\n");
   const node = (extra = {}) => ({ hidden: false, className: "", textContent: "", children: [], replaceChildren(...k) { this.children = k; }, append(...k) { this.children.push(...k); }, ...extra });
   const row = node();
   const ctx = {
     $: (s) => (s === "#mod-row" ? row : null),
     el: (tag, cls, text) => node({ tag, className: cls || "", textContent: text == null ? "" : String(text) }),
     countries: { US: "United States" }, fmt: (n) => String(n), solscan: (wallet) => node({ textContent: wallet }),
-    document: { createTextNode: (t) => node({ textContent: String(t) }) },
+    document: { createTextNode: (t) => node({ textContent: String(t) }), documentElement: { getAttribute: () => null } },
     fetch: async () => { if (answer instanceof Error) throw answer; return { json: async () => answer }; },
     V: () => ({ me: () => me }), mode: "claim",
   };
   vm.createContext(ctx);
-  vm.runInContext(`${frozenLine}\nlet selected = null;\n${js.slice(from, to)}\nthis.show = async (c) => { selected = c; await renderModerator(c); };`, ctx);
+  vm.runInContext(`${brandLines}\n${frozenLine}\nlet selected = null;\n${js.slice(from, to)}\nthis.show = async (c) => { selected = c; await renderModerator(c); };`, ctx);
   await ctx.show({ cc: "US", id: UTICA });
   const text = (n) => (n.children.length ? n.children.map(text).join("") : n.textContent);
   return text(row);

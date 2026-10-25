@@ -1,4 +1,4 @@
-<!--{"title": "App preview", "description": "The Vicinity mobile app is in development: an early look at sending and receiving city coins and $VICINITY on your phone.", "page": "app", "scripts": ["app"], "styles": ["app-phone", "pages-app"]}-->
+<!--{"title": "App preview", "description": "The Vicinity mobile app is in development: an early look at sending and receiving city coins and $VICINITY on your phone.", "page": "app", "scripts": ["app"], "styles": ["app-phone", "pages-app"], "brand": {"citycoin": {"description": "The {{productName}} mobile app is in development: an early look at sending and receiving city coins on your phone."}}}-->
     <!-- ============ THE APP, IN DEVELOPMENT (design v4, prompt item 6): an early look at the design, never presented as available (rule
          R1): no store badge, nothing to fetch from a store, no date, no number on any screen. The phones are drawn in HTML and CSS (app-phone.css); a
          computer fans the three out in 3D, a phone swipes through them. ============ -->
@@ -6,8 +6,8 @@
       <div class="wrap app4-hero__grid">
         <div class="app4-hero__copy">
           <p class="app4-hero__tag"><span class="tag tag--gold">In development</span></p>
-          <h1 class="page-title app4-hero__title"><span class="text-ink">Vicinity,</span> <span class="accent">in your pocket.</span></h1>
-          <p class="lead app4-hero__lead">Send and receive city coins and $VICINITY from your phone. We're building the app now; this page is an early look at the design.</p>
+          <h1 class="page-title app4-hero__title"><span class="text-ink">{{productName}},</span> <span class="accent">in your pocket.</span></h1>
+          <p class="lead app4-hero__lead">Send and receive city coins<!--@if !citycoin--> and $VICINITY<!--@end--> from your phone. We're building the app now; this page is an early look at the design.</p>
           <div class="app4-hero__cta">
             <a class="btn btn--primary btn--lg has-ring app4-hero__first" href="/connect" data-app-first><span class="app4__as-guest">Sign up</span><span class="app4__as-member">My dashboard</span></a>
             <a class="btn btn--glass btn--lg" href="/launchpad">Open the Launchpad</a>
@@ -17,14 +17,16 @@
           <div class="app4-phones" id="app-phones" role="region" aria-label="Design previews of the app's screens">
             <figure class="app4-fig app4-fig--l">
               <div class="app4-tilt">
-                <div class="phone4" role="img" aria-label="Design preview of the Wallet screen: $VICINITY and your city coin, with Send and Receive">
+                <div class="phone4" role="img" aria-label="Design preview of the Wallet screen: <!--@if citycoin-->your city coin<!--@else-->$VICINITY and your city coin<!--@end-->, with Send and Receive">
                   <div class="phone4__screen">
                     <span class="phone4__notch"></span>
-                    <div class="pm-head"><span class="pm-title">Wallet</span><span class="pm-ava">V</span></div>
+                    <div class="pm-head"><span class="pm-title">Wallet</span><span class="pm-ava"><!--@if citycoin-->C<!--@else-->V<!--@end--></span></div>
                     <div class="pm-balance"><span class="pm-label">Balance</span><span class="skel pm-skel pm-skel--lg"></span></div>
                     <div class="pm-actions"><span class="pm-btn pm-btn--primary"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg>Send</span><span class="pm-btn"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 7 7 17M15 17H7V9"/></svg>Receive</span></div>
                     <div class="pm-list">
+<!--@if !citycoin-->
                       <div class="pm-row"><span class="pm-coin pm-coin--vic">V</span><span class="pm-row__name"><b>$VICINITY</b><small>Vicinity</small></span><span class="skel pm-skel"></span></div>
+<!--@end-->
                       <div class="pm-row"><span class="pm-coin pm-coin--city"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg></span><span class="pm-row__name"><b>Your city coin</b><small>One per city</small></span><span class="skel pm-skel"></span></div>
                     </div>
                   </div>
@@ -39,7 +41,7 @@
                     <span class="phone4__notch"></span>
                     <div class="pm-head"><span class="pm-back">‹</span><span class="pm-title">Send</span></div>
                     <div class="pm-form"><span class="pm-label">To</span><span class="pm-field pm-field--ph">Wallet address</span></div>
-                    <div class="pm-form"><span class="pm-label">Amount</span><span class="pm-field"><span class="skel pm-skel pm-skel--amt"></span><span class="pm-chip">$VICINITY <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span></span></div>
+                    <div class="pm-form"><span class="pm-label">Amount</span><span class="pm-field"><span class="skel pm-skel pm-skel--amt"></span><span class="pm-chip"><!--@if citycoin-->City coin<!--@else-->$VICINITY<!--@end--> <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span></span></div>
                     <div class="pm-form"><span class="pm-label">Network fee</span><span class="skel pm-skel pm-skel--fee"></span></div>
                     <span class="pm-btn pm-btn--primary pm-btn--block pm-push is-off">Send</span>
                   </div>
@@ -72,7 +74,7 @@
       <div class="wrap">
         <h2 class="app4-for__title">What it's&nbsp;for</h2>
         <ul class="app4-for__list">
-          <li class="card"><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/><path d="M4 20h16"/></svg></span><span>Send and receive city coins and&nbsp;$VICINITY</span></li>
+          <li class="card"><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/><path d="M4 20h16"/></svg></span><span>Send and receive city coins<!--@if !citycoin--> and&nbsp;$VICINITY<!--@end--></span></li>
           <li class="card"><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg></span><span>Your city's coin, one tap&nbsp;away</span></li>
         </ul>
       </div>
@@ -82,7 +84,7 @@
     <section class="section app4-end">
       <div class="wrap">
         <div class="card app4-end__card">
-          <p>Until then, buy $VICINITY right here in your browser, and each city coin as it launches.</p>
+          <p><!--@if citycoin-->Until then, buy each city coin right here in your browser as it launches.<!--@else-->Until then, buy $VICINITY right here in your browser, and each city coin as it launches.<!--@end--></p>
           <a class="btn btn--glass" href="/launchpad">Open the Launchpad</a>
         </div>
       </div>

@@ -55,7 +55,8 @@ export async function checkSigned(body, request, now, actions, bad, db = null, h
   const { address, message, signature } = body || {};
   if (!isSolanaAddress(address)) return bad("bad_address");
 
-  const parsed = parseMessage(message);
+  // the statement may be in today's name or the label set's (opts.names: src/brandwords.js statementNames); left out, today's only
+  const parsed = parseMessage(message, opts && Array.isArray(opts.names) && opts.names.length ? opts.names : undefined);
   if (!parsed || !actions.includes(parsed.action)) return bad("bad_message");
 
   const expected = host === undefined ? new URL(request.url).host : host;

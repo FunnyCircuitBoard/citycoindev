@@ -12,13 +12,19 @@
 // Everything is built with createElement / textContent (the security policy allows no inline script or style).
 (() => {
   "use strict";
+  // The product's names in this file's words (the label migration, area b). A page built for a label set other than today's carries the
+  // set on <html> (data-brand, data-brand-name, data-brand-domain: scripts/pages/build.mjs writes them from src/brand.js); brand`…` puts
+  // those names in a text's own words, never in a value put into it. A page without them (today's pages) gets every text exactly as written.
+  const BRAND = (() => { try { const r = document.documentElement, at = (k) => (r && typeof r.getAttribute === "function" ? r.getAttribute(k) : null); return at("data-brand") && at("data-brand-name") && at("data-brand-domain") ? Object.freeze({ key: at("data-brand"), name: at("data-brand-name"), domain: at("data-brand-domain") }) : null; } catch { return null; } })();
+  const brand = (s, ...v) => s.reduce((out, part, i) => out + (BRAND ? part.replace(/vicinity\.city/g, () => BRAND.domain).replace(/Vicinity/g, () => BRAND.name) : part) + (i < v.length ? String(v[i]) : ""), "");
   const V = window.V;
   if (!V || !document.body || document.getElementById("fb")) return;
   const { $, el, api } = V;
   const MAX = 1000;
   // [kind, label, what the panel says, the message box's placeholder]
   const KINDS = [
-    ["question", "Question", "Ask us anything about Vicinity, $VICINITY, founders or the map.", "What would you like to know?"],
+    // a page built for another label set names no token here: the legacy token is not that brand's, and its own token is not live yet
+    ["question", "Question", BRAND ? brand`Ask us anything about Vicinity, founders or the map.` : "Ask us anything about Vicinity, $VICINITY, founders or the map.", "What would you like to know?"],
     ["bug", "Report a bug", "Tell us what you did, what you expected and what happened instead.", "What went wrong, and on which page?"],
     ["city", "Request a city", "Your city isn't on the map? Give us its name and country and we'll check its boundaries.", "Anything else we should know? (optional)"],
   ];

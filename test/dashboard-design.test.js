@@ -6,9 +6,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { sourceAs } from "../scripts/pages/build.mjs";
 import { ADDR, UA, memberMe, openDashboard } from "./helpers/dashpage.js";
 
-const read = (p) => readFileSync(new URL("../" + p, import.meta.url), "utf8").replace(/\r\n/g, "\n");
+// a page source as today's build reads it (BRAND unset: its brand blocks and {{label}} fills resolved; scripts/pages/build.mjs sourceAs)
+const read = (p) => { const t = readFileSync(new URL("../" + p, import.meta.url), "utf8").replace(/\r\n/g, "\n"); return p.startsWith("scripts/pages/src/") ? sourceAs(p, t) : t; };
 const html = read("public/dashboard.html"), src = read("scripts/pages/src/dashboard.html"), css = read("public/polish-dash.css");
 const dash = read("public/dashboard.js"), v2 = read("public/dashboard-v2.js"), roles = read("public/dashboard-roles.js"), profile = read("public/profile.js");
 const tag = (id) => { const m = html.match(new RegExp(`<a [^>]*id="${id}"[^>]*>[\\s\\S]*?</a>`)); assert.ok(m, id); return m[0]; };

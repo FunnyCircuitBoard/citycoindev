@@ -6,13 +6,16 @@
 (() => {
   const KEY = "vicinity-theme";
   const root = document.documentElement;
+  // a page built for another label set writes its own dark canvas colour (scripts/pages/build.mjs LOOKS): kept for the dark theme
+  const metaColor = document.querySelector('meta[name="theme-color"]');
+  const darkColor = typeof root.getAttribute === "function" && root.getAttribute("data-brand") && metaColor && metaColor.content ? metaColor.content : "#070E19";
   const read = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
   const write = (k, v) => { try { if (v) localStorage.setItem(k, v); else localStorage.removeItem(k); } catch {} };
 
   function apply(theme) {
     root.dataset.theme = theme;
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.content = theme === "light" ? "#F5F7FB" : "#070E19";
+    if (meta) meta.content = theme === "light" ? "#F5F7FB" : darkColor;
     const scheme = document.querySelector('meta[name="color-scheme"]');
     if (scheme) scheme.content = theme; // the browser's own canvas and controls follow the theme, never the device setting
     document.querySelectorAll("[data-theme-toggle]").forEach((b) => {

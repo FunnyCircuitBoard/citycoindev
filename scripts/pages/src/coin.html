@@ -1,4 +1,4 @@
-<!--{"title": "Coin: live price, chart and holders", "description": "A coin listed on the Vicinity Launchpad: its live price, an interactive chart, the bonding curve, recent trades, holders and where to buy. Every number with its source.", "page": "coin", "nav": "launchpad", "scripts": ["coinchart", "wallets", "swap", "lp-sign", "lp-launch", "coin"], "styles": ["swap", "lp-launch", "pages-coin"]}-->
+<!--{"title": "Coin: live price, chart and holders", "description": "A coin listed on the {{productName}} Launchpad: its live price, an interactive chart, the bonding curve, recent trades, holders and where to buy. Every number with its source.", "page": "coin", "nav": "launchpad", "scripts": ["coinchart", "wallets", "swap", "lp-sign", "lp-launch", "coin"], "styles": ["swap", "lp-launch", "pages-coin"]}-->
     <section class="coin-page" id="coin" aria-busy="true">
       <div class="wrap">
         <a class="coin-back" href="/launchpad"><span aria-hidden="true">‹</span> Launchpad</a>
@@ -27,7 +27,7 @@
                 <p class="coin-price__sub" id="coin-price-sub">Loading the live price…</p>
               </div>
               <a class="btn btn--primary coin-head__buy" id="coin-head-buy" href="/launchpad" rel="noopener" target="_blank" hidden>Buy on Raydium <span aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a>
-              <p class="coin-foot coin-head__safe">You trade in your own wallet. Vicinity never touches your funds.</p>
+              <p class="coin-foot coin-head__safe">You trade in your own wallet. {{productName}} never touches your funds.</p>
             </header>
 
             <!-- the chart -->
@@ -154,9 +154,9 @@
           </div>
         </div>
 
-        <p class="coin-trust">Powered by Jupiter · Vicinity never touches your funds</p>
+        <p class="coin-trust">Powered by Jupiter · {{productName}} never touches your funds</p>
         <details class="fold coin-sources-fold">
-          <summary>Where the numbers come from <span class="fold__meta">Jupiter · Raydium LaunchLab · the Solana chain · vicinity.city</span></summary>
+          <summary>Where the numbers come from <span class="fold__meta">Jupiter · Raydium LaunchLab · the Solana chain · {{domain}}</span></summary>
           <p class="coin-sources" id="coin-sources"></p>
         </details>
       </div>

@@ -90,7 +90,7 @@ export const POLICY = {
   freshProofMinutes: 30,       // sensitive actions need the wallet proven again within 30 minutes
   limits: { locatePerHour: 20, reportsPerDay: 30 },
 
-  // Things nobody can ever do, by design. Shown on /rules.
+  // Things nobody can ever do, by design. Shown on /rules (LEGACY_NEVER: today's label set only, src/index.js /api/policy).
   never: [
     "Move, freeze or take anyone's tokens.",
     "Mint more $VICINITY: minting is switched off on the blockchain.",
@@ -101,6 +101,10 @@ export const POLICY = {
     "See or store anyone's exact location.",
   ],
 };
+
+/** The never-list's statement about the legacy token's mint (a fact of $VICINITY): /api/policy leaves it out under a label set other than today's,
+ *  which shows the legacy token nowhere (src/official.js legacyHidden; owner directive of 24 Oct 2026). */
+export const LEGACY_NEVER = POLICY.never[1];
 
 /** Tokens a founder of this city must hold: 100K × (pop/10K)^(1/3), clamped [100K, 1M], floored to 10K. */
 export function founderAmount(pop = 0) {

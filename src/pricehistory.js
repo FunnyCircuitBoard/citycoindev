@@ -20,6 +20,7 @@ import { PAIRS } from "./coins.js";
 import { liveMarkets, fetchKline, recentCandles } from "./marketlive.js";
 import { codeOf } from "./sources.js";
 import { DAY, iso } from "./policy.js";
+import { brandWords } from "./brandwords.js";
 
 const SOL = PAIRS.SOL.mint;
 const GRID = 600; // seconds: one sample per coin per 10-minute run
@@ -188,7 +189,7 @@ const SRC = { jupiter: "j", jupiter_pair: "c", dexscreener: "d" };
  *   missing  { candles?, line? }: why a series is empty.
  */
 export async function chartFor(env, coin, tf, fetchImpl = fetch, now = Date.now()) {
-  const db = env.DB;
+  const db = env.DB, bw = brandWords(env);
   await ensureMarketSchema(db);
   const nowS = Math.floor(now / 1000);
   const meta = await db.prepare("SELECT pool, graduated_at, backfilled_at FROM market_meta WHERE mint = ?").bind(coin.mint).first();
@@ -206,7 +207,7 @@ export async function chartFor(env, coin, tf, fetchImpl = fetch, now = Date.now(
   if (tf === "1h" && meta?.pool && !meta.graduated_at) {
     const r = await recentCandles(meta.pool, fetchImpl, { now, minT: minTimeOf(coin) });
     if (Array.isArray(r.values.get(meta.pool))) rows = r.values.get(meta.pool).filter((x) => x[0] >= since);
-    else note = "Raydium's 1-minute candles could not be read: 15-minute candles from vicinity.city's copy";
+    else note = bw`Raydium's 1-minute candles could not be read: 15-minute candles from vicinity.city's copy`;
   }
   if (rows == null) {
     const s = tf === "1h" ? 900 : step;
@@ -218,9 +219,9 @@ export async function chartFor(env, coin, tf, fetchImpl = fetch, now = Date.now(
   if (meta?.pool || rows.length) {
     candles = { unit: symbol, interval, source: "Raydium LaunchLab", rows, from: rows.length ? iso(rows[0][0] * 1000) : null, to: rows.length ? iso(rows[rows.length - 1][0] * 1000) : null };
     if (note) candles.note = note;
-    if (meta?.graduated_at) candles.note = `Raydium's candles end at graduation (seen by vicinity.city ${meta.graduated_at.slice(0, 10)})`;
+    if (meta?.graduated_at) candles.note = bw`Raydium's candles end at graduation (seen by vicinity.city ${meta.graduated_at.slice(0, 10)})`;
     if (!rows.length) missing.candles = firstCandle == null ? (meta?.backfilled_at ? "No trades recorded by Raydium yet" : "Not recorded yet: the first reading runs within 10 minutes") : "No trades in this range";
-  } else missing.candles = "No candles recorded: every 10 minutes vicinity.city reads Raydium's candles of each coin on a LaunchLab curve";
+  } else missing.candles = bw`No candles recorded: every 10 minutes vicinity.city reads Raydium's candles of each coin on a LaunchLab curve`;
 
   // ---- line (USD, our samples) ----
   const firstSample = await range("price_samples", "at");
@@ -230,26 +231,26 @@ export async function chartFor(env, coin, tf, fetchImpl = fetch, now = Date.now(
     .map((r) => [r.at, r.price_usd ?? null, r.price_usd == null ? null : SRC[r.usd_src] || null, r.price_native ?? null]);
   const points = lastPerBucket(samples, lstep);
   const line = {
-    unit: "USD", interval: NAME[lstep], source: "vicinity.city samples",
+    unit: "USD", interval: NAME[lstep], source: bw`vicinity.city samples`,
     rule: `Jupiter's price (last trade) every 10 minutes; the on-chain curve × ${symbol || "pair"} price (Jupiter) where Jupiter had none`,
     points, from: points.length ? iso(points[0][0] * 1000) : null, to: points.length ? iso(points[points.length - 1][0] * 1000) : null,
     recordingSince: firstSample == null ? null : iso(firstSample * 1000),
   };
-  if (!points.length) missing.line = firstSample == null ? "Not recorded yet: vicinity.city samples the price every 10 minutes from its first run on" : "No sample in this range";
+  if (!points.length) missing.line = firstSample == null ? bw`Not recorded yet: vicinity.city samples the price every 10 minutes from its first run on` : "No sample in this range";
   return { ok: true, mint: coin.mint, tf, asOf: iso(now), candles, line, missing };
 }
 
 /** What our samples say about the last 24 hours, in the pair token (null until 24 hours of samples exist). */
 export async function samplesSummary(env, coin, now = Date.now()) {
-  const db = env.DB;
+  const db = env.DB, bw = brandWords(env);
   await ensureMarketSchema(db);
   const nowS = Math.floor(now / 1000);
   const first = await db.prepare("SELECT MIN(at) AS a FROM price_samples WHERE mint = ?").bind(coin.mint).first();
-  if (first?.a == null) return { since: null, change24hNativePct: null, source: "vicinity.city samples" };
+  if (first?.a == null) return { since: null, change24hNativePct: null, source: bw`vicinity.city samples` };
   const latest = await db.prepare("SELECT at, price_native FROM price_samples WHERE mint = ? AND price_native IS NOT NULL ORDER BY at DESC LIMIT 1").bind(coin.mint).first();
   const dayAgo = await db.prepare("SELECT at, price_native FROM price_samples WHERE mint = ? AND price_native IS NOT NULL AND at <= ? ORDER BY at DESC LIMIT 1").bind(coin.mint, nowS - 86400).first();
   const fresh = latest && nowS - latest.at <= 3 * GRID && dayAgo && latest.at - dayAgo.at <= 86400 + 3 * GRID && dayAgo.price_native > 0;
-  return { since: iso(first.a * 1000), change24hNativePct: fresh ? ((latest.price_native - dayAgo.price_native) / dayAgo.price_native) * 100 : null, source: "vicinity.city samples" };
+  return { since: iso(first.a * 1000), change24hNativePct: fresh ? ((latest.price_native - dayAgo.price_native) / dayAgo.price_native) * 100 : null, source: bw`vicinity.city samples` };
 }
 
 export const _DAY = DAY;

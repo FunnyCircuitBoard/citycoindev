@@ -18,7 +18,7 @@
  * main token's history come from its own series. With the switch off everything is exactly as before.
  */
 import { DAY, POLICY, founderLevels, iso } from "./policy.js";
-import { tokenMint } from "./official.js";
+import { legacyHidden, tokenMint } from "./official.js";
 import { legacySeatsFrozen, mainTokenV5 } from "./v5policy.js";
 import { getAllHolders, publishHolders } from "./chain.js";
 import { getBlob, putBlob, sha256hex } from "./blobs.js";
@@ -36,9 +36,11 @@ export const legacyDayKey = (day) => `day:${day}`;
  * summed into one day and the $VICINITY days stay as they were, history; null while no main token is configured (nothing is read or
  * written). The `mday:` prefix keeps these keys out of the `day:%` pruning below. The Founding Supporters snapshot (src/snapshot.js) never
  * goes through this: it names the $VICINITY series itself (legacyDayKey), whatever the switch says.
+ * Under a label set other than today's without the switch (src/official.js legacyHidden: no token is live, the legacy one is shown
+ * nowhere) null too: no balance is read from the $VICINITY days, so no holding, holder count, founder clock or ranking comes from them.
  */
 export function dayKey(env, day) {
-  if (!mainTokenV5(env)) return legacyDayKey(day);
+  if (!mainTokenV5(env)) return legacyHidden(env) ? null : legacyDayKey(day);
   const mint = tokenMint(env);
   return mint ? `mday:${mint}:${day}` : null;
 }
@@ -161,10 +163,11 @@ async function seriesSamplesSince(env, now, since) {
  * How long has this wallet held `level` tokens in every sample? { since, days, needed, qualified }. While the legacy seats are frozen
  * (LEGACY_SEATS=frozen, or MAIN_TOKEN_V5 counting, under which a hold streak is $VICINITY's history and never counts for the new main token;
  * src/v5policy.js legacySeats) the streaks are no longer updated, so a row's start says nothing about today: the answer is "no streak" (fail
- * closed: no legacy seat is won on it, and no frozen clock is shown as running).
+ * closed: no legacy seat is won on it, and no frozen clock is shown as running). The same under a label set other than today's
+ * (src/official.js legacyHidden), where no token is live without the switch.
  */
 export async function tenure(env, wallet, level, now) {
-  if (legacySeatsFrozen(env)) return { since: null, days: 0, needed: POLICY.founder.qualifyingDays, qualified: false };
+  if (legacySeatsFrozen(env) || legacyHidden(env)) return { since: null, days: 0, needed: POLICY.founder.qualifyingDays, qualified: false };
   const r = await env.DB.prepare("SELECT above_since FROM streaks WHERE wallet = ? AND level = ?").bind(wallet, level).first();
   const since = r && r.above_since ? Date.parse(r.above_since) : null;
   const days = since ? Math.max(0, (now - since) / DAY) : 0;
@@ -219,6 +222,8 @@ export async function samplesStale(env, now) {
 /** Health of the balance history (shown on /rules so anyone can see it's running): the main token's own series under MAIN_TOKEN_V5. */
 export async function ledgerStatus(env, now) {
   if (!env.DB) return { running: false };
+  // a label set other than today's without the switch: no token is sampled (the $VICINITY samples are history, shown nowhere)
+  if (!mainTokenV5(env) && legacyHidden(env)) return { running: false, lastSample: null, samplesLast24h: 0 };
   await ensureSchema(env.DB);
   if (mainTokenV5(env)) {
     const prev = tokenMint(env) ? await lastOfSeries(env, now) : null;

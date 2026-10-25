@@ -95,7 +95,7 @@ test("the honest lines that moved into folds are still on the page, word for wor
   // design v4: the trust line keeps the attribution and the non-custody fact, and drops the risk warning (the Terms carry it)
   assert.match(coin, /<p class="coin-trust">Powered by Jupiter · Vicinity never touches your funds<\/p>/);
   const sources = read("public/coin.js").match(/function paintSources\(d\) \{[\s\S]*?\n  \}/)[0];
-  assert.match(sources, /parts\.push\(el\("span", null, "Price history in USD: read by vicinity\.city every 10 minutes"\)\);\n    p\.replaceChildren/, "the sources line ends with where the history comes from");
+  assert.match(sources, /parts\.push\(el\("span", null, brand`Price history in USD: read by vicinity\.city every 10 minutes`\)\);\n    p\.replaceChildren/, "the sources line ends with where the history comes from");
   assert.ok(token.includes("Price: Jupiter (Powered by Jupiter)."), "the token facts name their sources");
   assert.match(connect, /<details class="fold su-keep"[^>]*>\s*<summary>What we keep and who sees it/, "the consent facts are one fold with its summary");
   const terms = read("public/terms.html");
@@ -114,7 +114,7 @@ test("no risk warning in the page chrome, pop-ups or scripts (design v4, the own
   }
   // a transaction's own facts are not disclaimers: they stay where the money moves
   assert.match(read("public/swap.js"), /const jupFee = feeBps \? ` and takes a \$\{\(feeBps \/ 100\)\.toString\(\)\}% platform fee` : onPool \? " and adds no platform fee" : " and takes no fee";/);
-  assert.match(read("public/swap.js"), /You sign in your own wallet; Vicinity never touches your funds\$\{jupFee\}\$\{onPool \? "; if the route uses this coin's own Meteora pool, Vicinity's locked share of it earns part of that pool's fee" : ""\}/);
+  assert.match(read("public/swap.js"), /You sign in your own wallet; Vicinity never touches your funds\$\{jupFee\}\$\{onPool \? brand`; if the route uses this coin's own Meteora pool, Vicinity's locked share of it earns part of that pool's fee` : ""\}/);
 });
 
 test("icons, not emoji: the pages' sources carry no pictographic emoji", () => {

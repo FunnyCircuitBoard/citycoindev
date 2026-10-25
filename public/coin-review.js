@@ -14,6 +14,11 @@
 // the server checks it all again.
 (() => {
   "use strict";
+  // The product's names in this file's words (the label migration, area b). A page built for a label set other than today's carries the
+  // set on <html> (data-brand, data-brand-name, data-brand-domain: scripts/pages/build.mjs writes them from src/brand.js); brand`…` puts
+  // those names in a text's own words, never in a value put into it. A page without them (today's pages) gets every text exactly as written.
+  const BRAND = (() => { try { const r = document.documentElement, at = (k) => (r && typeof r.getAttribute === "function" ? r.getAttribute(k) : null); return at("data-brand") && at("data-brand-name") && at("data-brand-domain") ? Object.freeze({ key: at("data-brand"), name: at("data-brand-name"), domain: at("data-brand-domain") }) : null; } catch { return null; } })();
+  const brand = (s, ...v) => s.reduce((out, part, i) => out + (BRAND ? part.replace(/vicinity\.city/g, () => BRAND.domain).replace(/Vicinity/g, () => BRAND.name) : part) + (i < v.length ? String(v[i]) : ""), "");
   const { $ } = window.V;
   const ERR = {
     reprove: "Confirm it's you with your wallet, then try again.",
@@ -140,11 +145,11 @@
     // (closed, R.closed: no change can be requested any more, so the caption offers none)
     const how = R && R.closed ? "" : " You can't edit these yourself: request changes and a reviewer decides.";
     const words = own
-      ? `Set by Vicinity, with the changes a reviewer approved for your coin.${how}`
-      : `Set by Vicinity. Every city coin uses the same Vicinity design, filled in from the Vicinity city list.${how}`;
+      ? brand`Set by Vicinity, with the changes a reviewer approved for your coin.${how}`
+      : brand`Set by Vicinity. Every city coin uses the same Vicinity design, filled in from the Vicinity city list.${how}`;
     const src = document.querySelector(".coin-ready__src");
     if (src) {
-      if (on && renamed) { if (srcWas == null) srcWas = src.textContent; src.textContent = "The place comes from the Vicinity city list; the ticker and the name are the ones a reviewer approved for your coin."; }
+      if (on && renamed) { if (srcWas == null) srcWas = src.textContent; src.textContent = brand`The place comes from the Vicinity city list; the ticker and the name are the ones a reviewer approved for your coin.`; }
       else if (srcWas != null) { src.textContent = srcWas; srcWas = null; }
     }
     const node = Array.from(c.childNodes || []).filter((n) => n && !n.tagName && typeof n.textContent === "string" && n.textContent.trim()).pop() || null; // the words after the icon
@@ -227,9 +232,9 @@
     if (R.can.request && !open && !formOpen) box.append(button("Request changes", () => openForm()));
     if (R.can.describe && !describeOpen) box.append(button("Write your own description", () => openDescribe()));
     if (R.can.reset) {
-      box.append(button("Reset to Vicinity defaults", () => {
-        if (!window.confirm("Go back to the Vicinity coin as the city list makes it (its picture, ticker, name and description)?")) return;
-        send("reset", {}, "Back to the Vicinity coin").then((r) => { if (r && r.ok) wantFocus("actions"); });
+      box.append(button(brand`Reset to Vicinity defaults`, () => {
+        if (!window.confirm(brand`Go back to the Vicinity coin as the city list makes it (its picture, ticker, name and description)?`)) return;
+        send("reset", {}, brand`Back to the Vicinity coin`).then((r) => { if (r && r.ok) wantFocus("actions"); });
       }));
     }
   }
@@ -260,7 +265,7 @@
     const intro = el("p", "small", "Your draft is private. Your coin stays as it is until a reviewer approves the change. Submitting pauses your launch until they decide.");
     // the picture
     const pics = el("fieldset", "crv-fieldset"); pics.append(el("legend", null, "Picture"));
-    const choices = [["vicinity", "Keep the Vicinity design (drawn with your ticker and name)"], ...(sel.upload ? [["keep", "Keep this picture"]] : []), ["upload", "Upload a picture"]];
+    const choices = [["vicinity", brand`Keep the Vicinity design (drawn with your ticker and name)`], ...(sel.upload ? [["keep", "Keep this picture"]] : []), ["upload", "Upload a picture"]];
     for (const [v, label] of choices) {
       const l = el("label", "crv-choice"); const i = el("input"); i.setAttribute("type", "radio"); i.setAttribute("name", "crv-picture"); i.value = v; i.setAttribute("value", v); i.id = `crv-pic-${v}`;
       i.checked = draft.picture === v;
@@ -293,7 +298,7 @@
     const row = el("div", "crv-row"); row.append(submit, save, discard);
     const ask = el("div", "crv-confirm"); ask.id = "crv-confirm"; ask.hidden = true; ask.setAttribute("role", "group"); ask.setAttribute("aria-labelledby", "crv-confirm-title");
     box.append(title, intro, pics,
-      label("Ticker", tk, el("p", "tiny muted", "Tickers come from the Vicinity city list. An approved change is added to the list in a site update before you can launch with it.")), tkMsg,
+      label("Ticker", tk, el("p", "tiny muted", brand`Tickers come from the Vicinity city list. An approved change is added to the list in a site update before you can launch with it.`)), tkMsg,
       label("Coin name", nm, nmCount), label("Why (only the reviewers read this)", why), row, ask);
     syncForm(R);
   }
@@ -415,8 +420,8 @@
     let info = $("#crv-desc-info");
     if (!info) { info = el("p", "small crv-desc-info"); info.id = "crv-desc-info"; box.prepend(info); }
     // an admin's takedown that made the coin what it is now is said here, in the server's words, until the founder changes the coin again
-    info.textContent = d.source === "founder" ? "Description: your own, checked by Vicinity."
-      : d.takenDown && d.takenDown.message ? `Description: Vicinity's default. ${d.takenDown.message}` : "Description: Vicinity's default.";
+    info.textContent = d.source === "founder" ? brand`Description: your own, checked by Vicinity.`
+      : d.takenDown && d.takenDown.message ? brand`Description: Vicinity's default. ${d.takenDown.message}` : brand`Description: Vicinity's default.`;
     if (describeOpen && !editor) {
       editor = el("div", "crv-editor"); editor.id = "crv-desc-editor";
       const city = (last.city && last.city.name) || "your city";
@@ -484,7 +489,7 @@
     if (s.text && s.result !== "pass") card.append(marked(s.text, s.issues));
     const row = el("div", "crv-row");
     if (s.result === "flag") {
-      card.append(el("p", "small", "You can revise it, or send it to Vicinity for review; your launch waits until they decide. Or keep the default description, which needs no review."));
+      card.append(el("p", "small", brand`You can revise it, or send it to Vicinity for review; your launch waits until they decide. Or keep the default description, which needs no review.`));
       row.append(button("Revise", () => openDescribe(s.text)));
       if (s.id) row.append(button("Send for review", () => send("description/review", { screeningId: s.id }, "Sent for review").then((r) => { if (r && r.ok) { screening = null; describeOpen = false; paint(last); wantFocus("status"); } }), "btn btn--primary"));
       row.append(button("Keep the default", () => send("description/default", {}, "Default description").then((r) => { if (r && r.ok) { screening = null; describeOpen = false; paint(last); wantFocus("info"); } })));

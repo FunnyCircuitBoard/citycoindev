@@ -55,6 +55,19 @@ export function isSolanaAddress(str) {
 export const MESSAGE_STATEMENT =
   "Verify wallet ownership for Vicinity. This is free, is not a transaction, and cannot move funds.";
 
+/**
+ * The product's name in today's statements (the label migration, stage S48): "Vicinity", byte for byte, unless a caller names its label set's
+ * (src/brandwords.js statementName: the Citycoin.dev name only with pages built for it). Every statement made with the default is exactly
+ * today's (test/persist-guard.test.js C08); a message is accepted for any name its checker is given (statementNames: today's name always,
+ * so a text issued just before the label set changed still works for the minutes it is valid).
+ */
+export const LEGACY_NAME = "Vicinity";
+const PRODUCT_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9 .-]{0,38}[A-Za-z0-9]$/;
+const nameOf = (name) => (typeof name === "string" && PRODUCT_NAME_RE.test(name) ? name : LEGACY_NAME);
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/** The "verify" statement in a product's name (today's MESSAGE_STATEMENT for "Vicinity"). */
+export const messageStatement = (name = LEGACY_NAME) => (nameOf(name) === LEGACY_NAME ? MESSAGE_STATEMENT : `Verify wallet ownership for ${nameOf(name)}. This is free, is not a transaction, and cannot move funds.`);
+
 const FREE = "Free, not a transaction, cannot move funds.";
 
 /** A city name we accept: letters (any language), spaces and . ' - only. */
@@ -70,28 +83,39 @@ export const CITY_NAME_RE = /^[\p{L}\p{M}][\p{L}\p{M} .'’-]{0,58}[\p{L}\p{M}.]
  *            later; with a check number when a wallet app approves for another device). A login statement never links (src/auth.js
  *            walletProven: use_link) and a link statement never signs anyone in: the two are different sentences.
  */
-export function statementFor(action = "verify", { cityId, name, country, pin, handle } = {}) {
-  if (action === "claim") return `Claim city #${cityId} (${country}) for this wallet on Vicinity. ${FREE}`;
-  if (action === "add") return `Add the city "${name}" (${country}) and claim it for this wallet on Vicinity. ${FREE}`;
-  if (action === "login" && pin) return `Sign in to Vicinity on my other device (check number ${pin}). ${FREE}`;
-  if (action === "login") return `Sign in to Vicinity with this wallet. ${FREE}`;
-  if (action === "link" && pin) return `Link this wallet to my Vicinity account @${handle} on my other device (check number ${pin}). ${FREE}`;
-  if (action === "link") return `Link this wallet to my Vicinity account @${handle}. ${FREE}`;
-  return MESSAGE_STATEMENT;
+export function statementFor(action = "verify", { cityId, name, country, pin, handle } = {}, product = LEGACY_NAME) {
+  const p = nameOf(product);
+  if (action === "claim") return `Claim city #${cityId} (${country}) for this wallet on ${p}. ${FREE}`;
+  if (action === "add") return `Add the city "${name}" (${country}) and claim it for this wallet on ${p}. ${FREE}`;
+  if (action === "login" && pin) return `Sign in to ${p} on my other device (check number ${pin}). ${FREE}`;
+  if (action === "login") return `Sign in to ${p} with this wallet. ${FREE}`;
+  if (action === "link" && pin) return `Link this wallet to my ${p} account @${handle} on my other device (check number ${pin}). ${FREE}`;
+  if (action === "link") return `Link this wallet to my ${p} account @${handle}. ${FREE}`;
+  return messageStatement(p);
 }
 
-function parseStatement(line) {
-  if (line === MESSAGE_STATEMENT) return { action: "verify" };
-  if (line === statementFor("login")) return { action: "login" };
-  const pin = line.match(/^Sign in to Vicinity on my other device \(check number ([0-9]{2})\)\. /);
-  if (pin && line === statementFor("login", { pin: pin[1] })) return { action: "login", pin: pin[1] };
-  const link = line.match(/^Link this wallet to my Vicinity account @([A-Za-z][A-Za-z0-9_]{0,39})(?: on my other device \(check number ([0-9]{2})\))?\. /);
-  if (link && line === statementFor("link", { handle: link[1], pin: link[2] })) return { action: "link", handle: link[1], ...(link[2] ? { pin: link[2] } : {}) };
-  let m = line.match(/^Claim city #([0-9]{1,10}|c[0-9]{1,9}) \(([A-Z]{2})\) for this wallet on Vicinity\. /);
-  if (m && line === statementFor("claim", { cityId: m[1], country: m[2] })) return { action: "claim", cityId: m[1], country: m[2] };
-  m = line.match(/^Add the city "(.+)" \(([A-Z]{2})\) and claim it for this wallet on Vicinity\. /);
-  if (m && CITY_NAME_RE.test(m[1]) && line === statementFor("add", { name: m[1], country: m[2] }))
+/** The statement on line 4 of a message, in one product's name, or null. */
+function parseStatementAs(line, product) {
+  const p = nameOf(product), q = escapeRe(p);
+  if (line === messageStatement(p)) return { action: "verify" };
+  if (line === statementFor("login", {}, p)) return { action: "login" };
+  const pin = line.match(new RegExp(`^Sign in to ${q} on my other device \\(check number ([0-9]{2})\\)\\. `));
+  if (pin && line === statementFor("login", { pin: pin[1] }, p)) return { action: "login", pin: pin[1] };
+  const link = line.match(new RegExp(`^Link this wallet to my ${q} account @([A-Za-z][A-Za-z0-9_]{0,39})(?: on my other device \\(check number ([0-9]{2})\\))?\\. `));
+  if (link && line === statementFor("link", { handle: link[1], pin: link[2] }, p)) return { action: "link", handle: link[1], ...(link[2] ? { pin: link[2] } : {}) };
+  let m = line.match(new RegExp(`^Claim city #([0-9]{1,10}|c[0-9]{1,9}) \\(([A-Z]{2})\\) for this wallet on ${q}\\. `));
+  if (m && line === statementFor("claim", { cityId: m[1], country: m[2] }, p)) return { action: "claim", cityId: m[1], country: m[2] };
+  m = line.match(new RegExp(`^Add the city "(.+)" \\(([A-Z]{2})\\) and claim it for this wallet on ${q}\\. `));
+  if (m && CITY_NAME_RE.test(m[1]) && line === statementFor("add", { name: m[1], country: m[2] }, p))
     return { action: "add", name: m[1], country: m[2] };
+  return null;
+}
+/** The statement in the first of `products` it is written in (today's name by default), or null. */
+function parseStatement(line, products = [LEGACY_NAME]) {
+  for (const product of products) {
+    const st = parseStatementAs(line, product);
+    if (st) return st;
+  }
   return null;
 }
 
@@ -111,8 +135,8 @@ export function buildMessage({ host, address, nonce, issuedAt, statement = MESSA
   ].join("\n");
 }
 
-/** Parse a message produced by buildMessage. Returns null if the format is wrong. */
-export function parseMessage(message) {
+/** Parse a message produced by buildMessage. Returns null if the format is wrong. `products`: the names its statement may be in. */
+export function parseMessage(message, products = [LEGACY_NAME]) {
   if (typeof message !== "string" || message.length > 1000) return null;
   const lines = message.split("\n");
   if (lines.length !== 10) return null;
@@ -120,7 +144,7 @@ export function parseMessage(message) {
   const nonce = lines[8].match(/^Nonce: ([A-Za-z0-9]{16,64})$/);
   const issued = lines[9].match(/^Issued At: (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z)$/);
   if (!m0 || !nonce || !issued) return null;
-  const st = parseStatement(lines[3]);
+  const st = parseStatement(lines[3], products);
   if (!st) return null;
   const parsed = { host: m0[1], address: lines[1], nonce: nonce[1], issuedAt: issued[1], statement: lines[3], ...st };
   return buildMessage(parsed) === message ? parsed : null;

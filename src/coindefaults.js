@@ -13,6 +13,7 @@ import { tickerOf, tickersAvailable } from "./tickers.js";
 import { cityRecord } from "./cities.js";
 import { checkName, checkSymbol } from "./coinmeta.js";
 import { nameProblem } from "./lpadmin.js";
+import { brandWords } from "./brandwords.js";
 
 /** Registry names over 32 UTF-8 bytes, shortened to the name people use. Keyed by GeoNames id. */
 export const NAME_OVERRIDES = Object.freeze({
@@ -40,10 +41,10 @@ export const DEFAULT_GATES = Object.freeze({
 
 /**
  * The ready-made coin of `cityId` in country `cc` (the seat's): { ok: true, city, ticker, name, description, pair } or
- * { ok: false, code, message } (DEFAULT_GATES).
+ * { ok: false, code, message } (DEFAULT_GATES, in the product's own name: src/brandwords.js).
  */
 export async function coinDefaults(env, cityId, cc) {
-  const fail = (code) => ({ ok: false, code, message: DEFAULT_GATES[code] });
+  const fail = (code) => ({ ok: false, code, message: brandWords(env).say(DEFAULT_GATES[code]) });
   if (!/^\d{1,19}$/.test(String(cityId)) || !/^[A-Z]{2}$/.test(String(cc || ""))) return fail("not_in_list");
   if (!(await tickersAvailable(env))) return fail("list_unavailable");
   const t = await tickerOf(env, cityId);

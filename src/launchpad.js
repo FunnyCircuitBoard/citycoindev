@@ -17,7 +17,7 @@
  *             shows nothing for it.
  */
 import { json } from "./http.js";
-import { launchedAtOf, officialFor, teamFor, tokenMint } from "./official.js";
+import { launchedAtOf, legacyHidden, officialFor, teamFor, tokenMint } from "./official.js";
 import { MAIN_TOKEN_LABEL } from "./maintoken.js";
 import { mainTokenRoute } from "./swap.js";
 import { swapOn } from "./cluster.js";
@@ -36,6 +36,7 @@ import { choiceHolds } from "./coinready.js";
 import { coinV2ReadyOn } from "./flags.js";
 import { mainTokenV5 } from "./v5policy.js";
 import { onForget } from "./memos.js";
+import { brandWords } from "./brandwords.js";
 
 const SOL = PAIRS.SOL.mint;
 const NEW_DAYS = 7; // "New" = live for less than this (a default, see the product decisions in the report)
@@ -129,10 +130,13 @@ async function communityCounts(env, cityIds, now) {
   let balances = null;
   try { balances = (await latestBalances(env, now))?.balances || null; } catch { balances = null; }
   const team = teamFor(env, tokenMint(env)); // the balances are the main token's: under MAIN_TOKEN_V5 no $VICINITY team wallet is set aside
+  // a label set other than today's without the switch (src/official.js legacyHidden): no token is live, so nobody is a holder of one (null,
+  // "no such count", never a 0 that reads like a count of holders)
+  const noToken = !tokenMint(env) && legacyHidden(env);
   for (const u of placed) {
     const id = String(u.home_city);
     if (!cityIds.has(id)) continue;
-    const c = out.get(id) || { members: 0, holders: 0 };
+    const c = out.get(id) || { members: 0, holders: noToken ? null : 0 };
     c.members++;
     if (balances && u.wallet && (balances[u.wallet] || 0) > 0 && !isTeamWallet(u.wallet, team)) c.holders++; // a member without a wallet is counted, never a holder
     out.set(id, c);
@@ -144,6 +148,7 @@ async function communityCounts(env, cityIds, now) {
 async function build(env, fetchImpl, now) {
   const official = officialFor(env);
   const vicMint = tokenMint(env) || null;
+  const bw = brandWords(env); // the product's name in the words of the cards' sources (src/brandwords.js)
   // one source after the other: some of them run a batch, and batches must not overlap on one database
   const coinsRes = await (await handleCoins(new Request("https://launchpad.internal/api/coins"), env, fetchImpl, now)).json();
   const seatsRes = await (await handleSeats(env, now)).json();
@@ -196,13 +201,15 @@ async function build(env, fetchImpl, now) {
       ticker: (await displayTicker(env, { cityId: c.city, chainSymbol: (c.mint && chainSymbols.get(c.mint)) || null }))?.ticker || null, name: c.name, pitch: c.pitch || "", color: c.color, logo: c.logo,
       pair: { symbol: c.pair, mint: c.pairMint }, mint: c.mint, launchedAt: c.launchedAt, designedAt: c.updatedAt,
       founder, members: members.get(String(c.city)) || null,
-      market: c.mint ? (lp.has(c.mint) ? applyLpMarket(market.markets.get(c.mint) || null, lpCurves.get(c.mint) ?? null, market.pairPrices.get(lp.get(c.mint).quote_mint) ?? null) : market.markets.get(c.mint) || null) : null,
+      market: c.mint ? (lp.has(c.mint) ? applyLpMarket(market.markets.get(c.mint) || null, lpCurves.get(c.mint) ?? null, market.pairPrices.get(lp.get(c.mint).quote_mint) ?? null, bw) : market.markets.get(c.mint) || null) : null,
       holders: c.mint ? stats.counts.get(c.mint) || null : null,
       links: c.mint && lp.has(c.mint) ? lpLinks(c.mint, lpCurves.get(c.mint)?.stage) : tradeLinks(c.mint, c.pairMint, buyHereLink(env, c.mint, vicMint)), rewardModel: null,
     });
   }
-  const vicinity = {
-    kind: "vicinity", status: vicMint ? "live" : "upcoming", city: null, ticker: "VICINITY", name: "Vicinity",
+  // a label set other than today's without the configured main token (src/official.js legacyHidden): no first card at all (its own token
+  // is not live, and the legacy token is shown nowhere): the list is the city coins. With the switch, the main token's card below.
+  const vicinity = legacyHidden(env) && !mainTokenV5(env) ? null : {
+    kind: "vicinity", status: vicMint ? "live" : "upcoming", city: null, ticker: "VICINITY", name: bw.on ? MAIN_TOKEN_LABEL : "Vicinity",
     pitch: "One city. One coin. One community.", color: "gold", logo: null, pair: { symbol: "SOL", mint: SOL },
     mint: vicMint, launchedAt: launchedAtOf(vicMint), designedAt: null, founder: null, members: null, // "New" for its first 7 days, like any coin
     market: vicMint ? market.markets.get(vicMint) || null : null, holders: vicMint ? stats.counts.get(vicMint) || null : null,
@@ -210,9 +217,9 @@ async function build(env, fetchImpl, now) {
   };
   // MAIN_TOKEN_V5 on: the first card is the configured main token (or "upcoming" without one), with nothing of $VICINITY's: no ticker
   // or name of its own until its on-chain metadata is recorded, no launch date, and purchase links only once a route exists
-  if (mainTokenV5(env)) Object.assign(vicinity, { ticker: null, name: MAIN_TOKEN_LABEL, launchedAt: null, links: await mainTokenLinks(env, vicMint, fetchImpl, now) });
+  if (vicinity && mainTokenV5(env)) Object.assign(vicinity, { ticker: null, name: MAIN_TOKEN_LABEL, launchedAt: null, links: await mainTokenLinks(env, vicMint, fetchImpl, now) });
 
-  const all = [vicinity, ...cards];
+  const all = [...(vicinity ? [vicinity] : []), ...cards];
   const isNew = (k) => k.status === "live" && k.launchedAt && now - Date.parse(k.launchedAt) < NEW_DAYS * DAY;
   const byCountry = new Map();
   for (const k of cards) byCountry.set(k.city.country, (byCountry.get(k.city.country) || 0) + 1);
@@ -223,7 +230,7 @@ async function build(env, fetchImpl, now) {
     ok: true, asOf: iso(now), opensAt: official.launchpadOpensAt, open: now >= Date.parse(official.launchpadOpensAt),
     vicinity, coins: cards, countries,
     stats: { live: all.filter((k) => k.status === "live").length, new: all.filter(isNew).length, upcoming: all.filter((k) => k.status !== "live").length },
-    attribution: attributionFor(market.used, { holders: all.some((k) => k.holders) }),
+    attribution: attributionFor(market.used, { holders: all.some((k) => k.holders) }, bw),
   };
   return { body, degraded: !market.ok || !stats.ok || !lpOk };
 }

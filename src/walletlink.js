@@ -60,6 +60,7 @@ import { legacySeatsFrozen, walletOnly } from "./v5policy.js";
 import { emailConfigured, sendMail, walletLinkedEmail } from "./mail.js";
 import { DAY, HOUR, POLICY, iso } from "./policy.js";
 import { clearPasswordSince, passwordSetSince } from "./pwlogin.js";
+import { statementNames } from "./brandwords.js";
 
 const MINUTES = 10; // an "Open app" code lives 10 minutes (like the location hand-off and a pairing code)
 export const RELAY_OPEN_MS = 2 * 60_000; // a relay code must be OPENED within 2 minutes (then it can be claimed for the rest of its 10)
@@ -165,7 +166,8 @@ export async function linkWallet(env, s, wallet, now, via = "page") {
 export async function linkNotice(env, u, wallet, app, ctx = null, fetchImpl = fetch, origin = undefined) {
   const to = u && (u.provider === "email" ? u.provider_id : u.contact_email);
   if (!to || !emailConfigured(env)) return;
-  const { subject, text, html } = walletLinkedEmail(maskWallet(wallet), app, origin); // origin: the host the wallet joined on (src/hostbind.js mailOrigin)
+  // origin: the host the wallet joined on (src/hostbind.js mailOrigin); env: the product's own name (src/mail.js)
+  const { subject, text, html } = walletLinkedEmail(maskWallet(wallet), app, origin, env);
   const p = sendMail(env, { to, subject, text, html }, { fetchImpl })
     .then((r) => { if (!r.ok) console.error("wallet link notice not sent", r.error); })
     .catch((e) => console.error("wallet link notice failed", String((e && e.message) || e).slice(0, 80)));
@@ -286,7 +288,7 @@ async function handleLink(request, env, x) {
   ]);
   if (over) return over;
   // a signed message works once, on the host it names (and, while WALLET_ONLY counts, never when the database cannot confirm that: strict)
-  const r = await checkSigned(body, request, x.now, ["link"], badSigned, env.DB, servedHost(env, request).host, { strict: walletOnly(env) });
+  const r = await checkSigned(body, request, x.now, ["link"], badSigned, env.DB, servedHost(env, request).host, { strict: walletOnly(env), names: statementNames(env) });
   if (r.error) return r.error;
   // the statement names THIS account, and the plain one (the check-number variant belongs to the pairing)
   if (r.parsed.pin || r.parsed.handle !== accountName(s.user)) return json({ ok: false, error: "bad_message" }, 400);
@@ -396,7 +398,7 @@ async function handleCarryClaim(request, env, x) {
   const served = servedHost(env, request);
   // sessions.host (src/hostbind.js), before the signed text is used up: a migration that fails here leaves the signature usable for a retry
   if (served.bound) await ensureHostSchema(env.DB, "sessions");
-  const r = await checkSigned(body, request, x.now, ["link"], badSigned, env.DB, served.host, { strict: walletOnly(env) }); // (only on the host the text names)
+  const r = await checkSigned(body, request, x.now, ["link"], badSigned, env.DB, served.host, { strict: walletOnly(env), names: statementNames(env) }); // (only on the host the text names)
   if (r.error) return r.error;
   if (r.parsed.pin || r.parsed.handle !== accountName(u.owner)) return json({ ok: false, error: "bad_message" }, 400);
   const wallet = r.parsed.address, app = appOf(body.app), at = iso(x.now);

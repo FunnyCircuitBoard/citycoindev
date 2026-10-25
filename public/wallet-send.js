@@ -18,6 +18,11 @@
  */
 (() => {
   "use strict";
+  // The product's names in this file's words (the label migration, area b). A page built for a label set other than today's carries the
+  // set on <html> (data-brand, data-brand-name, data-brand-domain: scripts/pages/build.mjs writes them from src/brand.js); brand`…` puts
+  // those names in a text's own words, never in a value put into it. A page without them (today's pages) gets every text exactly as written.
+  const BRAND = (() => { try { const r = document.documentElement, at = (k) => (r && typeof r.getAttribute === "function" ? r.getAttribute(k) : null); return at("data-brand") && at("data-brand-name") && at("data-brand-domain") ? Object.freeze({ key: at("data-brand"), name: at("data-brand-name"), domain: at("data-brand-domain") }) : null; } catch { return null; } })();
+  const brand = (s, ...v) => s.reduce((out, part, i) => out + (BRAND ? part.replace(/vicinity\.city/g, () => BRAND.domain).replace(/Vicinity/g, () => BRAND.name) : part) + (i < v.length ? String(v[i]) : ""), "");
   const W = () => window.VW;
   const $ = (s, r = document) => r.querySelector(s);
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
@@ -33,10 +38,11 @@
   // plain words when the Worker's answer carries none of its own (it nearly always does: `message`)
   const WORDS = {
     bad_address: "That is not a Solana address.", same_wallet: "That is your own wallet address.", not_a_wallet: "This address is not a person's wallet.",
-    unsupported_asset: "Only SOL, $VICINITY and Vicinity city coins can be sent from here.", bad_amount: "Type an amount above zero, with a point for decimals (like 0.5).",
+    unsupported_asset: BRAND ? "Only the coins listed here can be sent from here." : "Only SOL, $VICINITY and Vicinity city coins can be sent from here.", bad_amount: "Type an amount above zero, with a point for decimals (like 0.5).",
     too_many_decimals: "Too many decimals for this coin.", insufficient_sol: "Not enough SOL for this send.", insufficient_balance: "You do not hold that much.",
     leaves_dust: "This would leave too little SOL in your wallet.", amount_below_rent: "That wallet has not been used yet and needs more SOL than this to open.", all_required: "This would send everything you have. Tap Max for that.",
-    no_wallet: "Link a wallet to your account first.", sign_in: "Sign in again, then try once more.", wrong_origin: "Please open vicinity.city directly and try again.", bad_origin: "Please open vicinity.city directly and try again.",
+    no_wallet: "Link a wallet to your account first.", sign_in: "Sign in again, then try once more.", wrong_origin: BRAND ? "Please open the site directly and try again." : "Please open vicinity.city directly and try again.",
+    bad_origin: BRAND ? "Please open the site directly and try again." : "Please open vicinity.city directly and try again.",
     slow_down: "Too many tries in a short time. Wait a minute and try again.", rpc_unavailable: "The blockchain could not be reached just now. Nothing was sent. Try again in a minute.",
     unavailable: "This is not available right now. Nothing was sent. Try again in a minute.", not_found: "Sending is switched off right now.", bad_json: "Something went wrong. Nothing was sent.",
     program_error: "The network refused this send. Nothing was spent.", rejected_by_network: "The network refused this send. Nothing was spent.", tx_too_large: "This send is too big for one transaction.",
@@ -131,7 +137,9 @@
     const check = el("p", "small wsend__check"); check.setAttribute("role", "status"); check.setAttribute("aria-live", "polite");
     const status = el("p", "small wsend__status"); status.setAttribute("role", "status"); status.setAttribute("aria-live", "polite");
     const review = el("button", "btn btn--primary btn--block wsend__review", "Review"); review.type = "button";
-    const foot = el("p", "tiny muted wsend__foot", "Only SOL, $VICINITY and Vicinity city coins. You sign in your own wallet; Vicinity never holds your keys and takes no fee.");
+    // (a page built for another label set names no legacy token: the Worker lists what can be sent, src/walletsend.js supportedAssets)
+    const foot = el("p", "tiny muted wsend__foot", BRAND ? brand`Only the coins listed here. You sign in your own wallet; Vicinity never holds your keys and takes no fee.`
+      : "Only SOL, $VICINITY and Vicinity city coins. You sign in your own wallet; Vicinity never holds your keys and takes no fee.");
     form.append(el("p", "kicker", "Send"), title, from, assetsBox, amtRow, toRow, check, status, review, foot);
     // the confirm screen
     const confirm = el("div", "wsend__confirm"); confirm.hidden = true;
@@ -346,7 +354,7 @@
     if (!list.length && w.isMobile) {
       // a phone's Safari / Chrome: no wallet on the page; this very page opens inside the wallet app, signed in
       ui.go.hidden = true;
-      const lead = el("p", "small wsend__lead", "Sending happens in your wallet app. Open Vicinity there and send from its Wallet tab:");
+      const lead = el("p", "small wsend__lead", brand`Sending happens in your wallet app. Open Vicinity there and send from its Wallet tab:`);
       const row = el("div", "swap__deeplinks");
       const here = w.KNOWN.filter((k) => typeof k.open === "function").slice(0, 3);
       for (const k of here) { const a = el("a", "wallet-option"); a.setAttribute("href", k.open(`${location.origin}/connect?mode=login&with=${k.id}&next=${encodeURIComponent("/dashboard#wallet")}`)); a.setAttribute("rel", "noopener"); a.dataset.app = k.id; a.append(w.mark(k.name), el("span", null, `Open in ${k.name}`), el("span", "go", "↗")); row.append(a); }

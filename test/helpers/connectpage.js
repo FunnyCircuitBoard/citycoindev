@@ -79,11 +79,12 @@ function spyTerms(gate, log) {
  *   noSignupJs       true: /signup.js does not load (its <script> fails)
  *   hash             the address bar's fragment when the page opens, without "#" (a wallet-only link: "register=<code>", "pair=<code>")
  *   clipboard        true: the browser has a clipboard; what the page copies is in `copied`
+ *   page             the page's HTML (default: the built public/connect.html; a test passes a build for another label set)
  */
 export async function openConnect({ ua = UA.desktop, search = "", api = async () => ({ ok: true }), me = {}, state = STATE.empty(), storage = {}, session: sessionStore = {},
-  agreed = "2026-10-01", geolocation, wallets = [], touchPoints, setup, net, noSignupJs = false, hash = "", clipboard = false } = {}) {
+  agreed = "2026-10-01", geolocation, wallets = [], touchPoints, setup, net, noSignupJs = false, hash = "", clipboard = false, page = null } = {}) {
   const doc = new Doc();
-  doc.append(...parse(doc, read("connect.html")));
+  doc.append(...parse(doc, page ?? read("connect.html")));
   // time: only what the test lets pass
   let now = 0, seq = 0, hidden = false;
   const timers = [];

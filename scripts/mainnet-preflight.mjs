@@ -596,7 +596,8 @@ async function setupRows(summary, { row, lp, lrpc, fetchImpl, mainnetLp, global,
   if (lp.cluster === "mainnet" && isSolanaAddress(mint)) {
     const m = await acct(lrpc, mint, fetchImpl, "base64", { dataSlice: { offset: 0, length: 0 } });
     const tp = m && (m.owner === PROGRAM_IDS.token2022 || m.owner === PROGRAM_IDS.token) ? m.owner : null;
-    if (!tp) { feeLevel = "FAIL"; feeRows.push(`$VICINITY ${mint} is not a token mint here`); } else await check("$VICINITY", ra.vicinity, await ata(ADDRESSES.feeRecipient, mint, tp));
+    // (the admin console names this account "legacyToken" under a label set other than today's, src/lpadmin.js summary)
+    if (!tp) { feeLevel = "FAIL"; feeRows.push(`$VICINITY ${mint} is not a token mint here`); } else await check("$VICINITY", ra.vicinity !== undefined ? ra.vicinity : ra.legacyToken, await ata(ADDRESSES.feeRecipient, mint, tp));
   }
   row(feeLevel, "setup fee accounts", feeRows.join("; "));
   // Meteora's partner name for the dev wallet (step 7, dev wallet only): a WARN, never a blocker

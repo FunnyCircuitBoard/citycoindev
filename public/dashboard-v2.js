@@ -26,6 +26,16 @@
 //                                  no Profile tab in the strip: the header's avatar opens it, inStrip / keyStop)
 (() => {
   "use strict";
+  // The product's names in this file's words (the label migration, area b). A page built for a label set other than today's carries the
+  // set on <html> (data-brand, data-brand-name, data-brand-domain: scripts/pages/build.mjs writes them from src/brand.js); brand`…` puts
+  // those names in a text's own words, never in a value put into it. A page without them (today's pages) gets every text exactly as written.
+  const BRAND = (() => { try { const r = document.documentElement, at = (k) => (r && typeof r.getAttribute === "function" ? r.getAttribute(k) : null); return at("data-brand") && at("data-brand-name") && at("data-brand-domain") ? Object.freeze({ key: at("data-brand"), name: at("data-brand-name"), domain: at("data-brand-domain") }) : null; } catch { return null; } })();
+  const brand = (s, ...v) => s.reduce((out, part, i) => out + (BRAND ? part.replace(/vicinity\.city/g, () => BRAND.domain).replace(/Vicinity/g, () => BRAND.name) : part) + (i < v.length ? String(v[i]) : ""), "");
+  // the holdings' token: "$VICINITY" on today's pages; a page built for another label set names its own (the legacy one is shown nowhere there).
+  // NOT_LIVE: what a page built for another label set says where a rank or holding would be while its own token is not live (/api/me says
+  // launched false); it never claims an Early member badge (that is history, and /api/me's badges say who has it) and offers no Buy
+  const UNIT = BRAND ? `${BRAND.name} tokens` : "$VICINITY";
+  const NOT_LIVE = BRAND ? `The ${BRAND.name} token is not live yet, so there are no ranks yet.` : null;
   const { $, $$, el, fmt, mask, copy } = window.V;
   const byId = (id) => document.getElementById(id);
 
@@ -66,7 +76,8 @@
   // the legacy seats frozen (LEGACY_SEATS=frozen: /api/me says legacySeats "frozen"; Citycoin.dev master v5 stage S16): Today offers no claim,
   // endorsement, vote, squad, objection period or grace top-up; the city header, Founder Status and the Founder card say only what is on record.
   // Without the key (today) every line reads as before.
-  const frozenSeats = (d) => Boolean(d && d.legacySeats === "frozen");
+  // (a page built for another label set is always built with the legacy seats frozen (scripts/pages/build.mjs pageBrandPrerequisites))
+  const frozenSeats = (d) => Boolean(BRAND) || Boolean(d && d.legacySeats === "frozen");
 
   let ctx = null, active = "home", pending = null, lastMod = null, coin = null, coinKnown = false, coinQueueN = 0, fcardAction = null, lastTarget = null, targetTimer = 0;
   // the glass pill behind the chosen tab: its box now ({ x, y, w, h }, or null until it has measured a tab), its slide on the way, and
@@ -92,7 +103,7 @@
   // comes first, so a line cut short on a phone still says it.
   const LEGACY_CONTRACT = "Nothing can launch until an admin settles the contract sent for this city through the old Raydium LaunchLab path.";
   // the launchpad's words while the launch card's status is on its way (or could not be asked): true whatever it will say
-  const LP_PENDING = "Your coin launches on the Vicinity launchpad, after an admin approves it on chain.";
+  const LP_PENDING = brand`Your coin launches on the Vicinity launchpad, after an admin approves it on chain.`;
   const me = () => (ctx ? ctx.me() : null);
   const countryName = (cc) => (ctx ? ctx.countryName(cc) : cc);
   const behavior = () => (window.V.reduced ? "auto" : "smooth");
@@ -198,7 +209,7 @@
     if (started && was !== tab) $("#dv2").dataset.dir = TABS.indexOf(tab) > TABS.indexOf(was) ? "next" : "prev";
     for (const t of $$(".dtab")) { const on = t.dataset.tab === tab; t.setAttribute("aria-selected", String(on)); t.setAttribute("tabindex", on ? "0" : "-1"); }
     for (const p of $$(".dpanel")) p.hidden = p.id !== "panel-" + tab;
-    document.title = tab === "home" ? "Dashboard · Vicinity" : `${LABEL[tab]} · Dashboard · Vicinity`;
+    document.title = tab === "home" ? brand`Dashboard · Vicinity` : brand`${LABEL[tab]} · Dashboard · Vicinity`;
     const url = location.pathname + location.search + "#" + tab;
     if (replace) history.replaceState(null, "", url);
     else if (push && was !== tab) history.pushState(null, "", url);
@@ -514,11 +525,11 @@
   function readyStep(rf, city) {
     const ch = rf.chosen && !rf.chosen.launched ? rf.chosen : null;
     if (ch && ch.current && !ch.mine) return [`Choose ${city}'s coin`, "A former founder chose this coin. Use it to make it yours."];
-    if (ch && ch.current) return [`Choose ${city}'s coin again`, "Vicinity's design or the city list changed since you chose. Check the new version, then use it."];
+    if (ch && ch.current) return [`Choose ${city}'s coin again`, brand`Vicinity's design or the city list changed since you chose. Check the new version, then use it.`];
     if (ch && ch.mine) return [`Choose ${city}'s coin again`, "Your coin's design was changed since you chose it. Check it, then use it again."];
-    if (rf.earlier) return [`Choose ${city}'s coin`, "Your earlier design is kept, but city coins are made by Vicinity now. Check yours, then use it."];
-    if (rf.earlierOther) return [`Choose ${city}'s coin`, "A former founder's design is kept, but city coins are made by Vicinity now. Check this coin, then use it."];
-    return [`${city}'s coin is ready`, "The Vicinity design with your city's ticker, from the city list. Check it, then use it."];
+    if (rf.earlier) return [`Choose ${city}'s coin`, brand`Your earlier design is kept, but city coins are made by Vicinity now. Check yours, then use it.`];
+    if (rf.earlierOther) return [`Choose ${city}'s coin`, brand`A former founder's design is kept, but city coins are made by Vicinity now. Check this coin, then use it.`];
+    return [`${city}'s coin is ready`, brand`The Vicinity design with your city's ticker, from the city list. Check it, then use it.`];
   }
   function today(d) {
     const f = d.founder || {}, seat = f.seat, c = d.community, n = d.national, sq = d.squad, h = d.holding || {}, u = d.user;
@@ -527,7 +538,7 @@
     const add = (title, sub, tone, tab, go, exact) => rows.push({ title, sub, tone, href: tab[0] === "/" ? tab : "#" + tab, go, exact });
     const legacy = !frozenSeats(d); // (frozen: none of the seat, window, squad or election steps below is offered)
     // (an account without a wallet: the wallet card is the first card of Home, so Today does not repeat "Link your wallet")
-    if (legacy && seat && (seat.status === "grace" || (seat.status === "steward" && seat.graceUntil))) add("Top up your holding", `Hold ${fmt(seat.threshold)} $VICINITY again before ${when(seat.graceUntil)}`, "warn", "home", "#trade");
+    if (legacy && seat && (seat.status === "grace" || (seat.status === "steward" && seat.graceUntil))) add("Top up your holding", `Hold ${fmt(seat.threshold)} ${UNIT} again before ${when(seat.graceUntil)}`, "warn", BRAND ? "founder" : "home", BRAND ? "#progress" : "#trade");
     if (legacy && seat && seat.status === "provisional") add("Objection period", `${seat.city} chose you · ends ${when(seat.appealUntil)}`, "info", "founder", "#progress");
     if (legacy && !seat && f.application) add(`You applied to found ${city}`, `Window closes ${when(f.application.closesAt)} (${left(f.application.closesAt)})`, "info", "founder", "#progress");
     if (legacy && !seat && !f.application && f.eligible) add(f.challenging ? `Challenge ${city}'s steward` : `Claim ${city}`, "You qualify. Apply from inside the city.", "ok", "founder", "#progress");
@@ -550,11 +561,15 @@
     if (modOn() && q.total > 0) add(`${q.total} waiting for you`, q.parts.join(" · "), "warn", "moderate", q.total === q.counts.coins ? "#coin-admin" : "#mod");
     if (legacy && sq && sq.joinable && !sq.joinable.full) add(`A squad is forming in ${city}`, `${sq.joinable.members.length} of ${sq.joinable.max} members · join to pool holdings`, "info", "founder", "#squad");
     if (legacy && sq && sq.mine && sq.mine.ready && sq.mine.status !== "applied") add("Your squad is ready", "Apply as a squad from inside the city.", "ok", "founder", "#squad");
-    if (!u.handle) add("Pick a username", "Your public name everywhere on Vicinity.", "info", "profile", "#username-input");
-    if (d.launched && h.amount === 0 && !seat && u.wallet) add("Get $VICINITY", "Holding any amount unlocks posting, voting and your rank.", "info", "home", "#trade");
-    if (!d.launched) {
-      const soon = opensIn();
-      add(soon ? `Launch in ${soon}` : "Launching now", soon ? "$VICINITY launches on Raydium LaunchLab. The Launchpad has the countdown." : "The contract is published on the Token page first.", "info", soon ? "/launchpad" : "/token", null);
+    if (!u.handle) add("Pick a username", brand`Your public name everywhere on Vicinity.`, "info", "profile", "#username-input");
+    if (BRAND) {
+      // a page built for another label set offers no Buy and no launch countdown: its token's pages are not there
+    } else {
+      if (d.launched && h.amount === 0 && !seat && u.wallet) add("Get $VICINITY", "Holding any amount unlocks posting, voting and your rank.", "info", "home", "#trade");
+      if (!d.launched) {
+        const soon = opensIn();
+        add(soon ? `Launch in ${soon}` : "Launching now", soon ? "$VICINITY launches on Raydium LaunchLab. The Launchpad has the countdown." : "The contract is published on the Token page first.", "info", soon ? "/launchpad" : "/token", null);
+      }
     }
     $("#today-list").replaceChildren(...rows.slice(0, 4).map((r) => {
       const a = el("a", "today__card");
@@ -573,7 +588,7 @@
     const h = d.holding || {};
     return !d.user.wallet ? "nowallet" : !d.launched ? "prelaunch" : h.team ? "team" : !(h.amount > 0) ? "none" : !h.rank ? "ranking" : "ranked";
   }
-  const STANDING_WHY = { nowallet: "Link a wallet to see your rank.", prelaunch: "Ranks go live the moment $VICINITY launches.", team: "A team wallet: shown without a rank.",
+  const STANDING_WHY = { nowallet: "Link a wallet to see your rank.", prelaunch: BRAND ? NOT_LIVE : "Ranks go live the moment $VICINITY launches.", team: "A team wallet: shown without a rank.",
     none: "Not ranked yet.", ranking: "Your rank is on its way: ranks refresh about every minute." };
   function standing(d) {
     const h = d.holding || {}, state = standingState(d), box = $("#standing");
@@ -623,22 +638,22 @@
   }
   function rankings(d) {
     const h = d.holding || {}, c = d.community, n = d.national, launched = d.launched, st = $("#rk-state");
-    st.textContent = launched ? "● Live" : "Live at launch"; st.className = launched ? "tag tag--ok" : "tag";
-    const fallback = !d.user.wallet ? "link a wallet" : launched ? (h.team ? "team wallet, not ranked" : h.amount > 0 ? "ranking…" : "not holding yet") : "live at launch";
+    st.textContent = launched ? "● Live" : BRAND ? "Not live yet" : "Live at launch"; st.className = launched ? "tag tag--ok" : "tag";
+    const fallback = !d.user.wallet ? "link a wallet" : launched ? (h.team ? "team wallet, not ranked" : h.amount > 0 ? "ranking…" : "not holding yet") : BRAND ? "not live yet" : "live at launch";
     tile("rk-global", h.rank ? `#${fmt(h.rank)}` : "—", h.rank ? `of ${fmt(h.total)} · top ${pctText(h.percentile)}%` : fallback);
     const gap = $("#rk-global-gap");
     gap.hidden = !(h.next && h.next.gap > 0);
-    if (!gap.hidden) gap.textContent = `${fmt(h.next.gap)} $VICINITY to catch #${h.next.rank}`;
+    if (!gap.hidden) gap.textContent = `${fmt(h.next.gap)} ${UNIT} to catch #${h.next.rank}`;
     board("rk-country", n, n ? countryName(n.country) : "Your country", fallback);
     board("rk-city", c, c ? c.name : "Your city", fallback);
     $("#rk-note").textContent = launched ? "Ranks count people, not pools, program accounts or team wallets. Refreshed about every minute."
-      : "Every rank goes live the moment $VICINITY launches. Your Early member badge is already yours.";
+      : BRAND ? NOT_LIVE : "Every rank goes live the moment $VICINITY launches. Your Early member badge is already yours.";
     // no rank anywhere: one clear empty state instead of three tiles of dashes
     const any = Boolean(h.rank || (c && c.rank) || (n && n.rank)), empty = $("#rankings-card .rk-empty"), state = standingState(d);
     empty.hidden = any; $("#rk-tiles").hidden = !any;
     if (!any) {
-      $("#rankings-card .rk-empty__why").textContent = { nowallet: "Link a wallet to see where you stand among every holder.", prelaunch: "Every rank goes live the moment $VICINITY launches.",
-        team: "Team wallets are shown without a rank.", none: "Hold any $VICINITY to get your rank.", ranking: "Your rank is on its way: ranks refresh about every minute." }[state] || "";
+      $("#rankings-card .rk-empty__why").textContent = { nowallet: "Link a wallet to see where you stand among every holder.", prelaunch: BRAND ? NOT_LIVE : "Every rank goes live the moment $VICINITY launches.",
+        team: "Team wallets are shown without a rank.", none: `Hold any ${UNIT} to get your rank.`, ranking: "Your rank is on its way: ranks refresh about every minute." }[state] || "";
       $("#rankings-card .rk-empty__link").hidden = !(state === "nowallet" && d.signupFlow === "v2");
       $("#rankings-card .rk-empty__go").hidden = state !== "none";
     }
@@ -669,7 +684,7 @@
     $("#ca-country").textContent = countryName(c.country);
     const T = (s && s.threshold) || (d.founder && d.founder.threshold);
     const th = $("#ca-threshold"); // (the pages built with the legacy seats frozen have no founder amount row; frozen, a row that is there hides)
-    if (th) { if (frozenSeats(d)) th.parentNode.hidden = true; else th.textContent = T ? `${fmt(T)} $VICINITY` : "Set by city size when the first claim is made (100K to 1M)"; }
+    if (th) { if (frozenSeats(d)) th.parentNode.hidden = true; else th.textContent = T ? `${fmt(T)} ${UNIT}` : "Set by city size when the first claim is made (100K to 1M)"; }
     $("#ca-map").href = `/cities?city=${encodeURIComponent(c.id)}`;
     $("#studio-city").textContent = c.name;
   }
@@ -699,7 +714,7 @@
     else {
       rk.hidden = !ranked;
       if (ranked) {
-        $("#fs-rank-text").textContent = `You are #${c.rank} of ${c.holders} $VICINITY holder${c.holders === 1 ? "" : "s"} in ${c.name}, with ${fmt(h.amount)} $VICINITY.`;
+        $("#fs-rank-text").textContent = `You are #${c.rank} of ${c.holders} ${BRAND ? `${BRAND.name} token holder` : "$VICINITY holder"}${c.holders === 1 ? "" : "s"} in ${c.name}, with ${fmt(h.amount)} ${UNIT}.`;
         $("#fs-rank-note").textContent = "For information only: rank does not decide the founder. The first qualified claimer becomes Seed Steward at once; if several claim together, a 72-hour window scores them (50% local endorsements, 30% contribution, 20% holdings, capped at 2× the bar).";
       }
     }
@@ -736,7 +751,11 @@
     const button = (label, cls, fn) => { go.hidden = false; go.textContent = label; go.className = cls; fcardAction = fn; };
     if (frozen && (st === "provisional" || st === "grace")) { note.textContent = "No founder powers: this seat is on record as it was."; go.hidden = true; fcardAction = null; }
     else if (st === "provisional") { note.textContent = "No founder powers yet. Locals can object until then; if no objection is upheld, you become the founder."; button("Founder path", "btn btn--primary", () => goTo("#progress")); }
-    else if (st === "grace") { note.textContent = `Hold ${fmt(seat.threshold)} $VICINITY again before the deadline or the seat reopens. Moderation is paused meanwhile.`; button("Buy & swap", "btn btn--primary", () => goTo("#trade")); }
+    else if (st === "grace") {
+      note.textContent = `Hold ${fmt(seat.threshold)} ${UNIT} again before the deadline or the seat reopens. Moderation is paused meanwhile.`;
+      // (no Buy & swap on a page built for another label set: that card is not shown there)
+      if (BRAND) button("Founder path", "btn btn--primary", () => goTo("#progress")); else button("Buy & swap", "btn btn--primary", () => goTo("#trade"));
+    }
     else if (!coinKnown) { note.textContent = ""; go.hidden = true; fcardAction = null; }
     // (closed: the launch card or the ready-made coin's card right under this one says the closed line, so it is said here only when neither
     // shows: once per tab, review finding S23-OFF-3)
@@ -746,13 +765,13 @@
     else if (readyOn() && readyFirst()) {
       const rf = readyFounder();
       if (!rf && !readyKnown) { note.textContent = "Checking your city coin…"; go.hidden = true; fcardAction = null; }
-      else if (!rf) { note.textContent = "City coins are made by Vicinity from the city list now: yours is in your Founder tab."; button("See your city coin", "btn btn--glass", () => goTo("#coin-ready")); }
+      else if (!rf) { note.textContent = brand`City coins are made by Vicinity from the city list now: yours is in your Founder tab.`; button("See your city coin", "btn btn--glass", () => goTo("#coin-ready")); }
       else if (!rf.coin) { note.textContent = rf.gate ? rf.gate.message : ""; button("See your city coin", "btn btn--glass", () => goTo("#coin-ready")); }
       // something stands in the way of "Use this coin" (an approval for another wallet or of an earlier design, a low balance...): why
       else if (rf.gate) { note.textContent = rf.gate.message; button("See your city coin", "btn btn--glass", () => goTo("#coin-ready")); }
-      else if (!coin) { note.textContent = `${seat.city}'s coin is ready: the Vicinity design with its ticker, from the city list. Check it, then use it.`; button("See your city coin", "btn btn--primary", () => goTo("#coin-ready")); }
+      else if (!coin) { note.textContent = brand`${seat.city}'s coin is ready: the Vicinity design with its ticker, from the city list. Check it, then use it.`; button("See your city coin", "btn btn--primary", () => goTo("#coin-ready")); }
       // (the Founder card is the first card of the Founder tab, the coin card right under it: ORDER.founder)
-      else { note.textContent = "Choose your city coin below (Use this coin); then Vicinity's owner approves it on the blockchain."; button("See your city coin", "btn btn--primary", () => goTo("#coin-ready")); }
+      else { note.textContent = brand`Choose your city coin below (Use this coin); then Vicinity's owner approves it on the blockchain.`; button("See your city coin", "btn btn--primary", () => goTo("#coin-ready")); }
     }
     else if (!coin) { note.textContent = `Your coin, your call. Design ${seat.city}'s coin: everyone in ${seat.city} sees it.`; button("Design the city coin", "btn btn--primary", () => goTo("#coin-studio")); }
     else if (coin.launched) { note.textContent = `${seat.city}'s coin is live. Its design is locked for good, as the rules promise.`; button("Manage city coin", "btn btn--primary", () => goTo("#coin", { noAlias: true })); }
@@ -762,8 +781,8 @@
       // the launch card's word (lp.state); none yet (its status on its way, or the launch card could not be shown): LP_PENDING, no button;
       // a status that could not be read ("error": the card says why): LP_PENDING too, never "not approved" from a guess
       const s = lp.on ? lp.state : null;
-      note.textContent = s === "ready" ? "An admin approved your coin. Launch it on the Vicinity launchpad: one signature in your wallet."
-        : s === "launched" ? "Your coin is live on the Vicinity launchpad."
+      note.textContent = s === "ready" ? brand`An admin approved your coin. Launch it on the Vicinity launchpad: one signature in your wallet.`
+        : s === "launched" ? brand`Your coin is live on the Vicinity launchpad.`
           : s === "expired" ? "Your approval expired. Ask an admin to approve your coin again."
             : s === "paused" ? (REVIEW_PAUSE.has(lp.why) && lp.message ? lp.message : "Launches are paused for now. Your approval stays.")
               : s === "not_approved" ? "An admin approves your coin on chain first; your pair must be SOL. Then you launch it here."
@@ -772,7 +791,7 @@
       else if (s) button(s === "ready" ? "Launch your city coin" : s === "launched" ? "See your coin" : "See the launch", s === "ready" ? "btn btn--primary" : "btn btn--glass", () => goTo("#lp-launch"));
       else { go.hidden = true; fcardAction = null; }
     }
-    else if (readyOn()) { note.textContent = "Your coin is made by Vicinity from the city list. Check the coin you chose; Vicinity's owner approves it on the blockchain before it can launch."; button("See your city coin", "btn btn--primary", () => goTo("#coin-ready")); }
+    else if (readyOn()) { note.textContent = brand`Your coin is made by Vicinity from the city list. Check the coin you chose; Vicinity's owner approves it on the blockchain before it can launch.`; button("See your city coin", "btn btn--primary", () => goTo("#coin-ready")); }
     else { note.textContent = "Launch it on Raydium LaunchLab, then add the contract here. An admin (never you) checks and records it."; button("Add the contract", "btn btn--primary", () => goTo("#cs-mint")); }
     $("#fcard-alt").hidden = !((st === "active" || st === "steward") && modOn());
     const meterLink = $("#fcard-meter"); if (meterLink) meterLink.hidden = frozen || st !== "steward";
@@ -847,7 +866,7 @@
     const sol = balances && balances.sol && balances.sol.ui != null ? Number(balances.sol.ui) || 0 : null;
     const rows = [{ key: "SOL", label: "SOL", sub: "Solana", amount: sol, usd: sol != null && solUsd != null ? sol * Number(solUsd) : null }];
     const vic = vicMint || ((items.find((i) => i && i.kind === "vicinity") || {}).mint || null); // /api/coins' live mint, else the portfolio's
-    if (vic) { const a = amountOf(vic); rows.push({ key: vic, label: "$VICINITY", sub: "Vicinity", amount: a, usd: usdOf(vic, a) }); }
+    if (vic) { const a = amountOf(vic); rows.push({ key: vic, label: BRAND ? `${BRAND.name} token` : "$VICINITY", sub: BRAND ? "Main token" : "Vicinity", amount: a, usd: usdOf(vic, a) }); }
     const cityRow = (mint, ticker, source, name, cityName) => {
       const a = amountOf(mint), where = source === "chain" ? " · ticker on chain" : source === "registry" ? " · ticker fixed by the map" : "";
       rows.push({ key: mint, label: ticker ? `$${String(ticker).replace(/^\$/, "")}` : name, sub: `${cityName} city coin${where}`, amount: a, usd: usdOf(mint, a) });

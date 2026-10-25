@@ -6,8 +6,20 @@
  *   2. Resend: RESEND_API_KEY (REST API), EMAIL_FROM sets the sender.
  *
  * `deps.smtpImpl` lets tests fake the whole SMTP conversation; `deps.fetchImpl` fakes Resend.
+ *
+ * The product's name (the label migration, stage S48): the sender's display name and every word of the e-mails come from the label set
+ * (src/brand.js brandOf, fail closed: the Citycoin.dev labels only with pages built for them). With today's label set every e-mail, its
+ * sender and its SMTP greeting are exactly today's. Under another label set:
+ *   - no address of the old name is shown: when the address the mail would go out from carries it (Resend: EMAIL_FROM, or the default
+ *     noreply@vicinity.city; Gmail: GMAIL_USER), e-mail counts as not configured (emailConfigured false, sendMail "email_unavailable"):
+ *     the pages then offer no e-mail step, as they do whenever no sender is set, until the owner sets a sender of the new name
+ *     (a domain the mail provider has verified);
+ *   - the words name the product, never a host to type: the links are the buttons, on the origin the request was served as
+ *     (src/hostbind.js mailOrigin, stage S06) or else src/site-config.js's canonical origin, never written out in the text;
+ *   - the SMTP greeting names the canonical host only when it is not an old name, else an address literal.
  */
 import { brandOf } from "./brand.js";
+import { LEGACY_HOSTS, siteConfig } from "./site-config.js";
 
 const SMTP_TIMEOUT_MS = 12_000;
 
@@ -74,7 +86,24 @@ function rawMessage({ from, to, subject, text }) {
     "Content-Type: text/plain; charset=utf-8", "Content-Transfer-Encoding: 8bit", "", text].join("\r\n");
 }
 
+/** The host the SMTP greeting (EHLO) names: today's "vicinity.city" under today's label set; under another, the canonical host unless it is
+ *  an old name, else "[127.0.0.1]" (an address literal, which RFC 5321 allows a client without a name of its own to send). */
+export function ehloName(env) {
+  if (!brandOf(env).key) return "vicinity.city";
+  const host = siteConfig(env).host;
+  return LEGACY_HOSTS.includes(host) ? "[127.0.0.1]" : host;
+}
+/** Would the mail's visible sender carry the old name under a label set other than today's? (Today's label set: never asked: false.) */
+export function senderShowsOldName(env) {
+  const b = brandOf(env);
+  if (!b.key) return false;
+  const gmail = Boolean(env.GMAIL_USER && env.GMAIL_APP_PASSWORD);
+  const from = gmail ? `${b.senderName} <${env.GMAIL_USER}>` : env.EMAIL_FROM || `${b.senderName} <noreply@vicinity.city>`;
+  return /vicinity/i.test(String(from));
+}
+
 async function sendViaGmail(env, { to, subject, text, html }, smtpImpl) {
+  if (senderShowsOldName(env)) return { ok: false, error: "email_unavailable" };
   const user = env.GMAIL_USER;
   const pass = String(env.GMAIL_APP_PASSWORD || "").replace(/\s+/g, "");
   if (!user || !pass) return { ok: false, error: "email_unavailable" };
@@ -87,10 +116,10 @@ async function sendViaGmail(env, { to, subject, text, html }, smtpImpl) {
     const done = (async () => {
       conn = new Smtp(connect({ hostname: "smtp.gmail.com", port: 587 }));
       await conn.expect(220);
-      await conn.cmd("EHLO vicinity.city", 250);
+      await conn.cmd(`EHLO ${ehloName(env)}`, 250);
       await conn.cmd("STARTTLS", 220);
       await conn.startTls();
-      await conn.cmd("EHLO vicinity.city", 250);
+      await conn.cmd(`EHLO ${ehloName(env)}`, 250);
       await conn.cmd("AUTH LOGIN", 334);
       await conn.cmd(b64(user), 334);
       await conn.cmd(b64(pass), 235);
@@ -110,7 +139,7 @@ async function sendViaGmail(env, { to, subject, text, html }, smtpImpl) {
 }
 
 export async function sendViaResend(env, { to, subject, text, html }, fetchImpl) {
-  if (!env.RESEND_API_KEY) return { ok: false, error: "email_unavailable" };
+  if (!env.RESEND_API_KEY || senderShowsOldName(env)) return { ok: false, error: "email_unavailable" };
   // the display name follows src/brand.js; the address stays on vicinity.city until the mail provider verifies another sending domain
   const from = env.EMAIL_FROM || `${brandOf(env).senderName} <noreply@vicinity.city>`;
   const body = { from, to: [to], subject, text };
@@ -132,13 +161,14 @@ export async function sendMail(env, { to, subject, text, html }, deps = {}) {
   // Defense in depth: whatever the caller checked, never let control characters, spaces or angle brackets
   // reach the SMTP "RCPT TO" line or a mail header.
   if (typeof to !== "string" || !to || /[\u0000-\u0020\u007f-\u009f<>]/.test(to)) return { ok: false, error: "bad_email" };
+  if (senderShowsOldName(env)) return { ok: false, error: "email_unavailable" }; // never a sender of the old name under another label set
   const fetchImpl = deps.fetchImpl || fetch;
   if (env.GMAIL_USER && env.GMAIL_APP_PASSWORD) return sendViaGmail(env, { to, subject, text, html }, deps.smtpImpl || null);
   return sendViaResend(env, { to, subject, text, html }, fetchImpl);
 }
 
-/** E-mail sign-in is on when either sender is configured. */
-export const emailConfigured = (env) => Boolean((env.GMAIL_USER && env.GMAIL_APP_PASSWORD) || env.RESEND_API_KEY);
+/** E-mail sign-in is on when either sender is configured (and, under a label set other than today's, its address does not carry the old name). */
+export const emailConfigured = (env) => Boolean((env.GMAIL_USER && env.GMAIL_APP_PASSWORD) || env.RESEND_API_KEY) && !senderShowsOldName(env);
 
 /** What the code is for: the one phrase of the e-mail that changes. "signin" (the default) is the e-mail as it has always been. */
 const KINDS = {
@@ -153,14 +183,15 @@ export const MAIL_ORIGIN = "https://vicinity.city";
  * The site an e-mail names: { origin, host, eo, eh } (eo and eh HTML-escaped). `origin` is the origin the request was served as
  * (src/hostbind.js mailOrigin: an allowlist entry while the host binding counts, else MAIL_ORIGIN), so a sign-up or session made on
  * citycoin.dev, which is found only there, gets links to citycoin.dev (stage S06 review, finding R3). Anything that is not exactly an
- * http(s) origin with a plain host name (or address) and optional port falls back to MAIL_ORIGIN; with MAIL_ORIGIN every e-mail is byte for
- * byte what it was.
+ * http(s) origin with a plain host name (or address) and optional port falls back to `fallback` (MAIL_ORIGIN for today's e-mails; the
+ * configured canonical origin for the e-mails of another label set, mailLook below); with MAIL_ORIGIN every e-mail is byte for byte what
+ * it was.
  */
-function mailSite(origin) {
+function mailSite(origin, fallback = MAIL_ORIGIN) {
   let u = null;
   try { u = typeof origin === "string" ? new URL(origin) : null; } catch { u = null; }
   const ok = u && (u.protocol === "https:" || u.protocol === "http:") && u.origin === origin && /^(\[[0-9a-f:.]+\]|[a-z0-9.-]+)(:\d+)?$/.test(u.host);
-  const site = ok ? { origin: u.origin, host: u.host } : { origin: MAIL_ORIGIN, host: new URL(MAIL_ORIGIN).host };
+  const site = ok ? { origin: u.origin, host: u.host } : { origin: fallback, host: new URL(fallback).host };
   const esc = (t) => String(t).replace(/[<>&"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[c]));
   return { ...site, eo: esc(site.origin), eh: esc(site.host) };
 }
@@ -168,8 +199,15 @@ function mailSite(origin) {
 /**
  * The verification-code e-mail, branded like the site. Returns { subject, text, html }. The subject is the same for every kind.
  * `origin`: the site the code is to be entered on (mailSite above); left out, today's https://vicinity.city.
+ * `env`: the label set (src/brand.js; left out, or with today's label set, today's e-mail for that origin) and, under another label set
+ * when no usable origin is given, the configured canonical origin the button opens (src/site-config.js).
  */
-export function verificationEmail(code, kind = "signin", origin = MAIL_ORIGIN) {
+export function verificationEmail(code, kind = "signin", origin = undefined, env = {}) {
+  const look = mailLook(env, origin);
+  return look ? brandedVerificationEmail(code, kind, look) : legacyVerificationEmail(code, kind, origin);
+}
+/** Today's verification-code e-mail, byte for byte for an origin (S06: the host the code was asked on). */
+function legacyVerificationEmail(code, kind, origin) {
   const k = KINDS[kind] || KINDS.signin;
   const site = mailSite(origin);
   const subject = `${code} is your Vicinity code`;
@@ -217,9 +255,15 @@ const APP_NAMES = { phantom: "Phantom", solflare: "Solflare", backpack: "Backpac
  * "A wallet was connected to your Vicinity account": sent when a wallet joins an account from ANOTHER browser (a wallet app's own
  * browser, or a pairing), so the owner can say "that wasn't me" within 7 days (src/walletlink.js handleDisown). It holds only the wallet
  * masked ("Abcd…wxyz"), the app it was connected in (a name from the list above, else "A wallet app") and the dashboard link. Returns
- * { subject, text, html }, branded like the code e-mail. `origin`: the site the dashboard link opens (as verificationEmail's).
+ * { subject, text, html }, branded like the code e-mail. `origin`: the site the dashboard link opens; `env`: the label set (both as
+ * verificationEmail's).
  */
-export function walletLinkedEmail(masked, app, origin = MAIL_ORIGIN) {
+export function walletLinkedEmail(masked, app, origin = undefined, env = {}) {
+  const look = mailLook(env, origin);
+  return look ? brandedWalletLinkedEmail(masked, app, look) : legacyWalletLinkedEmail(masked, app, origin);
+}
+/** Today's wallet notice, byte for byte for an origin. */
+function legacyWalletLinkedEmail(masked, app, origin) {
   const who = APP_NAMES[app] || null;
   const site = mailSite(origin);
   const subject = "A wallet was connected to your Vicinity account";
@@ -253,10 +297,15 @@ export function walletLinkedEmail(masked, app, origin = MAIL_ORIGIN) {
  * "Google sign-in was added to your Vicinity account": sent when a member adds Google as a way to log in (src/logins.js googleNotice), so
  * an owner who did not add it hears of it the same day. It names no Google account (we keep only Google's account number, and never put
  * it in a mail) and says the two ways to take it off: Remove in the Profile, or a new password ("Forgot or never set a password?"), which
- * also logs out every browser. Returns { subject, text, html }, branded like the code e-mail. `origin`: the site its links open (as
- * verificationEmail's).
+ * also logs out every browser. Returns { subject, text, html }, branded like the code e-mail. `origin`: the site its links open; `env`:
+ * the label set (both as verificationEmail's).
  */
-export function googleAddedEmail(origin = MAIL_ORIGIN) {
+export function googleAddedEmail(origin = undefined, env = {}) {
+  const look = mailLook(env, origin);
+  return look ? brandedGoogleAddedEmail(look) : legacyGoogleAddedEmail(origin);
+}
+/** Today's Google notice, byte for byte for an origin. */
+function legacyGoogleAddedEmail(origin) {
   const site = mailSite(origin);
   const subject = "Google sign-in was added to your Vicinity account";
   const what = "Google sign-in was added to your Vicinity account: from now on, “Log in with Google” with that Google account opens it.";
@@ -282,5 +331,108 @@ export function googleAddedEmail(origin = MAIL_ORIGIN) {
 </table>
 </td></tr></table>
 </body></html>`;
+  return { subject, text, html };
+}
+
+/* ---------------------------------------------------------------- the e-mails under another label set (BRAND=citycoin) */
+const escHtml = (s) => String(s).replace(/[<>&"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[c]));
+/**
+ * How the e-mails look under a label set other than today's, or null for today's (src/brand.js brandOf, fail closed): the product's name, its
+ * wordmark (the name in lower case with its last part, ".dev", in the brand's gold, as the logo writes it), the tagline, the Civic Atlas
+ * colours (navy text on gold buttons: never white on gold), and the links of the buttons: on the origin the request was served as (`origin`,
+ * src/hostbind.js mailOrigin, as today's e-mails since S06, so a sign-up made on citycoin.dev is mailed links to citycoin.dev), else on the
+ * configured canonical origin (src/site-config.js). The words never write a host out.
+ */
+function mailLook(env, origin) {
+  const b = brandOf(env || {});
+  if (!b.key) return null;
+  const name = b.productName, dot = name.lastIndexOf(".");
+  const lower = name.toLowerCase();
+  const wordmark = dot > 0 ? `${escHtml(lower.slice(0, dot))}<span style="color:#F8C13A;">${escHtml(lower.slice(dot))}</span>` : escHtml(lower);
+  origin = mailSite(origin, siteConfig(env).origin).origin;
+  return { name, esc: escHtml(name), wordmark, tagline: b.tagline, origin, gold: "#F8C13A", onGold: "#0C2344" };
+}
+/** The frame every branded e-mail shares: the wordmark, the tagline, the body rows, one button, the closing line. */
+function brandedHtml(look, { preheader = "", rows, button, closing }) {
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background-color:#060C17;">
+${preheader ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${preheader}</div>\n` : ""}<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#060C17;padding:32px 16px;">
+<tr><td align="center">
+<table width="560" cellpadding="0" cellspacing="0" role="presentation" style="max-width:560px;width:100%;background-color:#0A1322;border:1px solid #1B2A44;border-radius:16px;">
+<tr><td align="center" style="padding:36px 32px 8px;">
+<div style="font-family:'Space Grotesk',Arial,Helvetica,sans-serif;font-size:24px;font-weight:700;letter-spacing:1px;color:#FFFFFF;">${look.wordmark}</div>
+<div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;letter-spacing:3px;color:#8A97AD;margin-top:10px;">${escHtml(look.tagline.toUpperCase().replace(/\.\s*/g, " · ").replace(/ · $/, ""))}</div>
+</td></tr>
+${rows}
+<tr><td align="center" style="padding:18px 32px 36px;">
+<a href="${escHtml(button.href)}" style="display:inline-block;background-color:${look.gold};color:${look.onGold};font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:700;text-decoration:none;padding:13px 40px;border-radius:999px;">${escHtml(button.text)}</a>
+</td></tr>
+${closing ? `<tr><td align="center" style="padding:0 48px 32px;">
+<div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.8;color:#5A6B87;">${closing}</div>
+</td></tr>
+` : ""}</table>
+</td></tr></table>
+</body></html>`;
+}
+const signature = (look) => `— ${look.name} · ${look.tagline}`;
+
+/** The verification-code e-mail under another label set: the same code and kinds, the product's name, no host written out. */
+function brandedVerificationEmail(code, kind, look) {
+  const k = KINDS[kind] || KINDS.signin;
+  const subject = `${code} is your ${look.name} code`;
+  const text = `Your ${look.name} ${k.name} is ${code}.\n\nEnter it on ${look.name}, where you asked for it. It expires in 10 minutes.\nIf you didn't ask for this, just ignore this email.\n\n${signature(look)}`;
+  const esc = escHtml(code);
+  const html = brandedHtml(look, {
+    preheader: `Your ${look.esc} ${k.name} is ${esc}. It expires in 10 minutes.`,
+    rows: `<tr><td align="center" style="padding:28px 32px 4px;">
+<div style="font-family:Arial,Helvetica,sans-serif;font-size:16px;color:#E8EDF5;">${k.Name}</div>
+</td></tr>
+<tr><td align="center" style="padding:12px 32px;">
+<table cellpadding="0" cellspacing="0" role="presentation"><tr><td align="center" style="background-color:#0F1C31;border:1px solid ${look.gold};border-radius:12px;padding:18px 36px;">
+<div style="display:inline-block;font-family:'Courier New',Courier,monospace;font-size:44px;font-weight:700;letter-spacing:10px;padding-left:10px;color:${look.gold};">${esc}</div>
+</td></tr></table>
+</td></tr>
+<tr><td align="center" style="padding:14px 48px 4px;">
+<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.7;color:#8A97AD;">Enter this code on ${look.esc} to ${k.finish}.<br>It expires in <b style="color:#E8EDF5;">10 minutes</b>.</div>
+</td></tr>`,
+    button: { href: `${look.origin}/connect`, text: "Enter code" },
+    closing: `If you didn't request this code, you can safely ignore this email.<br>&copy; 2026 ${look.esc}`,
+  });
+  return { subject, text, html };
+}
+
+/** The wallet notice under another label set. */
+function brandedWalletLinkedEmail(masked, app, look) {
+  const who = APP_NAMES[app] || null;
+  const subject = `A wallet was connected to your ${look.name} account`;
+  const what = who ? `${who} (wallet ${masked}) was connected to your ${look.name} account.` : `The wallet ${masked} was connected to your ${look.name} account.`;
+  const text = `${what} If that was you, there's nothing to do.\n\nIf it wasn't you, open your ${look.name} dashboard within 7 days and tap “Remove it”.\n\n${signature(look)}`;
+  const html = brandedHtml(look, {
+    rows: `<tr><td align="center" style="padding:24px 40px 4px;">
+<div style="font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.6;color:#E8EDF5;">${escHtml(what)}</div>
+</td></tr>
+<tr><td align="center" style="padding:10px 48px 4px;">
+<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.7;color:#8A97AD;">If that was you, there's nothing to do.<br>If it wasn't you, open your dashboard within <b style="color:#E8EDF5;">7 days</b> and tap “Remove it”.</div>
+</td></tr>`,
+    button: { href: `${look.origin}/dashboard`, text: "Open my dashboard" },
+  });
+  return { subject, text, html };
+}
+
+/** The Google notice under another label set. */
+function brandedGoogleAddedEmail(look) {
+  const subject = `Google sign-in was added to your ${look.name} account`;
+  const what = `Google sign-in was added to your ${look.name} account: from now on, “Log in with Google” with that Google account opens it.`;
+  const fix = `If it wasn't you, set a new password: on ${look.name} tap Log in, then “Forgot or never set a password?”. That logs out every browser and removes this Google sign-in. Or open your dashboard, Profile, Google sign-in, and tap “Remove”.`;
+  const text = `${what} If that was you, there's nothing to do.\n\n${fix}\n\n${signature(look)}`;
+  const html = brandedHtml(look, {
+    rows: `<tr><td align="center" style="padding:24px 40px 4px;">
+<div style="font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.6;color:#E8EDF5;">${escHtml(what)}</div>
+</td></tr>
+<tr><td align="center" style="padding:10px 48px 4px;">
+<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.7;color:#8A97AD;">If that was you, there's nothing to do.<br>If it wasn't you, set a new password: on ${look.esc} tap Log in, then “Forgot or never set a password?”. That logs out every browser and removes this Google sign-in.</div>
+</td></tr>`,
+    button: { href: `${look.origin}/connect?mode=login`, text: `Open ${look.name}` },
+  });
   return { subject, text, html };
 }

@@ -15,6 +15,7 @@
 import { test, beforeEach, after } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { sourceAs } from "../scripts/pages/build.mjs";
 import { IN_UTICA, MINT, browser, newWorld, person, realClock, useClock } from "./helpers/world.js";
 import { CITY_COIN, LP, dexMock, seedCoin, seedSeat } from "./helpers/launchpad.js";
 import { DEMOV, DEMOV_COIN, LP_ON, PROGRAM, REWARDS, SOL_CONFIG, addr, lpChain, meteoraAsTested } from "./helpers/lpchain.js";
@@ -371,7 +372,7 @@ test("no page makes a ticker up from a city's name (dashboards, member pass, Buy
   assert.ok(swap.includes("t.kind === \"city\" ? (t.symbol ? `$${String(t.symbol).replace(/^\\$/, \"\")}` : t.name || \"city coin\")"), "the Buy panel's symbol");
   assert.doesNotMatch(swap, /\|\| "COIN"/);
   assert.ok(coin.includes("const ticker = str(c.ticker) ? `$${str(c.ticker)}` : str(c.name) || \"city coin\";"), "the coin page's header");
-  assert.ok(coin.includes("document.title = `${str(d.coin.ticker) ? `$${str(d.coin.ticker)}` : str(d.coin.name) || \"City coin\"}: live price, chart and holders · Vicinity`;"), "the coin page's title");
+  assert.ok(coin.includes("document.title = brand`${str(d.coin.ticker) ? `$${str(d.coin.ticker)}` : str(d.coin.name) || \"City coin\"}: live price, chart and holders · Vicinity`;"), "the coin page's title");
   assert.doesNotMatch(coin, /\|\| "COIN"|\|\| "Coin"\}/);
   // the member pass: the server's ticker (else the initial) on the disc, and the portfolio's $ only with a tickerSource
   const prof = read("public/profile.js");
@@ -412,6 +413,6 @@ test("the rules page: the one sentence is in the live Never list (/api/policy, w
   assert.ok((await browser(newWorld()).get("/api/policy")).policy.never.includes(sentence), "and /api/policy carries it");
   assert.match(read("public/rules.js"), /\$\("#never-list"\)\.replaceChildren\(\.\.\.p\.never\.map/, "the page repaints the list from the live rules (so the static list alone would not have shown it)");
   assert.ok(read("public/rules.html").includes(`<li>${sentence}</li>`), "the same sentence is the static fallback");
-  assert.equal(read("scripts/pages/src/rules.html").includes(sentence), true, "from the source the build reads");
+  assert.equal(sourceAs("rules.html", read("scripts/pages/src/rules.html")).includes(sentence), true, "from the source the build reads (BRAND unset)");
   assert.doesNotMatch(sentence, /risk|warning|moon|rocket/i, "no warning, no hype");
 });

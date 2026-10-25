@@ -20,3 +20,24 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+
+  # The BRAND=citycoin switch, tried before anyone sets it (review finding F2 of the Citycoin.dev rebrand stage): this runner's own copy of
+  # wrangler.jsonc gets the switch and the prerequisites the page build asks for (scripts/brand/switch-trial.mjs; a clearly fake sender
+  # address), then the same `npm run build` as above: the Citycoin.dev pages are built (the build refuses any page that still says
+  # "vicinity"), checked against that wrangler.jsonc (test/build-parity.test.js), and the whole suite runs, today's site through its
+  # stand-in (test/helpers/today-build.mjs). Nothing is committed or deployed from here. Once wrangler.jsonc itself carries BRAND=citycoin
+  # with its prerequisites (the configuration pull request and every one after it), the trial writes nothing and says so (exit 0), and the
+  # build below builds the committed switch; a half-set or inconsistent wrangler.jsonc still fails here, with the reason.
+  brand-switch-trial:
+    runs-on: ubuntu-latest
+    env:
+      NODE_OPTIONS: --unhandled-rejections=strict
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node scripts/brand/switch-trial.mjs
+      - run: npm run build

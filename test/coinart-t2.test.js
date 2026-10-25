@@ -43,10 +43,21 @@ test("t1 is byte for byte what edabab5 drew: one digest over the t1 SVG of every
   assert.equal(sha(lines.join("\n")), LEGACY.t1Registry.digest, "every stored t1 picture still has the SVG it was drawn from");
 });
 
-test("src/coinart.js is as it was: t1 only, t1 the default, the same template numbers, fonts and renderer as at edabab5", () => {
-  assert.deepEqual(Object.keys(TEMPLATES), ["t1"]);
+// Relaxed by the rebrand stage (final check finding 1): src/coinart.js also holds the Citycoin.dev label set's own template (t1c, t1 with
+// the CITYCOIN.DEV arc; test/coinart.test.js pins it). What S22 needs stays pinned: t1 is byte for byte edabab5's and the default, no
+// id there is one of S22's, and S22's t2 is untouched (its golden hashes below).
+test("src/coinart.js keeps t1 as at edabab5: the default, the same template numbers, fonts and renderer; any other template there is never an id of S22's", () => {
+  assert.deepEqual(Object.keys(LEGACY.coinart.TEMPLATES), ["t1"], "edabab5 had t1 only");
   assert.equal(TEMPLATE_VERSION, "t1");
-  assert.deepEqual(JSON.parse(JSON.stringify(TEMPLATES)), LEGACY.coinart.TEMPLATES);
+  assert.deepEqual(JSON.parse(JSON.stringify(TEMPLATES.t1)), LEGACY.coinart.TEMPLATES.t1);
+  assert.equal(Object.keys(TEMPLATES)[0], "t1");
+  const others = Object.keys(TEMPLATES).filter((id) => id !== "t1");
+  for (const id of others) {
+    assert.ok(!Object.hasOwn(ART_TEMPLATES, id) && id !== "t3", `${id}: not S22's t2, nor the t3 it keeps for its next version`);
+    assert.throws(() => artTemplate(id), /unknown template version/, `${id}: S22's art registry does not take it`);
+  }
+  assert.ok(!Object.hasOwn(TEMPLATES, "t2"), "S22's t2 is defined only here, in src/coinart-t2.js");
+  assert.deepEqual(Object.keys(ART_TEMPLATES), ["t1", "t2"]);
   assert.equal(ART_TEMPLATES.t1, TEMPLATES.t1, "t1 is the same frozen object, not a copy");
   assert.equal(artTemplate("t2"), T2);
   for (const bad of ["t3", "T2", "", undefined, "toString", "__proto__"]) assert.throws(() => artTemplate(bad), /unknown template version/, String(bad));

@@ -16,6 +16,11 @@
 // Needs window.V (site.js) and window.VW (wallets.js). Nothing here runs when the switch is off (/api/official has no swap key).
 (() => {
   "use strict";
+  // The product's names in this file's words (the label migration, area b). A page built for a label set other than today's carries the
+  // set on <html> (data-brand, data-brand-name, data-brand-domain: scripts/pages/build.mjs writes them from src/brand.js); brand`…` puts
+  // those names in a text's own words, never in a value put into it. A page without them (today's pages) gets every text exactly as written.
+  const BRAND = (() => { try { const r = document.documentElement, at = (k) => (r && typeof r.getAttribute === "function" ? r.getAttribute(k) : null); return at("data-brand") && at("data-brand-name") && at("data-brand-domain") ? Object.freeze({ key: at("data-brand"), name: at("data-brand-name"), domain: at("data-brand-domain") }) : null; } catch { return null; } })();
+  const brand = (s, ...v) => s.reduce((out, part, i) => out + (BRAND ? part.replace(/vicinity\.city/g, () => BRAND.domain).replace(/Vicinity/g, () => BRAND.name) : part) + (i < v.length ? String(v[i]) : ""), "");
   if (typeof window === "undefined" || !window.V) return;
   const { $, $$, el, api, toast, copy, isAddr } = window.V;
   const W = () => window.VW;
@@ -129,7 +134,7 @@
     alt_mismatch: "The route's account table did not match the chain, so nothing was built. Try again.",
     alt_missing: "The route's account table was not found on the chain, so nothing was built. Try again.",
     swap_unavailable: "Swapping is not available right now. Try again in a minute.",
-    bad_origin: "Please open vicinity.city directly and try again.",
+    bad_origin: BRAND ? "Please open the site directly and try again." : "Please open vicinity.city directly and try again.",
     wallet_devnet: "Switch your wallet to devnet for this test coin.",
     no_send: "This wallet can sign messages here but not transactions: open this page in Phantom, Solflare or Backpack.",
   };
@@ -183,7 +188,10 @@
   /** The graduated city coin whose pool this quote trades through (a Jupiter route with a Meteora DAMM v2 hop), or null: decided by the route and the coin's stage, never by whether its fee figure has loaded. */
   const poolCoin = (q, s) => (q && q.source !== "curve" && viaMeteoraPool(q) ? graduatedCoin(s) : null);
   // a city coin: the server's ticker (the chain's once launched, else the city list's) with its "$"; one without a ticker goes by its name, plain (nothing here makes a ticker up)
-  const symbolOf = (mint, fallback) => { const t = tokenOf(mint); return t ? (t.kind === "vicinity" ? "$VICINITY" : t.kind === "city" ? (t.symbol ? `$${String(t.symbol).replace(/^\$/, "")}` : t.name || "city coin") : t.symbol) : fallback || shortAddr(mint); };
+  // the site's main token by name: "$VICINITY" on today's pages; on a page built for another label set its own symbol or name as the Worker
+  // lists it (the legacy token is never listed there: src/swap.js handleSwapConfig)
+  const mainLabel = (t) => (BRAND ? (t.symbol ? `$${String(t.symbol).replace(/^\$/, "")}` : t.name || "Main token") : "$VICINITY");
+  const symbolOf = (mint, fallback) => { const t = tokenOf(mint); return t ? (t.kind === "vicinity" ? mainLabel(t) : t.kind === "city" ? (t.symbol ? `$${String(t.symbol).replace(/^\$/, "")}` : t.name || "city coin") : t.symbol) : fallback || shortAddr(mint); };
   const decimalsOf = (mint) => { const t = tokenOf(mint); return t ? t.decimals : 6; };
   // silent: connected by the page itself inside a wallet app (connectSilently below), not by a tap on this page
   // checking: the wallet app is being asked silently and may still connect the panels (the button says CHECKING, still)
@@ -932,7 +940,7 @@
           // a phone with no wallet on the page: buying happens inside the wallet app, this very page opened there with the trade
           // filled in (no sign-up, no login); the app this person opened last comes first
           const lead = el("p", "small swap__lead", ""); lead.setAttribute("tabindex", "-1"); // where the keyboard and a screen reader land
-          this.share.push(() => { lead.textContent = `Buying happens in your wallet app. Tap yours: Vicinity opens there${this.carries() ? " with this amount filled in" : ""}.`; });
+          this.share.push(() => { lead.textContent = brand`Buying happens in your wallet app. Tap yours: Vicinity opens there${this.carries() ? " with this amount filled in" : ""}.`; });
           box.append(lead, this.appLinks());
           const ph = this.phantomBuy(); if (ph) box.append(ph);
           if (this.s.out) { const ca = el("p", "tiny muted swap__ca"); ca.append("Contract: ", el("code", null, this.s.out), " "); const c = el("button", "link-btn", "Copy"); c.type = "button"; c.addEventListener("click", () => copy(this.s.out, "Address copied")); ca.append(c); box.append(ca); }
@@ -1012,7 +1020,7 @@
       const a = el("a", "wallet-option swap__phantom-link", null); a.setAttribute("href", phantomFungible(m)); a.setAttribute("rel", "noopener");
       a.append(W().mark("Phantom"), el("span", null, `See ${symbolOf(m)} in the Phantom app`), el("span", "go", "↗"));
       a.addEventListener("click", () => rememberApp("phantom"));
-      wrap.append(a, el("p", "tiny muted", "Phantom's own page: buy it there with Phantom's swap. Vicinity is not involved."));
+      wrap.append(a, el("p", "tiny muted", brand`Phantom's own page: buy it there with Phantom's swap. Vicinity is not involved.`));
       return wrap;
     }
     /**
@@ -1025,7 +1033,7 @@
       wrap.append(say, spot);
       let want = "";
       this.share.push((url) => {
-        say.textContent = `${none ? "No wallet here? " : ""}Scan with your phone's camera: Vicinity opens there${this.carries() ? " with this amount filled in" : ""}.`;
+        say.textContent = brand`${none ? "No wallet here? " : ""}Scan with your phone's camera: Vicinity opens there${this.carries() ? " with this amount filled in" : ""}.`;
         if (url === want) return;
         want = url;
         loadQR().then((ok) => {
@@ -1061,7 +1069,7 @@
       const draw = (rows) => {
         list.replaceChildren(...rows.map((t) => {
           const b = el("button", "wallet-option swap__opt"); b.type = "button"; b.setAttribute("role", "option");
-          b.append(mark(t.mint, t.symbol || t.name), el("span", null, t.kind === "vicinity" ? "$VICINITY" : t.kind === "city" ? `${t.name}` : t.symbol), el("span", "go", t.kind === "city" ? (t.city ? t.city.name : "city coin") : t.name));
+          b.append(mark(t.mint, t.symbol || t.name), el("span", null, t.kind === "vicinity" ? mainLabel(t) : t.kind === "city" ? `${t.name}` : t.symbol), el("span", "go", t.kind === "city" ? (t.city ? t.city.name : "city coin") : t.name));
           b.addEventListener("click", () => {
             if (this.locked) return; // a trade on its way: its pair stays
             this.note.hidden = true;
@@ -1276,7 +1284,7 @@
       // Pool fee row: the sentence holds while the figure is still loading or did not come, and on a route split with another venue
       const onPool = Boolean(poolCoin(q, s));
       const jupFee = feeBps ? ` and takes a ${(feeBps / 100).toString()}% platform fee` : onPool ? " and adds no platform fee" : " and takes no fee";
-      this.foot.textContent = (q && q.source === "curve") ? `Prices by the Meteora bonding curve, exactly as the chain computes them. You sign in your own wallet; Vicinity never touches your funds.${testNet}` : `Powered by Jupiter. You sign in your own wallet; Vicinity never touches your funds${jupFee}${onPool ? "; if the route uses this coin's own Meteora pool, Vicinity's locked share of it earns part of that pool's fee" : ""}.${testNet}`;
+      this.foot.textContent = (q && q.source === "curve") ? brand`Prices by the Meteora bonding curve, exactly as the chain computes them. You sign in your own wallet; Vicinity never touches your funds.${testNet}` : brand`Powered by Jupiter. You sign in your own wallet; Vicinity never touches your funds${jupFee}${onPool ? brand`; if the route uses this coin's own Meteora pool, Vicinity's locked share of it earns part of that pool's fee` : ""}.${testNet}`;
     }
   }
   const norm = (m) => (m === "SOL" ? SOL : m === "USDC" ? USDC : m === "USDT" ? USDT : isAddr(m) ? m : null);
@@ -1344,21 +1352,26 @@
   // With the switch off the pages keep their words exactly. Each entry: the page (body[data-page]), the element, what its text must
   // still say today (a sentence someone rewrote is left alone), and the new text or a function that rewrites the element.
   const link = (href, text) => { const a = el("a", null, text); a.setAttribute("href", href); return a; };
-  const OLD_TRADE_SENTENCE = /You trade in your own wallet on Raydium or Jupiter; Vicinity never touches your funds\./;
-  const NEW_TRADE_SENTENCE = "You buy and sell here, in your own wallet (routed by Jupiter, executed on Raydium LaunchLab or the Meteora curve); Vicinity never touches your funds.";
+  // the launchpad page's sentence as its build wrote it (the product's name from <html>, so a renamed page is found too)
+  const OLD_TRADE_SENTENCE = BRAND ? new RegExp(brand`You trade in your own wallet on Raydium or Jupiter; Vicinity never touches your funds.`.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    : /You trade in your own wallet on Raydium or Jupiter; Vicinity never touches your funds\./;
+  const NEW_TRADE_SENTENCE = brand`You buy and sell here, in your own wallet (routed by Jupiter, executed on Raydium LaunchLab or the Meteora curve); Vicinity never touches your funds.`;
+  // the home page's and the token page's sentences send people to the legacy token's Buy panel: rewritten on today's pages only (a page built
+  // for another label set has none of them, and its /token page is the plain "not live yet" one: copySweep skips them there)
+  const HOME_BUY_TAIL = BRAND ? "" : ": the Buy panel quotes through Jupiter and executes on Raydium LaunchLab, signed in your own wallet, so you get the real $VICINITY without leaving vicinity.city.";
   /** Replace a sentence inside an element's own text, leaving its links (Powered by Jupiter and the like) alone. */
   const replaceSentence = (e, from, to) => { for (const n of Array.from(e.childNodes)) if (!n.tagName && from.test(String(n.data))) n.data = String(n.data).replace(from, to); };
   const COPY = [
     ["home", ".buy-steps h3", /^Buy on Raydium$/, "Buy here"],
-    ["home", ".buy-steps p", /Buy on Raydium/, (p) => p.replaceChildren("Right here, on our ", link("/token#buy-slot", "Token page"), ": the Buy panel quotes through Jupiter and executes on Raydium LaunchLab, signed in your own wallet, so you get the real $VICINITY without leaving vicinity.city.")],
+    ["home", ".buy-steps p", /Buy on Raydium/, (p) => p.replaceChildren("Right here, on our ", link("/token#buy-slot", "Token page"), HOME_BUY_TAIL)],
     ["home", "#buy-faq p", /Buy on Raydium/, (p) => p.replaceChildren("Get a Solana wallet (Phantom, Solflare or Backpack), add SOL, then use the Buy panel on the ", link("/token#buy-slot", "Token page"), ". It quotes through Jupiter and executes on Raydium LaunchLab, signed in your own wallet; you never leave this site. Look-alike sites that copy Raydium are scams that empty wallets.")],
-    ["token", "#buy li", /^Buy on Raydium\./, (li) => li.replaceChildren(el("strong", null, "Buy here."), " Use the Buy panel at the top of this page: it quotes through Jupiter and executes on Raydium LaunchLab, signed in your own wallet. You never leave vicinity.city.")],
+    ["token", "#buy li", /^Buy on Raydium\./, (li) => li.replaceChildren(el("strong", null, "Buy here."), brand` Use the Buy panel at the top of this page: it quotes through Jupiter and executes on Raydium LaunchLab, signed in your own wallet. You never leave vicinity.city.`)],
     ["launchpad", "#lp-honesty", OLD_TRADE_SENTENCE, (p) => replaceSentence(p, OLD_TRADE_SENTENCE, NEW_TRADE_SENTENCE)],
   ];
   function copySweep() {
     const page = document.body && document.body.dataset ? document.body.dataset.page : "";
     for (const [p, sel, test, apply] of COPY) {
-      if (p !== page) continue;
+      if (p !== page || (BRAND && p !== "launchpad")) continue;
       for (const e of Array.from($$(sel))) {
         if (e.dataset.swapCopy || !test.test(e.textContent)) continue;
         e.dataset.swapCopy = "1";

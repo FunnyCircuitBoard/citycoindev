@@ -12,6 +12,14 @@
 // (the chain's symbol once launched, else the city list's): this file never makes one up from the city's name.
 (() => {
   "use strict";
+  // The product's names in this file's words (the label migration, area b). A page built for a label set other than today's carries the
+  // set on <html> (data-brand, data-brand-name, data-brand-domain: scripts/pages/build.mjs writes them from src/brand.js); brand`…` puts
+  // those names in a text's own words, never in a value put into it. A page without them (today's pages) gets every text exactly as written.
+  const BRAND = (() => { try { const r = document.documentElement, at = (k) => (r && typeof r.getAttribute === "function" ? r.getAttribute(k) : null); return at("data-brand") && at("data-brand-name") && at("data-brand-domain") ? Object.freeze({ key: at("data-brand"), name: at("data-brand-name"), domain: at("data-brand-domain") }) : null; } catch { return null; } })();
+  const brand = (s, ...v) => s.reduce((out, part, i) => out + (BRAND ? part.replace(/vicinity\.city/g, () => BRAND.domain).replace(/Vicinity/g, () => BRAND.name) : part) + (i < v.length ? String(v[i]) : ""), "");
+  // the site's main token in this file's words: "$VICINITY" on today's pages; a page built for another label set names its own token (the
+  // legacy one is shown nowhere there, and while that token is not live /api/me says launched false: no rank, holding or Buy is offered)
+  const UNIT = BRAND ? `${BRAND.name} tokens` : "$VICINITY", MAIN = BRAND ? `${BRAND.name} token` : "$VICINITY";
   const { $, $$, el, api, toast, copy, fmt, compact, mask, short, ago, initials, getLocation, burst, reveal, isAddr, logout } = window.V;
   const W = window.VW;
   // the wallet app this person uses on this phone, and the one whose browser this is (site.js): null on a computer and in Safari
@@ -58,7 +66,8 @@
   // let historical rules authorize new actions"): no claim, application, endorsement, objection, vote, squad or resignation is offered (their
   // routes answer 410), and no old founder rule (the seven-day hold, the founder amount, the Seed Steward probation, grace, elections) is told as
   // current. A seat or a term on record is shown as recorded. Without the key (today) every line below reads as before.
-  const seatsFrozen = (d = me) => Boolean(d && d.legacySeats === "frozen");
+  // (a page built for another label set is always built with the legacy seats frozen (scripts/pages/build.mjs pageBrandPrerequisites))
+  const seatsFrozen = (d = me) => Boolean(BRAND) || Boolean(d && d.legacySeats === "frozen");
   // the legacy launch path closed (LEGACY_LAUNCH=off: /api/me says legacyLaunch "off"; Citycoin.dev master v5 stage S23): the coin studio is not
   // shown (its route answers 410), the coin card says the closed line until a coin has launched, and the old-contract queue offers Reject only.
   // Without the key (today) every line below reads as before.
@@ -285,7 +294,7 @@
   function showWelcome(d) {
     // an e-mail account has no name yet (the server calls it "E-mail member"): the card greets the city alone
     const u = d.user, c = d.community, box = $("#welcome"), who = u.provider === "email" ? "" : firstName(u);
-    $("#welcome-title").textContent = `Welcome to ${u.home ? u.home.name : "Vicinity"}${who ? `, ${who}` : ""}.`;
+    $("#welcome-title").textContent = `Welcome to ${u.home ? u.home.name : brand`Vicinity`}${who ? `, ${who}` : ""}.`;
     $("#welcome-line").textContent = (c && c.memberNumber ? `You are member #${fmt(c.memberNumber)} here. ` : "Your dashboard is live. ")
       + (u.wallet ? "Your profile is complete." : "Two of three steps done: link a wallet whenever you like.");
     if (c) discText($("#welcome-disc"), coinDisc(c)); else $("#welcome-disc").textContent = "📍";
@@ -356,7 +365,7 @@
     $("#wcard-title").textContent = "Connect your wallet";
     $("#wcard-lead").textContent = phone ? `${k ? k.name : "Your wallet app"} opens. Approve once, and you stay there, logged in.`
       : fold ? (seatsFrozen(d) ? "Free, one signature. Unlocks your holdings, rank and badges." : "Free, one signature. Unlocks your holdings, rank, badges and the founder path.")
-      : "Free: one signature, not a transaction. Vicinity never asks for your recovery phrase or private key.";
+      : brand`Free: one signature, not a transaction. Vicinity never asks for your recovery phrase or private key.`;
     const waiting = linkStarted();
     $("#wcard-wait").hidden = !waiting;
     if (waiting) { $("#wcard-wait-text").textContent = `Waiting for ${app || "your wallet"}…`; startLinkPoll(); } else stopLinkPoll();
@@ -371,9 +380,11 @@
     cardReset(card); card.classList.add("is-done"); card.classList.remove("wcard--folded");
     // ("Phantom connected ✓" only when nobody needs to ask "was this you?": while the notice shows, a neutral kicker; the note under the
     // button names the wallet itself. Never the wallet in the kicker: it is set in capitals, and a wallet address is case-sensitive.)
-    $("#wcard-kicker").textContent = wn && wn.notMe ? "New wallet on your account" : wn ? `${k ? k.name : "Wallet"} connected ✓` : "Buy $VICINITY";
-    $("#wcard-title").textContent = k ? `Buy in ${k.name}` : "Buy in your wallet app";
-    $("#wcard-lead").textContent = k ? `Opens Vicinity inside ${k.name}, logged in. You buy there.` : "Pick the wallet app you use: it opens Vicinity there, logged in. You buy there.";
+    // (a page built for another label set names no token to buy: the card opens the site in the wallet app, where the coins are bought)
+    $("#wcard-kicker").textContent = wn && wn.notMe ? "New wallet on your account" : wn ? `${k ? k.name : "Wallet"} connected ✓` : BRAND ? "Open in your wallet app" : "Buy $VICINITY";
+    $("#wcard-title").textContent = BRAND ? (k ? `Open in ${k.name}` : "Open in your wallet app") : k ? `Buy in ${k.name}` : "Buy in your wallet app";
+    $("#wcard-lead").textContent = BRAND ? (k ? brand`Opens Vicinity inside ${k.name}, logged in.` : brand`Pick the wallet app you use: it opens Vicinity there, logged in.`)
+      : k ? brand`Opens Vicinity inside ${k.name}, logged in. You buy there.` : brand`Pick the wallet app you use: it opens Vicinity there, logged in. You buy there.`;
     $("#wcard-perks").hidden = true; $("#wcard-tiny").hidden = true; $("#wcard-skip").hidden = true; $("#wcard-actions").hidden = false;
     go.hidden = !k;
     if (k) { go.textContent = `Open ${k.name}`; go.href = openIn(k); go.dataset.app = k.id; }
@@ -381,6 +392,7 @@
     appChips($("#wcard-apps"), k ? k.id : null); $("#wcard-apps").hidden = Boolean(k);
     if (wn && wn.notMe) noteLine(wn);
   }
+  const hostHere = () => { try { return location.host || "this site's address"; } catch { return "this site's address"; } };
   /** Inside the wallet app: connected, who is logged in, and how to come back here next time (until the person puts the tip away). */
   function tipCard(card, u, k) {
     cardReset(card); card.classList.add("is-done", "wcard--folded");
@@ -389,7 +401,8 @@
     $("#wcard-title").textContent = `${k.name} connected ✓`;
     $("#wcard-lead").textContent = u.handle ? `You're logged in as @${u.handle}.` : "You're logged in.";
     $("#wcard-perks").hidden = true; $("#wcard-actions").hidden = true; $("#wcard-tiny").hidden = true;
-    $("#wcard-tip-text").textContent = `Next time: open ${k.name}, open its browser and type vicinity.city. You'll still be logged in. Save it there to make it one tap.`;
+    // the address to type is the one serving this page (never a host that does not serve the site yet); today's pages keep their words
+    $("#wcard-tip-text").textContent = `Next time: open ${k.name}, open its browser and type ${BRAND ? hostHere() : "vicinity.city"}. You'll still be logged in. Save it there to make it one tap.`;
     $("#wcard-tip").hidden = false;
   }
   /** A computer (or any older browser of the account) after a wallet joined from a wallet app: what joined, when, and "Remove it". */
@@ -454,7 +467,7 @@
   async function removeWallet() {
     const wn = me && me.walletNew; if (!wn) return;
     const k = appNamed(wn.app);
-    if (!confirm(`Remove this wallet (${wn.wallet}) from your account? ${k ? k.name : "The wallet app"} will be logged out of Vicinity.`)) return;
+    if (!confirm(brand`Remove this wallet (${wn.wallet}) from your account? ${k ? k.name : "The wallet app"} will be logged out of Vicinity.`)) return;
     const r = await api("/api/me/wallet/disown", {});
     if (r.ok) { toast(r.passwordCleared ? "Wallet removed. Other browsers are logged out. Set a new password with “Forgot password”." : "Wallet removed. Other browsers are logged out."); linkedNow = false; await refresh(); return; }
     if (r.error === "relogin") { await logout("/connect?mode=login&error=relogin"); return; } // a fresh login first (a stolen old cookie can't)
@@ -467,11 +480,12 @@
     const li = $("#ob-rank"), t = $("#ob-rank-text"), h = d.holding;
     li.classList.toggle("is-ok", Boolean(d.user.wallet));
     if (!d.user.wallet) t.textContent = "Link a wallet from your dashboard to see your position among all holders. Free, one signature.";
-    else if (!d.launched) t.textContent = "Ranks go live the moment $VICINITY launches. You joined before launch: 🌱 Early member badge unlocked.";
-    else if (h.rank) t.textContent = `#${fmt(h.rank)} of ${fmt(h.total)} holders · top ${pctText(h.percentile)}% · ${fmt(h.amount)} $VICINITY`;
-    else if (h.team) t.textContent = `${fmt(h.amount)} $VICINITY · team wallet, not ranked`;
-    else if (h.amount > 0) t.textContent = `${fmt(h.amount)} $VICINITY`;
-    else t.textContent = "This wallet doesn't hold $VICINITY yet. You can still join your city; holding unlocks posting, voting and your rank.";
+    // (a page built for another label set claims no Early member badge here: that badge is history, and /api/me's badges say who has it)
+    else if (!d.launched) t.textContent = BRAND ? `The ${BRAND.name} token is not live yet, so there are no ranks yet.` : "Ranks go live the moment $VICINITY launches. You joined before launch: 🌱 Early member badge unlocked.";
+    else if (h.rank) t.textContent = `#${fmt(h.rank)} of ${fmt(h.total)} holders · top ${pctText(h.percentile)}% · ${fmt(h.amount)} ${UNIT}`;
+    else if (h.team) t.textContent = `${fmt(h.amount)} ${UNIT} · team wallet, not ranked`;
+    else if (h.amount > 0) t.textContent = `${fmt(h.amount)} ${UNIT}`;
+    else t.textContent = `This wallet doesn't hold ${UNIT} yet. You can still join your city; holding unlocks posting, voting and your rank.`;
     $("#ob-locate").addEventListener("click", findHome);
     $("#ob-enter").addEventListener("click", () => location.assign("/dashboard"));
   }
@@ -522,9 +536,9 @@
 
     // without a wallet there is nothing to hold or rank: the two tiles point at the link instead
     $("#d-amount").textContent = d.launched && linked ? compact(h.amount) : "—";
-    $("#d-amount-sub").textContent = !linked ? "link a wallet" : d.launched ? `${fmt(h.amount)} $VICINITY` : "live at launch";
+    $("#d-amount-sub").textContent = !linked ? "link a wallet" : d.launched ? `${fmt(h.amount)} ${UNIT}` : BRAND ? "not live yet" : "live at launch";
     $("#d-rank").textContent = h.rank ? `#${fmt(h.rank)}` : "—";
-    $("#d-rank-sub").textContent = h.rank ? `of ${fmt(h.total)} holder${h.total === 1 ? "" : "s"}` : !linked ? "link a wallet" : d.launched ? (h.team ? "team wallet, not ranked" : h.amount > 0 ? "ranking…" : "not holding yet") : "live at launch";
+    $("#d-rank-sub").textContent = h.rank ? `of ${fmt(h.total)} holder${h.total === 1 ? "" : "s"}` : !linked ? "link a wallet" : d.launched ? (h.team ? "team wallet, not ranked" : h.amount > 0 ? "ranking…" : "not holding yet") : BRAND ? "not live yet" : "live at launch";
     $("#d-city-label").textContent = home ? home.name : "your city";
     $("#d-country-label").textContent = n ? countryName(n.country) : "your country";
     $("#d-crank").textContent = c && c.rank ? `#${c.rank}` : "—";
@@ -544,7 +558,7 @@
     const alert = $("#lost-alert");
     const seat = d.founder.seat;
     if (seat && seat.status === "grace" && !seatsFrozen(d)) { // (frozen: a seat in grace is only a record; nothing reopens it)
-      alert.textContent = `⚠️ Your founder seat for ${seat.city} is in grace until ${when(seat.graceUntil)}. Hold ${fmt(seat.threshold)} $VICINITY again or the seat reopens. Moderation is paused meanwhile.`;
+      alert.textContent = `⚠️ Your founder seat for ${seat.city} is in grace until ${when(seat.graceUntil)}. Hold ${fmt(seat.threshold)} ${UNIT} again or the seat reopens. Moderation is paused meanwhile.`;
       alert.hidden = false;
     } else if (d.lost.length) {
       const names = d.lost.map((id) => BADGE_NAMES[id] || id);
@@ -722,8 +736,8 @@
       const s = f.seat;
       if (s.status === "provisional") parts.push(say(`🎉 ${s.city} chose you! Locals can object until ${when(s.appealUntil)}; if no objection is upheld, you're the founder.`));
       else if (s.status === "steward") parts.push(say(`🌟 You're ${s.city}'s Seed Steward: probation until ${day(s.probationUntil)}, or sooner once enough verified local holders back the city. Locals can challenge you.`));
-      else if (s.status === "active") parts.push(say(`👑 You're the founder of ${s.city}. Keep ${fmt(s.threshold)} $VICINITY: if you drop below, moderation pauses at once and you have 7 days to fix it.`));
-      else if (s.status === "grace") parts.push(say(`⚠️ Grace until ${when(s.graceUntil)}: hold ${fmt(s.threshold)} $VICINITY again or ${s.city}'s seat reopens.`));
+      else if (s.status === "active") parts.push(say(`👑 You're the founder of ${s.city}. Keep ${fmt(s.threshold)} ${UNIT}: if you drop below, moderation pauses at once and you have 7 days to fix it.`));
+      else if (s.status === "grace") parts.push(say(`⚠️ Grace until ${when(s.graceUntil)}: hold ${fmt(s.threshold)} ${UNIT} again or ${s.city}'s seat reopens.`));
     } else if (f.application) {
       parts.push(say(`📨 You applied. The window closes ${when(f.application.closesAt)} (${left(f.application.closesAt)}). Then everyone is scored by the published formula.`));
       parts.push(actBtn("Withdraw my application", async () => {
@@ -732,7 +746,8 @@
         toast(r.ok ? "Withdrawn" : errText({}, r, "Couldn't withdraw.")); refresh();
       }));
     } else if (!d.launched) {
-      parts.push(say("Applications open after $VICINITY launches, once you've held your city's founder amount for 7 days in a row. The first qualified claimer becomes Seed Steward at once; if rivals claim together, a 72-hour window decides."));
+      parts.push(say(BRAND ? `Founder applications are closed while the ${BRAND.name} token is not live.`
+        : "Applications open after $VICINITY launches, once you've held your city's founder amount for 7 days in a row. The first qualified claimer becomes Seed Steward at once; if rivals claim together, a 72-hour window decides."));
     } else if (f.eligible) {
       const challenge = Boolean(f.challenging);
       const where = walletOnly() ? "" : " (checks your location)"; // (wallet-only: an application asks for no location)
@@ -754,15 +769,15 @@
       });
       parts.push(say(challenge
         ? `✅ You qualify to challenge ${c && c.seat ? c.seat.name : "the steward"}, ${home.name}'s Seed Steward. If 10 verified locals endorse you within 72 hours, an election is forced (the steward defends the seat in it).`
-        : `✅ You qualify: held ${T} $VICINITY for 7 days. ${walletOnly() ? "Apply" : `Apply from inside ${home.name}`}: you become Seed Steward at once if nobody else is claiming. If rivals claim together, a 72-hour window scores everyone, locals' endorsements first.`), form);
+        : `✅ You qualify: held ${T} ${UNIT} for 7 days. ${walletOnly() ? "Apply" : `Apply from inside ${home.name}`}: you become Seed Steward at once if nobody else is claiming. If rivals claim together, a 72-hour window scores everyone, locals' endorsements first.`), form);
     } else {
       const why = {
         no_home: "Set your home community first.",
         home_too_new: `Your home community must be set 7 days before applying: ready ${f.homeReadyAt ? day(f.homeReadyAt) : "soon"}.`,
         not_qualified: f.tenure && f.tenure.days > 0
           ? `Held ${T} for ${Math.floor(f.tenure.days)} of 7 days. Balances are checked at random times, about every hour: hold through all of them.`
-          : `Hold ${T} $VICINITY to start your 7-day clock. Balances are checked at random times, so borrowed tokens don't help.`,
-        below_threshold: `Hold ${T} $VICINITY right now to apply.`,
+          : `Hold ${T} ${UNIT} to start your 7-day clock. Balances are checked at random times, so borrowed tokens don't help.`,
+        below_threshold: `Hold ${T} ${UNIT} right now to apply.`,
         cooldown: `You can apply again on ${f.cooldownUntil ? day(f.cooldownUntil) : "soon"} (30 days after losing a seat).`,
         city_taken: f.whyNot ? `${home ? home.name : "Your city"} has a Seed Steward on probation. To challenge them: ${VOTER_WHY[f.whyNot] || "you need to be a verified local."}` : `${home ? home.name : "Your city"} already has a founder.`,
         banned: "You can't apply while banned.",
@@ -888,7 +903,7 @@
   }
   $("#cc-share").addEventListener("click", () => {
     const name = me?.community?.name || "my city";
-    copy(`I'm repping ${name} on Vicinity. One city, one coin${seatsFrozen() ? "" : ", chosen by locals"}: join us → ${location.origin}/connect`, "Invite copied. Send it to your locals!");
+    copy(brand`I'm repping ${name} on Vicinity. One city, one coin${seatsFrozen() ? "" : ", chosen by locals"}: join us → ${location.origin}/connect`, "Invite copied. Send it to your locals!");
   });
 
   function renderCountry(d) {
@@ -961,7 +976,7 @@
   const PLACEHOLDER = { meme: "Caption a local meme…", checkin: "Say something about where you are (optional)", talk: "Start a discussion with your neighbours…", update: "Share an update with everyone here…" };
   // feed v2 (FEED_V2=on, /api/me says feedV2: true): the Updates chip, who may write one, the per-row menu, the one national confirmation
   const feedV2 = () => Boolean(me && me.feedV2);
-  const UPDATE_HINT = "Updates come from the city founder, the country manager or Vicinity.";
+  const UPDATE_HINT = brand`Updates come from the city founder, the country manager or Vicinity.`;
   const mayUpdate = () => Boolean(me && me.roles && (me.roles.admin || (scope === "city" ? me.roles.founder : me.roles.manager)));
   /** POST /api/posts; the first national post asks once ("Everyone in <country> will see this. Post it?") and is sent again with ack: true. */
   async function postWithAck(body) {
@@ -970,10 +985,12 @@
     if (!confirm(`Everyone in ${countryName(r.country || (me && me.user.home.country))} will see this. Post it?`)) return { ok: false, error: "not_sent" };
     return api("/api/posts", { ...body, ack: true });
   }
-  const NEEDS_WALLET_POST = "Link a wallet and hold any $VICINITY to post.";
+  const NEEDS_WALLET_POST = `Link a wallet and hold any ${UNIT} to post.`;
   const POST_ERR = {
-    holders_only: () => (me && !me.user.wallet ? NEEDS_WALLET_POST : "Only $VICINITY holders can post and vote now that it's live. Holding any amount unlocks it."),
-    no_addresses: "Contract addresses can't be posted. The only official one is on the Token page.",
+    holders_only: () => (me && !me.user.wallet ? NEEDS_WALLET_POST : BRAND ? `Only holders of the ${BRAND.name} token can post and vote now that it's live. Holding any amount unlocks it.`
+      : "Only $VICINITY holders can post and vote now that it's live. Holding any amount unlocks it."),
+    // (a page built for another label set points at no token page: it is the plain "not live yet" page there)
+    no_addresses: BRAND ? "Contract addresses can't be posted." : "Contract addresses can't be posted. The only official one is on the Token page.",
     too_long: (d) => `That's too long (max ${d.max} characters).`,
     empty: "Write something or add a picture.",
     banned: "You've been banned from posting here.",
@@ -1001,8 +1018,10 @@
     lock.hidden = !locked;
     if (locked) {
       const wallet = Boolean(me.user.wallet), go = $("#feed .composer-lock__go");
-      $("#feed .composer-lock__text").textContent = wallet ? "Hold any $VICINITY to post and vote." : "Link a wallet and hold any $VICINITY to post.";
-      go.textContent = wallet ? "Get $VICINITY" : "Connect wallet";
+      $("#feed .composer-lock__text").textContent = wallet ? `Hold any ${UNIT} to post and vote.` : `Link a wallet and hold any ${UNIT} to post.`;
+      // (no Buy on a page built for another label set: the Buy & swap card is not shown there)
+      go.hidden = Boolean(BRAND && wallet);
+      go.textContent = wallet ? (BRAND ? "Get tokens" : "Get $VICINITY") : "Connect wallet";
       go.href = wallet ? "#home" : "/connect?mode=link";
       if (wallet) go.dataset.go = "#trade"; else delete go.dataset.go;
     }
@@ -1246,7 +1265,7 @@
     bad_address: "That isn't a Solana contract address.",
     no_ticker: "This city has no ticker yet. Tell us and we will add it.",
     list_unavailable: "The city list could not be read just now. Try again in a minute.",
-    not_a_city_coin: "That's $VICINITY or the pair, not your city's coin.",
+    not_a_city_coin: BRAND ? "That isn't your city's coin." : "That's $VICINITY or the pair, not your city's coin.",
     design_first: "Save a design first.",
     mint_taken: "That contract is already another city's coin.",
     needs_second_person: "Someone other than the founder has to check a coin's contract.",
@@ -1255,7 +1274,7 @@
     not_a_mint: "The blockchain says that address is not a token with a supply. Nothing was recorded.",
     chain_unavailable: "The blockchain could not be asked just now. Nothing was recorded; try again in a minute.",
     // the server's own words: a founder's "can't be added here", an admin's "can only be rejected, not recorded"
-    launchpad_only: (d) => d.message || "City coins launch on the Vicinity launchpad now. Nothing was changed.",
+    launchpad_only: (d) => d.message || brand`City coins launch on the Vicinity launchpad now. Nothing was changed.`,
     // the legacy launch path closed (LEGACY_LAUNCH=off, stage S23): the server's own words
     legacy_launch_closed: (d) => d.message || LAUNCH_CLOSED,
   };
@@ -1312,31 +1331,31 @@
     st.textContent = cd && cd.launched ? "● Live" : cd && cd.waiting ? (lpOn ? "Old contract waiting" : "Contract being checked")
       : cd ? (byV ? (!founded ? "Not launched" : chosenV ? "Chosen" : "Not chosen yet") : "Designed") : shut ? "Closed" : rdy ? (founded ? "Not chosen yet" : "No founder yet") : "Not designed yet";
     const kick = $("#coin-kicker"); // coin-ready.js names Vicinity here while its preview stands in, and puts these words back after
-    kick.dataset.base = shut ? "City coin" : (rdy && !cd) || byV ? "City coin · made by Vicinity" : "City coin · designed by the City Founder";
+    kick.dataset.base = shut ? "City coin" : (rdy && !cd) || byV ? brand`City coin · made by Vicinity` : "City coin · designed by the City Founder";
     kick.textContent = kick.dataset.base;
     // the founder sees their working picture (the server sends logoDraft to them and the staff only); everyone else the approved one or none
     if (!(mine && studioDirty)) paintCoin(cd ? { ...cd, logo: mine ? cd.logoDraft || cd.logo : cd.logo } : { name: c.name, color: "gold", logo: null, pair: null });
     $("#coin-pitch").textContent = cd ? cd.pitch : "";
-    $("#coin-by").textContent = !cd ? "" : byV ? (chosenV ? `Made by Vicinity from the city list · chosen ${date(cd.updatedAt)}` : "Made by Vicinity from the city list")
+    $("#coin-by").textContent = !cd ? "" : byV ? (chosenV ? brand`Made by Vicinity from the city list · chosen ${date(cd.updatedAt)}` : brand`Made by Vicinity from the city list`)
       : `Designed by ${cd.by || "the City Founder"} · updated ${date(cd.updatedAt)}`;
     logoState(mine ? cd : null);
     $("#coin-contract").hidden = !(cd && cd.mint);
     // a short chip (the whole address is the copy button's name and the chip's title); Copy copies the whole address
     if (cd && cd.mint) { $("#coin-mint").textContent = cd.mint; $("#coin-mint").title = cd.mint; $("#coin-mint-copy").setAttribute("aria-label", `Copy the contract address ${cd.mint}`); }
     tickerLine();
-    const MADE = "Every city coin is made by Vicinity from the city list; the founder chooses it and launches it once Vicinity's owner approves it on the blockchain.";
+    const MADE = brand`Every city coin is made by Vicinity from the city list; the founder chooses it and launches it once Vicinity's owner approves it on the blockchain.`;
     $("#coin-note").textContent = launchClosed() && !(cd && cd.launched) ? LAUNCH_CLOSED
       : rdy && !cd
       ? (mine ? `${c.name}'s coin is ready in your Founder tab: check it, then use it.` : seat ? `${MADE} ${seat.name}, ${c.name}'s ${founded ? "founder" : "chosen founder"}, hasn't chosen it yet.` : (seatsFrozen() ? MADE : `${MADE} The seat is still open: see the founder path.`))
       : mine
       ? (cd ? (cd.launched ? `${c.name}'s coin is live. Its design is locked, as the rules promise.`
-        : rdy ? (byV && !chosenV ? "Your city coin is made by Vicinity, and the city list changed since it was chosen: see your Founder tab. Nothing has launched yet."
-          : "Your city coin is the one made by Vicinity, in your Founder tab. Nothing has launched yet.")
+        : rdy ? (byV && !chosenV ? brand`Your city coin is made by Vicinity, and the city list changed since it was chosen: see your Founder tab. Nothing has launched yet.`
+          : brand`Your city coin is the one made by Vicinity, in your Founder tab. Nothing has launched yet.`)
           : "Change anything until your coin launches. Every save is public in the log.")
         : `Your coin, your call. Design ${c.name}'s coin below: everyone in ${c.name} will see it.`)
       : cd ? (cd.launched ? `The one official ${c.ticker ? tk : `${c.name} coin`}. Buy or swap it in the panel on the right.`
-        : byV ? "Made by Vicinity from the city list. Nothing has launched yet." : rdy ? `Designed by ${c.name}'s founder. Nothing has launched yet.`
-          : `Designed by ${c.name}'s founder. It launches on ${lpOn ? "the Vicinity launchpad" : "Raydium LaunchLab"}.`)
+        : byV ? brand`Made by Vicinity from the city list. Nothing has launched yet.` : rdy ? `Designed by ${c.name}'s founder. Nothing has launched yet.`
+          : `Designed by ${c.name}'s founder. It launches on ${lpOn ? brand`the Vicinity launchpad` : "Raydium LaunchLab"}.`)
       : seat ? `${seat.name}, ${c.name}'s founder, hasn't designed the coin yet. It'll appear here the moment they do.`
       : `${c.name}'s founder designs this coin: its name, logo, colour and what it's paired with.${seatsFrozen() ? "" : " The seat is still open: see the founder path."}`;
     // with the ready-made coin on (COIN_V2_READY), the coin is made by Vicinity and chosen in its own card: the old studio stays hidden
@@ -1357,7 +1376,7 @@
     let text = "";
     if (s === "pending") {
       text = cd.logo ? "Your new picture is being checked. Until it is approved, your coin keeps showing the picture approved before."
-        : "Your picture is being checked. Until it is approved, nobody else sees it: your coin shows its initials on the site and the Vicinity badge in wallets.";
+        : `Your picture is being checked. Until it is approved, nobody else sees it: your coin shows its initials on the site and ${BRAND ? "the default badge" : "the Vicinity badge"} in wallets.`;
       if (!cd.launched && !launchClosed()) text += " Your coin can still be approved and launched meanwhile."; // (closed: nothing is launched there)
     } else if (s === "rejected") {
       text = `Not approved: ${REASON_WORDS[cd.logoReason] || cd.logoReason || "breaks the rules"}.${cd.logoNote ? ` ${cd.logoNote}${/[.!?]$/.test(cd.logoNote) ? "" : "."}` : ""}${launchClosed() ? "" : " Replace it to try again."}`;
@@ -1495,7 +1514,7 @@
   // answer says so: launchLabClosed) that old LaunchLab path is closed: a contract sent before can only be REJECTED (the server refuses
   // to record one), which settles the city for the launchpad, so the queue shows Reject only, says why, and asks for no reason: the
   // server logs fixed, neutral words and tells the founder (LEGACY_REJECTED in src/coins.js; the contract is not judged)
-  const LEGACY_REJECTED = "City coins launch on the Vicinity launchpad now; a contract from the old Raydium LaunchLab path is not recorded.";
+  const LEGACY_REJECTED = brand`City coins launch on the Vicinity launchpad now; a contract from the old Raydium LaunchLab path is not recorded.`;
   function settleForm(host, go) {
     host.querySelector(".reason-form")?.remove();
     const f = el("form", "reason-form reason-form--settle");
@@ -1525,7 +1544,7 @@
       // the decision carries the address the admin looked at: the server records only if it is still the one waiting
       const decide = (approve, note) => sensitive(() => api("/api/coins/mint/decide", { city: w.city, mint: w.pendingMint, approve, note }));
       const acts = el("div", `coin-check__actions${closed ? " coin-check__actions--one" : ""}`);
-      if (closed) li.append(el("p", "tiny muted coin-check__closed", "City coins launch on the Vicinity launchpad now, so this contract can't be recorded as the city's coin. Reject it to settle the city: then its coin can be approved and launched on the launchpad."));
+      if (closed) li.append(el("p", "tiny muted coin-check__closed", brand`City coins launch on the Vicinity launchpad now, so this contract can't be recorded as the city's coin. Reject it to settle the city: then its coin can be approved and launched on the launchpad.`));
       else acts.append(actBtn("Record it", async () => { const x = await decide(true, "Checked on the blockchain"); toast(x.ok ? "Recorded: it's the official coin now ✓" : errText(COIN_ERR, x, "Couldn't do that.")); loadCoinQueue(); }, "btn btn--primary btn--sm"));
       acts.append(closed
         ? actBtn("Reject", () => settleForm(li, async () => {
@@ -1628,11 +1647,11 @@
   let route = "vic", flipped = false, priceCache = { key: "", at: 0, p: {} }, estTimer = 0;
   function routeInfo() {
     const cd = coinData, tk = cityTk(), cityMint = cd && cd.mint ? cd.mint : null;
-    const base = route === "vic" ? [["SOL", SOL_MINT], ["$VICINITY", vicMint]]
+    const base = route === "vic" ? [["SOL", SOL_MINT], [MAIN, vicMint]]
       : route === "city" ? [[cd ? cd.pair : "SOL", cd ? cd.pairMint : SOL_MINT], [tk, cityMint]]
-      : [[tk, cityMint], ["$VICINITY", vicMint]];
+      : [[tk, cityMint], [MAIN, vicMint]];
     const [a, b] = flipped ? [base[1], base[0]] : base;
-    const missing = route !== "city" && !vicMint ? "$VICINITY" : route !== "vic" && !cityMint ? tk : null;
+    const missing = route !== "city" && !vicMint ? MAIN : route !== "vic" && !cityMint ? tk : null;
     return { a, b, missing, tk };
   }
   const swapSide = (m) => (m === SOL_MINT ? "SOL" : m);
@@ -1670,8 +1689,8 @@
     if (mountSwap(a, b, missing)) return;
     $("#tr-in").lastElementChild.textContent = a[0];
     $("#tr-outk").lastElementChild.textContent = b[0];
-    $("#tr-in").dataset.token = a[0].startsWith("$") ? (a[0] === "$VICINITY" ? "vic" : "city") : a[0].toLowerCase();
-    $("#tr-outk").dataset.token = b[0].startsWith("$") ? (b[0] === "$VICINITY" ? "vic" : "city") : b[0].toLowerCase();
+    $("#tr-in").dataset.token = a[0] === MAIN ? "vic" : a[0].startsWith("$") ? "city" : a[0].toLowerCase();
+    $("#tr-outk").dataset.token = b[0] === MAIN ? "vic" : b[0].startsWith("$") ? "city" : b[0].toLowerCase();
     const state = $("#trade-state"), go = $("#tr-go"), go2 = $("#tr-go-2"), amt = $("#tr-amt");
     // "● Live" only once /api/prices answered with both prices (see estimate): a recorded contract alone is listed, not live
     state.className = "tag tag--warn";
@@ -1686,9 +1705,9 @@
       go.href = !vicMint ? "/token#buy" : "#coin"; go.removeAttribute("target");
       go2.hidden = true;
       $("#tr-note").textContent = !vicMint
-        ? "Trading opens the moment $VICINITY launches on Raydium LaunchLab. Its contract is published on the Token page first."
+        ? (BRAND ? `The ${BRAND.name} token is not live yet.` : "Trading opens the moment $VICINITY launches on Raydium LaunchLab. Its contract is published on the Token page first.")
         : shut ? LAUNCH_CLOSED
-        : lpOn ? `${tk} trades once an admin approves it on chain and ${me.community.name}'s founder launches it on the Vicinity launchpad.`
+        : lpOn ? brand`${tk} trades once an admin approves it on chain and ${me.community.name}'s founder launches it on the Vicinity launchpad.`
           : `${tk} trades once ${me.community.name}'s founder launches it and an admin records its contract.`;
     } else {
       go.textContent = `${route === "swap" ? "Swap" : flipped ? `Sell ${a[0]}` : `Buy ${b[0]}`} on Jupiter ↗`;
@@ -1697,7 +1716,7 @@
       // pool between a city coin and $VICINITY is known, so the swap route offers Jupiter alone (it routes through SOL).
       go2.hidden = route === "swap";
       if (!go2.hidden) { go2.href = `https://raydium.io/launchpad/token/?mint=${route === "vic" ? vicMint : coinData.mint}`; go2.textContent = "or on Raydium LaunchLab ↗"; }
-      $("#tr-note").textContent = "You sign every swap in your own wallet on Jupiter or Raydium; Vicinity never touches your funds. Price ratio, not a quote. Slippage and fees are set in your wallet.";
+      $("#tr-note").textContent = brand`You sign every swap in your own wallet on Jupiter or Raydium; Vicinity never touches your funds. Price ratio, not a quote. Slippage and fees are set in your wallet.`;
     }
     estimate();
   }
@@ -1905,7 +1924,7 @@
   const GOOGLE_SAID = {
     linked: "Google sign-in added. You can now log in with Google too.",
     already: "That Google account already logs you in to this account. Nothing changed.",
-    google_taken: "That Google account already logs in to another Vicinity account, so it can't be added here. Pick another Google account.",
+    google_taken: brand`That Google account already logs in to another Vicinity account, so it can't be added here. Pick another Google account.`,
     has_google: "Your account already has a Google sign-in. Remove it first to add a different one.",
     reprove: (d) => (d.password ? "For your safety, type your password to add Google."
       : d.relogin ? "For your safety, adding a way to log in needs a fresh login. Log in again, then add Google within 30 minutes."

@@ -30,7 +30,7 @@ function page() {
     byId: new Map([[city.id, city]]), claims: new Map(), windows: new Map(), members: new Map(), memberCount: new Map(), holderCount: new Map(), joined: new Set(),
     ov: { failed: false }, area: null, compact: new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }),
     fmt: (n) => Number(n).toLocaleString("en-US", { maximumFractionDigits: 0 }), placeOf: () => "Kinshasa, DR Congo",
-    tickerOf: () => "KINSHASA", founderMin: () => 650000, until: (iso, t) => `${Math.round((Date.parse(iso) - t) / 60000)}m`,
+    tickerOf: () => "KINSHASA", UNIT: "$VICINITY", founderMin: () => 650000, until: (iso, t) => `${Math.round((Date.parse(iso) - t) / 60000)}m`,
     toLonLat: () => [0, 0], nearestCommunities: () => [], fcx: 0, fcy: 0,
     FOCUS_TAG: { open: ["tag tag--ok", "Open"], choosing: ["tag tag--gold", "Choosing"], founded: ["tag tag--no", "Founded"], mine: ["tag tag--warn", "Yours"] },
     STATUS_WORD: { open: "Open", choosing: "Choosing its founder", founded: "Founded", mine: "Yours" },

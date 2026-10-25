@@ -62,6 +62,7 @@ import { decodeConfig, decodePool } from "./sol/dbc.js";
 import { PROGRAM_IDS } from "./sol/pda.js";
 import { decodeMetadata, metadataAddress } from "./sol/metaplex.js";
 import { iso } from "./policy.js";
+import { SAME, brandWords } from "./brandwords.js";
 
 export const OFFICIAL_CSV_PATH = "/official-coins.csv";
 /** A reading is kept this long per server: only so the CSV and the JSON asked together share one; the edge keeps the answers. */
@@ -89,9 +90,9 @@ export const officialCacheKey = (s, csv) => `official-coins-${csv ? "csv" : "jso
 
 /**
  * The one plain sentence on how a coin gets on the list (in the JSON answer, so the rule travels with the list). It starts from the
- * coin record, never from a pool's creator: that alone is what a look-alike can copy.
+ * coin record, never from a pool's creator: that alone is what a look-alike can copy. `bw`: the product's name (src/brandwords.js).
  */
-export const ruleOf = (programId) => `A city coin is listed only if its coin record for that city is owned by the Vicinity launchpad program (${programId}), the record names the coin's mint and its Meteora pool, and that pool's creator is the record, its price-curve setting is one of those listed in configs, and it holds that mint.`;
+export const ruleOf = (programId, bw = SAME) => bw`A city coin is listed only if its coin record for that city is owned by the Vicinity launchpad program (${programId}), the record names the coin's mint and its Meteora pool, and that pool's creator is the record, its price-curve setting is one of those listed in configs, and it holds that mint.`;
 
 /** The reading cannot be a true picture of the chain: it fails as a whole (503, nothing kept), it never leaves a coin out. */
 const broken = (why) => Object.assign(new Error(why), { code: why });
@@ -194,7 +195,7 @@ async function readOfficialCoins(env, s, fetchImpl, now) {
   coins.sort((a, b) => (BigInt(a.cityId) < BigInt(b.cityId) ? -1 : BigInt(a.cityId) > BigInt(b.cityId) ? 1 : 0));
   // a whole reading: the next one on this server must be at least as new
   if (!floor || floor.key !== recordsKey || slot > floor.slot) floor = { key: recordsKey, slot };
-  return { cluster: s.cluster, readAt: iso(now), program: s.programId, configs: [...s.dbcConfigs], coins, rule: ruleOf(s.programId) };
+  return { cluster: s.cluster, readAt: iso(now), program: s.programId, configs: [...s.dbcConfigs], coins, rule: ruleOf(s.programId, brandWords(env)) };
 }
 
 /**

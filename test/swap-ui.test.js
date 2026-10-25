@@ -575,6 +575,6 @@ test("copy behind the switch: the token page's FAQ step and the Launchpad's hone
   assert.equal(L.win.VSwap.tradeSentence, "You buy and sell here, in your own wallet (routed by Jupiter, executed on Raydium LaunchLab or the Meteora curve); Vicinity never touches your funds.");
   // launchpad.js writes the same sentence when it redraws the line with the answer's attribution (source check: the words live in swap.js)
   const lp = readFileSync(new URL("../public/launchpad.js", import.meta.url), "utf8");
-  assert.match(lp, /const trade = swapOn && window\.VSwap && window\.VSwap\.tradeSentence \? window\.VSwap\.tradeSentence : "You trade in your own wallet on Raydium or Jupiter; Vicinity never touches your funds\.";/);
+  assert.match(lp, /const trade = swapOn && window\.VSwap && window\.VSwap\.tradeSentence \? window\.VSwap\.tradeSentence : brand`You trade in your own wallet on Raydium or Jupiter; Vicinity never touches your funds\.`;/);
   assert.match(lp, /says how old its numbers are\. \$\{trade\}`\);/);
 });

@@ -32,6 +32,7 @@ import { Source, SourceError, getJson } from "./sources.js";
 import { readCurves } from "./launchlab.js";
 import { marketFor } from "./market.js";
 import { isSolanaAddress } from "./solana.js";
+import { SAME, brandWords } from "./brandwords.js";
 
 const JUPITER_BASE = "https://lite-api.jup.ag";
 export const RAYDIUM_MINT_URL = "https://launch-mint-v1.raydium.io/get/by/mints";
@@ -249,7 +250,7 @@ const blank = () => ({
  * that never had one): before graduation, or while the chain cannot be read, a pair there can only be someone else's pool, at any
  * price its creator chose, so its market cap, volume, change, liquidity and price are never shown next to the curve's.
  */
-export function combine(coin, s, staleOf = {}) {
+export function combine(coin, s, staleOf = {}, bw = SAME) {
   const m = blank();
   const used = new Set(), codes = {};
   const take = (field, value, label, src) => { m[field] = value; m.sources[fieldName(field)] = label; codes[fieldName(field)] = src; used.add(src); if (staleOf[src]) m.stale = true; };
@@ -258,7 +259,7 @@ export function combine(coin, s, staleOf = {}) {
   if (curve) {
     m.curve = { poolId: curve.poolId, stage: curve.stage, symbol: curve.symbol, raised: curve.raised, target: curve.target, progressPct: curve.progressPct,
       tokensSold: curve.tokensSold, tokensForSale: curve.tokensForSale, supply: curve.supply, slot: curve.slot };
-    m.sources.curve = LABEL.chain; used.add("chain");
+    m.sources.curve = bw.say(LABEL.chain); used.add("chain");
     if (curve.stage === "curve") { m.priceNative = curve.priceNative; m.nativeSymbol = curve.symbol; }
   }
   m.stage = curve ? curve.stage : jt?.graduatedPool || rm?.migrateAmmId ? "graduated" : chainUnread ? null : s.dx ? "pool" : null;
@@ -351,7 +352,7 @@ export async function liveMarkets(env, coins, fetchImpl = fetch, { now = Date.no
   const note = (name, r) => { if (r && !r.ok) errors.push(`${name}:${r.error || "failed"}`); };
   note("chain", cv); note("jupiter_price", jp); note("jupiter_tokens", jt); note("raydium_mint", rm); note("dexscreener", dx);
   const staleOf = { jupiter: jp.stale || jt.stale, jupiter_pair: jp.stale, chain: cv.stale, raydium: rm?.stale || false, dexscreener: dx?.stale || false };
-  const used = new Set();
+  const used = new Set(), bw = brandWords(env);
   for (const c of list) {
     const curve = cv.curves.get(c.mint);
     const m = combine(c, {
@@ -359,7 +360,7 @@ export async function liveMarkets(env, coins, fetchImpl = fetch, { now = Date.no
       pairUsd: c.pairMint ? jp.values.get(c.pairMint)?.usdPrice ?? null : null, jt: jt.values.get(c.mint) || null, jtState: jt.values.get(c.mint),
       dx: dx?.values.get(c.mint) || null, dxState: dx ? dx.values.get(c.mint) : null, dxAsked: Boolean(dx),
       rm: rm?.values.get(c.mint) || null, rmState: rm ? rm.values.get(c.mint) : null,
-    }, staleOf);
+    }, staleOf, bw);
     for (const u of m.codes.used) used.add(u);
     markets.set(c.mint, m);
   }
@@ -367,14 +368,16 @@ export async function liveMarkets(env, coins, fetchImpl = fetch, { now = Date.no
   return { markets, ok: errors.length === 0, used, errors, pairPrices };
 }
 
-/** The attribution lines for the sources an answer used (Jupiter's "Powered by Jupiter" whenever its data is shown). */
-export function attributionFor(used, { holders = false, trades = false } = {}) {
+/** The attribution lines for the sources an answer used (Jupiter's "Powered by Jupiter" whenever its data is shown). `bw`: the product's name
+ *  in the lines that name it (src/brandwords.js; today's words, and the very same objects, by default). */
+export function attributionFor(used, { holders = false, trades = false } = {}, bw = SAME) {
   const out = [];
+  const ours = (a) => (bw.on ? { ...a, text: bw.say(a.text) } : a);
   if (used.has("jupiter") || used.has("jupiter_pair")) out.push(ATTRIBUTION.jupiter);
   if (trades || used.has("raydium")) out.push(used.has("raydium") ? ATTRIBUTION.raydiumVolume : ATTRIBUTION.raydium); // the volume it gave is credited too
-  if (used.has("chain")) out.push(ATTRIBUTION.chain);
+  if (used.has("chain")) out.push(ours(ATTRIBUTION.chain));
   if (used.has("dexscreener_graduated") || (used.has("dexscreener") && !used.has("dexscreener_pool"))) out.push(ATTRIBUTION.dexscreener);
   if (used.has("dexscreener_pool")) out.push(ATTRIBUTION.dexscreenerPool);
-  if (holders) out.push(ATTRIBUTION.holders);
+  if (holders) out.push(ours(ATTRIBUTION.holders));
   return out;
 }

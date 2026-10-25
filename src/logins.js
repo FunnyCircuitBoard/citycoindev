@@ -149,7 +149,8 @@ export async function dropLoginsStatement(db, userId) {
 export async function googleNotice(env, u, ctx = null, fetchImpl = fetch, origin = undefined) {
   const to = u && (u.provider === "email" ? u.provider_id : u.contact_email);
   if (!to || !emailConfigured(env)) return;
-  const p = sendMail(env, { to, ...googleAddedEmail(origin) }, { fetchImpl }) // origin: the host Google was added on (src/hostbind.js mailOrigin)
+  // origin: the host Google was added on (src/hostbind.js mailOrigin); env: the product's own name (src/mail.js)
+  const p = sendMail(env, { to, ...googleAddedEmail(origin, env) }, { fetchImpl })
     .then((r) => { if (!r.ok) console.error("google sign-in notice not sent", r.error); })
     .catch((e) => console.error("google sign-in notice failed", String((e && e.message) || e).slice(0, 80)));
   if (ctx && ctx.waitUntil) ctx.waitUntil(p); else await p;

@@ -38,6 +38,7 @@ import { formatAmount } from "./sol/input.js";
 import { iso } from "./policy.js";
 import { findCoin } from "./lpcoins.js";
 import { FEE_DENOMINATOR, HOST_FEE_PERCENT, PROTOCOL_FEE_PERCENT } from "../solana/sdk/launchpad/curve.mjs";
+import { SAME, brandWords } from "./brandwords.js";
 
 /**
  * Meteora's program constants (not in the config): the SDK's fee mirror (curve.mjs), measured on 16 Oct 2026 on copies of Meteora's
@@ -124,11 +125,11 @@ export function feeSchedule(config, { protocolPercent = METEORA.protocolPercent,
  * "Meteora protocol fee 0.25% (20% of the fee, set by Meteora's program, which sends a fifth of that to Vicinity on trades made here)":
  * the same clause wherever the curve's split is said (the Fees sections, the founder's launch card). Only the 20% and the fifth are
  * Meteora's program's, and the clause says so for both; the 0.25% is the config's fee times the 20%. `past`: the words for a coin that
- * has left its curve ("sent").
+ * has left its curve ("sent"). `bw`: the product's name in every clause here (src/brandwords.js; today's words by default).
  */
-export function meteoraWords(S, { past = false } = {}) {
+export function meteoraWords(S, { past = false } = {}, bw = SAME) {
   const r = S.meteora.referralPercent;
-  return `Meteora protocol fee ${S.curve.text.meteora} (${S.meteora.protocolPercent}% of the fee, set by Meteora's program${r > 0 ? `, which ${past ? "sent" : "sends"} ${partWords(r)} of that to Vicinity on trades made here` : ""})`;
+  return `Meteora protocol fee ${S.curve.text.meteora} (${S.meteora.protocolPercent}% of the fee, set by Meteora's program${r > 0 ? bw`, which ${past ? "sent" : "sends"} ${partWords(r)} of that to Vicinity on trades made here` : ""})`;
 }
 /** The note on the pool's split: the two locked positions share their part with anyone who adds liquidity later. */
 const LATER = "(anyone who adds liquidity to the pool later takes part of everything but the Meteora protocol fee)";
@@ -138,51 +139,51 @@ const LATER = "(anyone who adds liquidity to the pool later takes part of everyt
  * positions share the rest with anyone who adds liquidity to the pool later. `founder`: how the founder is named ("the city's
  * founder", "you"). Meteora's cut is called "the Meteora protocol fee" in every sentence, one name for one thing.
  */
-export function poolSplitWords(S, founder = "the city's founder") {
+export function poolSplitWords(S, founder = "the city's founder", bw = SAME) {
   const p = S.pool.text;
-  const after = S.meteora.referralPercent > 0 ? `none of the Meteora protocol fee goes to Vicinity ${LATER}` : LATER;
+  const after = S.meteora.referralPercent > 0 ? bw`none of the Meteora protocol fee goes to Vicinity ${LATER}` : LATER;
   if (S.pool.sameAsCurve) return S.meteora.referralPercent > 0 ? `split the same way, except that ${after}` : `split the same way ${LATER}`;
-  return `split: Meteora protocol fee ${p.meteora}, Vicinity ${p.vicinity}, ${founder} ${p.founder}, the city's holder pot ${p.holders}; ${after}`;
+  return bw`split: Meteora protocol fee ${p.meteora}, Vicinity ${p.vicinity}, ${founder} ${p.founder}, the city's holder pot ${p.holders}; ${after}`;
 }
 
 /**
  * Where the founder's and the holder pot's figures come from besides the settings: our program halves the city's share at harvest
  * (math.rs split_fee), which is not a field of the settings. Said under every source line. `founder`: "the founder", "you".
  */
-export const halvesWords = (founder = "the founder") => `Vicinity's program splits the city's share evenly between ${founder} and the holder pot.`;
+export const halvesWords = (founder = "the founder", bw = SAME) => bw`Vicinity's program splits the city's share evenly between ${founder} and the holder pot.`;
 /**
  * The plain sentences for a schedule. `scope`: "live" (the Launchpad: the price curve new coins launch on) or "coin" (a coin page:
  * the settings that coin launched under). Every number is the schedule's; the labels are the accurate ones (Meteora's cut is its
  * protocol fee). A coin page also gets `graduated` ({ curve, steps }): the same facts for a coin that has moved to its pool, the pool
  * first (the fee that applies now), the curve after it in the past tense.
  */
-export function feeWords(S, scope = "live") {
+export function feeWords(S, scope = "live", bw = SAME) {
   const c = S.curve.text, p = S.pool.text, coin = scope === "coin", r = S.meteora.referralPercent;
   // what waits for its own step. Reward rounds are not on the site yet (docs/OWNER-LAUNCH-GUIDE.md) and are not a promise (the
   // Terms, Platform Mechanisms): the holders' share is said to wait, never to be paid. Meteora's own part waits too, until Meteora
   // collects it (DBC's and DAMM v2's protocol-fee claims)
-  const rest = "waits on chain until collected: Meteora collects its own, the founder collects theirs, Vicinity claims its own, and the holders' share stays on chain for holder reward rounds. Those rounds are not on the site yet and are not a promise (see the Terms).";
+  const rest = bw.say("waits on chain until collected: Meteora collects its own, the founder collects theirs, Vicinity claims its own, and the holders' share stays on chain for holder reward rounds. Those rounds are not on the site yet and are not a promise (see the Terms).");
   // the referral is the one part paid inside the trade itself (the fee check of 16 Oct 2026), and only on curve trades the site
   // builds (they name the dev wallet's account); other front-ends name their own or none
-  const during = r > 0 ? `On curve trades made here, only Vicinity's part of the Meteora protocol fee reaches a wallet during the trade. The rest ${rest}` : `No share reaches a wallet during the trade. Each ${rest}`;
+  const during = r > 0 ? bw`On curve trades made here, only Vicinity's part of the Meteora protocol fee reaches a wallet during the trade. The rest ${rest}` : `No share reaches a wallet during the trade. Each ${rest}`;
   const words = {
-    curve: `Every buy and sell on the price curve pays ${c.total}: ${meteoraWords(S)}, Vicinity ${c.vicinity}, the city's founder ${c.founder}, the city's holder pot ${c.holders}. ${coin ? "After graduation, this coin's" : "After a coin graduates, its"} pool fee is ${p.total}, ${poolSplitWords(S)}.`,
+    curve: bw`Every buy and sell on the price curve pays ${c.total}: ${meteoraWords(S, {}, bw)}, Vicinity ${c.vicinity}, the city's founder ${c.founder}, the city's holder pot ${c.holders}. ${coin ? "After graduation, this coin's" : "After a coin graduates, its"} pool fee is ${p.total}, ${poolSplitWords(S, undefined, bw)}.`,
     steps: during,
     // the 90 / 10 split and the 0.2% are Meteora's program's, not the config's: each says so
-    oneOff: `Launch fee: ${S.launchFeeSol} SOL, paid once by the founder (${S.launchSplit.vicinity}% Vicinity, ${S.launchSplit.meteora}% Meteora, as Meteora's program splits it). At graduation Meteora's program keeps ${trim((S.meteora.migrationFeeBps / 100).toFixed(2))}% of the SOL and of the coins moved into the pool, once. No Vicinity fee on wallet transfers; only Solana's network fee and, for a first-time recipient, one-time account rent.`,
+    oneOff: bw`Launch fee: ${S.launchFeeSol} SOL, paid once by the founder (${S.launchSplit.vicinity}% Vicinity, ${S.launchSplit.meteora}% Meteora, as Meteora's program splits it). At graduation Meteora's program keeps ${trim((S.meteora.migrationFeeBps / 100).toFixed(2))}% of the SOL and of the coins moved into the pool, once. No Vicinity fee on wallet transfers; only Solana's network fee and, for a first-time recipient, one-time account rent.`,
     // the founder / holder-pot halving is our program's rule, not the settings': said after the source, as its own (the pages write
     // their own source line in the viewer's clock and add `halves` after it)
-    source: `Read from ${coin ? "this coin's" : "the"} price-curve settings on Solana${S.source.config ? ` (${short(S.source.config)})` : ""}${S.source.readAt ? ` at ${S.source.readAt.slice(11, 16)} UTC` : ""}. ${halvesWords()}`,
-    halves: halvesWords(),
+    source: `Read from ${coin ? "this coin's" : "the"} price-curve settings on Solana${S.source.config ? ` (${short(S.source.config)})` : ""}${S.source.readAt ? ` at ${S.source.readAt.slice(11, 16)} UTC` : ""}. ${halvesWords(undefined, bw)}`,
+    halves: halvesWords(undefined, bw),
   };
   if (!coin) return words;
   // a graduated coin: the pool's fee leads, with its own figures; the steps say only what waits on chain (whether Jupiter's own routing pays
   // anyone inside a pool trade is not ours to state)
-  const pool = `This coin has graduated. Every buy and sell in its pool pays ${p.total}: Meteora protocol fee ${p.meteora} (${S.meteora.protocolPercent}% of the fee, set by Meteora's program), Vicinity ${p.vicinity}, the city's founder ${p.founder}, the city's holder pot ${p.holders}. Anyone else who adds liquidity to the pool takes part of everything but the Meteora protocol fee, so these shares can be smaller.`;
+  const pool = bw`This coin has graduated. Every buy and sell in its pool pays ${p.total}: Meteora protocol fee ${p.meteora} (${S.meteora.protocolPercent}% of the fee, set by Meteora's program), Vicinity ${p.vicinity}, the city's founder ${p.founder}, the city's holder pot ${p.holders}. Anyone else who adds liquidity to the pool takes part of everything but the Meteora protocol fee, so these shares can be smaller.`;
   const sameSplit = S.pool.sameAsCurve && S.pool.totalBps === S.curve.totalBps; // the same figures, not only the same shares
   const before = sameSplit
-    ? `Before graduation, every buy and sell on the price curve paid ${c.total}, split the same way${r > 0 ? `, except that Meteora's program sent ${partWords(r)} of the Meteora protocol fee to Vicinity on trades made here` : ""}.`
-    : `Before graduation, every buy and sell on the price curve paid ${c.total}: ${meteoraWords(S, { past: true })}, Vicinity ${c.vicinity}, the city's founder ${c.founder}, the city's holder pot ${c.holders}.`;
+    ? `Before graduation, every buy and sell on the price curve paid ${c.total}, split the same way${r > 0 ? bw`, except that Meteora's program sent ${partWords(r)} of the Meteora protocol fee to Vicinity on trades made here` : ""}.`
+    : bw`Before graduation, every buy and sell on the price curve paid ${c.total}: ${meteoraWords(S, { past: true }, bw)}, Vicinity ${c.vicinity}, the city's founder ${c.founder}, the city's holder pot ${c.holders}.`;
   return { ...words, graduated: { curve: `${pool} ${before}`, steps: `Each share ${rest}` } };
 }
 
@@ -231,5 +232,5 @@ export async function handleFees(request, env, fetchImpl = fetch, now = Date.now
   if (!read) return json({ ok: false, error: "config_missing" }, 404);
   const S = feeSchedule(read.config, { address, readAt: read.readAt });
   if (!S) return json({ ok: false, error: "config_not_flat" }, 404); // a fee that changes with time or volatility: never described as flat
-  return json({ ok: true, cluster: s.cluster, config: address, ...(coin ? { coin } : {}), readAt: S.source.readAt, ...S, words: feeWords(S, scope) }, 200, { "Cache-Control": "public, max-age=300" });
+  return json({ ok: true, cluster: s.cluster, config: address, ...(coin ? { coin } : {}), readAt: S.source.readAt, ...S, words: feeWords(S, scope, brandWords(env)) }, 200, { "Cache-Control": "public, max-age=300" });
 }

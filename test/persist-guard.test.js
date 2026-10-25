@@ -165,9 +165,21 @@ const ADAPTERS = ["src/brand.js", "src/site-config.js", "src/footer-social.js"];
 // The only imports of an adapter that a producer may reach, each with exactly the names it takes and why none of them feeds an identifier.
 const ALLOWED_EDGES = {
   "src/mail.js>src/brand.js": ["brandOf"],                         // the display name of outgoing mail (senderName), a label
+  // the label migration (S48, area c): the e-mails' buttons link to the serving origin (siteConfig) and the SMTP greeting never names an
+  // old host under another label set (LEGACY_HOSTS); with BRAND unset every e-mail and greeting is today's (test/brand-adapters.test.js)
+  "src/mail.js>src/site-config.js": ["LEGACY_HOSTS", "siteConfig"],
   "src/sources.js>src/site-config.js": ["USER_AGENT"],             // the User-Agent of outside calls, never stored or signed
   "src/swap.js>src/site-config.js": ["USER_AGENT"],                // the same User-Agent
-  "src/v5policy.js>src/brand.js": ["brandOf"],                     // the MAIN_TOKEN_V5 check compares the label set's name; no label is read
+  // the MAIN_TOKEN_V5 check compares the label set's name; no label is read. _brandBuiltForTests: its test stand-in for a page build
+  // (_pagesBuiltForTests) moves src/brand.js's reading too; nothing in the Worker calls it
+  "src/v5policy.js>src/brand.js": ["_brandBuiltForTests", "brandOf"],
+  // the label migration (S48, area c: the server's words): src/brandwords.js puts the label set's names into the literal words of a message
+  // (brand`...` style, never a value put into it), and gives the serving origin for links. The modules that make persistent identifiers use
+  // it for their messages only: the stored and API value "vicinity", the /coin-meta/ URLs, the legacy coin-JSON brand, today's statements,
+  // hash domains, keys and cookie names never pass through it, and every one of them is the same under BRAND=citycoin (the test below)
+  "src/brandwords.js>src/brand.js": ["LEGACY_BRAND", "brandOf"],
+  // (and the old host names, to tell whether the serving origin is one of them: a list read, nothing named or stored; review finding CRAWL-1)
+  "src/brandwords.js>src/site-config.js": ["LEGACY_HOSTS", "siteConfig"],
   "src/v5policy.js>src/site-config.js": ["DEFAULT_SITE_ORIGIN", "DEFAULT_SITE_ORIGINS", "normalizeOrigin", "siteConfig"], // the configuration check
   // stage S04, session and challenge host binding (master section 05 BR-03 requires the session host, the challenge host and the hand-off
   // hosts to come from the configuration): the host a request is served as, looked up in the allowlist. It renames nothing pinned above: the
@@ -181,6 +193,14 @@ const ALLOWED_EDGES = {
   // today's statements, the signed-message format and its single-use digest stay (the test above); a challenge's text lives two minutes and is
   // stored only as a hash, checked against the text issued, never rebuilt from a label (test/identity-challenge.test.js)
   "src/challenge.js>src/brand.js": ["brandOf"],
+  // the label migration (S48, area d: the legacy token): src/official.js asks only whether the Worker speaks a label set other than today's
+  // (legacyHidden: the legacy token is then shown nowhere, and no token is live without MAIN_TOKEN_V5), and its link checker reads the serving
+  // hosts there. It renames no identifier: VICINITY_MINT and its value, the API's kind "vicinity", the coin-meta URLs, the team lists and the
+  // policy's legacy facts stay as they are (the test above; test/brand-adapters.test.js checks the answers under both label sets)
+  "src/official.js>src/brand.js": ["brandOf"],
+  // (and, review findings CRAWL-3 and F9: the old host names, left out of the public list of websites, and the cutover's planned hosts, which
+  // the checker says do not serve the site yet; lists read, nothing named or stored)
+  "src/official.js>src/site-config.js": ["CUTOVER_HOSTS", "LEGACY_HOSTS", "siteConfig"],
 };
 /** The relative modules a file imports (static import and export-from, and import()): [{ to, names }] (names null for a namespace or a call). */
 function importsOf(file) {
@@ -223,11 +243,12 @@ test("no module that makes a persistent identifier reaches the brand or site ada
   for (const f of ["src/index.js", "scripts/pages/build.mjs"]) assert.ok(importsOf(f).some((e) => e.to === "src/footer-social.js"), f);
 });
 
-test("BRAND and the site settings change no persistent identifier (an unknown BRAND keeps today's labels)", async () => {
+test("BRAND and the site settings change no persistent identifier (an unknown BRAND, or one the pages were not built with, keeps today's labels)", async () => {
   const { brandOf, LEGACY_BRAND } = await import("../src/brand.js");
-  for (const BRAND of ["citycoin", "CityCoin", "x", "__proto__"]) {
+  // "citycoin" is a label set since the label migration (S48), but the Worker counts it only with pages built for it (src/pages-built.js)
+  for (const [BRAND, problem] of [["citycoin", "BRAND_PAGES_MISMATCH"], ["CityCoin", "BRAND_PAGES_MISMATCH"], ["x", "BRAND_UNKNOWN"], ["__proto__", "BRAND_UNKNOWN"]]) {
     const b = brandOf({ BRAND });
-    assert.equal(b.problem, "BRAND_UNKNOWN");
+    assert.equal(b.problem, problem, BRAND);
     assert.equal(b.productName, LEGACY_BRAND.productName);
   }
   const { siteConfig } = await import("../src/site-config.js");
@@ -235,4 +256,44 @@ test("BRAND and the site settings change no persistent identifier (an unknown BR
   assert.equal(s.origin, "https://example.test", "a fixture origin (clearly fake), not a real one");
   const { artUrl } = await import("../src/coinart-store.js");
   assert.ok(artUrl("cd".repeat(32)).startsWith("https://vicinity.city/coin-meta/art/"), "live-launchpad coin art never follows SITE_ORIGIN");
+});
+
+test("BRAND=citycoin with pages built for it (the label migration, area c) renames no persistent identifier", async () => {
+  const { _pagesBuiltForTests } = await import("../src/v5policy.js");
+  const { brandOf } = await import("../src/brand.js");
+  const { brandWords, statementName, statementNames } = await import("../src/brandwords.js");
+  const S = await import("../src/solana.js");
+  const M = await import("../src/coinmeta.js");
+  const { artUrl } = await import("../src/coinart-store.js");
+  const { cityTag, VICINITY_PARTNER } = await import("../src/sol/lpadmin-ix.js");
+  const env = { BRAND: "citycoin" };
+  _pagesBuiltForTests({ brand: "citycoin" }); // a stand-in for a BRAND=citycoin page build (this file's own process)
+  try {
+    assert.equal(brandOf(env).productName, "Citycoin.dev", "the stand-in counts: the Worker speaks Citycoin.dev");
+    // the words: only the product's name and the data label move; the stored value "vicinity", a key, a hash domain never do
+    const bw = brandWords(env);
+    for (const persistent of ["vicinity", "vicinity-seat|", "vicinity:city:5128581", "vicinity_launchpad", "VICINITY", "$VICINITY", "vicinity_preview_role"]) assert.equal(bw.say(persistent), persistent);
+    // today's statements are what they were and are still accepted; the new ones name the product
+    assert.equal(S.statementFor("login"), "Sign in to Vicinity with this wallet. Free, not a transaction, cannot move funds.");
+    assert.equal(S.MESSAGE_STATEMENT, "Verify wallet ownership for Vicinity. This is free, is not a transaction, and cannot move funds.");
+    assert.equal(statementName(env), "Citycoin.dev");
+    assert.deepEqual(statementNames(env), ["Citycoin.dev", "Vicinity"]);
+    const msg = (statement) => S.buildMessage({ host: "vicinity.city", address: "Wallet1111111111111111111111111111111111111", nonce: "n0nce00000000000000", issuedAt: "2026-10-24T00:00:00.000Z", statement });
+    assert.equal(S.parseMessage(msg(S.statementFor("login")), statementNames(env)).action, "login", "a statement of today's name is still accepted");
+    assert.equal(S.parseMessage(msg(S.statementFor("login", {}, "Citycoin.dev")), statementNames(env)).action, "login");
+    assert.equal(S.parseMessage(msg(S.statementFor("login", {}, "Citycoin.dev"))), null, "today's checker (BRAND unset) never takes the new name");
+    // the metadata URI prefix, the picture URLs, the legacy coin-JSON brand, the partner entry and the rewards city tag stay
+    const PREFIX = "https://vicinity.city/coin-meta/";
+    assert.equal(M.metadataUriFor("Mint"), `${PREFIX}Mint.json`);
+    assert.equal(M.coinImageUrl("Mint"), `${PREFIX}Mint.png`);
+    assert.equal(artUrl("ab".repeat(32)), `${PREFIX}art/${"ab".repeat(32)}.png`);
+    assert.deepEqual({ ...M.VICINITY_BRAND }, { name: "Vicinity", site: "https://vicinity.city", logo: "https://vicinity.city/brand/vicinity-512.png", network: "Solana", metadataPrefix: PREFIX });
+    assert.equal(M.metaBrand(env).metadataPrefix, PREFIX);
+    assert.deepEqual({ ...VICINITY_PARTNER }, { name: "Vicinity", website: "https://vicinity.city", logo: "https://vicinity.city/brand/vicinity-512.png" });
+    assert.equal(Buffer.from(cityTag("5128581")).subarray(0, 21).toString("latin1"), "vicinity:city:5128581");
+    // a coin whose JSON was first built under the legacy brand keeps it when it is built again
+    assert.equal(M.metaBrandFor(env, { meta_json: JSON.stringify({ launchpad: "Vicinity" }) }), M.VICINITY_BRAND);
+    assert.equal(M.metaBrandFor(env, { meta_json: null }).name, "Citycoin.dev");
+  } finally { _pagesBuiltForTests(null); }
+  assert.equal(brandOf(env).productName, "Vicinity", "back to the committed build record");
 });

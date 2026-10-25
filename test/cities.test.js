@@ -110,11 +110,12 @@ test("map: a selected city shows the founder amount: the Stake Ladder from /api/
   assert.ok(!js.includes("seat's bar") && !js.includes("Founder minimum"), "one name for the number: the founder amount, as the checklist, token page and dashboard say");
   assert.equal(h.short(180_000), "180K"); assert.equal(h.short(950_000), "950K"); assert.equal(h.short(1_000_000), "1M");
   // the panel line (after "Holders: N") and the tooltip line (its own line, so the status line is no wider than before and the tooltip still fits a 390px phone)
-  assert.ok(js.includes("if (!frozen) sub.append(document.createElement(\"br\"), document.createTextNode(`Founder amount: ${fmt(founderMin(selected, win))} $VICINITY · held ${qualifyingDays} days`));"), "panel line (not while the legacy seats are frozen)");
+  assert.ok(js.includes("if (!frozen) sub.append(document.createElement(\"br\"), document.createTextNode(`Founder amount: ${fmt(founderMin(selected, win))} ${UNIT} · held ${qualifyingDays} days`));"), "panel line (not while the legacy seats are frozen)");
+  assert.ok(js.includes('const UNIT = BRAND ? `${BRAND.name} tokens` : "$VICINITY";'), "the unit: $VICINITY on today's pages (the label migration, area d)");
   assert.ok(js.indexOf("`Founder amount: ${fmt(") > js.indexOf("`Holders: ${fmt(holderCount.get(selected.id) || 0)}`"), "below the Holders line");
   // (stage S16: "no founder yet" and "Open" lose the "yet" and become "No founder" only while the legacy seats are frozen, test/legacy-seats-copy.test.js)
   assert.ok(js.includes(": windows.has(c.id) ? `Choosing its founder: ${windows.get(c.id).applicants} applying` : st === \"active\" ? `Active: ${fmt(h)} verified holder${h === 1 ? \"\" : \"s\"}, no founder${seatsFrozen() ? \"\" : \" yet\"}` : statusWord(\"open\")), el(\"span\", \"tip-ticker\", tk ? `  $${tk.ticker}` : \"\"));"), "the status + ticker line: founder, choosing, active (9 Oct 2026), open");
-  assert.ok(js.includes("if (!seatsFrozen()) tip.append(document.createElement(\"br\"), el(\"span\", \"tip-area\", `Founder amount: ${short(founderMin(c, windows.get(c.id)))} $VICINITY`));"), "tooltip: the founder amount on its own line (not while the legacy seats are frozen)");
+  assert.ok(js.includes("if (!seatsFrozen()) tip.append(document.createElement(\"br\"), el(\"span\", \"tip-area\", `Founder amount: ${short(founderMin(c, windows.get(c.id)))} ${UNIT}`));"), "tooltip: the founder amount on its own line (not while the legacy seats are frozen)");
   // the numbers come from /api/policy once per page load (never per city), applied when they land: that route is a database round
   // trip, so the map's first paint waits for the static files only, and a policy that lands later re-renders the panel
   assert.equal((js.match(/fetch\("\/api\/policy"\)/g) || []).length, 1);

@@ -8,7 +8,7 @@
  * Every number carries its source; a missing one carries a reason (market.missing). Nothing is estimated.
  */
 import { json } from "./http.js";
-import { activeMint, launchedAtOf, tokenMint } from "./official.js";
+import { activeMint, launchedAtOf, legacyHidden, tokenMint } from "./official.js";
 import { mainTokenV5 } from "./v5policy.js";
 import { MAIN_TOKEN_LABEL } from "./maintoken.js";
 import { PAIRS, coinOf, coinView } from "./coins.js";
@@ -23,6 +23,7 @@ import { poolAddress } from "./launchlab.js";
 import { isSolanaAddress } from "./solana.js";
 import { iso } from "./policy.js";
 import { NO_CHART, NO_TRADES, applyLpMarket, curveOf, lpLinks, recordedCoins } from "./lpcoins.js";
+import { brandWords } from "./brandwords.js";
 
 const SOL = PAIRS.SOL.mint;
 const MEMO_MS = 30_000, DEGRADED_MS = 5_000, FACTS_MS = 5 * 60_000;
@@ -38,8 +39,10 @@ export async function allowListed(env, mint) {
     const main = tokenMint(env);
     if (main && mint === main) return { kind: "vicinity", mint, pairMint: SOL, pair: "SOL", ticker: null, name: MAIN_TOKEN_LABEL, launchedAt: null, city: null, color: "gold", logo: null, logoHash: null };
   }
+  // the legacy token's page: today's label set only (a label set other than today's shows $VICINITY nowhere: src/official.js legacyHidden;
+  // its mint then answers like any unknown one, and the page says only the city coins have a page)
   const vic = activeMint(env);
-  if (!mainTokenV5(env) && vic && mint === vic) {
+  if (!mainTokenV5(env) && !legacyHidden(env) && vic && mint === vic) {
     return { kind: "vicinity", mint, pairMint: SOL, pair: "SOL", ticker: "VICINITY", name: "Vicinity", launchedAt: launchedAtOf(mint), city: null, color: "gold", logo: null, logoHash: null };
   }
   await ensureSchema(env.DB);
@@ -72,6 +75,7 @@ let memos = new WeakMap(); // env.DB -> Map(mint -> { at, ttl, promise }): one b
 export const _resetCoin = () => { memos = new WeakMap(); facts.clear(); };
 
 async function build(env, coin, fetchImpl, now) {
+  const bw = brandWords(env); // the product's name in this answer's own words (src/brandwords.js): today's words while BRAND is unset
   const live = await liveMarkets(env, [coin], fetchImpl, { now });
   const market = live.markets.get(coin.mint);
   // a coin of our own launchpad (only while its settings are there): its stage and progress from its Meteora curve, its own
@@ -82,12 +86,12 @@ async function build(env, coin, fetchImpl, now) {
     if (lpRow) lpCurve = await curveOf(env, lpRow, fetchImpl, now);
   } catch (e) { live.ok = false; console.error("coin curve unavailable", codeOf(e)); }
   // the curve's own quote token prices it (the chain's, never the design's pair: a USD price off by the price of SOL otherwise)
-  if (lpRow) applyLpMarket(market, lpCurve, live.pairPrices.get(lpRow.quote_mint) ?? null);
+  if (lpRow) applyLpMarket(market, lpCurve, live.pairPrices.get(lpRow.quote_mint) ?? null, bw);
   let holders = null, holdersOk = true;
   try {
     await ensureLaunchpadSchema(env.DB);
     const r = await env.DB.prepare("SELECT holders, updated_at FROM coin_stats WHERE mint = ?").bind(coin.mint).first();
-    if (r && r.holders != null) holders = { count: Number(r.holders), asOf: r.updated_at, source: "Counted by vicinity.city (pools and team wallets excluded)" };
+    if (r && r.holders != null) holders = { count: Number(r.holders), asOf: r.updated_at, source: bw`Counted by vicinity.city (pools and team wallets excluded)` };
   } catch (e) { holdersOk = false; console.error("coin holders unavailable", codeOf(e)); }
   const f = await factsOf(env, coin.mint, fetchImpl, now);
 
@@ -97,7 +101,7 @@ async function build(env, coin, fetchImpl, now) {
   const unread = !lpRow && !market.curve && market.codes?.chain === "unreadable" && market.stage == null;
   const guessed = unread ? await poolAddress(coin.mint, coin.pairMint) : null;
   const pool = lpRow ? null : market.curve?.poolId || guessed;
-  if (lpRow) trades = { source: null, rows: [], missing: NO_TRADES };
+  if (lpRow) trades = { source: null, rows: [], missing: bw.say(NO_TRADES) };
   else if (pool) {
     // the same Raydium call with a page of 50 (its default is 20): the token page shows the newest 20 and opens the rest on "Show all"
     const r = await raydiumTradesFor(pool, fetchImpl, { now, minT: minTimeOf(coin), limit: 50 });
@@ -130,9 +134,9 @@ async function build(env, coin, fetchImpl, now) {
   const body = {
     ok: true, asOf: iso(now), mint: coin.mint,
     coin: { kind: coin.kind, ticker: coin.ticker, name: coin.name, city: coin.city, pair: { symbol: coin.pair, mint: coin.pairMint }, launchedAt: coin.launchedAt, color: coin.color, logo: coin.logo, logoHash: coin.logoHash ?? null },
-    facts: f ? { ...f, source: "Solana blockchain, read by vicinity.city" } : null,
+    facts: f ? { ...f, source: bw`Solana blockchain, read by vicinity.city` } : null,
     market, holders, trades, samples, links,
-    attribution: attributionFor(live.used, { holders: Boolean(holders), trades: Boolean(pool) }),
+    attribution: attributionFor(live.used, { holders: Boolean(holders), trades: Boolean(pool) }, bw),
   };
   if (!f) body.missing = { facts: "The chain could not be read" };
   return { body, degraded: !live.ok || !holdersOk || !f };
@@ -165,12 +169,12 @@ export const CHART_TTL = { "1h": 60, "24h": 60, "7d": 300, "30d": 300, all: 300 
 
 /** GET /api/coin/chart?mint=&tf= (the route has checked the switch, the method, the database, the mint and tf). */
 export async function handleCoinChart(env, mint, tf, fetchImpl = fetch, now = Date.now()) {
-  const coin = await allowListed(env, mint);
+  const coin = await allowListed(env, mint), bw = brandWords(env);
   if (!coin) return json({ ok: false, error: "unknown_coin" }, 404);
   try {
     const body = await chartFor(env, coin, tf, fetchImpl, now);
     // a coin of our own launchpad has no LaunchLab candles: an honest line instead (the USD line of our own samples stays)
-    if ((await recordedCoins(env)).has(mint)) { body.candles = null; body.missing = { ...body.missing, candles: NO_CHART }; }
+    if ((await recordedCoins(env)).has(mint)) { body.candles = null; body.missing = { ...body.missing, candles: bw.say(NO_CHART) }; }
     const short = body.candles?.note && /could not be read/.test(body.candles.note);
     return json(body, 200, { "Cache-Control": `public, max-age=${short ? 10 : CHART_TTL[tf]}` });
   } catch (e) {

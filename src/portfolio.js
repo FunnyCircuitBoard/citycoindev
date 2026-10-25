@@ -32,7 +32,7 @@
  */
 import { json } from "./http.js";
 import { access } from "./access.js";
-import { activeMint, tokenMint } from "./official.js";
+import { activeMint, legacyHidden, tokenMint } from "./official.js";
 import { mainTokenV5 } from "./v5policy.js";
 import { MAIN_TOKEN_LABEL } from "./maintoken.js";
 import { ensureSchema } from "./store.js";
@@ -99,7 +99,8 @@ async function loadMints(env, now) {
   const flight = (async () => {
     const list = [];
     const seen = new Set(Object.values(PAIRS).map((p) => p.mint)); // SOL, USDC and RAY are never a city coin, whatever the table says
-    const v5 = mainTokenV5(env), live = v5 ? null : activeMint(env);
+    // the legacy token is on the list for today's label set only (a label set other than today's shows it nowhere: src/official.js legacyHidden)
+    const v5 = mainTokenV5(env), hidden = legacyHidden(env), live = v5 || hidden ? null : activeMint(env);
     if (live && isSolanaAddress(live) && !seen.has(live)) {
       seen.add(live);
       list.push({ kind: "vicinity", mint: live, symbol: "VICINITY", name: "Vicinity" });
@@ -109,7 +110,7 @@ async function loadMints(env, now) {
       // $VICINITY's name), then $VICINITY as a legacy item (`kind: "legacy"`): a member may still see and send their own, labelled legacy
       const main = tokenMint(env), legacy = activeMint(env);
       if (main && isSolanaAddress(main) && !seen.has(main)) { seen.add(main); list.push({ kind: "vicinity", mint: main, symbol: null, name: MAIN_TOKEN_LABEL }); }
-      if (legacy && isSolanaAddress(legacy) && !seen.has(legacy)) { seen.add(legacy); list.push({ kind: "legacy", mint: legacy, symbol: "VICINITY", name: "Vicinity (legacy token)" }); }
+      if (!hidden && legacy && isSolanaAddress(legacy) && !seen.has(legacy)) { seen.add(legacy); list.push({ kind: "legacy", mint: legacy, symbol: "VICINITY", name: "Vicinity (legacy token)" }); }
     }
     if (env && env.DB) {
       await ensureSchema(env.DB);

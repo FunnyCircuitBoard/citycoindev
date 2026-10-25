@@ -12,7 +12,8 @@ import * as W from "./helpers/world.js";
 import { openDashboard, memberMe, ADDR } from "./helpers/dashpage.js";
 import { pagesAsCommitted } from "./helpers/mainswitch.js";
 import { FROZEN_COPY } from "../scripts/pages/frozen-copy.mjs";
-import { PAGES_BUILT_FILE, buildPages, buildStandalonePages, deployedVars, frozenCopy, pageLegacySeats, pagesBuiltSource } from "../scripts/pages/build.mjs";
+import { PAGES_BUILT_FILE, buildPages, buildStandalonePages, deployedVars, frozenCopy, frozenFor, pageLegacySeats, pagesBuiltSource } from "../scripts/pages/build.mjs";
+import { LEGACY_BRAND } from "../src/brand.js";
 import { _resetPolicyCheck } from "../src/v5policy.js";
 
 const committed = (f) => readFileSync(new URL(`../public/${f}`, import.meta.url), "utf8");
@@ -66,8 +67,10 @@ test("the frozen copy: every passage applies once; only the pages it names chang
     else assert.equal(html, committed(f), `${f}: untouched by the freeze`);
   }
   for (const f of named) {
-    const d = FROZEN_COPY[f];
+    // (the table as today's label set reads it: brand blocks and label fills resolved, scripts/pages/build.mjs frozenFor)
+    const d = frozenFor(f, FROZEN_COPY[f], LEGACY_BRAND);
     if (d.description) assert.match(frozen.get(f), new RegExp(`<meta name="description" content="${d.description.replace(/[$.()]/g, "\\$&")}">`), `${f}: its frozen description`);
+    assert.equal(d.replace.length, FROZEN_COPY[f].replace.length, `${f}: every passage is today's label set's`);
     for (const [old] of d.replace) assert.ok(committed(f).includes(old), `${f}: the passage is today's copy, as built`);
   }
   // a passage that is gone, or there twice, stops the build (a typo never ships half old, half new)

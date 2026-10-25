@@ -30,6 +30,7 @@ import { LAYOUT } from "./sol/layout.js";
 import { decodeMetadata, metadataAddress } from "./sol/metaplex.js";
 import { metaJsonFor, metadataUriFor } from "./coinmeta.js";
 import { bindVersion } from "./coinart-store.js";
+import { SAME, brandWords } from "./brandwords.js";
 
 export const COIN_SIZE = LAYOUT.Coin.size; // 243
 export const COIN_MINT_OFFSET = LAYOUT.Coin.fields.mint.at; // 48
@@ -289,7 +290,7 @@ const pairOfQuote = (quoteMint) => QUOTE_SYMBOL[quoteMint] ?? null;
  * true: set now · false: already this mint · "conflict": another mint is recorded there (nothing changes) · null: no design row.
  */
 async function lockDesign(env, row, chain, now) {
-  const db = env.DB;
+  const db = env.DB, bw = brandWords(env);
   const name = chain && typeof chain.name === "string" && chain.name ? chain.name : null;
   const pair = chain ? pairOfQuote(chain.quoteMint) : null;
   const usable = pair && ["SOL", "USDC"].includes(pair) ? pair : null; // RAY/USDT are not quote mints the design form can name truthfully here
@@ -318,7 +319,7 @@ async function lockDesign(env, row, chain, now) {
   await db.prepare(`INSERT INTO mod_actions (actor_id, actor_role, action, target_type, target_id, target_user, country, place, reason, note, created_at, state)
       VALUES (?, 'founder', 'coin_launched', 'city_coin', NULL, ?, ?, ?, 'launch', ?, ?, 'done')`)
     .bind(design.user_id, design.user_id, design.country, String(row.city_id),
-      `${design.city_name}: launched on the Vicinity launchpad (Solana ${row.cluster}), contract ${row.mint}. Recorded from the blockchain; the coin design is locked.${dropped}`, iso(now)).run();
+      bw`${design.city_name}: launched on the Vicinity launchpad (Solana ${row.cluster}), contract ${row.mint}. Recorded from the blockchain; the coin design is locked.${dropped}`, iso(now)).run();
   if (dropped) {
     await db.prepare("INSERT INTO admin_audit (actor, action, target, detail, created_at) VALUES ('site', 'coin_contract_dropped', ?, ?, ?)")
       .bind(String(row.city_id), `the waiting Raydium LaunchLab contract ${was.pending_mint} was dropped when ${row.mint} was recorded from the blockchain`, iso(now)).run()
@@ -442,20 +443,21 @@ export function lpLinks(mint, stage) {
 /**
  * Put the truth of our launchpad on a market object of src/marketlive.js (in place): no LaunchLab venue, the stage and the
  * progress toward the target from the DBC pool (market.lpCurve), and on the curve the price, market cap and "in the curve"
- * from the chain × the pair's price (Jupiter) where Jupiter has no price of its own. `curve` null: the pool could not be read.
+ * from the chain × the pair's price (Jupiter) where Jupiter has no price of its own. `curve` null: the pool could not be read. `bw`: the
+ * product's name in the words (src/brandwords.js; today's words by default).
  */
-export function applyLpMarket(m, curve, pairUsd) {
+export function applyLpMarket(m, curve, pairUsd, bw = SAME) {
   if (!m) return m;
   m.launchpad = "vicinity";
   m.curve = null; // market.curve is the Raydium LaunchLab curve on every page; ours has its own key
   if (m.url && /raydium\.io/.test(m.url)) m.url = null;
-  const say = (v) => (typeof v === "string" ? v.replace(/no LaunchLab curve on the chain/g, "a coin on the Vicinity curve") : v);
+  const say = (v) => (typeof v === "string" ? v.replace(/no LaunchLab curve on the chain/g, bw.say("a coin on the Vicinity curve")) : v);
   for (const k of Object.keys(m.missing || {})) m.missing[k] = say(m.missing[k]);
-  if (!curve) { m.lpCurve = null; m.missing.curve = "The Vicinity curve could not be read just now"; return m; }
+  if (!curve) { m.lpCurve = null; m.missing.curve = bw`The Vicinity curve could not be read just now`; return m; }
   m.stage = curve.stage;
-  m.lpCurve = { venue: LP_VENUE, stage: curve.stage, symbol: curve.symbol, raised: curve.raised, target: curve.target, progressPct: curve.progressPct,
-    pool: curve.pool, graduatesTo: "a Meteora DAMM v2 pool", source: "Solana blockchain, read by vicinity.city" };
-  m.sources.curve = "Solana blockchain, read by vicinity.city";
+  m.lpCurve = { venue: bw.say(LP_VENUE), stage: curve.stage, symbol: curve.symbol, raised: curve.raised, target: curve.target, progressPct: curve.progressPct,
+    pool: curve.pool, graduatesTo: "a Meteora DAMM v2 pool", source: bw`Solana blockchain, read by vicinity.city` };
+  m.sources.curve = bw`Solana blockchain, read by vicinity.city`;
   if (curve.stage === "curve") {
     m.liquidityKind = "bonding_curve";
     if (curve.priceNative != null) { m.priceNative = curve.priceNative; m.nativeSymbol = curve.symbol; }
@@ -498,7 +500,8 @@ export async function handleLpCoin(request, env, fetchImpl = fetch, now = Date.n
   if (!f.row) return json({ ok: false, error: "not_found" }, 404, { "Cache-Control": "public, max-age=60" });
   const row = f.row;
   let curve = null, missing = null;
-  try { curve = await curveOf(env, row, fetchImpl, now); if (!curve) missing = "The coin's curve could not be read as a Vicinity curve"; }
+  const bw = brandWords(env);
+  try { curve = await curveOf(env, row, fetchImpl, now); if (!curve) missing = bw`The coin's curve could not be read as a Vicinity curve`; }
   catch (e) { console.error("lp coin curve failed", codeOf(e)); missing = "The blockchain could not be read just now"; }
   return json({
     ok: true, mint: row.mint, cityId: String(row.city_id), cluster: row.cluster, coin: row.coin, founder: mask(row.founder), name: row.name, symbol: row.symbol,

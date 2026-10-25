@@ -1,10 +1,10 @@
-<!--{"title": "Connect", "description": "Join Vicinity in two quick steps: where you are, then who you are. Your dashboard opens right after; link a Solana wallet there whenever you like.", "page": "connect", "scripts": ["vendor/qrcode", "wallets", "connect"], "styles": ["onboard", "pages-connect"]}-->
+<!--{"title": "Connect", "description": "Join {{productName}} in two quick steps: where you are, then who you are. Your dashboard opens right after; link a Solana wallet there whenever you like.", "page": "connect", "scripts": ["vendor/qrcode", "wallets", "connect"], "styles": ["onboard", "pages-connect"]}-->
     <section class="connect">
       <div class="wrap connect__grid">
         <!-- the intro: a compact centred header above the panel (public/signup.js setIntro and connect.js write the kicker, the title and
              the lead; signup.js writes the first .safety line, so the fold stays the intro's last child) -->
         <div class="connect__intro">
-          <p class="kicker">Join Vicinity</p>
+          <p class="kicker">Join {{productName}}</p>
           <h1 class="page-title">Your city.<br><span class="accent">Your account.</span></h1>
           <p class="lead">Share your location once (it is never stored), then sign in. Link a wallet later, from your dashboard.</p>
           <ol class="stepper" id="stepper">
@@ -16,7 +16,7 @@
             <summary><svg class="safe-fold__ico" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 5 6.2v5.3c0 4.3 2.9 7.9 7 9 4.1-1.1 7-4.7 7-9V6.2z"/><path d="m9 12 2.2 2.2L15.2 10"/></svg>Safe by design</summary>
             <ul class="safety">
               <li>Signing in is free. It isn't a transaction and can't move funds.</li>
-              <li>Vicinity will never ask for your recovery phrase or private key.</li>
+              <li>{{productName}} will never ask for your recovery phrase or private key.</li>
               <li>One account per wallet and per Google login or verified e-mail. That makes fake accounts harder, but it is not proof of one person.</li>
             </ul>
           </details>
@@ -58,7 +58,7 @@
               <p class="tiny muted" id="lg-wallet-note" hidden>One free signature. Nothing is paid or moved.</p>
               <button class="link-btn" type="button" id="lg-join" hidden>New here? Join</button>
               <a class="btn btn--social btn--google" href="/api/auth/google/start" id="lg-google" hidden><span class="social-mark social-mark--g" aria-hidden="true"><svg viewBox="0 0 48 48" width="20" height="20" focusable="false"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg></span> Log in with Google</a>
-              <p class="callout small" id="lg-inapp" hidden>You're inside a wallet app's browser. Google doesn't allow log-in here, so use your e-mail or your wallet. To use Google, open <strong>vicinity.city/connect</strong> in Safari or Chrome. <button class="link-btn" type="button" id="lg-copy">Copy the link</button></p>
+              <p class="callout small" id="lg-inapp" hidden>You're inside a wallet app's browser. Google doesn't allow log-in here, so use your e-mail or your wallet. To use Google, open <!--@if citycoin-->this page<!--@else--><strong>vicinity.city/connect</strong><!--@end--> in Safari or Chrome. <button class="link-btn" type="button" id="lg-copy">Copy the link</button></p>
               <p class="or-line" id="lg-or"><span>or with your e-mail</span></p>
               <form class="su-form" id="lg-form" method="post" action="/api/auth/email/login" novalidate>
                 <div class="su-field">
@@ -106,7 +106,7 @@
                 </form>
               </div>
               <p class="muted small" id="login-off" hidden>Log in with Google or e-mail is being switched on. Use your wallet below for now.</p>
-              <p class="callout small" id="login-inapp" hidden>You're inside a wallet app's browser. Google doesn't allow log-in here, so use e-mail or your wallet. To use Google, open <strong>vicinity.city/connect</strong> in Safari or Chrome. <button class="link-btn" type="button" id="login-copy">Copy the link</button></p>
+              <p class="callout small" id="login-inapp" hidden>You're inside a wallet app's browser. Google doesn't allow log-in here, so use e-mail or your wallet. To use Google, open <!--@if citycoin-->this page<!--@else--><strong>vicinity.city/connect</strong><!--@end--> in Safari or Chrome. <button class="link-btn" type="button" id="login-copy">Copy the link</button></p>
               <p class="tiny muted">Logging in with Google or e-mail doesn't prove your wallet. You'll sign once with it before you apply, vote or moderate.</p>
             </section>
             <!-- v2, a member without a wallet (link mode): the top of the panel -->
@@ -114,7 +114,7 @@
               <p class="kicker">Almost done</p>
               <h2 class="h2--sm" id="link-title" tabindex="-1">Connect your wallet.</h2>
               <p class="muted small">One free signature proves the wallet is yours. Nothing is paid or moved.</p>
-              <p class="tiny muted link-top__safe">Vicinity will never ask for your recovery phrase or private key.</p>
+              <p class="tiny muted link-top__safe">{{productName}} will never ask for your recovery phrase or private key.</p>
             </div>
             <p class="or-line" id="or-line"><span>New here, or logging in with your wallet</span></p>
             <h2 class="h2--sm" id="wallet-h">Choose your wallet</h2>
@@ -135,14 +135,14 @@
             <div class="alt-ways">
               <button type="button" class="alt" id="alt-phone"><span class="alt__icon ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></span><span><strong>Wallet on my phone</strong><em>Scan a code with your phone, sign there, continue here.</em></span></button>
               <button type="button" class="alt" id="alt-app"><span class="alt__icon ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5h11v3"/><rect x="4" y="8" width="16.5" height="11" rx="2.5"/><path d="M16 13.5h1.5"/></svg></span><span><strong>App wallet (FOMO, exchanges…)</strong><em>Can't connect to websites? Send yourself a tiny, exact amount instead.</em></span></button>
-              <a class="alt" href="/token#verify" id="alt-check"><span class="alt__icon ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5h16"/><path d="m4.5 15 4.5-4.5 3.5 3.5 7-7.5"/><path d="M15 6.5h4.5V11"/></svg></span><span><strong>Just check a wallet's rank</strong><em>Paste any address. No sign-in needed.</em></span></a>
+              <a class="alt<!--@if citycoin--> cc-off<!--@end-->" href="/token#verify" id="alt-check"><span class="alt__icon ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5h16"/><path d="m4.5 15 4.5-4.5 3.5 3.5 7-7.5"/><path d="M15 6.5h4.5V11"/></svg></span><span><strong>Just check a wallet's rank</strong><em>Paste any address. No sign-in needed.</em></span></a>
               <a class="link-btn link-skip" href="/dashboard" id="alt-skip" hidden>Skip for now</a>
             </div>
           </div>
 
           <!-- 1b. sign the message (a log-in, or the link of a wallet to the account) -->
           <div class="cstate" data-state="sign" hidden>
-            <div class="wallet__icon" aria-hidden="true"><img src="/logo.svg" alt="" width="44" height="44"></div>
+            <div class="wallet__icon" aria-hidden="true"><img src="<!--@if citycoin-->/brand/favicon.svg<!--@else-->/logo.svg<!--@end-->" alt="" width="44" height="44"></div>
             <h2 class="h2--sm" id="sign-h">Sign in with this wallet</h2>
             <div class="addr"><span class="addr__dot" aria-hidden="true"></span><span id="c-addr">—</span></div>
             <p class="muted small" id="c-lead">Connected with <span id="c-wallet">your wallet</span>. Signing is free and isn't a transaction.</p>
@@ -155,7 +155,7 @@
           <div class="cstate" data-state="phone" hidden>
             <h2 class="h2--sm" id="pair-h">Scan with your phone</h2>
             <p class="callout small" id="pair-why" hidden></p>
-            <div class="qr" id="pair-qr"><canvas id="qr" width="232" height="232" aria-label="QR code to open Vicinity on your phone"></canvas></div>
+            <div class="qr" id="pair-qr"><canvas id="qr" width="232" height="232" aria-label="QR code to open {{productName}} on your phone"></canvas></div>
             <p class="pin-row">Check number: <strong class="pin" id="pair-pin">--</strong></p>
             <ol class="howto small" id="pair-howto">
               <li>Scan the code with your phone's camera.</li>
@@ -271,7 +271,7 @@
             <div id="su-acc-choose">
               <div class="su-ident">
                 <button class="btn btn--primary btn--block btn--lg" type="button" id="su-google" hidden><span class="social-mark social-mark--g" aria-hidden="true"><svg viewBox="0 0 48 48" width="20" height="20" focusable="false"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg></span> Agree and continue with Google</button>
-                <p class="callout small" id="su-inapp" hidden>Google cannot sign you in inside a wallet app. Use e-mail here, or open <strong>vicinity.city/connect</strong> in Safari or Chrome. <button class="link-btn" type="button" id="su-copy">Copy the link</button></p>
+                <p class="callout small" id="su-inapp" hidden>Google cannot sign you in inside a wallet app. Use e-mail here, or open <!--@if citycoin-->this page<!--@else--><strong>vicinity.city/connect</strong><!--@end--> in Safari or Chrome. <button class="link-btn" type="button" id="su-copy">Copy the link</button></p>
               </div>
               <!-- ticked from the start: the button above already says "Agree and continue", so the box only records it (untick it to hold the buttons);
                    data-fb-avoid: the floating feedback button steps aside rather than sit on the Terms box -->
@@ -306,7 +306,7 @@
               <details class="fold su-keep">
                 <summary>What we keep and who sees it <span class="fold__meta">Google: your id and first name · e-mail: the address and a scrambled password<span data-profiles-only hidden> · members see your wallet and balances</span></span></summary>
                 <p class="tiny muted">With Google we keep only your Google account id and first name. With e-mail we keep your address and a scrambled (hashed) copy of your password. Nobody can read your password, not even us.</p>
-                <p class="tiny muted" id="su-profiles-note" data-profiles-only hidden>Other signed-in members can see your username, community, bio, wallet address and your $VICINITY and city-coin balances.</p>
+                <p class="tiny muted" id="su-profiles-note" data-profiles-only hidden>Other signed-in members can see your username, community, bio, wallet address and your <!--@if !citycoin-->$VICINITY and <!--@end-->city-coin balances.</p>
               </details>
             </div>
             <form class="su-form" id="su-code-form" method="post" action="/api/signup/email/verify" hidden novalidate>
@@ -351,7 +351,7 @@
 
           <!-- v2, the wallet app's browser opened by "Open app" (/connect?link=CODE): nothing happens until the person confirms it is their own account -->
           <div class="cstate link-in" data-state="carry-in" hidden>
-            <h2 class="h2--sm" id="carry-in-h" tabindex="-1">Link this wallet to your Vicinity account?</h2>
+            <h2 class="h2--sm" id="carry-in-h" tabindex="-1">Link this wallet to your {{productName}} account?</h2>
             <div class="su-carry">
               <div class="link-in__pass" id="carry-in-pass">
                 <span class="link-in__avatar" id="carry-in-avatar" aria-hidden="true">•</span>
@@ -377,7 +377,7 @@
             <h2 class="h2--sm" id="na-h" tabindex="-1">No account for this wallet yet</h2>
             <p class="muted small" id="na-body">Create one with Google in a minute, then link this wallet from your dashboard.</p>
             <button class="btn btn--primary btn--block btn--lg" type="button" id="na-create">Create my account</button>
-            <button class="btn btn--primary btn--block btn--lg" type="button" id="na-copy" hidden>Copy vicinity.city/connect</button>
+            <button class="btn btn--primary btn--block btn--lg" type="button" id="na-copy" hidden><!--@if citycoin-->Copy the link<!--@else-->Copy vicinity.city/connect<!--@end--></button>
             <p class="tiny muted" id="na-tiny" hidden>Already a member? <button class="link-btn link-btn--tiny" type="button" id="na-login">Log in with the wallet on your account, or with your e-mail and password.</button></p>
             <button class="link-btn" type="button" id="na-another">Try another wallet</button>
           </div>
@@ -408,7 +408,7 @@
           <div class="cstate" data-state="su-reset" hidden>
             <h2 class="h2--sm" id="rs-title" tabindex="-1">Get back in with an e-mail code</h2>
             <form class="su-form" id="rs-form1" method="post" action="/api/auth/password/reset/start" novalidate>
-              <p class="muted small">Enter your e-mail. If it has a Vicinity account, we'll send a 6-digit code. Then you choose a new password and you're in. Signed up with Google? Use the Google button on the Log in tab instead.</p>
+              <p class="muted small">Enter your e-mail. If it has a {{productName}} account, we'll send a 6-digit code. Then you choose a new password and you're in. Signed up with Google? Use the Google button on the Log in tab instead.</p>
               <div class="su-field">
                 <label for="rs-email">E-mail</label>
                 <input id="rs-email" name="email" type="email" inputmode="email" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="254" placeholder="you@example.com" required aria-describedby="rs-email-error">
@@ -417,7 +417,7 @@
               <button class="btn btn--primary btn--block" type="submit" id="rs-send">Send me a code</button>
             </form>
             <form class="su-form" id="rs-form2" method="post" action="/api/auth/password/reset" hidden novalidate>
-              <p class="small">If that address has a Vicinity account, we sent a 6-digit code to <strong id="rs-sent-to">—</strong>. It works for 10 minutes. Check your spam folder too.</p>
+              <p class="small">If that address has a {{productName}} account, we sent a 6-digit code to <strong id="rs-sent-to">—</strong>. It works for 10 minutes. Check your spam folder too.</p>
               <div class="su-field">
                 <label for="rs-code">6-digit code</label>
                 <input id="rs-code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" spellcheck="false" maxlength="6" placeholder="••••••" aria-describedby="rs-code-error">

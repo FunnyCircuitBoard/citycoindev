@@ -28,13 +28,14 @@ import { mainCacheTag, tokenMint } from "./official.js";
 import { coinV2ReviewOn } from "./flags.js";
 import { notify, pictureReason } from "./notify.js";
 import { coinDefaults } from "./coindefaults.js";
-import { TEMPLATE_VERSION, coinSvg, sha256Hex } from "./coinart.js";
+import { coinSvg, sha256Hex } from "./coinart.js";
 import { artBySvg, artBytes, artPath, chosenOf, cityDescription, storeArtStatement, takedownStatement, unboundUploads, versionForCoin } from "./coinart-store.js";
-import { canonicalContent, choiceStatements, ensureArt, renderPng, versionLabel } from "./coinready.js";
+import { canonicalContent, choiceStatements, ensureArt, renderPng, templateOf, versionLabel } from "./coinready.js";
 import { ensureReviewSchema } from "./coinreview.js";
-import { versionJson } from "./coinmeta.js";
+import { metaBrandFor, versionJson } from "./coinmeta.js";
 import { rebuildMetaJson } from "./lpcoins.js";
 import { forgetCopies } from "./memos.js";
+import { brandWords } from "./brandwords.js";
 
 /** The words the older path gave for a launched ready-made coin whose description is Vicinity's own (kept word for word). */
 export const SYSTEM_TEXT_LAUNCHED = "This coin's description is Vicinity's own sentence from the city list (it launched with the Vicinity design), not the founder's text, so there is nothing to take down. Nothing was changed.";
@@ -66,7 +67,8 @@ export async function v2Takedown(env, { coin, what, sha = null, reason, note, ac
   const on = coinV2ReviewOn(env);
   if (!on && (c.origin || "default") === "default") return null; // stage 1's coin with the switch off: as before
   if (on) await ensureReviewSchema(db);
-  const t = { env, db, cityId, coin, c, reason, note, actor, now, at: iso(now), city: c.content.city || {}, sentence: cityDescription(c.content.city) };
+  // bw: the product's name in every word this takedown writes or answers (src/brandwords.js); tv: the template its defaults are drawn with
+  const t = { env, db, cityId, coin, c, reason, note, actor, now, at: iso(now), city: c.content.city || {}, sentence: cityDescription(c.content.city), bw: brandWords(env), tv: templateOf(env) };
   if (what === "text") return launched ? textLaunched(t) : textChosen(t);
   return launched ? artLaunched(t, sha) : artChosen(t, sha);
 }
@@ -80,8 +82,8 @@ async function vicinityName(t, d) {
 /** Vicinity's coin for the city as the list gives it now (the picture drawn if it never was). */
 async function defaultsVersion(t, d) {
   const art = await ensureArt(t.env, d, t.now);
-  const content = canonicalContent({ city: d.city, name: d.name, symbol: d.ticker, description: d.description, artSha256: art.sha256, templateVersion: TEMPLATE_VERSION });
-  return { content, hash: await sha256Hex(content), name: d.name, symbol: d.ticker, description: d.description, artSha: art.sha256, templateVersion: TEMPLATE_VERSION, origin: "default" };
+  const content = canonicalContent({ city: d.city, name: d.name, symbol: d.ticker, description: d.description, artSha256: art.sha256, templateVersion: t.tv });
+  return { content, hash: await sha256Hex(content), name: d.name, symbol: d.ticker, description: d.description, artSha: art.sha256, templateVersion: t.tv, origin: "default" };
 }
 const modLog = (t, action, words) => t.db.prepare(`INSERT INTO mod_actions (actor_id, actor_role, action, target_type, target_id, target_user, country, place, reason, note, created_at, state)
     VALUES (?, 'admin', ?, 'city_coin', NULL, ?, ?, ?, ?, ?, ?, 'done')`).bind(t.actor.id, action, t.coin.user_id ?? null, t.coin.country, t.cityId, t.reason, `${t.coin.city_name}: ${words}`, t.at);
@@ -137,7 +139,7 @@ async function textChosen(t) {
   const d = await coinDefaults(env, cityId, coin.country);
   if (!d.ok) return refuse(d.code === "list_unavailable" ? 503 : 409, d.code, `${d.message} Nothing was changed.`);
   const ownText = c.description !== t.sentence, ownName = !(await vicinityName(t, d));
-  if (!ownText && !ownName) return refuse(409, "system_text", SYSTEM_TEXT);
+  if (!ownText && !ownName) return refuse(409, "system_text", t.bw.say(SYSTEM_TEXT));
   let v;
   if (ownName) v = await defaultsVersion(t, d);
   else {
@@ -157,18 +159,18 @@ async function textChosen(t) {
   const refused = await writeChoice(t, v, {
     before: [...marks, ...(withdraw.n ? [withdraw.stmt] : []), ...(redacted.n ? [redacted.stmt] : [])],
     log: { actorId: t.actor.id, role: "admin", action: "coin_text_removed", reason: t.reason,
-      note: `${coin.city_name}: the founder's ${what} taken down (${pictureReason(t.reason)}); the coin uses Vicinity's ${ownName ? "coin for the city" : "own description"}, version ${versionLabel(v.hash)}` },
+      note: t.bw`${coin.city_name}: the founder's ${what} taken down (${pictureReason(t.reason)}); the coin uses Vicinity's ${ownName ? "coin for the city" : "own description"}, version ${versionLabel(v.hash)}` },
     after: [audit(t, "coins/takedown_text", `version ${c.content_hash} → ${v.hash}`)],
   });
   if (refused) return refused;
   await purgePages(env);
   const n = await notify(env, { to: c.user_id, kind: "founder", ref: cityId, href: "/dashboard#founder", now: t.now,
-    text: ownName ? `Vicinity took down your coin's ${ownText ? "name and description" : "name"}: ${pictureReason(t.reason)}. Your coin is Vicinity's coin for ${d.city.name} again.`
-      : `Vicinity took down your coin's description: ${pictureReason(t.reason)}. Your coin uses Vicinity's own description now.` });
+    text: ownName ? t.bw`Vicinity took down your coin's ${ownText ? "name and description" : "name"}: ${pictureReason(t.reason)}. Your coin is Vicinity's coin for ${d.city.name} again.`
+      : t.bw`Vicinity took down your coin's description: ${pictureReason(t.reason)}. Your coin uses Vicinity's own description now.` });
   const changed = ownName
     ? [`Taken down: the founder's coin name${ownText ? " and their description" : ""}.`,
-      `The coin is Vicinity's coin for ${d.city.name} again: $${v.symbol} “${v.name}”, the Vicinity design and Vicinity's own description (“${v.description}”), because the name, the ticker and the picture were reviewed together.`]
-    : [`Taken down: the founder's description of $${c.symbol}.`, `The coin uses Vicinity's own sentence now (“${t.sentence}”); its name, ticker and picture stay.`];
+      t.bw`The coin is Vicinity's coin for ${d.city.name} again: $${v.symbol} “${v.name}”, the Vicinity design and Vicinity's own description (“${v.description}”), because the name, the ticker and the picture were reviewed together.`]
+    : [`Taken down: the founder's description of $${c.symbol}.`, t.bw`The coin uses Vicinity's own sentence now (“${t.sentence}”); its name, ticker and picture stay.`];
   if (withdraw.n) changed.push(`The founder's request that carried the description was withdrawn (${withdraw.n}).`);
   if (redacted.n) changed.push(`The public log no longer names the taken-down coin name (${redacted.n} line${redacted.n === 1 ? "" : "s"}).`);
   changed.push(approvalWords(t), SPREAD, told(n, true), "If the founder sends the same words again, a person reviews them first.");
@@ -183,9 +185,9 @@ async function textLaunched(t) {
     if (lp && lp.meta_json && !String(JSON.parse(lp.meta_json).description || "").startsWith(t.sentence)) {
       if (!(await rebuildMetaJson(env, coin.mint, t.now))) return refuse(503, "unavailable", "The coin's metadata couldn't be rebuilt just now. Nothing was changed. Try again in a minute.");
       await purgePages(env, coin.mint);
-      return done([`The coin's metadata (/coin-meta/${coin.mint}.json) carried another description than the coin; it was rebuilt with Vicinity's own sentence (“${t.sentence}”).`]);
+      return done([t.bw`The coin's metadata (/coin-meta/${coin.mint}.json) carried another description than the coin; it was rebuilt with Vicinity's own sentence (“${t.sentence}”).`]);
     }
-    return refuse(409, "system_text", SYSTEM_TEXT_LAUNCHED);
+    return refuse(409, "system_text", t.bw.say(SYSTEM_TEXT_LAUNCHED));
   }
   if (!lp || !lp.name || !lp.symbol) return refuse(503, "unavailable", "The launched coin's record couldn't be read just now. Nothing was changed. Try again in a minute.");
   const md = { name: lp.name, symbol: lp.symbol };
@@ -193,7 +195,7 @@ async function textLaunched(t) {
   const content = canonicalContent({ city: t.city, name: c.name, symbol: c.symbol, description: t.sentence, artSha256: c.art_sha256,
     templateVersion: c.content.image ? c.content.image.template : null, ...(c.content.pair ? { pair: c.content.pair } : {}) });
   const hash = await sha256Hex(content);
-  const meta = published ? JSON.stringify(versionJson(lp, md, { ...c, description: t.sentence, content: JSON.parse(content) })) : null;
+  const meta = published ? JSON.stringify(versionJson(lp, md, { ...c, description: t.sentence, content: JSON.parse(content) }, metaBrandFor(env, lp))) : null;
   const withdraw = await carrying(t, c.description);
   try {
     await db.batch([
@@ -206,7 +208,7 @@ async function textLaunched(t) {
       ...(meta ? [db.prepare("UPDATE lp_coins SET meta_json = ?, meta_at = ? WHERE mint = ?").bind(meta, t.at, coin.mint)] : []),
       await takedownStatement(db, { cityId, adminId: t.actor.id, text: c.description, reason: t.reason, at: t.at }),
       ...(withdraw.n ? [withdraw.stmt] : []),
-      modLog(t, "coin_text_removed", `the founder's description was taken down (${pictureReason(t.reason)}); the launched coin and its metadata use Vicinity's own description`),
+      modLog(t, "coin_text_removed", t.bw`the founder's description was taken down (${pictureReason(t.reason)}); the launched coin and its metadata use Vicinity's own description`),
       audit(t, "coins/takedown_text", `launched ${coin.mint} · version ${c.content_hash} → ${hash}`),
       guard(db, "EXISTS (SELECT 1 FROM coin_ready WHERE city_id = ? AND mint = ? AND content_hash = ?)", [cityId, coin.mint, hash]),
     ]);
@@ -218,10 +220,10 @@ async function textLaunched(t) {
   }
   await purgePages(env, coin.mint);
   const n = await notify(env, { to: c.user_id, kind: "founder", ref: cityId, href: "/dashboard#founder", now: t.now,
-    text: `Vicinity took down your coin's description: ${pictureReason(t.reason)}. Your coin and its metadata use Vicinity's own description now.` });
+    text: t.bw`Vicinity took down your coin's description: ${pictureReason(t.reason)}. Your coin and its metadata use Vicinity's own description now.` });
   return done([
     `Taken down: the founder's description of $${c.symbol}.`,
-    `The coin's page, the Launchpad and its metadata (/coin-meta/${coin.mint}.json, what wallets and Jupiter read) show Vicinity's own sentence now: “${t.sentence}”`,
+    t.bw`The coin's page, the Launchpad and its metadata (/coin-meta/${coin.mint}.json, what wallets and Jupiter read) show Vicinity's own sentence now: “${t.sentence}”`,
     `The coin's name “${c.name}” and ticker $${c.symbol} stay: they are on the blockchain for good.`,
     "Wallets and apps that read the metadata in the last hour may show the old description until they read it again.", SPREAD, told(n),
   ], { version: versionLabel(hash) });
@@ -238,7 +240,7 @@ async function artChosen(t, sha) {
   const { env, db, cityId, coin, c } = t;
   const all = await unboundUploads(db, cityId);
   const gone = sha == null ? all : all.filter((x) => x === sha);
-  if (!gone.length) return refuse(404, "not_found", NO_ART);
+  if (!gone.length) return refuse(404, "not_found", t.bw.say(NO_ART));
   const inUse = gone.includes(c.art_sha256);
   const deletes = gone.map((x) => artDelete(db, x));
   let d = null, v = null;
@@ -248,7 +250,7 @@ async function artChosen(t, sha) {
     v = await defaultsVersion(t, d);
     const refused = await writeChoice(t, v, { before: deletes,
       log: { actorId: t.actor.id, role: "admin", action: "coin_art_removed", reason: t.reason,
-        note: `${coin.city_name}: the founder's own picture was taken down (${pictureReason(t.reason)}); the coin uses Vicinity's coin for the city, version ${versionLabel(v.hash)}` },
+        note: t.bw`${coin.city_name}: the founder's own picture was taken down (${pictureReason(t.reason)}); the coin uses Vicinity's coin for the city, version ${versionLabel(v.hash)}` },
       after: [audit(t, "coins/takedown_art", `${gone.join(", ")} · version ${c.content_hash} → ${v.hash}`)] });
     if (refused) return refused;
   } else {
@@ -257,9 +259,9 @@ async function artChosen(t, sha) {
   }
   await purgePages(env, null, gone);
   const n = await notify(env, { to: c.user_id, kind: "picture", ref: cityId, href: "/dashboard#founder", now: t.now,
-    text: `Your coin picture was taken down: ${pictureReason(t.reason)}.${inUse ? ` Your coin is Vicinity's coin for ${d.city.name} again.` : ""}` });
+    text: `Your coin picture was taken down: ${pictureReason(t.reason)}.${inUse ? t.bw` Your coin is Vicinity's coin for ${d.city.name} again.` : ""}` });
   const changed = [`Taken down: ${gone.length === 1 ? "the founder's own picture" : `${gone.length} pictures of the founder's own`} (${gone.map(artPath).join(", ")}). ${gone.length === 1 ? "Its address answers" : "Their addresses answer"} “not found” now; browsers keep a copy at most 5 minutes.`];
-  if (inUse) changed.push(`The coin used it, so it is Vicinity's coin for ${d.city.name} again: $${v.symbol} “${v.name}”, the Vicinity design and Vicinity's own description, because the name, the ticker and the picture were reviewed together.`, approvalWords(t));
+  if (inUse) changed.push(t.bw`The coin used it, so it is Vicinity's coin for ${d.city.name} again: $${v.symbol} “${v.name}”, the Vicinity design and Vicinity's own description, because the name, the ticker and the picture were reviewed together.`, approvalWords(t));
   else changed.push("The coin does not use it: nothing else changed.");
   changed.push(SPREAD, told(n));
   return done(changed, inUse ? { version: versionLabel(v.hash) } : {});
@@ -270,7 +272,7 @@ async function artLaunched(t, sha) {
   const bound = await artBytes(db, c.art_sha256);
   const takeBound = Boolean(bound && bound.upload) && (sha == null || sha === c.art_sha256);
   const others = (await unboundUploads(db, cityId)).filter((x) => sha == null || x === sha);
-  if (!takeBound && !others.length) return refuse(404, "not_found", NO_ART);
+  if (!takeBound && !others.length) return refuse(404, "not_found", t.bw.say(NO_ART));
   const stmts = others.map((x) => artDelete(db, x));
   let newArt = null, hash = null, meta = null;
   if (takeBound) {
@@ -279,21 +281,21 @@ async function artLaunched(t, sha) {
     const md = { name: lp.name, symbol: lp.symbol };
     const published = await versionForCoin(env, { cityId, mint: coin.mint, name: md.name, symbol: md.symbol });
     // the Vicinity design of the coin's own ticker and name (what its launch would have shown without the upload), drawn once
-    const svg = coinSvg({ ticker: c.symbol, city: c.name, templateVersion: TEMPLATE_VERSION }), svgSha = await sha256Hex(svg);
-    const known = await artBySvg(db, svgSha, TEMPLATE_VERSION, { fresh: true });
+    const svg = coinSvg({ ticker: c.symbol, city: c.name, templateVersion: t.tv }), svgSha = await sha256Hex(svg);
+    const known = await artBySvg(db, svgSha, t.tv, { fresh: true });
     if (known) newArt = known.sha256;
     else {
       const png = await renderPng(svg);
       newArt = await sha256Hex(png);
-      stmts.push(storeArtStatement(db, { sha256: newArt, svgSha256: svgSha, templateVersion: TEMPLATE_VERSION, bytes: png, now: t.now }));
+      stmts.push(storeArtStatement(db, { sha256: newArt, svgSha256: svgSha, templateVersion: t.tv, bytes: png, now: t.now }));
     }
-    const content = canonicalContent({ city: t.city, name: c.name, symbol: c.symbol, description: c.description, artSha256: newArt, templateVersion: TEMPLATE_VERSION,
+    const content = canonicalContent({ city: t.city, name: c.name, symbol: c.symbol, description: c.description, artSha256: newArt, templateVersion: t.tv,
       ...(c.content.pair ? { pair: c.content.pair } : {}) });
     hash = await sha256Hex(content);
-    if (published) meta = JSON.stringify(versionJson(lp, md, { ...c, art_sha256: newArt, content: JSON.parse(content) }));
+    if (published) meta = JSON.stringify(versionJson(lp, md, { ...c, art_sha256: newArt, content: JSON.parse(content) }, metaBrandFor(env, lp)));
     stmts.push(
       db.prepare(`INSERT OR IGNORE INTO coin_versions (city_id, origin, content_json, content_hash, name, symbol, description, art_sha256, template_version, created_by, created_at)
-        VALUES (?, 'takedown', ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(cityId, content, hash, c.name, c.symbol, c.description, newArt, TEMPLATE_VERSION, t.actor.id, t.at),
+        VALUES (?, 'takedown', ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(cityId, content, hash, c.name, c.symbol, c.description, newArt, t.tv, t.actor.id, t.at),
       db.prepare("UPDATE coin_ready SET version_id = (SELECT id FROM coin_versions WHERE city_id = ? AND content_hash = ?), content_hash = ? WHERE city_id = ? AND mint = ? AND version_id = ?")
         .bind(cityId, hash, hash, cityId, coin.mint, c.version_id),
       ...(meta ? [db.prepare("UPDATE lp_coins SET meta_json = ?, meta_at = ? WHERE mint = ?").bind(meta, t.at, coin.mint)] : []),
@@ -302,16 +304,16 @@ async function artLaunched(t, sha) {
     );
   }
   const gone = [...(takeBound ? [c.art_sha256] : []), ...others];
-  stmts.push(modLog(t, "coin_art_removed", takeBound ? `the founder's own picture was taken down (${pictureReason(t.reason)}); the launched coin and its metadata use the Vicinity design`
+  stmts.push(modLog(t, "coin_art_removed", takeBound ? t.bw`the founder's own picture was taken down (${pictureReason(t.reason)}); the launched coin and its metadata use the Vicinity design`
     : `a picture of the founder's own was taken down (${pictureReason(t.reason)}); the coin does not use it`), audit(t, "coins/takedown_art", `launched ${coin.mint} · ${gone.join(", ")}${hash ? ` · version ${c.content_hash} → ${hash}` : ""}`));
   try { await db.batch(stmts); } catch (e) { if (guardFailed(e)) return refuse(409, "coin_changed", NOT_WRITTEN.coin_changed); throw e; }
   if (takeBound && !meta) await rebuildMetaJson(env, coin.mint, t.now).catch(() => false);
   await purgePages(env, coin.mint, gone);
   const n = await notify(env, { to: c.user_id, kind: "picture", ref: cityId, href: "/dashboard#founder", now: t.now,
-    text: `Your coin picture was taken down: ${pictureReason(t.reason)}.${takeBound ? " Your coin and its metadata show the Vicinity design now." : ""}` });
+    text: `Your coin picture was taken down: ${pictureReason(t.reason)}.${takeBound ? t.bw.say(" Your coin and its metadata show the Vicinity design now.") : ""}` });
   const changed = takeBound
     ? [`Taken down: the founder's own picture of $${c.symbol} (${artPath(c.art_sha256)}): its address answers “not found” now.`,
-      `The coin's metadata (/coin-meta/${coin.mint}.json) and /coin-meta/${coin.mint}.png show the Vicinity design of $${c.symbol} “${c.name}” instead (${artPath(newArt)}).`,
+      t.bw`The coin's metadata (/coin-meta/${coin.mint}.json) and /coin-meta/${coin.mint}.png show the Vicinity design of $${c.symbol} “${c.name}” instead (${artPath(newArt)}).`,
       "Wallets, explorers and browsers that copied the old picture may keep showing it until they refresh: once the coin launched it was served as permanent.",
       "The coin's name, ticker and description stay."]
     : [`Taken down: ${others.length === 1 ? "a picture" : `${others.length} pictures`} of the founder's own the coin does not use (${others.map(artPath).join(", ")}): “not found” now.`];

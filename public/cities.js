@@ -30,6 +30,14 @@
 //   and the list. Founded and choosing come first: a founded city with holders is founded.
 (() => {
   "use strict";
+  // The product's names in this file's words (the label migration, area b). A page built for a label set other than today's carries the
+  // set on <html> (data-brand, data-brand-name, data-brand-domain: scripts/pages/build.mjs writes them from src/brand.js); brand`…` puts
+  // those names in a text's own words, never in a value put into it. A page without them (today's pages) gets every text exactly as written.
+  const BRAND = (() => { try { const r = document.documentElement, at = (k) => (r && typeof r.getAttribute === "function" ? r.getAttribute(k) : null); return at("data-brand") && at("data-brand-name") && at("data-brand-domain") ? Object.freeze({ key: at("data-brand"), name: at("data-brand-name"), domain: at("data-brand-domain") }) : null; } catch { return null; } })();
+  const brand = (s, ...v) => s.reduce((out, part, i) => out + (BRAND ? part.replace(/vicinity\.city/g, () => BRAND.domain).replace(/Vicinity/g, () => BRAND.name) : part) + (i < v.length ? String(v[i]) : ""), "");
+  // the founder amounts' token: "$VICINITY" on today's pages; a page built for another label set names its own token (the legacy one is shown
+  // nowhere there, and founder applications stay closed while that token is not live: /api/seats says launched false)
+  const UNIT = BRAND ? `${BRAND.name} tokens` : "$VICINITY";
   const sec = document.getElementById("cities");
   if (!sec) return;
   const $ = (s, r = document) => r.querySelector(s);
@@ -309,7 +317,8 @@
   // the legacy seats frozen (LEGACY_SEATS=frozen: /api/me says legacySeats "frozen"; Citycoin.dev master v5 stage S16): the map shows who founded
   // what (history), but an open window on record is not shown as "choosing" (refreshClaims keeps none), and no founder amount, "open seat" or
   // button to claim, apply or endorse is shown; a city without a founder reads "No founder". Without the key (today) every line reads as before.
-  const seatsFrozen = () => V().me?.()?.legacySeats === "frozen";
+  // (a page built for another label set is always built with the legacy seats frozen (scripts/pages/build.mjs pageBrandPrerequisites): frozen from the first paint, before /api/me answers)
+  const seatsFrozen = () => Boolean(BRAND) || V().me?.()?.legacySeats === "frozen";
 
   const placeOf = (c) => [admin[`${c.cc}.${c.adm}`], countries[c.cc] || c.cc].filter(Boolean).join(", ");
 
@@ -1223,7 +1232,7 @@
     const cl = claims.get(c.id), tk = tickers.get(c.id), a = areaFacts(c.id), st = statusOf(c), h = holderCount.get(c.id) || 0;
     tip.replaceChildren(el("strong", null, c.name), el("span", null, ` ${placeOf(c)}`), document.createElement("br"),
       el("span", cl ? "tip-claimed" : st === "active" ? "tip-active" : "tip-open", cl ? `Founder: ${cl.founder || cl.wallet}${cl.status === "active" ? "" : ` (${cl.status})`}` : windows.has(c.id) ? `Choosing its founder: ${windows.get(c.id).applicants} applying` : st === "active" ? `Active: ${fmt(h)} verified holder${h === 1 ? "" : "s"}, no founder${seatsFrozen() ? "" : " yet"}` : statusWord("open")), el("span", "tip-ticker", tk ? `  $${tk.ticker}` : ""));
-    if (!seatsFrozen()) tip.append(document.createElement("br"), el("span", "tip-area", `Founder amount: ${short(founderMin(c, windows.get(c.id)))} $VICINITY`)); // (frozen: no founder amount)
+    if (!seatsFrozen()) tip.append(document.createElement("br"), el("span", "tip-area", `Founder amount: ${short(founderMin(c, windows.get(c.id)))} ${UNIT}`)); // (frozen: no founder amount)
     if (a) tip.append(document.createElement("br"), el("span", "tip-area", areaNote(a, c)));
     const n = (members.get(c.id) || []).length;
     if (n) tip.append(document.createElement("br"), el("span", "tip-area", `Includes ${n} listed place${n === 1 ? "" : "s"}`));
@@ -1279,7 +1288,7 @@
     }
     nearestGo = null;
     const st = statusOf(c), cl = claims.get(c.id), win = windows.get(c.id), t = tickerOf(c), a = areaFacts(c.id);
-    const amt = `${compact.format(founderMin(c, win))} $VICINITY`, n = (members.get(c.id) || []).length, frozen = seatsFrozen(); // (frozen: no founder amount, no "yet")
+    const amt = `${compact.format(founderMin(c, win))} ${UNIT}`, n = (members.get(c.id) || []).length, frozen = seatsFrozen(); // (frozen: no founder amount, no "yet")
     const m = memberCount.get(c.id) || 0, h = holderCount.get(c.id) || 0;
     let l4;
     if (st === "mine") l4 = `You founded ${c.name}`;
@@ -1610,7 +1619,7 @@
       finding = false;
       if (home) { select(home, true); V().toast?.(`You're in ${home.name}`); }
       else { userMoved = true; flyTo(loc.lon, loc.lat, kAt(60)); showNearby(loc.lon, loc.lat); V().toast?.("No community here yet: pick one of the three nearest."); }
-    } catch (e) { V().toast?.(e?.inApp ? `${e.message} Open vicinity.city in Safari or Chrome to see where you are.` : e?.message || "Couldn't get your location."); }
+    } catch (e) { V().toast?.(e?.inApp ? `${e.message} ${BRAND ? "Open this page in Safari or Chrome to see where you are." : "Open vicinity.city in Safari or Chrome to see where you are."}` : e?.message || "Couldn't get your location."); }
     finally { b.disabled = false; b.classList.remove("is-busy"); }
   }
   $("#map-locate").addEventListener("click", () => locateMe($("#map-locate")));
@@ -1732,10 +1741,10 @@
         txt.textContent = m ? `Country manager (${cname}): ${m.name} (${m.city}), term until ${new Date(m.endsAt).toLocaleDateString()}.` : `Country manager (${cname}): none. ${d.rule || ""}`.trim();
       } else if (d.moderator) {
         txt.append(document.createTextNode(`Country moderator (${cname}): `), solscan(d.moderator.wallet),
-          document.createTextNode(` · founder of ${d.moderator.city} · holds ${fmt(d.moderator.amount)} $VICINITY`));
-      } else txt.textContent = `Country moderator (${cname}): ${d.launched ? "no founders here yet." : "picked at launch."} It's the city founder in ${cname} who holds the most $VICINITY.`;
+          document.createTextNode(` · founder of ${d.moderator.city} · holds ${fmt(d.moderator.amount)} ${UNIT}`));
+      } else txt.textContent = `Country moderator (${cname}): ${d.launched ? "no founders here yet." : BRAND ? `picked once the ${BRAND.name} token is live.` : "picked at launch."} It's the city founder in ${cname} who holds the most ${UNIT}.`;
       row.replaceChildren(el("span", "mod-row__icon"), txt);
-    } catch { row.replaceChildren(el("span", "mod-row__icon"), el("span", null, seatsFrozen() ? `Country manager (${cname}): couldn't be loaded just now.` : `Country moderator (${cname}): the city founder holding the most $VICINITY.`)); }
+    } catch { row.replaceChildren(el("span", "mod-row__icon"), el("span", null, seatsFrozen() ? `Country manager (${cname}): couldn't be loaded just now.` : `Country moderator (${cname}): the city founder holding the most ${UNIT}.`)); }
   }
 
   /* =================== empty land: pick one of the three nearest communities =================== */
@@ -1794,7 +1803,7 @@
       else sub.append(document.createElement("br"), document.createTextNode(frozen ? "City Founder: none" : "City Founder: No city founder yet"));
       sub.append(document.createElement("br"), document.createTextNode(`Holders: ${fmt(holderCount.get(selected.id) || 0)}`));
       const win = windows.get(selected.id);
-      if (!frozen) sub.append(document.createElement("br"), document.createTextNode(`Founder amount: ${fmt(founderMin(selected, win))} $VICINITY · held ${qualifyingDays} days`));
+      if (!frozen) sub.append(document.createElement("br"), document.createTextNode(`Founder amount: ${fmt(founderMin(selected, win))} ${UNIT} · held ${qualifyingDays} days`));
       if (!cl && win) sub.append(document.createElement("br"), el("span", "shared-note", `${win.applicants} applying · window closes ${new Date(win.closesAt).toLocaleString()}`));
       const m = memberCount.get(selected.id) || 0;
       mrow.hidden = false;
@@ -1814,7 +1823,8 @@
     btn.textContent = label; btn.href = href;
     const note = $("#claim-note");
     note.textContent = frozen ? "Founder seats, squads and elections are closed for changes."
-      : !open ? "Applications open after $VICINITY launches, for people who have held the founder amount for 7 days. There's no race: each city gets a 72-hour window and locals decide."
+      : !open ? (BRAND ? `Founder applications are closed while the ${BRAND.name} token is not live. There's no race: each city gets a 72-hour window and locals decide.`
+        : "Applications open after $VICINITY launches, for people who have held the founder amount for 7 days. There's no race: each city gets a 72-hour window and locals decide.")
       : selected && myHome() && myHome() !== selected.id ? "You can only found the community you live in. Your dashboard shows yours."
       : "Apply, or endorse a neighbour who applied, in your dashboard: it checks your wallet, holding time and location together."; // "Locals decide" right above already gives the rule (it was said twice)
   }
@@ -1928,7 +1938,7 @@
     const list = [...claims.values()].sort((a, b) => Date.parse(b.claimed_at) - Date.parse(a.claimed_at)).slice(0, 8);
     const wrap = $(".claim-feed-wrap");
     if (wrap) wrap.hidden = !list.length; // an empty feed under the map read as a dead page
-    if (!list.length) { feed.replaceChildren(el("li", "claim-feed__empty", seatsFrozen() ? "No founders yet." : open ? "No founders yet. Qualify by holding for 7 days, then apply." : "No founders yet. Applications open after $VICINITY launches.")); return; }
+    if (!list.length) { feed.replaceChildren(el("li", "claim-feed__empty", seatsFrozen() ? "No founders yet." : open ? "No founders yet. Qualify by holding for 7 days, then apply." : BRAND ? `No founders yet. Founder applications are closed while the ${BRAND.name} token is not live.` : "No founders yet. Applications open after $VICINITY launches.")); return; }
     feed.replaceChildren(...list.map((c) => {
       const li = el("li", fresh.has(c.city_id) ? "is-new" : null);
       const city = byId.get(c.city_id);

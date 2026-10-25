@@ -14,8 +14,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { sourceAs } from "../scripts/pages/build.mjs";
 
-const read = (p) => readFileSync(new URL("../" + p, import.meta.url), "utf8").replace(/\r\n/g, "\n");
+// a page source as today's build reads it (BRAND unset: its brand blocks and {{label}} fills resolved; scripts/pages/build.mjs sourceAs)
+const read = (p) => { const t = readFileSync(new URL("../" + p, import.meta.url), "utf8").replace(/\r\n/g, "\n"); return p.startsWith("scripts/pages/src/") ? sourceAs(p, t) : t; };
 const style = read("public/style.css"), polish = read("public/polish.css"), cities = read("public/pages-cities.css"), lp = read("public/pages-launchpad.css");
 const js = read("public/cities.js"), homeSrc = read("scripts/pages/src/index.html"), home = read("public/index.html");
 const citySrc = read("scripts/pages/src/cities.html"), cityPage = read("public/cities.html");
