@@ -153,9 +153,11 @@
     "LEGACY_LAUNCH": "off",
     // Wallet-only sign-in and registration with location once (stages S09 to S13; the S15 switch-on): Google, e-mail, password and
     // tiny-transfer sign-in answer 404, a new member registers with a wallet and a location check once. The pages are built with the
-    // wallet-only copy (scripts/pages/walletonly-copy.mjs). LEGACY_LINK stays unset: production has 0 members since 24 Oct 2026, so no
-    // Google- or e-mail-only account needs the link window. Owner's go of 25 Oct 2026 (above), with the S15 gate (implementation-report.md
-    // section 11). Was unset; to roll back, set it to "off".
+    // wallet-only copy (scripts/pages/walletonly-copy.mjs), and src/v5policy.js holds the switch closed if this value is ever not exactly
+    // "on" while those pages are deployed. LEGACY_LINK stays unset only on the pre-merge census: production had 0 members when the owner
+    // deleted all member data on 24 Oct 2026, and the census in the deploy checklist must still find no Google- or e-mail-only account
+    // (else this pull request sets the window). Owner's go of 25 Oct 2026 (above), with the S15 gate (implementation-report.md section 11).
+    // Was unset; to roll back, set it to "off" and rebuild the pages in the same pull request.
     "WALLET_ONLY": "on",
     // Community feed v2 (src/flags.js feedV2On): the "update" post kind, delete your own post, mute, the author's city on every
     // national post, one confirmation before the first national post. ON since 17 Oct 2026, by the owner ("switch on all the

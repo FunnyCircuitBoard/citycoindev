@@ -187,8 +187,9 @@ export function checkPolicyConfig(env, { log = (...args) => console.error(...arg
   let redirectOn = false;
   try { redirectOn = hostRedirectOn(env); } catch { /* the switch reads as off */ }
   if (redirectOn) for (const code of hostRedirectRefusals(env)) say(`host|${code}`, "host redirect switch refused", code);
+  // (also when it is not set on but held: a value outside its set, or pages built wallet-only; go-live review finding GL-SAFE-2)
   let walletOn = false;
-  try { walletOn = walletOnlyOn(env); } catch { /* the switch reads as off */ }
+  try { walletOn = walletOnlyWanted(env); } catch { walletOn = true; }
   if (walletOn) for (const code of walletOnlyRefusals(env)) say(`wallet|${code}`, "wallet-only switch refused", code);
   let legacyOn = false;
   try { legacyOn = legacyLinkOn(env); } catch { /* the switch reads as off */ }
@@ -318,6 +319,14 @@ const ownErrors = (env, codes, flag) => policyConfig(env).errors.filter((e) => c
 export function walletOnlyRefusals(env) {
   try {
     const out = [];
+    const v = walletOnlyValue(env);
+    if (v !== "on") {
+      // not set exactly "on", yet the switch holds closed (go-live review finding GL-SAFE-2, as LEGACY_SEATS does, SEC-S16-3): a value outside
+      // the switch's set (a typo such as "true" set in the Cloudflare dashboard), or pages built wallet-only (src/pages-built.js walletOnly)
+      // whose Rules, Terms and copy describe wallet-only sign-in while this Worker's own setting says otherwise
+      if (!WALLET_ONLY_VALUES.includes(v)) out.push("WALLET_ONLY_VALUE_REFUSED");
+      if (pagesBuilt.walletOnly === true) out.push("WALLET_ONLY_UNSET_PAGES_WALLET_ONLY");
+    }
     if (!siteConfig(env).configured) out.push("WALLET_ONLY_SITE_REFUSED");
     if (ownErrors(env, WALLET_ONLY_CODES, "WALLET_ONLY").length) out.push("WALLET_ONLY_POLICY_REFUSED");
     return out;
@@ -332,12 +341,25 @@ export function walletOnly(env) {
   try { return walletOnlyOn(env) && walletOnlyRefusals(env).length === 0; } catch { return false; }
 }
 
+/** WALLET_ONLY's values: "" (unset or blank) and "off" are today's site, "on" the switch; anything else is refused and holds (below). */
+const WALLET_ONLY_VALUES = Object.freeze(["", "off", "on"]);
+// (a setting that cannot be read reads as unset, as for LEGACY_SEATS: today's site over today's pages, held over pages built wallet-only)
+const walletOnlyValue = (env) => { try { return String((env && env.WALLET_ONLY) ?? "").trim().toLowerCase(); } catch { return ""; } };
 /**
- * WALLET_ONLY is set on but refused (walletOnlyRefusals is not empty): the identity routes fail closed (see the top of this file). False with the
- * switch unset, off or counting. Never throws: a switch that cannot be read reads as unset.
+ * Does this Worker want wallet-only sign-in at all? WALLET_ONLY set on; or a value outside its set; or pages built wallet-only (go-live review
+ * finding GL-SAFE-2: the Citycoin.dev pages, Rules 7 and Terms 2026-10-25 describe wallet-only sign-in, so a WALLET_ONLY that goes missing,
+ * "off" or a typo in the Cloudflare dashboard never reopens Google, e-mail or password sign-in under them). Only an unset, blank or "off" value
+ * with pages built without it is today's site.
+ */
+const walletOnlyWanted = (env) => { const v = walletOnlyValue(env); return v === "on" || !WALLET_ONLY_VALUES.includes(v) || pagesBuilt.walletOnly === true; };
+
+/**
+ * WALLET_ONLY is wanted (above) but refused (walletOnlyRefusals is not empty): the identity routes fail closed (see the top of this file). False
+ * with the switch unset or off over pages built without it, and while it counts. Never throws: a switch that cannot be read reads as unset
+ * (so it holds only over pages built wallet-only).
  */
 export function walletOnlyHeld(env) {
-  try { return walletOnlyOn(env) && walletOnlyRefusals(env).length > 0; } catch { return false; }
+  try { return walletOnlyWanted(env) && walletOnlyRefusals(env).length > 0; } catch { return false; }
 }
 
 /* ---------------------------------------------------------------- LEGACY_LINK as the Worker applies it */

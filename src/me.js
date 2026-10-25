@@ -16,7 +16,7 @@ import { countRecent, noteEvent, useAttestation } from "./attest.js";
 import { configuredSocialProfiles, teamFor, tokenMint } from "./official.js";
 import { getHolding, holderSnapshot, isTeamWallet, rankOf } from "./chain.js";
 import { DAY, HOUR, POLICY, iso } from "./policy.js";
-import { rulesVersion } from "./editions.js";
+import { rulesVersion, termsVersion } from "./editions.js";
 import { VOTE_WEIGHT, activeBan, adminWallets, amountsFor, liveSeatOfUser, managerOf } from "./roles.js";
 import { cityPicture, cooldownUntil, eligibility, squadPicture } from "./seats.js";
 import { countryPicture } from "./elections.js";
@@ -83,6 +83,12 @@ export function badgesFor({ u, launched, amount, position, seat, manager, admin,
   // a label set other than today's with no live token (src/official.js legacyHidden, MAIN_TOKEN_V5 not counting): no holding is measured, so
   // no badge describes a holding, an amount or a holder rank of a token that has no supply yet (review finding F3); they come back with it
   if (bw.on && !launched) for (let i = list.length - 1; i >= 0; i--) if (TOKEN_BADGES.has(list[i].id)) list.splice(i, 1);
+  // a badge nobody can earn is not offered "to earn" (go-live review finding GL-4): under a label set other than today's, "Early member" (its
+  // record, users.early, is set only before today's token launched, so no member of the label set's site gets it; whether its first members
+  // should is an owner decision not taken here), and while the legacy seats are frozen, City Founder and Country Manager (no seat and no
+  // term can be won). Earned ones stay, as records
+  const unearnable = new Set([...(bw.on ? ["early"] : []), ...(legacyFrozen ? ["city_founder", "country_manager"] : [])]);
+  for (let i = list.length - 1; i >= 0; i--) if (unearnable.has(list[i].id) && !list[i].earned) list.splice(i, 1);
   if (!legacyFrozen) return list;
   // (and the wallet badge no longer promises a founder path: the dashboards built with the freeze show none; under a label set other than today's
   // with no live token it promises no holdings or rank either, which do not exist there yet: rebrand review finding RB-3)
@@ -303,15 +309,18 @@ export async function handleMe(request, env, fetchImpl = fetch, now = Date.now()
 }
 
 /**
- * POST /api/me/terms { version } → record that the signed-in user agreed to the Terms of Use.
- * The frontend also keeps a local copy so anonymous visitors are gated before entry.
+ * POST /api/me/terms { version } → record that the signed-in user agreed to the Terms of Use: `version` must be the edition the deployed
+ * pages publish (src/editions.js termsVersion), else 400 bad_version with `current`. The frontend also keeps a local copy so anonymous
+ * visitors are gated before entry.
  */
 export async function handleTermsAgree(request, env, now = Date.now()) {
   const a = await access(request, env, now);
   if (a.error) return a.error;
   const body = await readJson(request);
   const version = typeof body?.version === "string" ? body.version.slice(0, 32) : "";
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(version)) return json({ ok: false, error: "bad_version" }, 400);
+  // only the edition the deployed pages publish (src/editions.js termsVersion) is recorded: a made-up or an older version is refused, never
+  // stored (go-live review finding GL-HON-9). A page from before a deploy sends its own edition and gets the current one back, to show again
+  if (version !== termsVersion(env)) return json({ ok: false, error: "bad_version", current: termsVersion(env) }, 400);
   await ensureSchema(env.DB);
   await env.DB.prepare("UPDATE users SET terms_version = ?, terms_agreed_at = ? WHERE id = ?")
     .bind(version, new Date(now).toISOString(), a.u.id).run();

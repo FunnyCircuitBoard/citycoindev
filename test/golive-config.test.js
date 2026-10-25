@@ -44,7 +44,8 @@ after(() => { W.realClock(); _pagesBuiltForTests(null); });
 test("the committed wrangler.jsonc carries the go-live settings, each with a comment naming the owner's go of 25 Oct 2026, and nothing more", () => {
   assert.deepEqual([V.BRAND, V.LEGACY_SEATS, V.LEGACY_LAUNCH, V.WALLET_ONLY, V.EMAIL_FROM, V.SITE_ORIGIN, V.SITE_ORIGINS, V.DEPLOYMENT_ENV],
     ["citycoin", "frozen", "off", "on", "Citycoin.dev <noreply@citycoin.dev>", "https://citycoin.dev", "https://citycoin.dev https://vicinity.city", "production"]);
-  // LEGACY_LINK stays unset (production has had 0 members since 24 Oct 2026: no Google- or e-mail-only account to link), and so does every
+  // LEGACY_LINK stays unset (0 members when the owner deleted all member data on 24 Oct 2026; the pre-merge census must still find no Google- or
+  // e-mail-only account, or the same pull request sets the window: the deploy checklist), and so does every
   // switch this pull request does not move (HOST_REDIRECT is never to be set: the owner's decision of 24 Oct 2026, no forwarding)
   for (const k of ["LEGACY_LINK", "LEGACY_LINK_UNTIL", "HOST_REDIRECT", "MAIN_TOKEN_V5", "MAIN_TOKEN_MINT", "PUBLIC_V5", "SELECTION_V5", "LAUNCH_V5", "CC_TRADING", "CC_HOURLY"])
     assert.equal(Object.hasOwn(V, k), false, `${k} is not set`);
@@ -98,12 +99,14 @@ test("one edition, one text: WALLET_ONLY=on is built only with BRAND=citycoin, a
 
 test("the wallet-only copy: written for the Citycoin.dev pages only, each passage found exactly once (a source edited without it stops the build)", () => {
   const B = escBrand(CITYCOIN_BRAND);
-  assert.deepEqual(Object.keys(WALLET_ONLY_COPY).sort(), ["connect.html", "dashboard.html", "index.html", "rules.html", "terms.html"]);
+  assert.deepEqual(Object.keys(WALLET_ONLY_COPY).sort(), ["app.html", "cities.html", "connect.html", "dashboard.html", "index.html", "rules.html", "terms.html"]);
   for (const [f, entry] of Object.entries(WALLET_ONLY_COPY)) {
     assert.equal(frozenFor(f, entry, LEGACY_BRAND), null, `${f}: never applied to today's label set`);
     const r = frozenFor(f, entry, CITYCOIN_BRAND, B);
     for (const [old, next] of r.replace) {
-      assert.match(old, /google|e-?mail|password|then sign in\. Link a wallet later|<span>Connect your wallet<\/span>/i, `${f}: every passage replaced offers or describes a Google, e-mail or password way in, or today's order (a wallet later)`);
+      // a Google, e-mail, password or tiny-transfer way in, or today's order (a wallet later); or, since the go-live review, what the edition no
+      // longer does: the town request's location check and Country Manager (GL-3), check-ins (GL-HON-6), launches before the token (GL-6)
+      assert.match(old, /google|e-?mail|password|App wallet \(FOMO…\)|then sign in\. Link a wallet later|<span>Connect your wallet<\/span>|Stand in the town|checks location|Country Manager|check-ins|designs it|as it launches|lets each city launch/i, `${f}: every passage replaced offers or describes a way in that is gone, or something this edition no longer does`);
       assert.doesNotMatch(next.replace(/No password: you sign in|There is no password to keep: you sign in/g, ""), /google|e-?mail|password/i, `${f}: no replacement offers one`);
       assert.doesNotMatch(next, /vicinity|\{\{|<!--@/i, `${f}: resolved and in the label set's words`);
     }
@@ -149,6 +152,8 @@ test("the committed pages: no \"vicinity\" anywhere; nothing shown offers Google
     let text = shown(html);
     for (const a of ALLOWED) text = text.replace(a, "");
     assert.deepEqual(text.match(/.{0,50}(google|e-?mail|password).{0,50}/gi) || [], [], `${f}: what the page shows before any script`);
+    // and no tiny-transfer sign-in either (go-live review finding GL-2: the home FAQ offered it; the routes answer 404 under wallet-only sign-in)
+    assert.deepEqual(text.match(/.{0,50}(App wallet \(FOMO|[Tt]iny transfer|tiny, exact amount|to yourself\. It costs).{0,50}/g) || [], [], `${f}: no tiny-transfer sign-in shown`);
     assert.match(html, /<html lang="en" data-brand="citycoin" data-brand-name="Citycoin\.dev" data-brand-domain="Citycoin\.dev" data-terms="2026-10-25">/, f);
     assert.match(html, /<span>Wallet, sign-in and phone<\/span>/, `${f}: the account sheet`);
   }
