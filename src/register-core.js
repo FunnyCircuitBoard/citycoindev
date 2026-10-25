@@ -37,7 +37,7 @@
  */
 import { clearCookie, cookie, getCookie, json, randomToken, sha256 } from "./http.js";
 import { SESSION_COOKIE, SESSION_SECONDS } from "./session.js";
-import { SIGNUP_COOKIE, TERMS_VERSION, getSignup } from "./signup-core.js";
+import { SIGNUP_COOKIE, termsVersion, getSignup } from "./signup-core.js";
 import { recheckLocation } from "./signup-finish.js";
 import { NULL_HOST, onThisHost, servedHost } from "./hostbind.js";
 import { activeMint } from "./official.js";
@@ -81,7 +81,7 @@ export function readBind(text) {
 /** Is this sign-up ready for the wallet (its city resolved, the current Terms accepted)? null, or the refusal { error, status }. */
 export function notReady(row) {
   if (!row || !row.loc_city) return { error: "location_required", status: 409 };
-  if (row.terms_version !== TERMS_VERSION) return { error: "terms_required", status: 409 };
+  if (row.terms_version !== termsVersion()) return { error: "terms_required", status: 409 };
   return null;
 }
 
@@ -98,7 +98,7 @@ export async function registerPin(code) {
 /* ---------------- the gates ---------------- */
 
 /** The condition on the sign-up every gate carries in its own WHERE: alive, its Terms, the city the gate was made for. */
-const aliveFrom8 = (signupId, city) => ({ sql: " AND EXISTS (SELECT 1 FROM signups WHERE id = ?8 AND expires_at > ?1 AND terms_version = ?9 AND loc_city = ?10)", args: [signupId, TERMS_VERSION, city] });
+const aliveFrom8 = (signupId, city) => ({ sql: " AND EXISTS (SELECT 1 FROM signups WHERE id = ?8 AND expires_at > ?1 AND terms_version = ?9 AND loc_city = ?10)", args: [signupId, termsVersion(), city] });
 
 /**
  * The gate of a register challenge (this browser, or a hand-off together with handoffGate): the challenge `row` (checked by src/challenge.js
@@ -134,7 +134,7 @@ export async function pairGate(db, p, signupId, city, now) {
   return {
     stmts: [db.prepare(`UPDATE pairs SET bind = ? WHERE id = ? AND purpose = 'register' AND wallet = ? AND signup_id = ? AND bind = ? AND expires_at > ?
         AND EXISTS (SELECT 1 FROM signups WHERE id = ? AND expires_at > ? AND terms_version = ? AND loc_city = ?)`)
-      .bind(usedBy, p.id, p.wallet, signupId, p.bind, iso(now), signupId, iso(now), TERMS_VERSION, city)],
+      .bind(usedBy, p.id, p.wallet, signupId, p.bind, iso(now), signupId, iso(now), termsVersion(), city)],
     cond: { sql: " AND EXISTS (SELECT 1 FROM pairs WHERE id = ? AND bind = ?)", args: [p.id, usedBy] },
     failed: (res) => (res[0].meta.changes === 1 ? null : { status: 410, body: { ok: false, status: "expired" } }),
   };
@@ -146,7 +146,7 @@ export async function pairGate(db, p, signupId, city, now) {
 async function whyNot(env, signupId, city, gateAnswer, now) {
   const s = await env.DB.prepare("SELECT expires_at, terms_version, loc_city FROM signups WHERE id = ?").bind(signupId).first();
   if (!s || !(Date.parse(s.expires_at) > now)) return { status: 410, body: { ok: false, error: "signup_expired" } };
-  if (s.terms_version !== TERMS_VERSION) return { status: 409, body: { ok: false, error: "terms_required" } };
+  if (s.terms_version !== termsVersion()) return { status: 409, body: { ok: false, error: "terms_required" } };
   if (s.loc_city !== city) return { status: 409, body: { ok: false, error: "location_changed" } };
   return gateAnswer;
 }
@@ -203,7 +203,7 @@ export async function register(env, request, { signup, city, wallet, gate, here 
           s.loc_city, s.loc_name, s.loc_country, ?, ?, 'register', ?, ?, s.loc_at, ?, CASE WHEN s.loc_choices IS NULL THEN 'inside' ELSE 'nearest' END
           FROM signups s WHERE s.id = ? AND s.expires_at > ? AND s.terms_version = ? AND s.loc_city = ?${c.sql}
         ON CONFLICT(wallet) DO NOTHING`)
-      .bind(wallet, wallet, auto, activeMint(env) ? 0 : 1, at, at, at, app, at, IDENTITY_POLICY.policyVersion, signup.id, at, TERMS_VERSION, city, ...c.args));
+      .bind(wallet, wallet, auto, activeMint(env) ? 0 : 1, at, at, at, app, at, IDENTITY_POLICY.policyVersion, signup.id, at, termsVersion(), city, ...c.args));
     const cols = ["id", "wallet", "user_id", "proof", "created_at", "expires_at", "proven_at", "auth"], vals = ["?", "wallet", "id", "NULL", "?", "?", "?", "'wallet'"];
     const args = [sid, at, iso(now + SESSION_SECONDS * 1000), at];
     if (here) { cols.push("made_by"); vals.push("'wallet'"); }
@@ -294,7 +294,7 @@ export async function usableHandoff(env, request, code, now, cf, mode, nonces) {
   const signup = await env.DB.prepare("SELECT * FROM signups WHERE id = ?").bind(row.signup_id).first();
   if (!signup || !(Date.parse(signup.expires_at) > now)) return refuse("signup_expired", 410);
   const bind = readBind(row.bind);
-  if (!bind || signup.loc_city !== bind.city || signup.terms_version !== TERMS_VERSION) return refuse("location_changed", 409);
+  if (!bind || signup.loc_city !== bind.city || signup.terms_version !== termsVersion()) return refuse("location_changed", 409);
   if (row.opener) {
     if (!(await Promise.all(nonces.map(openerHash))).includes(row.opener)) {
       await env.DB.prepare("UPDATE handoffs SET result = 'contested' WHERE id = ? AND result = 'opened'").bind(row.id).run();

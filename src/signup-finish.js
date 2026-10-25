@@ -14,7 +14,7 @@
  */
 import { clearCookie, cookie, randomToken, sha256 } from "./http.js";
 import { SESSION_COOKIE, SESSION_SECONDS } from "./session.js";
-import { SIGNUP_COOKIE, TERMS_VERSION, netOf } from "./signup-core.js";
+import { SIGNUP_COOKIE, termsVersion, netOf } from "./signup-core.js";
 import { isRelayNetwork, networkCheck } from "./network.js";
 import { countryCities } from "./cities.js";
 import { activeMint } from "./official.js";
@@ -106,7 +106,7 @@ async function whyNotFinished(env, row, now) {
   }
   if (await env.DB.prepare("SELECT id FROM users WHERE provider = ? AND provider_id = ?").bind(row.provider, row.provider_id).first()) return { error: "social_taken", status: 409 };
   if (await addedBy(env.DB, row.provider, row.provider_id)) return { error: "social_taken", status: 409 }; // a member added this Google account to theirs
-  if (sig.terms_version !== TERMS_VERSION) return { error: "terms_required", status: 400 };
+  if (sig.terms_version !== termsVersion()) return { error: "terms_required", status: 400 };
   if (!sig.loc_city) return { error: "location_required", status: 400 };
   if (!sig.identity_at) return { error: "account_required", status: 400, pending: Boolean(sig.pending_email) };
   return { error: "changed_retry", status: 409 }; // something changed while we were working: nothing was lost, try again
@@ -124,7 +124,7 @@ export async function finishCore(env, row, request, now = Date.now(), cf = reque
   const limit = await check(env, [{ key: await limitKey(env, "fins", row.id), windowMs: HOUR, max: FINISHES_PER_HOUR }], now);
   if (!limit.ok) return { error: "slow_down", status: 429 };
   // These checks only give precise answers: the transaction below checks everything again.
-  if (row.terms_version !== TERMS_VERSION) return { error: "terms_required", status: 400 };
+  if (row.terms_version !== termsVersion()) return { error: "terms_required", status: 400 };
   if (!row.loc_city) return { error: "location_required", status: 400 };
   if (!row.identity_at) return { error: "account_required", status: 400, pending: Boolean(row.pending_email) };
   if (!(await recheckLocation(env, row, cf))) {
@@ -148,7 +148,7 @@ export async function finishCore(env, row, request, now = Date.now(), cf = reque
   // A username can collide with the (case-insensitive) unique index when someone takes it a moment before: not the person's
   // problem. The whole batch rolled back, so pick another name and go on. An identity collision is theirs (social_taken).
   for (let attempt = 0; ; attempt++) {
-    const values = [iso(now), row.id, TERMS_VERSION, row.provider, row.provider_id, await autoUsername(env.DB), early, sessionId, iso(now + SESSION_SECONDS * 1000)];
+    const values = [iso(now), row.id, termsVersion(), row.provider, row.provider_id, await autoUsername(env.DB), early, sessionId, iso(now + SESSION_SECONDS * 1000)];
     let r;
     try { r = await env.DB.batch([...FINISH.map((sql) => bindFor(env.DB, sql, values)), ...(host ? [host] : [])]); }
     catch (e) {

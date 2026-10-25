@@ -337,7 +337,9 @@ are rehearsed first.
   `https://citycoin.dev/launchpad?tab=new`; without it the name does not resolve.
 - `node scripts/check-live.mjs https://citycoin.dev` passes (the deploy workflow runs it only for vicinity.city; retry while the
   certificate is being issued).
-- `curl -sI https://citycoin.dev/` carries `x-robots-tag: noindex`; `curl -sI https://vicinity.city/` carries none.
+- `curl -sI https://citycoin.dev/` carries `x-robots-tag: noindex`; `curl -sI https://vicinity.city/` carries none. (Until the go-live pull
+  request, branch `cc/golive`, not merged. From its deploy on it is the other way round: citycoin.dev carries none, and vicinity.city
+  and www.vicinity.city carry `x-robots-tag: noindex`; implementation-report.md section 11, "Go-live switch-on".)
 - On citycoin.dev, "Check a link" (`/api/check?q=citycoin.dev`) answers official; an e-mail sign-up's code e-mail asked there says "Enter it
   at https://citycoin.dev/connect"; with the Google console entry (section 1.3) "Continue with Google" comes back signed in, without it
   Google shows `redirect_uri_mismatch`.
@@ -364,6 +366,9 @@ are rehearsed first.
 - Items 3 to 6 of section 0 are known to the owner; the mail sender and the link checker's list (items 5 and 6) are settled.
 - The S55 pull request removes the `https://citycoin.dev/*` rule (`X-Robots-Tag: noindex`) from `public/_headers`, or the canonical site
   stays out of search engines.
+  Since the go-live pull request (branch `cc/golive`, not merged; owner's go of 25 Oct 2026), the rules in `public/_headers` are
+  `https://vicinity.city/*` and `https://www.vicinity.city/*` instead, and citycoin.dev is indexed. Once the go-live is deployed, the S55
+  pull request removes those two rules together with the routes.
 
 **After step 4:**
 

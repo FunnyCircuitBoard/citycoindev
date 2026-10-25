@@ -34,6 +34,7 @@ import { json, readJson } from "./http.js";
 import { access, voterProblem, hoursFrom } from "./access.js";
 import { useAttestation } from "./attest.js";
 import { DAY, POLICY, founderAmount, iso } from "./policy.js";
+import { rulesVersion } from "./editions.js";
 import { averages, dayOf, latestBalances, samplesStale, tenure } from "./ledger.js";
 import { LIVE, activeBan, adminWallets, amountsFor, liveSeatOfCity, liveSeatOfUser } from "./roles.js";
 import { LAUNCHPAD_OPENS_AT, legacyHidden, tokenMint } from "./official.js";
@@ -228,7 +229,7 @@ async function openWindow(env, city, now, fetchImpl) {
   if (await liveSeatOfCity(db, city.id)) return null;
   try {
     const r = await db.prepare("INSERT INTO windows (city_id, city_name, country, policy, threshold, opened_at, closes_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
-      .bind(city.id, city.name, city.country, POLICY.version, city.threshold, iso(now), hoursFrom(now, F.windowHours)).run();
+      .bind(city.id, city.name, city.country, rulesVersion(), city.threshold, iso(now), hoursFrom(now, F.windowHours)).run();
     // in-app notice (NOTIFY=on) to every member of the city, one statement (at most 5,000 rows): the window is on their City card as always
     await notifyMany(env, { column: "home_city", value: city.id, kind: "founder", ref: r.meta.last_row_id, now, href: "/dashboard#founder",
       text: `A founder claim window opened in ${city.name}. It closes in ${F.windowHours} hours.` });
@@ -248,11 +249,11 @@ async function tryGrantSteward(env, e, u, pitch, squadId, now) {
     const seat = await db.prepare(
       `INSERT INTO seats (city_id, city_name, country, user_id, wallet, policy, threshold, status, created_at, probation_until)
        VALUES (?, ?, ?, ?, ?, ?, ?, 'steward', ?, ?) RETURNING id, probation_until`)
-      .bind(e.cityId, e.cityName, e.country, u.id, u.wallet, POLICY.version, e.threshold, iso(now), probationUntil).first();
+      .bind(e.cityId, e.cityName, e.country, u.id, u.wallet, rulesVersion(), e.threshold, iso(now), probationUntil).first();
     const w = await db.prepare(
       `INSERT INTO windows (city_id, city_name, country, policy, threshold, opened_at, closes_at, status, kind, decided_at, result)
        VALUES (?, ?, ?, ?, ?, ?, ?, 'decided', 'steward_direct', ?, ?) RETURNING id`)
-      .bind(e.cityId, e.cityName, e.country, POLICY.version, e.threshold, iso(now), iso(now), iso(now),
+      .bind(e.cityId, e.cityName, e.country, rulesVersion(), e.threshold, iso(now), iso(now), iso(now),
         JSON.stringify({ steward: u.id, wallet: u.wallet, squad: squadId || null, reason: "sole_qualified_claimer", probationUntil })).first();
     const app = await db.prepare(
       "INSERT INTO applications (window_id, city_id, user_id, wallet, squad_id, pitch, created_at, valid, rank) VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1) RETURNING id")
@@ -280,7 +281,7 @@ async function openChallengeWindow(env, e, u, now, fetchImpl) {
   if (!seat) return null; // the stewardship ended while the challenger was applying
   try {
     const r = await db.prepare("INSERT INTO windows (city_id, city_name, country, policy, threshold, opened_at, closes_at, kind) VALUES (?, ?, ?, ?, ?, ?, ?, 'steward_challenge')")
-      .bind(e.cityId, e.cityName, e.country, POLICY.version, e.threshold, iso(now), hoursFrom(now, F.windowHours)).run();
+      .bind(e.cityId, e.cityName, e.country, rulesVersion(), e.threshold, iso(now), hoursFrom(now, F.windowHours)).run();
     await notifyMany(env, { column: "home_city", value: e.cityId, kind: "founder", ref: r.meta.last_row_id, now, href: "/dashboard#founder",
       text: `A challenge to ${e.cityName}'s Seed Steward opened. The window closes in ${F.windowHours} hours.` }); // (NOTIFY=on)
   } catch (err) { if (!/UNIQUE/i.test(String(err))) throw err; } // someone opened it at the same moment: use theirs

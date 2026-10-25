@@ -12,6 +12,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { sourceAs } from "../scripts/pages/build.mjs";
 import { POLICY } from "../src/policy.js";
+import { rulesVersion } from "../src/editions.js";
 
 // a page source as today's build reads it (BRAND unset: its brand blocks and {{label}} fills resolved; scripts/pages/build.mjs sourceAs)
 const read = (p) => { const t = readFileSync(new URL("../" + p, import.meta.url), "utf8").replace(/\r\n/g, "\n"); return p.startsWith("scripts/pages/src/") ? sourceAs(p, t) : t; };
@@ -64,14 +65,18 @@ test("honest claims: liquidity is never said to be locked or burned today while 
 });
 
 test("honest claims: the Roles box and the rules page show the rules' own version, even before the live answer fills it", () => {
+  // today's pages (read() resolves a source with today's label set; the Citycoin.dev pages carry their own edition, version 7: src/editions.js
+  // and test/golive-config.test.js)
   for (const f of ["scripts/pages/src/dashboard.html", "public/dashboard.html"]) {
     assert.ok(read(f).includes(`rules version <span data-policy-version>${POLICY.version}</span>`), `${f}: the Roles box says version ${POLICY.version}`);
   }
   for (const f of ["scripts/pages/src/rules.html", "public/rules.html"]) {
     assert.ok(read(f).includes(`version <span data-rule="version">${POLICY.version}</span> · in effect since <span data-rule="effectiveAt">${POLICY.effectiveAt}</span>`), `${f}: the hero says version ${POLICY.version}`);
   }
-  // both are then filled from the same POLICY: /api/me's policyVersion on the dashboard, /api/policy on the rules page
-  assert.match(read("src/me.js"), /policyVersion: POLICY\.version/);
+  // both are then filled from the same edition: /api/me's policyVersion on the dashboard, /api/policy on the rules page (src/editions.js,
+  // POLICY's own version and date for today's pages)
+  assert.match(read("src/me.js"), /policyVersion: rulesVersion\(\)/);
+  assert.equal(rulesVersion(), POLICY.version, "today's pages: the rules' own version");
   assert.match(read("public/dashboard.js"), /\$\$\("\[data-policy-version\]"\)\.forEach\(\(e\) => \(e\.textContent = d\.policyVersion\)\);/);
   assert.match(read("public/rules.js"), /version: p\.version, effectiveAt: p\.effectiveAt,/);
 });

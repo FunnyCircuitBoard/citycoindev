@@ -4,13 +4,14 @@
 // Citycoin.dev rebrand stage: the configuration pull request that sets BRAND=citycoin in wrangler.jsonc runs `npm run build`, which builds
 // the Citycoin.dev pages and then runs this suite, before CI and `wrangler deploy` let it through).
 //
-// While the committed build IS today's (src/pages-built.js names no label set, no main-token switch and no freeze: the live site), this file
+// While the committed build IS today's (src/pages-built.js names no label set, no main-token switch, no freeze and no wallet-only copy), this file
 // does nothing at all. Otherwise, before any test runs, three committed things read as today's:
 //   wrangler.jsonc        as it was before the switch (todayWrangler below): what the CI switch trial wrote into this copy, taken back
 //                         exactly from the trial's own line (scripts/brand/wrangler-vars.mjs undoTrial); then the switch's own settings
-//                         (SWITCH_ON_SETTINGS: BRAND, a LEGACY_SEATS frozen, MAIN_TOKEN_V5 on) taken out and today's mail sender put back.
-//                         Nothing else: a DEPLOYMENT_ENV, SITE_ORIGIN or SITE_ORIGINS committed for another stage (S06) stays as committed
-//                         (rebrand second check S06-CI-RED), and every edit goes by the JSONC structure, never by lines (STANDIN-MULTILINE)
+//                         (SWITCH_ON_SETTINGS: BRAND, a LEGACY_SEATS frozen, MAIN_TOKEN_V5 on, WALLET_ONLY on) taken out and today's mail
+//                         sender put back. Nothing else: a DEPLOYMENT_ENV, SITE_ORIGIN or SITE_ORIGINS committed for another stage (S06, the
+//                         go-live's SITE_ORIGIN) and a LEGACY_LAUNCH stay as committed (rebrand second check S06-CI-RED; the suite pins those
+//                         committed values itself), and every edit goes by the JSONC structure, never by lines (STANDIN-MULTILINE)
 //   src/pages-built.js    the record the page build writes for those settings, as the file's text and as the Worker's reading
 //                         (src/v5policy.js _pagesBuiltBaseForTests; a test that stands in for another build merges onto this one, as it was
 //                         written to)
@@ -23,7 +24,7 @@ import { syncBuiltinESMExports } from "node:module";
 import { fileURLToPath } from "node:url";
 import { PAGES_BUILT } from "../../src/pages-built.js";
 import { brandFromSettings } from "../../src/brand.js";
-import { legacySeatsFrozenOn, mainTokenV5On } from "../../src/flags.js";
+import { legacySeatsFrozenOn, mainTokenV5On, walletOnlyOn } from "../../src/flags.js";
 import { removeVar, setVar, undoTrial, varsOf } from "../../scripts/brand/wrangler-vars.mjs";
 
 const realReadFileSync = fs.readFileSync;
@@ -31,14 +32,16 @@ const ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const PUBLIC = `${ROOT}public/`, SRC = `${ROOT}scripts/pages/src/`, WRANGLER = `${ROOT}wrangler.jsonc`, RECORD = `${ROOT}src/pages-built.js`;
 
 /** The settings that turn on what a committed build other than today's carries (src/pages-built.js: the label set, the legacy seat freeze, the
- *  main-token switch), each taken out by the stand-in when it is set; and today's mail sender, put back when a label set was (BRAND=citycoin
- *  needs a sender without the old name: scripts/pages/build.mjs pageBrandPrerequisites). Never DEPLOYMENT_ENV, SITE_ORIGIN or SITE_ORIGINS:
- *  a configuration pull request of another stage (S06) commits them, and the suite reads them as committed (rebrand second check S06-CI-RED). */
-export const SWITCH_ON_SETTINGS = Object.freeze(["BRAND", "LEGACY_SEATS", "MAIN_TOKEN_V5"]);
+ *  main-token switch, the wallet-only copy), each taken out by the stand-in when it is set; and today's mail sender, put back when a label set
+ *  was (BRAND=citycoin needs a sender without the old name: scripts/pages/build.mjs pageBrandPrerequisites). Never DEPLOYMENT_ENV, SITE_ORIGIN
+ *  or SITE_ORIGINS: a configuration pull request of another stage (S06, the go-live) commits them, and the suite reads them as committed
+ *  (rebrand second check S06-CI-RED). WALLET_ONLY=on goes because the page build takes it only with BRAND=citycoin (pageWalletOnly): the
+ *  Worker's wallet-only answers are tested by their own suites with the switch set in the test's settings. */
+export const SWITCH_ON_SETTINGS = Object.freeze(["BRAND", "LEGACY_SEATS", "MAIN_TOKEN_V5", "WALLET_ONLY"]);
 export const TODAY_EMAIL_FROM = "Vicinity <noreply@vicinity.city>";
 
 /** Is the committed build today's? */
-export const committedIsToday = PAGES_BUILT.brand === "" && PAGES_BUILT.mainTokenV5 === false && PAGES_BUILT.legacySeats === undefined;
+export const committedIsToday = PAGES_BUILT.brand === "" && PAGES_BUILT.mainTokenV5 === false && PAGES_BUILT.legacySeats === undefined && PAGES_BUILT.walletOnly === undefined;
 /** A committed file exactly as it is on disk, never the stand-in below (a path relative to the repository: "public/index.html"). */
 export const committedFile = (rel, encoding) => realReadFileSync(ROOT + rel, encoding);
 /** The committed wrangler.jsonc's text, exactly as it is on disk. */
@@ -46,8 +49,8 @@ export const realWrangler = () => realReadFileSync(WRANGLER, "utf8");
 
 /**
  * wrangler.jsonc as today's site has it: the CI switch trial's change taken back exactly (its own line says what it replaced), then each
- * SWITCH_ON_SETTINGS entry that turns something on taken out (a blank BRAND, a LEGACY_SEATS other than frozen, a MAIN_TOKEN_V5 other than on
- * are today's and stay), and today's mail sender when a label set was set. Every other byte stays: comments, other settings, a DEPLOYMENT_ENV
+ * SWITCH_ON_SETTINGS entry that turns something on taken out (a blank BRAND, a LEGACY_SEATS other than frozen, a MAIN_TOKEN_V5 or WALLET_ONLY
+ * other than on are today's and stay), and today's mail sender when a label set was set. Every other byte stays: comments, other settings, a DEPLOYMENT_ENV
  * or SITE_ORIGINS committed for another stage, a value written over several lines.
  */
 export function todayWrangler(text) {
@@ -57,6 +60,7 @@ export function todayWrangler(text) {
   if (labels) out = removeVar(out, "BRAND");
   if (legacySeatsFrozenOn(vars)) out = removeVar(out, "LEGACY_SEATS");
   if (mainTokenV5On(vars)) out = removeVar(out, "MAIN_TOKEN_V5");
+  if (walletOnlyOn(vars)) out = removeVar(out, "WALLET_ONLY");
   if (labels && Object.hasOwn(vars, "EMAIL_FROM") && vars.EMAIL_FROM !== TODAY_EMAIL_FROM) out = setVar(out, "EMAIL_FROM", TODAY_EMAIL_FROM);
   varsOf(out); // (throws if the result would not parse: never hand the suite a file it cannot read)
   return out;

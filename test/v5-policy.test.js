@@ -52,25 +52,28 @@ const policyLines = () => errors.filter((e) => e.startsWith("policy config refus
 
 test("the default: today's settings describe the policy's own default deployment, which validates; the fast answer equals the full check", () => {
   // the v5 inputs today's settings carry: the official X link the owner supplied on 24 Oct 2026 (amendment 01), shown only while a master
-  // switch counts, and since stage S06 (owner's go of 25 Oct 2026) the production environment and the two hosts the Worker serves, with
-  // vicinity.city still canonical (SITE_ORIGIN unset reads as https://vicinity.city); every switch stays at its default
+  // switch counts, and since stage S06 (owner's go of 25 Oct 2026) the production environment and the two hosts the Worker serves; since the
+  // go-live (the same go) citycoin.dev is canonical and the legacy launch path is closed. (The suite reads wrangler.jsonc through its stand-in
+  // for today's site, test/helpers/today-build.mjs, which takes the label set, the freeze and wallet-only sign-in back: they are tested on
+  // their own.) Every other switch stays at its default
   assert.equal(LIVE.OFFICIAL_X_URL, "https://x.com/CityCoinDev");
-  assert.deepEqual([LIVE[ENVIRONMENT_SETTING], LIVE.SITE_ORIGINS, LIVE.SITE_ORIGIN], ["production", "https://citycoin.dev https://vicinity.city", undefined]);
+  assert.deepEqual([LIVE[ENVIRONMENT_SETTING], LIVE.SITE_ORIGINS, LIVE.SITE_ORIGIN, LIVE.LEGACY_LAUNCH], ["production", "https://citycoin.dev https://vicinity.city", "https://citycoin.dev", "off"]);
   const withX = { ...MASTER_POLICY.deployment, inputs: { ...MASTER_POLICY.deployment.inputs, OFFICIAL_X_URL: LIVE.OFFICIAL_X_URL } };
-  const s06 = { ...withX, environment: "production",
-    inputs: { ...withX.inputs, SITE_ORIGIN: "https://vicinity.city", SITE_ORIGINS: ["https://citycoin.dev", "https://vicinity.city"] } };
-  for (const [env, want] of [[{}, MASTER_POLICY.deployment], [LIVE, s06], [{ ...LIVE, PUBLIC_V5: "off" }, s06], [{ ...LIVE, PUBLIC_V5: "", MAIN_TOKEN_V5: "  " }, s06],
-    [{ ...LIVE, ...NO_ENVIRONMENT, SITE_ORIGINS: [] }, withX], [{ ...LIVE, LEGACY_SEATS: "On", LEGACY_LAUNCH: "on", MAIN_TOKEN_V5: "OFF " }, s06]]) {
+  const open = { ...withX, environment: "production",
+    inputs: { ...withX.inputs, SITE_ORIGIN: "https://citycoin.dev", SITE_ORIGINS: ["https://citycoin.dev", "https://vicinity.city"] } };
+  const golive = { ...open, flags: { ...open.flags, LEGACY_LAUNCH: "off" } };
+  for (const [env, want] of [[{}, MASTER_POLICY.deployment], [LIVE, golive], [{ ...LIVE, PUBLIC_V5: "off" }, golive], [{ ...LIVE, PUBLIC_V5: "", MAIN_TOKEN_V5: "  " }, golive],
+    [{ ...LIVE, ...NO_ENVIRONMENT, SITE_ORIGINS: [], SITE_ORIGIN: "", LEGACY_LAUNCH: "" }, withX], [{ ...LIVE, LEGACY_SEATS: "On", LEGACY_LAUNCH: "on", MAIN_TOKEN_V5: "OFF " }, open]]) {
     assert.deepEqual(deploymentFromEnv(env), want, JSON.stringify(env).slice(0, 80));
     assert.deepEqual(validatePolicy({ ...MASTER_POLICY, deployment: deploymentFromEnv(env) }), { ok: true, errors: [] });
     assert.deepEqual(policyConfig(env), { ok: true, errors: [], environment: want.environment });
     assert.equal(publicV5(env), false);
   }
-  // none of today's settings is a v5 switch; the v5 inputs are the environment, SITE_ORIGINS and the official X link: the check reads only
-  // names the policy defines
+  // the one v5 switch of today's settings (as the suite reads them) is the go-live's LEGACY_LAUNCH=off; the v5 inputs are the environment,
+  // SITE_ORIGIN, SITE_ORIGINS and the official X link: the check reads only names the policy defines
   const read = new Set([...Object.keys(MASTER_POLICY.deployment.flags), ENVIRONMENT_SETTING, ...INPUT_SETTINGS, ...Object.keys(MASTER_POLICY.deployment.inputs.secrets_present)]);
-  assert.deepEqual(Object.keys(LIVE).filter((k) => Object.hasOwn(MASTER_POLICY.deployment.flags, k)), [], "no v5 switch is set");
-  assert.deepEqual(Object.keys(LIVE).filter((k) => read.has(k)).sort(), [ENVIRONMENT_SETTING, "OFFICIAL_X_URL", "SITE_ORIGINS"]);
+  assert.deepEqual(Object.keys(LIVE).filter((k) => Object.hasOwn(MASTER_POLICY.deployment.flags, k)), ["LEGACY_LAUNCH"], "one v5 switch is set: the legacy launch path closed");
+  assert.deepEqual(Object.keys(LIVE).filter((k) => read.has(k)).sort(), [ENVIRONMENT_SETTING, "LEGACY_LAUNCH", "OFFICIAL_X_URL", "SITE_ORIGIN", "SITE_ORIGINS"].sort());
   assert.deepEqual(checkPolicyConfig(LIVE), { ok: true, codes: [] });
   assert.deepEqual(errors, [], "nothing is logged");
 });

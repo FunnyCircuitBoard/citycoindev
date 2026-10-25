@@ -656,7 +656,10 @@ test("API messages and notices under BRAND=citycoin: every text of ours that nam
     // area d: the never-list's item about minting more $VICINITY is a fact of the legacy token, left out (its other items renamed only)
     assert.ok(POLICY.never.includes(LEGACY_NEVER) && /\$VICINITY/.test(LEGACY_NEVER));
     assert.deepEqual(p.never, POLICY.never.filter((t) => t !== LEGACY_NEVER).map((t) => CCW.say(t)));
-    assert.deepEqual({ ...p, never: null }, { ...JSON.parse(JSON.stringify(POLICY)), never: null }, "only the never-list changes");
+    // and the edition: the Citycoin.dev Rules are version 7, in effect since 2026-10-25 (src/editions.js; owner decision 2, the owner's go of
+    // 25 Oct 2026); every rule of POLICY is the same
+    assert.deepEqual([p.version, p.effectiveAt], [7, "2026-10-25"]);
+    assert.deepEqual({ ...p, never: null, version: null, effectiveAt: null }, { ...JSON.parse(JSON.stringify(POLICY)), never: null, version: null, effectiveAt: null }, "only the never-list and the edition change");
     const d = await coinDefaults(CC, "x", "US");
     assert.equal(d.message, "This city isn't in the Citycoin.dev city list yet, so it has no ready-made coin. Tell us and we'll add it.");
     for (const code of Object.keys(MESSAGES)) assert.doesNotMatch(explain(code, "Utica", brandWords(CC)), /vicinity/i, code);

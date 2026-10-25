@@ -621,6 +621,9 @@
      bind: at account creation (the sign-up's "I agree" box and "Agree and continue", recorded server-side as users.terms_version,
      src/signup.js) and on /terms itself (its inline "I agree"); every page's footer links them. V.termsGate stays with the same two
      methods, so signup.js and connect.js need no change: open() has nothing to open, agreed(version) notes the account's version here. */
+  // The Terms version these pages carry: a page built for another label set names its edition on <html> (data-terms, scripts/pages/build.mjs
+  // from src/editions.js: "2026-10-25" on the Citycoin.dev pages); today's pages carry none and mean today's "2026-10-01"
+  const TERMS_NOW = (() => { try { const v = document.documentElement.getAttribute("data-terms"); return v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : "2026-10-01"; } catch { return "2026-10-01"; } })();
   const termsGate = {
     open() {},
     agreed(version) { try { if (version) localStorage.setItem("vicinity_terms", version); } catch { /* private mode: nothing to note */ } },
@@ -628,8 +631,8 @@
   if (document.body.dataset.page === "terms") {
     const inline = $("#terms-agree");
     if (inline) inline.addEventListener("click", () => {
-      try { localStorage.setItem("vicinity_terms", "2026-10-01"); } catch { /* private mode */ }
-      ready.then((d) => { if (d && d.signedIn) api("/api/me/terms", { version: "2026-10-01" }); });
+      try { localStorage.setItem("vicinity_terms", TERMS_NOW); } catch { /* private mode */ }
+      ready.then((d) => { if (d && d.signedIn) api("/api/me/terms", { version: TERMS_NOW }); });
       inline.disabled = true;
       inline.textContent = "Agreed ✓";
       toast("Thanks — you're all set.");
@@ -642,7 +645,6 @@
      for this visit, "I agree" records it for the account (POST /api/me/terms, the same call as /terms' own button). Visitors never see
      it (no account, nothing to record), and a member who agreed at sign-up never does either. Only with the new sign-up on: its
      /api/me answer says which version the account agreed to. Not on /terms (its own button) or /connect (the sign-up itself). */
-  const TERMS_NOW = "2026-10-01";
   ready.then((d) => {
     if (!d || !d.signedIn || d.signupFlow !== "v2" || !("termsVersion" in d) || d.termsVersion === TERMS_NOW) return;
     if (["terms", "connect"].includes(document.body.dataset.page)) return;
@@ -666,7 +668,7 @@
     document.body.append(bar);
   });
 
-  window.V = { $, $$, el, fmt, compact, mask, short, ago, isAddr, initials, toast, burst, copy, api, getLocation, webView, takeCarry, takeLink, walletApp, termsGate, liveNums, reveal,
+  window.V = { $, $$, el, fmt, compact, mask, short, ago, isAddr, initials, toast, burst, copy, api, getLocation, webView, takeCarry, takeLink, walletApp, termsGate, termsNow: TERMS_NOW, liveNums, reveal,
     get reduced() { return reducedNow(); }, // read when it is needed: the device setting can change while the page is open
     me: () => meLite, ready, official, opensAt: () => opensAt, launchOpen, siteMode: () => siteMode,
     setAccount: (u) => setAccount(u), // the dashboard keeps the account sheet's name and home in step with /api/me

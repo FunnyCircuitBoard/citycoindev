@@ -28,8 +28,9 @@ jobs:
   # stand-in (test/helpers/today-build.mjs), which takes back exactly what the trial wrote (the trial records it in one comment line of
   # this copy), so settings committed for other stages (S06's SITE_ORIGINS and DEPLOYMENT_ENV) read as committed. Nothing is committed or
   # deployed from here. Once wrangler.jsonc itself carries BRAND=citycoin
-  # with its prerequisites (the configuration pull request and every one after it), the trial writes nothing and says so (exit 0), and the
-  # build below builds the committed switch; a half-set or inconsistent wrangler.jsonc still fails here, with the reason.
+  # with its prerequisites (the go-live pull request, which also commits WALLET_ONLY=on and SITE_ORIGIN, and every one after it), the trial
+  # writes nothing and says so (exit 0), and the build below builds the committed switch; a half-set or inconsistent wrangler.jsonc still
+  # fails here, with the reason.
   brand-switch-trial:
     runs-on: ubuntu-latest
     env:

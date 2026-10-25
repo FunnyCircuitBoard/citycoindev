@@ -37,8 +37,11 @@ test("a member whose account has no agreement to the current Terms sees one quie
     const r = await openPage(file, me ? { me } : {});
     assert.equal(r.$(".terms-note"), null, `${file} ${JSON.stringify(me && me.termsVersion)}`);
   }
-  assert.match(read("public/site.js"), /const TERMS_NOW = "2026-10-01";/);
-  assert.equal(TERMS, /export const TERMS_VERSION = "([^"]+)"/.exec(read("src/signup-core.js"))[1], "the bar asks for the version the sign-up records");
+  // the current version: the page's own edition (data-terms on a page built for another label set, src/editions.js), today's 2026-10-01 otherwise
+  assert.match(read("public/site.js"), /const TERMS_NOW = \(\(\) => \{ try \{ const v = document\.documentElement\.getAttribute\("data-terms"\); return v && \/\^\\d\{4\}-\\d\{2\}-\\d\{2\}\$\/\.test\(v\) \? v : "2026-10-01"; \} catch \{ return "2026-10-01"; \} \}\)\(\);/);
+  // (today's pages: the version the sign-up records for them, src/editions.js TERMS_TODAY, which src/signup-core.js TERMS_VERSION is)
+  assert.equal(TERMS, /export const TERMS_TODAY = "([^"]+)"/.exec(read("src/editions.js"))[1], "the bar asks for the version the sign-up records");
+  assert.match(read("src/signup-core.js"), /export const TERMS_VERSION = TERMS_TODAY;/);
   assert.match(style, /@media \(max-width: 900px\) \{ \.terms-note \{ bottom: calc\(var\(--bottom-bars, 64px\) \+ 10px\); \} \}/, "above the phone's tab bar");
   assert.match(read("docs/DEPLOY.md"), /the old sign-up has no Terms of Use step of its own any more/, "switching SIGNUP_FLOW back says what it means for the Terms");
 });

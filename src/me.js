@@ -16,6 +16,7 @@ import { countRecent, noteEvent, useAttestation } from "./attest.js";
 import { configuredSocialProfiles, teamFor, tokenMint } from "./official.js";
 import { getHolding, holderSnapshot, isTeamWallet, rankOf } from "./chain.js";
 import { DAY, HOUR, POLICY, iso } from "./policy.js";
+import { rulesVersion } from "./editions.js";
 import { VOTE_WEIGHT, activeBan, adminWallets, amountsFor, liveSeatOfUser, managerOf } from "./roles.js";
 import { cityPicture, cooldownUntil, eligibility, squadPicture } from "./seats.js";
 import { countryPicture } from "./elections.js";
@@ -51,13 +52,15 @@ const TOKEN_BADGES = new Set(["holder", "founder_ready", "whale", "top100", "top
 // (unitOf). "Early member" stays history: joined before $VICINITY launched (under another label set it says so without the old name).
 // `legacyFrozen` (the legacy seats frozen, stage S16; src/v5policy.js legacySeats): the seven-day "Founder-ready" badge is gone (nobody qualifies
 // or applies any more), and the founder and manager badges keep their names and their holders but describe a record, not today's seat rules.
-// `bw`: the product's name in the words (src/brandwords.js; today's words by default).
-export function badgesFor({ u, launched, amount, position, seat, manager, admin, checkins, posts, tenure, threshold, unit = "$VICINITY", legacyFrozen = false, bw = SAME }) {
+// `bw`: the product's name in the words (src/brandwords.js; today's words by default). `walletOnly` (WALLET_ONLY counting, src/v5policy.js
+// walletOnly; the S15 switch-on): an account is made and signed in to with its wallet only, so "Verified account" says that, never a Google
+// login or an e-mail; and "On the streets" stays only for a member who already earned it, since new check-ins are not posted (stage S13).
+export function badgesFor({ u, launched, amount, position, seat, manager, admin, checkins, posts, tenure, threshold, unit = "$VICINITY", legacyFrozen = false, bw = SAME, walletOnly: wo = false }) {
   const pct = (v, of) => Math.max(0, Math.min(1, v / of));
   const T = threshold || POLICY.founder.ladder.base;
   const list = [
     { id: "early", icon: "🌱", name: "Early member", detail: bw.on ? "One of the first members. This one can never be earned again." : "Joined before $VICINITY launched. This one can never be earned again.", earned: Boolean(u.early) },
-    { id: "verified", icon: "✅", name: "Verified account", detail: "A verified Google login or e-mail.", earned: true },
+    { id: "verified", icon: "✅", name: "Verified account", detail: wo ? "An account opened with one free signature from its Solana wallet." : "A verified Google login or e-mail.", earned: true },
     { id: "wallet", icon: "🔗", name: "Wallet linked", detail: "A Solana wallet linked to your account with one free signature. It unlocks holdings, rank, badges and the founder path.", earned: Boolean(u.wallet) },
     { id: "local", icon: "📍", name: "Local", detail: "Home community confirmed by location.", earned: Boolean(u.home_city) },
     { id: "holder", icon: "🏅", name: "Holder", detail: launched ? `Hold any ${unit}.` : bw.on ? `Hold ${unit} once the token is live.` : `Hold ${unit} once it launches.`, earned: amount > 0, progress: amount > 0 ? 1 : 0 },
@@ -76,6 +79,7 @@ export function badgesFor({ u, launched, amount, position, seat, manager, admin,
     { id: "streak", icon: "🔥", name: "On the streets", detail: "Checked in on 3 different days.", earned: checkins >= 3, progress: pct(checkins, 3) },
   ];
   if (admin) list.unshift({ id: "admin", icon: "⚙️", name: "Admin", detail: bw`Runs Vicinity, within the published rules.`, earned: true });
+  if (wo) { const i = list.findIndex((b) => b.id === "streak"); if (i >= 0 && !list[i].earned) list.splice(i, 1); }
   // a label set other than today's with no live token (src/official.js legacyHidden, MAIN_TOKEN_V5 not counting): no holding is measured, so
   // no badge describes a holding, an amount or a holder rank of a token that has no supply yet (review finding F3); they come back with it
   if (bw.on && !launched) for (let i = list.length - 1; i >= 0; i--) if (TOKEN_BADGES.has(list[i].id)) list.splice(i, 1);
@@ -184,7 +188,7 @@ async function liveStatus(env, s, fetchImpl, now) {
     `SELECT COUNT(*) AS posts, COUNT(DISTINCT CASE WHEN kind = 'checkin' THEN substr(created_at, 1, 10) END) AS days FROM posts WHERE user_id = ? AND hidden = 0${alive}`,
   ).bind(u.id).first();
   const bw = brandWords(env);
-  const badges = badgesFor({ u, launched, amount, position, seat, manager: isManager, admin, checkins: act?.days || 0, posts: act?.posts || 0, tenure: elig.tenure, threshold: elig.threshold, unit: unitOf(env, bw), legacyFrozen: frozen, bw });
+  const badges = badgesFor({ u, launched, amount, position, seat, manager: isManager, admin, checkins: act?.days || 0, posts: act?.posts || 0, tenure: elig.tenure, threshold: elig.threshold, unit: unitOf(env, bw), legacyFrozen: frozen, bw, walletOnly: walletOnly(env) });
   const earned = badges.filter((b) => b.earned).map((b) => b.id);
   let lost = [];
   try { lost = JSON.parse(u.badges || "[]").filter((id) => HOLDING_BADGES.has(id) && !earned.includes(id)); } catch {}
@@ -220,7 +224,7 @@ async function liveStatus(env, s, fetchImpl, now) {
   const setup = { percent: u.wallet ? 100 : 67, steps: [{ id: "location", done: true }, { id: "account", done: true }, { id: "wallet", done: Boolean(u.wallet) }] };
 
   return {
-    launched, chain, checkedAt: iso(now), level, fresh: isFresh(s, now), policyVersion: POLICY.version, setup,
+    launched, chain, checkedAt: iso(now), level, fresh: isFresh(s, now), policyVersion: rulesVersion(), setup,
     roles: { admin, manager: isManager, founder: founderLive, steward: Boolean(seat && seat.status === "steward"), holder: amount > 0,
       weight: VOTE_WEIGHT[isManager ? "manager" : founderLive ? "founder" : "member"] }, // the same weight powersOf gives for feed votes
     holding: { amount, rank: position ? position.rank : null, total: position ? position.total : null, percent: position ? position.percent : null,

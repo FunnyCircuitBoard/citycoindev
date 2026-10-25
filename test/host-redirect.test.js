@@ -192,8 +192,10 @@ test("a switch set on but refused says why, once per isolate, as codes only; uns
  *   - the site settings taken out (the rollback of domain-cutover.md section 5; DEPLOYMENT_ENV stays): unbound, only the cutover's own two
  *     hosts are refused (section 1.3), every other host is served in place as before S04;
  *   - the settings main had before stage S06 (no site setting, no environment): the same answers as the rollback. */
+// (the origin a refused host is told: the canonical one of the configuration, https://citycoin.dev as committed since the go-live, and
+// today's https://vicinity.city with the site settings taken out)
 const UNSET_CONFIGS = [
-  ["as committed (stage S06)", {}, new Set(["www.citycoin.dev", ...UNKNOWN_HOSTS, "localhost"])],
+  ["as committed (stage S06 and the go-live)", {}, new Set(["www.citycoin.dev", ...UNKNOWN_HOSTS, "localhost"])],
   ["site settings taken out (rollback)", { SITE_ORIGIN: undefined, SITE_ORIGINS: undefined }, new Set(CUTOVER_HOSTS)],
   ["before stage S06", { SITE_ORIGIN: undefined, SITE_ORIGINS: undefined, DEPLOYMENT_ENV: undefined }, new Set(CUTOVER_HOSTS)],
 ];
@@ -213,7 +215,7 @@ test("switch unset: every host, scheme, method and path class answers as today (
               // refused before any route and before the 301s: never served unbound (S04 review), never served outside the allowlist while the
               // binding counts; no Location, no cookie
               assert.deepEqual([got.status, JSON.parse(got.body), headerOf(got, "location"), headerOf(got, "set-cookie")],
-                [421, { error: "wrong_host", origin: "https://vicinity.city" }, null, null], at);
+                [421, { error: "wrong_host", origin: siteConfig(env).origin }, null, null], at);
             } else if (location && host !== "localhost") {
               assert.deepEqual(got, redirectTo(301, location), at);
             } else {
@@ -240,14 +242,16 @@ test("switch unset: every host, scheme, method and path class answers as today (
 
 // The reference of a refused switch is the same deployment with HOST_REDIRECT taken out: since stage S04 the site settings themselves count
 // (a SITE_ORIGINS that lists a second host, or a refused one, binds sessions and refuses hosts outside the allowlist: src/hostbind.js and
-// test/host-binding.test.js), so a refused HOST_REDIRECT must add nothing to them. `{ HOST_REDIRECT: "on" }` is the committed settings with
-// the switch (stage S06: refused, SITE_ORIGIN is not citycoin.dev); a variant with no site settings and no environment is compared with the
-// world with nothing set, as before S06.
+// test/host-binding.test.js), so a refused HOST_REDIRECT must add nothing to them. `{ HOST_REDIRECT: "on", SITE_ORIGIN: undefined }` is stage
+// S06's settings with the switch (refused: SITE_ORIGIN is not citycoin.dev); since the go-live the committed settings name citycoin.dev
+// canonical, so the committed settings with the switch are refused only because the pages bypass the Worker (the first variant: never
+// switched on, the owner's decision of 24 Oct 2026); a variant with no site settings and no environment is compared with the world with
+// nothing set, as before S06.
 const withoutSwitch = (v) => { const { HOST_REDIRECT, ...rest } = v; void HOST_REDIRECT; return rest; };
 test("switch set but refused (each reason): every answer, header and D1 row is exactly the switch-off one", async () => {
   const variants = [
     { ...ON },                                                         // as committed: the pages bypass the Worker
-    { ...ON, DEPLOYMENT_ENV: "" }, { HOST_REDIRECT: "on" }, { HOST_REDIRECT: "on", SITE_ORIGIN: undefined, SITE_ORIGINS: undefined, DEPLOYMENT_ENV: undefined },
+    { ...ON, DEPLOYMENT_ENV: "" }, { HOST_REDIRECT: "on", SITE_ORIGIN: undefined }, { HOST_REDIRECT: "on", SITE_ORIGIN: undefined, SITE_ORIGINS: undefined, DEPLOYMENT_ENV: undefined },
     { ...ON, SITE_ORIGIN: "https://vicinity.city" },
     { ...ON, SITE_ORIGINS: "nonsense" }, { HOST_REDIRECT: "true", DEPLOYMENT_ENV: "production", SITE_ORIGIN: ON.SITE_ORIGIN, SITE_ORIGINS: ON.SITE_ORIGINS },
   ];
@@ -532,12 +536,13 @@ test("switch accepted: redirects and refusals write nothing (every D1 row before
 test("the committed wrangler.jsonc: no HOST_REDIRECT, the pages bypass the Worker, so the switch does nothing until a configuration PR", () => {
   assert.equal(VARS.HOST_REDIRECT, undefined);
   // stage S06 (domain-cutover.md section 2 item 2 and section 3 step 2): citycoin.dev attached and listed in SITE_ORIGINS in the same
-  // configuration, vicinity.city still canonical (SITE_ORIGIN unset until S55), the production environment named
-  assert.equal(VARS.SITE_ORIGIN, undefined, "vicinity.city stays canonical until S55");
+  // configuration, the production environment named; the go-live (the owner's go of 25 Oct 2026) makes citycoin.dev the canonical origin
+  // while vicinity.city still serves in place until S55 removes its routes. HOST_REDIRECT stays unset (no forwarding: section 0)
+  assert.equal(VARS.SITE_ORIGIN, "https://citycoin.dev", "citycoin.dev canonical since the go-live");
   assert.equal(VARS.SITE_ORIGINS, "https://citycoin.dev https://vicinity.city");
   assert.equal(VARS.DEPLOYMENT_ENV, "production");
   const site = siteConfig(VARS);
-  assert.deepEqual([site.origin, site.hosts, site.problems], ["https://vicinity.city", ["citycoin.dev", "vicinity.city"], []]);
+  assert.deepEqual([site.origin, site.hosts, site.problems], ["https://citycoin.dev", ["citycoin.dev", "vicinity.city"], []]);
   assert.ok(!site.hosts.includes("www.citycoin.dev"), "www.citycoin.dev is never listed");
   assert.deepEqual(WRANGLER.assets.run_worker_first, ["/api/*", "/coin-meta/*", "/official-coins.csv"], "not changed by this stage");
   assert.deepEqual(WRANGLER.routes, [{ pattern: "citycoin.dev", custom_domain: true }, { pattern: "vicinity.city", custom_domain: true },
@@ -547,10 +552,12 @@ test("the committed wrangler.jsonc: no HOST_REDIRECT, the pages bypass the Worke
   assert.deepEqual(pageRouting(), { pagesReachWorker: false });
   assert.match(pagesBuiltSource(), /pagesReachWorker: false/);
   assert.deepEqual(deployedAssets(), WRANGLER.assets);
-  // the switch set on top of the committed settings would still do nothing: the pages bypass the Worker, and SITE_ORIGIN is not citycoin.dev
+  // the switch set on top of the committed settings would still do nothing: the pages bypass the Worker. (Since the go-live SITE_ORIGIN is
+  // citycoin.dev, so the page routing is the one refusal left; the switch is never to be set: the owner decided on 24 Oct 2026 that the old
+  // names are not forwarded, and the go-live deploy checklist confirms no dashboard HOST_REDIRECT)
   pagesAsCommitted();
   assert.equal(hostRedirect({ ...VARS, HOST_REDIRECT: "on" }), false);
-  assert.deepEqual(hostRedirectRefusals({ ...VARS, HOST_REDIRECT: "on" }), ["HOST_REDIRECT_PAGES_BYPASS_WORKER", "HOST_REDIRECT_POLICY_REFUSED"]);
+  assert.deepEqual(hostRedirectRefusals({ ...VARS, HOST_REDIRECT: "on" }), ["HOST_REDIRECT_PAGES_BYPASS_WORKER"]);
 });
 
 test("the page build refuses HOST_REDIRECT=on in wrangler.jsonc unless the pages reach the Worker and the Worker would accept it", () => {

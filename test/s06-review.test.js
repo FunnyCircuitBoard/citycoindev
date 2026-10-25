@@ -221,15 +221,19 @@ const matches = (pattern, url) => {
 };
 const headersFor = (url) => headerRules().filter((r) => matches(r.pattern, url)).flatMap((r) => r.headers);
 
-test("R5: citycoin.dev's pages and files carry X-Robots-Tag: noindex; vicinity.city's carry none, and their other headers are unchanged", () => {
+// The go-live (the owner's go of 25 Oct 2026) moved the rule: citycoin.dev is the canonical site (SITE_ORIGIN) and is indexed (master v5
+// section 06: "Production is indexable as intended"), and the copies vicinity.city and www.vicinity.city serve until S55 carry the noindex.
+test("R5, as moved by the go-live: vicinity.city's and www.vicinity.city's pages and files carry X-Robots-Tag: noindex; citycoin.dev's carry none, and their other headers are unchanged", () => {
   const rules = headerRules();
-  assert.deepEqual(rules.filter((r) => r.pattern.startsWith("https://")), [{ pattern: "https://citycoin.dev/*", headers: [["X-Robots-Tag", "noindex"]] }],
-    "one host rule, for citycoin.dev only, with the one header");
+  assert.deepEqual(rules.filter((r) => r.pattern.startsWith("https://")), [
+    { pattern: "https://vicinity.city/*", headers: [["X-Robots-Tag", "noindex"]] }, { pattern: "https://www.vicinity.city/*", headers: [["X-Robots-Tag", "noindex"]] }],
+    "two host rules, for the old names served in place, with the one header");
   for (const path of ["/", "/token", "/connect", "/style.css", "/fonts/x.woff2", "/no-such-page"]) {
-    const cc = headersFor(CC + path), vc = headersFor(VC + path);
-    assert.deepEqual(cc.filter(([k]) => k === "X-Robots-Tag"), [["X-Robots-Tag", "noindex"]], `citycoin.dev${path}`);
-    assert.deepEqual(vc.filter(([k]) => k === "X-Robots-Tag"), [], `vicinity.city${path}`);
-    assert.deepEqual(cc.filter(([k]) => k !== "X-Robots-Tag"), vc, `${path}: the security headers are the same on both hosts`);
+    const cc = headersFor(CC + path), vc = headersFor(VC + path), www = headersFor(`https://www.vicinity.city${path}`);
+    assert.deepEqual(cc.filter(([k]) => k === "X-Robots-Tag"), [], `citycoin.dev${path}: indexed`);
+    assert.deepEqual(vc.filter(([k]) => k === "X-Robots-Tag"), [["X-Robots-Tag", "noindex"]], `vicinity.city${path}`);
+    assert.deepEqual(www.filter(([k]) => k === "X-Robots-Tag"), [["X-Robots-Tag", "noindex"]], `www.vicinity.city${path}`);
+    assert.deepEqual(vc.filter(([k]) => k !== "X-Robots-Tag"), cc, `${path}: the security headers are the same on both hosts`);
   }
-  for (const host of ["www.citycoin.dev", "citycoin.dev.evil.example", "www.vicinity.city"]) assert.deepEqual(headersFor(`https://${host}/`).filter(([k]) => k === "X-Robots-Tag"), [], host);
+  for (const host of ["www.citycoin.dev", "citycoin.dev.evil.example", "vicinity.city.evil.example"]) assert.deepEqual(headersFor(`https://${host}/`).filter(([k]) => k === "X-Robots-Tag"), [], host);
 });

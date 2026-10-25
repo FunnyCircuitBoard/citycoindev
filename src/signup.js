@@ -37,7 +37,7 @@ import { checkPassword, hashPassword } from "./password.js";
 import { HOUR, POLICY, iso } from "./policy.js";
 import { v2On } from "./flags.js";
 import { walletOnly } from "./v5policy.js";
-import { TERMS_VERSION, asText, endSignup, findHandoff, getSignup, guardV2, netOf, nextStep, startSignup, touchSignup } from "./signup-core.js";
+import { termsVersion, asText, endSignup, findHandoff, getSignup, guardV2, netOf, nextStep, startSignup, touchSignup } from "./signup-core.js";
 import { finishCore, sameLocationNetwork } from "./signup-finish.js";
 import { ensureHostSchema } from "./store.js";
 import { hostWrite, mailOrigin, servedHost } from "./hostbind.js";
@@ -64,7 +64,7 @@ const parseChoices = (text) => { try { const a = JSON.parse(text); return Array.
 
 /** What the page may know about a sign-up: ticks and masked values only. Never coordinates, a full e-mail, or a hash. */
 export function signupState(row) {
-  const termsDone = row.terms_version === TERMS_VERSION;
+  const termsDone = row.terms_version === termsVersion();
   const choices = row.loc_choices ? parseChoices(row.loc_choices) : null;
   const location = { done: Boolean(row.loc_city) };
   if (row.loc_city) location.community = { id: row.loc_city, name: row.loc_name, country: row.loc_country };
@@ -78,7 +78,7 @@ export function signupState(row) {
     account.provider = row.provider;
     if (row.provider === "email") account.email = maskEmail(row.provider_id);
   } else if (row.pending_email) account.pending = { email: maskEmail(row.pending_email) };
-  return { terms: { done: termsDone, version: TERMS_VERSION }, location, account, next: nextStep(row) };
+  return { terms: { done: termsDone, version: termsVersion() }, location, account, next: nextStep(row) };
 }
 
 /**
@@ -88,7 +88,7 @@ export function signupState(row) {
  */
 export function registerState(row) {
   const s = signupState(row);
-  const next = !row.loc_city ? "location" : row.terms_version !== TERMS_VERSION ? "terms" : "wallet";
+  const next = !row.loc_city ? "location" : row.terms_version !== termsVersion() ? "terms" : "wallet";
   return { terms: s.terms, location: s.location, name: row.display_name || null, next };
 }
 /** The state a handler answers with: the registration's while WALLET_ONLY counts, today's otherwise. */
@@ -299,9 +299,9 @@ export async function handleTerms(request, env, x) {
   if (c.error) return c.error;
   const body = await readJson(request);
   if (!body) return badJson();
-  if (body.version !== TERMS_VERSION) return json({ ok: false, error: "bad_version" }, 400);
+  if (body.version !== termsVersion()) return json({ ok: false, error: "bad_version" }, 400);
   await env.DB.prepare("UPDATE signups SET terms_version = ?, terms_at = CASE WHEN terms_version = ? THEN terms_at ELSE ? END WHERE id = ? AND expires_at > ?")
-    .bind(TERMS_VERSION, TERMS_VERSION, iso(x.now), c.row.id, iso(x.now)).run();
+    .bind(termsVersion(), termsVersion(), iso(x.now), c.row.id, iso(x.now)).run();
   return c.reply({ ok: true, state: stateFor(env, await reload(env, c.row.id)) });
 }
 
@@ -321,7 +321,7 @@ async function handleAccountReset(request, env, x) {
 async function handleEmail(request, env, x) {
   const c = await needSignup(request, env, x.now);
   if (c.error) return c.error;
-  if (c.row.terms_version !== TERMS_VERSION) return json({ ok: false, error: "terms_required" }, 403);
+  if (c.row.terms_version !== termsVersion()) return json({ ok: false, error: "terms_required" }, 403);
   const body = await readJson(request);
   if (!body) return badJson();
   const email = cleanEmail(asText(body.email));
@@ -348,7 +348,7 @@ async function handleEmail(request, env, x) {
 /** The code proved the mailbox: this sign-up now has a verified e-mail (the password hash is already in it). */
 async function markEmailVerified(env, row, email, now) {
   const r = await env.DB.prepare(`UPDATE signups SET provider = 'email', provider_id = pending_email, identity_name = 'E-mail member', identity_at = ?
-      WHERE id = ? AND pending_email = ? AND terms_version = ? AND expires_at > ?`).bind(iso(now), row.id, email, TERMS_VERSION, iso(now)).run();
+      WHERE id = ? AND pending_email = ? AND terms_version = ? AND expires_at > ?`).bind(iso(now), row.id, email, termsVersion(), iso(now)).run();
   if (r.meta.changes) return { recorded: true };
   return { error: (await reload(env, row.id)) ? "email_mismatch" : "no_signup" };
 }

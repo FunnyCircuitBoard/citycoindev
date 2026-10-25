@@ -21,11 +21,13 @@ const add = (base, set) => { let out = base, last = "EMAIL_FROM"; for (const [k,
 const S06 = add(COMMITTED, { SITE_ORIGINS: "https://citycoin.dev https://vicinity.city", DEPLOYMENT_ENV: "production" });
 // the same list written as a JSON array over several lines, which the page build and the Worker accept as well
 const S06_LINES = setRawVar(S06, "SITE_ORIGINS", '[\n      "https://citycoin.dev",\n      "https://vicinity.city"\n    ]');
-const UNSET_ENV = add(COMMITTED, { DEPLOYMENT_ENV: "unset" });
+// (without the go-live's LEGACY_LAUNCH=off, which needs an accepted environment: "unset" with it is a configuration the page build refuses)
+const UNSET_ENV = add(COMMITTED, { DEPLOYMENT_ENV: "unset", LEGACY_LAUNCH: undefined });
 const BASES = [["as committed", COMMITTED], ["S06", S06], ["S06, SITE_ORIGINS over several lines", S06_LINES], ["DEPLOYMENT_ENV unset", UNSET_ENV]];
 const OWNER_FROM = "Citycoin.dev <owner-supplied@mail.example.org>";
-/** The configuration pull request that sets the switch on top of `base` (no trial: the committed file IS the switch). */
-const configPr = (base) => add(base, { EMAIL_FROM: OWNER_FROM, BRAND: "citycoin", LEGACY_SEATS: "frozen", DEPLOYMENT_ENV: "production" });
+/** The configuration pull request that sets the switch on top of `base` (no trial: the committed file IS the switch; since the go-live with
+ *  wallet-only sign-in and citycoin.dev canonical, which the page build asks for with BRAND=citycoin). */
+const configPr = (base) => add(base, { EMAIL_FROM: OWNER_FROM, BRAND: "citycoin", LEGACY_SEATS: "frozen", DEPLOYMENT_ENV: "production", WALLET_ONLY: "on", SITE_ORIGIN: "https://citycoin.dev" });
 
 test("wrangler-vars: entries are found by the JSONC structure (comments, strings with //, values over several lines), and every edit undone gives back the same bytes", () => {
   for (const [name, base] of BASES) {
@@ -72,7 +74,8 @@ test("S06-CI-RED (the configuration pull request): the stand-in takes back the s
     assert.equal(vars.EMAIL_FROM, TODAY_EMAIL_FROM, `${name}: today's sender`);
     assert.deepEqual(vars.SITE_ORIGINS, varsOf(base).SITE_ORIGINS, `${name}: SITE_ORIGINS as committed`);
     assert.equal(vars.DEPLOYMENT_ENV, "production", `${name}: DEPLOYMENT_ENV as committed in the pull request, never stripped`);
-    const others = (o) => Object.fromEntries(Object.entries(o).filter(([k]) => k !== "DEPLOYMENT_ENV"));
+    const others = (o) => Object.fromEntries(Object.entries(o).filter(([k]) => k !== "DEPLOYMENT_ENV" && k !== "SITE_ORIGIN"));
+    assert.equal(vars.SITE_ORIGIN, "https://citycoin.dev", `${name}: SITE_ORIGIN as committed in the pull request, never stripped`);
     assert.deepEqual(others(vars), others(varsOf(base)), `${name}: every other setting as on the base`);
   }
   // with S06 committed first (the switch-on order), the stand-in gives back S06's file byte for byte
@@ -90,11 +93,13 @@ test("TRIAL-ENV-UNSET: a committed DEPLOYMENT_ENV the freeze refuses ('unset') i
   assert.deepEqual(pageV5Config(varsOf(UNSET_ENV)), { ok: true }, "a configuration the page build takes with BRAND unset");
   const p = trialPlan(UNSET_ENV);
   assert.equal(p.action, "write", p.reason);
-  assert.doesNotMatch(p.line, /kept as committed/);
+  assert.doesNotMatch(p.line, /kept as committed:[^)]*DEPLOYMENT_ENV/);
   for (const env of ["test", "preview", "production"]) {
     const q = trialPlan(add(COMMITTED, { DEPLOYMENT_ENV: env }));
+    assert.equal(q.action, "write", `${env}: ${q.reason}`);
     assert.equal(varsOf(q.text).DEPLOYMENT_ENV, env, env);
-    assert.match(q.line, /kept as committed: DEPLOYMENT_ENV\)$/, env);
+    // (and, since the go-live commits them, citycoin.dev in SITE_ORIGINS and as SITE_ORIGIN, which the trial's wallet-only sign-in needs)
+    assert.match(q.line, /kept as committed: DEPLOYMENT_ENV, SITE_ORIGINS, SITE_ORIGIN\)$/, env);
   }
   assert.equal(TRIAL_SETTINGS.DEPLOYMENT_ENV, "production");
   assert.throws(() => withTrialSettings(p.text), /trial's own placeholder sender/);
