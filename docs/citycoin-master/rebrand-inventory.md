@@ -4,6 +4,8 @@ Required by master change order v5 (23 October 2026), section 03 (BR-01: "Create
 
 Written 24 October 2026 against main `4aa408e`, and updated the same day for owner amendment 01 (section 3.8): the main token becomes a new, owner-supplied mint configured as `MAIN_TOKEN_MINT`, `$VICINITY` becomes a legacy token, and the official X and Telegram links move to central configuration. The token counts below are unchanged; only the classification of the mint and social-link occurrences changes. This is an inventory only. No string, route, provider setting or on-chain value has been changed. Untracked files in the working tree (for example `public/brand/citycoin-*.svg`) are not part of `4aa408e`, and this file does not count or assess them.
 
+Stage S23 (25 October 2026, local branch `cc/s23`, not merged) deleted five of the files counted here (`docs/COIN-BATCH.md`, `src/lpbatch.js`, `test/lp-batch.test.js`, `test/lp-batch-ui.test.js` and `solana/tests-launchpad/22-batch-approvals.test.mjs`); their rows are marked, and the counts stay those of `4aa408e`.
+
 ## 1. Method
 
 - **Search.** `git grep -n -I -i vicinity 4aa408e` finds 3,848 matching lines in 431 text files. `git grep -l -i vicinity 4aa408e` adds 2 binary files (`solana/release/mainnet-2026-10-10/vicinity_launchpad.so`, `vicinity_rewards.so`), for 433 files.
@@ -216,7 +218,7 @@ Test: the residual report keeps them out of the label count (D01).
 | Item | Tokens | Examples | Action |
 |---|---|---|---|
 | Code comments (including 6 that name the token symbol) | 333 | across src/, public/, solana/ | Optional. Update comments that describe user-facing behavior when that code changes. |
-| Developer and owner docs | 102 | README.md, docs/DEPLOY.md, docs/MAINNET.md, docs/OWNER-LAUNCH-GUIDE.md, docs/RULES-V7-DRAFT.md, docs/COIN-READY.md, docs/COIN-BATCH.md | Add "Citycoin.dev (formerly Vicinity)" and keep history sections. COIN-BATCH.md and RULES-V7-DRAFT.md are removed by 00-reconciliation (CP-3). |
+| Developer and owner docs | 102 | README.md, docs/DEPLOY.md, docs/MAINNET.md, docs/OWNER-LAUNCH-GUIDE.md, docs/RULES-V7-DRAFT.md, docs/COIN-READY.md, docs/COIN-BATCH.md | Add "Citycoin.dev (formerly Vicinity)" and keep history sections. COIN-BATCH.md and RULES-V7-DRAFT.md are removed by 00-reconciliation (CP-3); COIN-BATCH.md was deleted in S23 (not merged). |
 | Internal identifiers, constants and local variable names | 134 | `VICINITY_BRAND`, `VICINITY_PARTNER`, `VICINITY_LAUNCHED`, `vicinityConfigParams`, `VicinityClient` | Optional. SDK exports get Citycoin aliases, and the old exports stay. |
 | Comments and docs naming the old domain | 65 | wrangler.jsonc:11, 127-128; src/index.js:689, 694 | Update with the code they describe |
 | Internal cache names and headers | 26 | `cache.vicinity.internal` (src/index.js:137; src/chain.js:319), `x-vicinity-max-age` (src/index.js:128), the MIME boundary (src/mail.js:63-66) | Keep. They are internal and not origins. |
@@ -333,7 +335,7 @@ Columns: total tokens, then migrate, compatibility-required, persistent identifi
 | docs/AUDIT.md | 17 |  |  |  |  | 17 |  |
 | docs/RULES-V7-DRAFT.md | 9 |  |  |  |  |  | 9 |
 | docs/COIN-READY.md | 5 |  |  |  | 1 |  | 4 |
-| docs/COIN-BATCH.md | 3 |  |  |  |  |  | 3 |
+| docs/COIN-BATCH.md (deleted in S23, not merged) | 3 |  |  |  |  |  | 3 |
 | docs/HARDENING-2026-10-03.md | 3 |  |  |  |  | 3 |  |
 | public/dashboard.js | 69 | 25 |  | 5 | 30 |  | 9 |
 | public/coin.js | 62 | 25 |  | 9 | 12 |  | 16 |
@@ -462,7 +464,7 @@ Columns: total tokens, then migrate, compatibility-required, persistent identifi
 | solana/tests-launchpad/04-trading.test.mjs | 3 |  |  |  |  |  | 3 |
 | solana/tests-launchpad/16-coin-meta.test.mjs | 3 | 2 | 1 |  |  |  |  |
 | solana/tests-launchpad/18-launch-builders.test.mjs | 3 | 1 |  |  |  |  | 2 |
-| solana/tests-launchpad/22-batch-approvals.test.mjs | 3 | 1 |  | 1 |  |  | 1 |
+| solana/tests-launchpad/22-batch-approvals.test.mjs (deleted in S23, not merged) | 3 | 1 |  | 1 |  |  | 1 |
 | solana/tests/01-init-lock-authority.ts | 3 | 2 |  | 1 |  |  |  |
 | solana/tests/04-sweep-cancel-deadline.ts | 3 |  |  | 3 |  |  |  |
 | solana/.gitignore | 2 |  |  | 2 |  |  |  |
@@ -552,7 +554,7 @@ Columns: total tokens, then migrate, compatibility-required, persistent identifi
 | src/common-passwords.js | 9 |  |  | 9 |  |  |  |
 | src/me.js | 9 | 1 |  | 2 | 5 |  | 1 |
 | src/walletsend.js | 9 | 2 |  | 1 | 6 |  |  |
-| src/lpbatch.js | 8 | 5 |  | 1 |  |  | 2 |
+| src/lpbatch.js (deleted in S23, not merged) | 8 | 5 |  | 1 |  |  | 2 |
 | src/portfolio.js | 8 | 1 |  | 1 | 4 |  | 2 |
 | src/screen-words.js | 8 |  |  |  | 1 |  | 7 |
 | src/coin.js | 7 | 3 |  | 2 | 2 |  |  |
@@ -672,7 +674,7 @@ Columns: total tokens, then migrate, compatibility-required, persistent identifi
 | test/coin-ready.test.js | 6 | 5 |  | 1 |  |  |  |
 | test/home-cities-layout.test.js | 6 |  |  |  | 6 |  |  |
 | test/launchpad-dark.test.js | 6 |  |  | 6 |  |  |  |
-| test/lp-batch-ui.test.js | 6 | 2 |  | 4 |  |  |  |
+| test/lp-batch-ui.test.js (deleted in S23, not merged) | 6 | 2 |  | 4 |  |  |  |
 | test/mainnet-preflight-guide.test.js | 6 |  |  | 4 |  |  | 2 |
 | test/team-unranked.test.js | 6 | 1 |  | 3 | 2 |  |  |
 | test/connect-pairing-review.test.js | 5 | 4 |  | 1 |  |  |  |
@@ -691,7 +693,7 @@ Columns: total tokens, then migrate, compatibility-required, persistent identifi
 | test/helpers/dashpage.js | 4 | 2 |  | 1 | 1 |  |  |
 | test/helpers/market.js | 4 |  |  |  | 4 |  |  |
 | test/helpers/tokenpage.js | 4 | 1 |  |  | 3 |  |  |
-| test/lp-batch.test.js | 4 | 1 |  | 1 |  |  | 2 |
+| test/lp-batch.test.js (deleted in S23, not merged) | 4 | 1 |  | 1 |  |  | 2 |
 | test/lp-sign.test.js | 4 | 4 |  |  |  |  |  |
 | test/market-honesty.test.js | 4 | 1 |  | 2 | 1 |  |  |
 | test/wallets-silent.test.js | 4 | 1 |  |  | 3 |  |  |
