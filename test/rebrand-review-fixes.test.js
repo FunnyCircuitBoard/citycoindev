@@ -11,7 +11,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { buildPages, buildStandalonePages, deployedVars, pageBrandPrerequisites, pageLegacySeats, pageV5Config } from "../scripts/pages/build.mjs";
-import { TRIAL_SETTINGS, trialPlan, varsOf, withTrialSettings } from "../scripts/brand/switch-trial.mjs";
+import { TRIAL_MARK, TRIAL_SETTINGS, trialPlan, undoTrial, varsOf, withTrialSettings } from "../scripts/brand/switch-trial.mjs";
+import { removeVar, setVar } from "../scripts/brand/wrangler-vars.mjs";
 import { CITYCOIN_BRAND, LEGACY_BRAND } from "../src/brand.js";
 import { SAME, wordsOf } from "../src/brandwords.js";
 import { _pagesBuiltForTests } from "../src/v5policy.js";
@@ -237,16 +238,27 @@ test("F2: the CI trial writes the switch and its prerequisites into a copy of wr
 
 /* ---------------------------------------------------------------- final check finding 2: the trial once the switch is committed */
 // The trial must stay green on the configuration pull request that sets BRAND=citycoin and on every pull request after it, and still fail
-// on a half-set or inconsistent configuration. Every sender below is a clearly fake fixture (example.org, example.com).
+// on a half-set or inconsistent configuration. Every sender below is a clearly fake fixture (example.org, example.com). The fixtures are
+// written by their place in the JSONC (scripts/brand/wrangler-vars.mjs), over whatever wrangler.jsonc carries, and each case runs on two
+// committed bases: the file as committed, and the file as stage S06 commits it (SITE_ORIGINS with citycoin.dev, DEPLOYMENT_ENV production;
+// rebrand second check S06-CI-RED: the fixtures used to assume no DEPLOYMENT_ENV was committed).
 const WRANGLER = read("wrangler.jsonc");
-const TODAY_FROM = '"EMAIL_FROM": "Vicinity <noreply@vicinity.city>",';
+const TODAY_FROM = "Vicinity <noreply@vicinity.city>";
 const OWNER_FROM = "Citycoin.dev <owner-supplied@mail.example.org>";
-const committed = (extra, from = TODAY_FROM) => {
-  assert.ok(WRANGLER.includes(TODAY_FROM), "today's sender line is where the fixtures put their settings");
-  return WRANGLER.replace(TODAY_FROM, [from, ...extra.map(([k, v]) => `    ${JSON.stringify(k)}: ${JSON.stringify(v)},`)].join("\n"));
+/** `base` with each setting of `set` written by its place (undefined: taken out); a new key goes after EMAIL_FROM (and the ones added before it). */
+const withVars = (base, set) => {
+  let out = base, last = "EMAIL_FROM";
+  for (const [k, v] of Object.entries(set)) {
+    if (v === undefined) { out = removeVar(out, k); continue; }
+    const had = Object.hasOwn(varsOf(out), k);
+    out = setVar(out, k, v, { after: last });
+    if (!had) last = k;
+  }
+  return out;
 };
-const ownerFrom = `"EMAIL_FROM": ${JSON.stringify(OWNER_FROM)},`;
-const SWITCHED = committed([["BRAND", "citycoin"], ["LEGACY_SEATS", "frozen"], ["DEPLOYMENT_ENV", "production"]], ownerFrom);
+const S06_SETTINGS = Object.freeze({ SITE_ORIGINS: "https://citycoin.dev https://vicinity.city", DEPLOYMENT_ENV: "production" });
+const BASES = [["as committed", WRANGLER], ["as stage S06 commits it", withVars(WRANGLER, S06_SETTINGS)]];
+const switched = (base) => withVars(base, { EMAIL_FROM: OWNER_FROM, BRAND: "citycoin", LEGACY_SEATS: "frozen", DEPLOYMENT_ENV: "production" });
 const cli = (text) => {
   const dir = mkdtempSync(join(tmpdir(), "switch-trial-"));
   try {
@@ -258,41 +270,47 @@ const cli = (text) => {
 };
 
 test("final check finding 2: wrangler.jsonc already carrying BRAND=citycoin with its prerequisites is a no-op (exit 0, one clear line, nothing written)", () => {
-  const vars = varsOf(SWITCHED);
-  assert.deepEqual(pageBrandPrerequisites(vars), { ok: true }, "the committed switch is one the page build accepts");
-  const p = trialPlan(SWITCHED);
-  assert.equal(p.action, "noop");
-  assert.match(p.line, /^switch-trial: wrangler\.jsonc already sets the switch with its prerequisites \(BRAND=citycoin, LEGACY_SEATS=frozen, DEPLOYMENT_ENV=production, EMAIL_FROM without the old name\): nothing to try and nothing written/);
-  assert.throws(() => withTrialSettings(SWITCHED), /already sets the switch/);
-  // the letter case the Worker accepts (trimmed, any case) counts the same
-  assert.equal(trialPlan(SWITCHED.replace('"BRAND": "citycoin"', '"BRAND": " CityCoin "')).action, "noop");
-  const r = cli(SWITCHED);
-  assert.equal(r.status, 0, r.err);
-  assert.match(r.out, /already sets the switch with its prerequisites/);
-  assert.equal(r.err, "");
-  assert.equal(r.text, SWITCHED, "nothing written");
+  for (const [name, base] of BASES) {
+    const SWITCHED = switched(base);
+    const vars = varsOf(SWITCHED);
+    assert.deepEqual(pageBrandPrerequisites(vars), { ok: true }, `${name}: the committed switch is one the page build accepts`);
+    const p = trialPlan(SWITCHED);
+    assert.equal(p.action, "noop", name);
+    assert.match(p.line, /^switch-trial: wrangler\.jsonc already sets the switch with its prerequisites \(BRAND=citycoin, LEGACY_SEATS=frozen, DEPLOYMENT_ENV=production, EMAIL_FROM without the old name\): nothing to try and nothing written/);
+    assert.throws(() => withTrialSettings(SWITCHED), /already sets the switch/);
+    // the letter case the Worker accepts (trimmed, any case) counts the same
+    assert.equal(trialPlan(withVars(SWITCHED, { BRAND: " CityCoin " })).action, "noop", name);
+    const r = cli(SWITCHED);
+    assert.equal(r.status, 0, r.err);
+    assert.match(r.out, /already sets the switch with its prerequisites/);
+    assert.equal(r.err, "");
+    assert.equal(r.text, SWITCHED, `${name}: nothing written`);
+  }
 });
 
 test("final check finding 2: a half-set or inconsistent wrangler.jsonc still fails the trial (exit 1, with the reason)", () => {
-  const fails = [
-    ["BRAND=citycoin without LEGACY_SEATS", committed([["BRAND", "citycoin"]], ownerFrom), /LEGACY_SEATS=frozen \(with DEPLOYMENT_ENV\)/],
-    ["BRAND=citycoin with today's sender", committed([["BRAND", "citycoin"], ["LEGACY_SEATS", "frozen"], ["DEPLOYMENT_ENV", "production"]]), /EMAIL_FROM without the old name/],
-    ["BRAND=citycoin and the freeze without DEPLOYMENT_ENV", committed([["BRAND", "citycoin"], ["LEGACY_SEATS", "frozen"]], ownerFrom), /ENVIRONMENT_UNSET/],
-    ["the freeze without DEPLOYMENT_ENV, no BRAND", committed([["LEGACY_SEATS", "frozen"]]), /ENVIRONMENT_UNSET/],
-    ["a BRAND that names no label set", committed([["BRAND", "nope"]]), /BRAND_UNKNOWN/],
-    ["a LEGACY_SEATS outside the switch's values", committed([["LEGACY_SEATS", "freeze"]]), /refused by the page build/],
-    ["the trial's own result, applied twice or committed", withTrialSettings(WRANGLER), /trial's own placeholder sender/],
-  ];
-  for (const [name, text, why] of fails) {
-    const p = trialPlan(text);
-    assert.equal(p.action, "fail", name);
-    assert.match(p.reason, why, name);
-    assert.throws(() => withTrialSettings(text), why, name);
+  for (const [name, base] of BASES) {
+    const fails = [
+      ["BRAND=citycoin without LEGACY_SEATS", withVars(base, { EMAIL_FROM: OWNER_FROM, BRAND: "citycoin", LEGACY_SEATS: undefined }), /LEGACY_SEATS=frozen \(with DEPLOYMENT_ENV\)/],
+      ["BRAND=citycoin with today's sender", withVars(switched(base), { EMAIL_FROM: TODAY_FROM }), /EMAIL_FROM without the old name/],
+      ["BRAND=citycoin and the freeze without DEPLOYMENT_ENV", withVars(switched(base), { DEPLOYMENT_ENV: undefined }), /ENVIRONMENT_UNSET/],
+      ["the freeze without DEPLOYMENT_ENV, no BRAND", withVars(base, { LEGACY_SEATS: "frozen", DEPLOYMENT_ENV: undefined }), /ENVIRONMENT_UNSET/],
+      ["a BRAND that names no label set", withVars(base, { BRAND: "nope" }), /BRAND_UNKNOWN/],
+      ["a LEGACY_SEATS outside the switch's values", withVars(base, { LEGACY_SEATS: "freeze" }), /refused by the page build/],
+      ["the trial's own result, applied twice or committed", withTrialSettings(base), /trial's own placeholder sender/],
+      ["the trial's own line committed with another sender", withVars(withTrialSettings(base), { EMAIL_FROM: OWNER_FROM }), /or its line: this is the trial's result/],
+    ];
+    for (const [what, text, why] of fails) {
+      const p = trialPlan(text);
+      assert.equal(p.action, "fail", `${name}: ${what}`);
+      assert.match(p.reason, why, `${name}: ${what}`);
+      assert.throws(() => withTrialSettings(text), why, `${name}: ${what}`);
+    }
+    const r = cli(fails[0][1]);
+    assert.equal(r.status, 1);
+    assert.match(r.err, /^switch-trial: the committed wrangler\.jsonc is refused by the page build: BRAND=citycoin in wrangler\.jsonc needs, in the same pull request: LEGACY_SEATS=frozen/);
+    assert.equal(r.text, fails[0][1], "nothing written");
   }
-  const r = cli(fails[0][1]);
-  assert.equal(r.status, 1);
-  assert.match(r.err, /^switch-trial: the committed wrangler\.jsonc is refused by the page build: BRAND=citycoin in wrangler\.jsonc needs, in the same pull request: LEGACY_SEATS=frozen/);
-  assert.equal(r.text, fails[0][1], "nothing written");
   // and never outside CI or a scratch copy
   const bare = spawnSync(process.execPath, [new URL("../scripts/brand/switch-trial.mjs", import.meta.url).pathname], { encoding: "utf8", env: { ...process.env, CI: "" } });
   assert.equal(bare.status, 1);
@@ -300,32 +318,44 @@ test("final check finding 2: a half-set or inconsistent wrangler.jsonc still fai
 });
 
 test("final check finding 2: prerequisites committed before BRAND (the freeze, DEPLOYMENT_ENV, a new sender) are kept, and the trial still tries the switch on top", () => {
-  const cases = [
-    ["the freeze switched on alone", committed([["LEGACY_SEATS", "frozen"], ["DEPLOYMENT_ENV", "production"]]), ["LEGACY_SEATS", "DEPLOYMENT_ENV"]],
-    ["DEPLOYMENT_ENV set for another switch", committed([["DEPLOYMENT_ENV", "production"]]), ["DEPLOYMENT_ENV"]],
-    ["the owner's new sender first", WRANGLER.replace(TODAY_FROM, ownerFrom), ["EMAIL_FROM"]],
-    ["a blank BRAND line", committed([["BRAND", ""]]), []],
-  ];
-  for (const [name, text, kept] of cases) {
-    const p = trialPlan(text);
-    assert.equal(p.action, "write", name);
-    const vars = varsOf(p.text);
-    assert.equal(vars.BRAND, "citycoin", name);
-    assert.equal(vars.LEGACY_SEATS, "frozen", name);
-    assert.equal(vars.DEPLOYMENT_ENV, "production", name);
-    assert.equal(vars.EMAIL_FROM, kept.includes("EMAIL_FROM") ? OWNER_FROM : TRIAL_SETTINGS.EMAIL_FROM, name);
-    for (const k of Object.keys(TRIAL_SETTINGS)) assert.equal(p.text.split(`"${k}":`).length - 1, 1, `${name}: one ${k} line`);
-    assert.deepEqual(pageBrandPrerequisites(vars), { ok: true }, name);
-    assert.deepEqual(pageV5Config(vars), { ok: true }, name);
-    if (kept.length) assert.match(p.line, new RegExp(`kept as committed: ${kept.join(", ")}\\)$`), name);
-    // every other line of wrangler.jsonc is untouched
-    const strip = (t) => t.split("\n").filter((l) => !/^\s*"(EMAIL_FROM|BRAND|LEGACY_SEATS|DEPLOYMENT_ENV)"\s*:/.test(l)).join("\n");
-    assert.equal(strip(p.text), strip(text), name);
+  const strip = (t) => t.split("\n").filter((l) => !/^\s*"(EMAIL_FROM|BRAND|LEGACY_SEATS|DEPLOYMENT_ENV)"\s*:/.test(l) && !l.includes(TRIAL_MARK)).join("\n");
+  for (const [name, base] of BASES) {
+    const cases = [
+      ["the freeze switched on alone", withVars(base, { LEGACY_SEATS: "frozen", DEPLOYMENT_ENV: "production" }), ["LEGACY_SEATS", "DEPLOYMENT_ENV"]],
+      ["DEPLOYMENT_ENV set for another switch", withVars(base, { DEPLOYMENT_ENV: "production" }), ["DEPLOYMENT_ENV"]],
+      ["the owner's new sender first", withVars(base, { EMAIL_FROM: OWNER_FROM }), ["EMAIL_FROM", ...(varsOf(base).DEPLOYMENT_ENV ? ["DEPLOYMENT_ENV"] : [])]],
+      ["a blank BRAND line", withVars(base, { BRAND: "" }), varsOf(base).DEPLOYMENT_ENV ? ["DEPLOYMENT_ENV"] : []],
+      // rebrand second check TRIAL-ENV-UNSET: "unset" is an environment the page build takes with BRAND unset, but the freeze refuses it, so
+      // the trial writes production over it (and takes it back after) instead of failing on a valid configuration
+      ["DEPLOYMENT_ENV unset", withVars(base, { DEPLOYMENT_ENV: "unset" }), []],
+    ];
+    for (const [what, text, kept] of cases) {
+      const at = `${name}: ${what}`;
+      assert.deepEqual(pageV5Config(varsOf(text)), { ok: true }, `${at}: a configuration the page build takes`);
+      const p = trialPlan(text);
+      assert.equal(p.action, "write", `${at}: ${p.reason}`);
+      const vars = varsOf(p.text);
+      assert.equal(vars.BRAND, "citycoin", at);
+      assert.equal(vars.LEGACY_SEATS, "frozen", at);
+      assert.equal(vars.DEPLOYMENT_ENV, "production", at);
+      assert.equal(vars.EMAIL_FROM, kept.includes("EMAIL_FROM") ? OWNER_FROM : TRIAL_SETTINGS.EMAIL_FROM, at);
+      const settingLines = p.text.split("\n").filter((l) => !l.includes(TRIAL_MARK));
+      for (const k of Object.keys(TRIAL_SETTINGS)) assert.equal(settingLines.filter((l) => l.includes(`"${k}":`)).length, 1, `${at}: one ${k} line`);
+      assert.deepEqual(pageBrandPrerequisites(vars), { ok: true }, at);
+      assert.deepEqual(pageV5Config(vars), { ok: true }, at);
+      if (kept.length) assert.match(p.line, new RegExp(`kept as committed: ${kept.join(", ")}\\)$`), at);
+      else assert.match(p.line, /\(this copy only\)$/, at);
+      // every other setting of wrangler.jsonc is untouched, and what the trial wrote is taken back exactly (its own line)
+      assert.equal(strip(p.text), strip(text), at);
+      assert.equal(undoTrial(p.text), text, `${at}: undone byte for byte`);
+      assert.equal(vars.SITE_ORIGINS, varsOf(text).SITE_ORIGINS, `${at}: SITE_ORIGINS as committed`);
+      if (varsOf(text).DEPLOYMENT_ENV === "production") assert.ok(kept.includes("DEPLOYMENT_ENV"), `${at}: a committed production environment is kept`);
+    }
   }
   // the committed file of today, as the CI job sees it: written, exit 0
   const r = cli(WRANGLER);
   assert.equal(r.status, 0, r.err);
-  assert.match(r.out, /^switch-trial: wrangler\.jsonc now sets EMAIL_FROM=Citycoin\.dev <noreply@example\.com>, BRAND=citycoin, LEGACY_SEATS=frozen, DEPLOYMENT_ENV=production \(this copy only\)/);
+  assert.match(r.out, /^switch-trial: wrangler\.jsonc now sets EMAIL_FROM=Citycoin\.dev <noreply@example\.com>, BRAND=citycoin, LEGACY_SEATS=frozen, DEPLOYMENT_ENV=production \(this copy only/);
   assert.equal(r.text, withTrialSettings(WRANGLER));
 });
 

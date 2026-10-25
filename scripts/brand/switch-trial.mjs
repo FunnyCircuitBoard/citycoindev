@@ -8,14 +8,17 @@
 // sets the switch, and on every pull request after it):
 //   BRAND unset (or blank)                 writes the switch: BRAND=citycoin, LEGACY_SEATS=frozen, DEPLOYMENT_ENV=production and the
 //                                          placeholder EMAIL_FROM. A value the committed file already has for one of them is kept when it
-//                                          is what the switch needs (LEGACY_SEATS=frozen, any DEPLOYMENT_ENV the build accepts, an EMAIL_FROM
-//                                          without the old name), so a pull request that sets them first still gets the trial.
+//                                          is what the switch needs (LEGACY_SEATS=frozen, a DEPLOYMENT_ENV the freeze accepts, so not "unset",
+//                                          an EMAIL_FROM without the old name), so a pull request that sets them first still gets the trial.
+//                                          The values are written by their place in the JSONC (scripts/brand/wrangler-vars.mjs), every other
+//                                          byte stays, and one comment line (TRIAL_MARK) records what was replaced, so the suite's stand-in for
+//                                          today's site takes back exactly the trial's change (test/helpers/today-build.mjs).
 //   BRAND=citycoin with its prerequisites  nothing to try: the committed file IS the switch, and the build that follows builds and tests
 //                                          it. Writes nothing, says so in one line and exits 0.
 //   anything else                          exits 1 with the reason: a half-set switch (BRAND=citycoin without LEGACY_SEATS=frozen, an
 //                                          accepted DEPLOYMENT_ENV or an EMAIL_FROM without the old name), a BRAND that names another label
 //                                          set, a LEGACY_SEATS the switch cannot carry, any setting the page build refuses, or the trial's own
-//                                          placeholder sender in the committed file (its result was committed, or it ran twice).
+//                                          placeholder sender or line in the committed file (its result was committed, or it ran twice).
 //
 //   node scripts/brand/switch-trial.mjs                          in CI (CI=true), or
 //   node scripts/brand/switch-trial.mjs --local                  on a scratch copy of the repository
@@ -25,11 +28,10 @@ import { fileURLToPath } from "node:url";
 import { brandFromSettings } from "../../src/brand.js";
 import { legacySeatsFrozenOn } from "../../src/flags.js";
 import { pageBrand, pageBrandPrerequisites, pageLegacySeats, pageV5Config } from "../pages/build.mjs";
+import { MARK_LINE, TRIAL_MARK, rawVar, setRawVar, trialMark, undoTrial, varsOf } from "./wrangler-vars.mjs";
 
+export { TRIAL_MARK, trialMark, undoTrial, varsOf };
 export const TRIAL_SETTINGS = Object.freeze({ EMAIL_FROM: "Citycoin.dev <noreply@example.com>", BRAND: "citycoin", LEGACY_SEATS: "frozen", DEPLOYMENT_ENV: "production" });
-
-/** The "vars" of a wrangler.jsonc text, read as scripts/mainnet-preflight.mjs settingsFrom reads them (whole-line comments and trailing commas out). */
-export const varsOf = (text) => JSON.parse(text.replace(/^\s*\/\/.*$/gm, "").replace(/,(\s*[}\]])/g, "$1")).vars || {};
 
 /** Every check the page build makes on these settings that concerns the switch; throws the build's own error. */
 function buildAccepts(vars) {
@@ -38,9 +40,10 @@ function buildAccepts(vars) {
   pageBrandPrerequisites(vars);
   pageV5Config(vars);
 }
-// one setting's line, `"KEY": "value",` (the comma optional, but needed on the EMAIL_FROM line the trial writes after)
-const lineOf = (k, comma = "?") => new RegExp(`^([ \\t]*)"${k}"[ \\t]*:[ \\t]*"([^"\\n]*)"([ \\t]*,${comma})[ \\t]*\\n`, "m");
 const said = (vars, keys) => keys.map((k) => `${k}=${vars[k]}`).join(", ");
+/** A DEPLOYMENT_ENV the freeze accepts (not blank, not "unset": the v5 policy names "unset" an environment, but the freeze refuses it,
+ *  rebrand second check TRIAL-ENV-UNSET). */
+const freezeTakes = (vars, env) => { try { return pageLegacySeats({ ...vars, LEGACY_SEATS: "frozen", DEPLOYMENT_ENV: env }).legacySeats === "frozen"; } catch { return false; } };
 
 /**
  * What the trial does with a wrangler.jsonc text (see the header):
@@ -52,8 +55,8 @@ export function trialPlan(text) {
   let vars;
   try { vars = varsOf(text); } catch (e) { return { action: "fail", reason: `wrangler.jsonc does not parse (${e.message})` }; }
   const has = (k) => Object.hasOwn(vars, k);
-  if (vars.EMAIL_FROM === TRIAL_SETTINGS.EMAIL_FROM)
-    return { action: "fail", reason: `wrangler.jsonc carries the trial's own placeholder sender (${TRIAL_SETTINGS.EMAIL_FROM}): this is the trial's result, already applied (never apply it twice, never commit it)` };
+  if (vars.EMAIL_FROM === TRIAL_SETTINGS.EMAIL_FROM || MARK_LINE.test(text))
+    return { action: "fail", reason: `wrangler.jsonc carries the trial's own placeholder sender (${TRIAL_SETTINGS.EMAIL_FROM}) or its line: this is the trial's result, already applied (never apply it twice, never commit it)` };
   try { buildAccepts(vars); } catch (e) { return { action: "fail", reason: `the committed wrangler.jsonc is refused by the page build: ${e.message}` }; }
   const b = brandFromSettings(vars);
   if (b.key === TRIAL_SETTINGS.BRAND) {
@@ -69,24 +72,29 @@ export function trialPlan(text) {
     EMAIL_FROM: from && !/vicinity/i.test(from) ? vars.EMAIL_FROM : TRIAL_SETTINGS.EMAIL_FROM,
     BRAND: TRIAL_SETTINGS.BRAND,
     LEGACY_SEATS: legacySeatsFrozenOn(vars) ? vars.LEGACY_SEATS : TRIAL_SETTINGS.LEGACY_SEATS,
-    DEPLOYMENT_ENV: has("DEPLOYMENT_ENV") && String(vars.DEPLOYMENT_ENV).trim() !== "" ? vars.DEPLOYMENT_ENV : TRIAL_SETTINGS.DEPLOYMENT_ENV,
+    DEPLOYMENT_ENV: has("DEPLOYMENT_ENV") && freezeTakes(vars, vars.DEPLOYMENT_ENV) ? vars.DEPLOYMENT_ENV : TRIAL_SETTINGS.DEPLOYMENT_ENV,
   };
-  const anchor = lineOf("EMAIL_FROM", "").exec(text);
-  if (!anchor) return { action: "fail", reason: "wrangler.jsonc: no EMAIL_FROM line to put the trial settings after" };
-  let out = text;
-  const added = [];
-  for (const [k, v] of Object.entries(want)) {
-    const m = lineOf(k).exec(out);
-    if (m) out = out.slice(0, m.index) + `${m[1]}${JSON.stringify(k)}: ${JSON.stringify(v)}${m[3]}\n` + out.slice(m.index + m[0].length);
-    else if (has(k)) return { action: "fail", reason: `wrangler.jsonc sets ${k} on a line the trial cannot rewrite (one "${k}": "…", line)` };
-    else added.push(`${anchor[1]}${JSON.stringify(k)}: ${JSON.stringify(v)},\n`);
-  }
-  if (added.length) {
-    const at = lineOf("EMAIL_FROM", "").exec(out);
-    out = out.slice(0, at.index + at[0].length) + added.join("") + out.slice(at.index + at[0].length);
-  }
-  const after = varsOf(out);
+  if (!has("EMAIL_FROM")) return { action: "fail", reason: "wrangler.jsonc: no EMAIL_FROM line to put the trial settings after" };
+  let out = text, last = "EMAIL_FROM";
+  const before = {};
+  try {
+    for (const [k, v] of Object.entries(want)) {
+      const raw = rawVar(out, k);
+      if (raw !== null && typeof vars[k] !== "string") return { action: "fail", reason: `wrangler.jsonc sets ${k} to something other than a text value, which the trial does not rewrite` };
+      if (raw !== null && vars[k] === v) continue; // kept as committed
+      before[k] = raw;
+      out = setRawVar(out, k, JSON.stringify(v), { after: last });
+      if (raw === null) last = k;
+    }
+    // the trial's own line, right after the sender's (whole-line comment), so the suite's stand-in takes back exactly these values
+    const at = out.indexOf("\n", out.indexOf('"EMAIL_FROM"')) + 1;
+    const indent = /^[ \t]*/.exec(out.slice(out.lastIndexOf("\n", out.indexOf('"EMAIL_FROM"')) + 1))[0];
+    out = `${out.slice(0, at)}${indent}${TRIAL_MARK}${JSON.stringify(before)}\n${out.slice(at)}`;
+  } catch (e) { return { action: "fail", reason: `the trial could not write the switch into wrangler.jsonc (${e.message})` }; }
+  let after;
+  try { after = varsOf(out); } catch (e) { return { action: "fail", reason: `the trial could not write the switch into wrangler.jsonc (${e.message})` }; }
   for (const [k, v] of Object.entries(want)) if (after[k] !== v) return { action: "fail", reason: `the trial could not write ${k} into wrangler.jsonc` };
+  if (undoTrial(out) !== text) return { action: "fail", reason: "the trial's change to wrangler.jsonc could not be taken back exactly" };
   try { buildAccepts(after); } catch (e) { return { action: "fail", reason: `the switch on top of the committed wrangler.jsonc is refused by the page build: ${e.message}` }; }
   const kept = Object.keys(want).filter((k) => has(k) && vars[k] === want[k]);
   return { action: "write", text: out,

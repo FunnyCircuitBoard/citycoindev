@@ -6,8 +6,11 @@
 //
 // While the committed build IS today's (src/pages-built.js names no label set, no main-token switch and no freeze: the live site), this file
 // does nothing at all. Otherwise, before any test runs, three committed things read as today's:
-//   wrangler.jsonc        without the settings that turn a switch on in a configuration pull request (SWITCH_ON_SETTINGS below: BRAND and
-//                         its prerequisites, the canonical origin and the main-token switch), and with today's mail sender
+//   wrangler.jsonc        as it was before the switch (todayWrangler below): what the CI switch trial wrote into this copy, taken back
+//                         exactly from the trial's own line (scripts/brand/wrangler-vars.mjs undoTrial); then the switch's own settings
+//                         (SWITCH_ON_SETTINGS: BRAND, a LEGACY_SEATS frozen, MAIN_TOKEN_V5 on) taken out and today's mail sender put back.
+//                         Nothing else: a DEPLOYMENT_ENV, SITE_ORIGIN or SITE_ORIGINS committed for another stage (S06) stays as committed
+//                         (rebrand second check S06-CI-RED), and every edit goes by the JSONC structure, never by lines (STANDIN-MULTILINE)
 //   src/pages-built.js    the record the page build writes for those settings, as the file's text and as the Worker's reading
 //                         (src/v5policy.js _pagesBuiltBaseForTests; a test that stands in for another build merges onto this one, as it was
 //                         written to)
@@ -19,14 +22,19 @@ import fs from "node:fs";
 import { syncBuiltinESMExports } from "node:module";
 import { fileURLToPath } from "node:url";
 import { PAGES_BUILT } from "../../src/pages-built.js";
+import { brandFromSettings } from "../../src/brand.js";
+import { legacySeatsFrozenOn, mainTokenV5On } from "../../src/flags.js";
+import { removeVar, setVar, undoTrial, varsOf } from "../../scripts/brand/wrangler-vars.mjs";
 
 const realReadFileSync = fs.readFileSync;
 const ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const PUBLIC = `${ROOT}public/`, SRC = `${ROOT}scripts/pages/src/`, WRANGLER = `${ROOT}wrangler.jsonc`, RECORD = `${ROOT}src/pages-built.js`;
 
-/** The settings a configuration pull request sets to turn on what the committed build carries, and today's mail sender (BRAND=citycoin needs a
- *  sender without the old name: scripts/pages/build.mjs pageBrandPrerequisites). */
-export const SWITCH_ON_SETTINGS = Object.freeze(["BRAND", "LEGACY_SEATS", "DEPLOYMENT_ENV", "SITE_ORIGIN", "SITE_ORIGINS", "MAIN_TOKEN_V5"]);
+/** The settings that turn on what a committed build other than today's carries (src/pages-built.js: the label set, the legacy seat freeze, the
+ *  main-token switch), each taken out by the stand-in when it is set; and today's mail sender, put back when a label set was (BRAND=citycoin
+ *  needs a sender without the old name: scripts/pages/build.mjs pageBrandPrerequisites). Never DEPLOYMENT_ENV, SITE_ORIGIN or SITE_ORIGINS:
+ *  a configuration pull request of another stage (S06) commits them, and the suite reads them as committed (rebrand second check S06-CI-RED). */
+export const SWITCH_ON_SETTINGS = Object.freeze(["BRAND", "LEGACY_SEATS", "MAIN_TOKEN_V5"]);
 export const TODAY_EMAIL_FROM = "Vicinity <noreply@vicinity.city>";
 
 /** Is the committed build today's? */
@@ -36,11 +44,22 @@ export const committedFile = (rel, encoding) => realReadFileSync(ROOT + rel, enc
 /** The committed wrangler.jsonc's text, exactly as it is on disk. */
 export const realWrangler = () => realReadFileSync(WRANGLER, "utf8");
 
-/** wrangler.jsonc as today's site has it: each SWITCH_ON_SETTINGS line taken out, the mail sender today's. */
+/**
+ * wrangler.jsonc as today's site has it: the CI switch trial's change taken back exactly (its own line says what it replaced), then each
+ * SWITCH_ON_SETTINGS entry that turns something on taken out (a blank BRAND, a LEGACY_SEATS other than frozen, a MAIN_TOKEN_V5 other than on
+ * are today's and stay), and today's mail sender when a label set was set. Every other byte stays: comments, other settings, a DEPLOYMENT_ENV
+ * or SITE_ORIGINS committed for another stage, a value written over several lines.
+ */
 export function todayWrangler(text) {
-  let out = text;
-  for (const k of SWITCH_ON_SETTINGS) out = out.replace(new RegExp(`^[ \\t]*"${k}"[ \\t]*:[^\\n]*\\n`, "gm"), "");
-  return out.replace(/^([ \t]*"EMAIL_FROM"[ \t]*:[ \t]*)"[^"\n]*"/m, (_, head) => `${head}${JSON.stringify(TODAY_EMAIL_FROM)}`);
+  let out = undoTrial(text);
+  const vars = varsOf(out);
+  const labels = brandFromSettings(vars).value !== "";
+  if (labels) out = removeVar(out, "BRAND");
+  if (legacySeatsFrozenOn(vars)) out = removeVar(out, "LEGACY_SEATS");
+  if (mainTokenV5On(vars)) out = removeVar(out, "MAIN_TOKEN_V5");
+  if (labels && Object.hasOwn(vars, "EMAIL_FROM") && vars.EMAIL_FROM !== TODAY_EMAIL_FROM) out = setVar(out, "EMAIL_FROM", TODAY_EMAIL_FROM);
+  varsOf(out); // (throws if the result would not parse: never hand the suite a file it cannot read)
+  return out;
 }
 
 if (!committedIsToday) {
