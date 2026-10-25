@@ -63,6 +63,12 @@ What stops answering once vicinity.city is removed (section 3, step 4), for the 
 1. **Coin metadata.** A coin launched through the legacy launchpad would name a dead address for good. So the legacy launch path is
    closed first: the website's legacy launch flow switched off (`LEGACY_LAUNCH=off`; the switch is stage S23's, not built yet) and the on-chain pause
    `set_pause(launches = true)`, which needs the signature of the legacy admin `13qRam…sRiN` (stage S58, external E3).
+   *Go-live note (25 Oct 2026):* S23 is merged, and the go-live pull request (PR #106, not merged) sets `LEGACY_LAUNCH=off`. The on-chain
+   pause is not a pre-merge item of the go-live. There it is a deviation taken under the owner's go of 25 Oct 2026 and recorded with its
+   evidence: a launch needs an `Approval` that only the admin wallet can create, and 0 `Approval` accounts and 0 coins exist on chain
+   (read-only, 25 Oct 2026 14:08 UTC, slots 461285542 and 461285543; `launches_paused` still 0). A fresh read-only re-check right before that merge is
+   blocking, and any `Approval` stops the merge (implementation-report.md section 11, go-live deploy checklist item 6). The pause stays
+   the owner's recommended step. How it bears on step 4 is S55's record.
 2. **`/brand/vicinity-512.png` on vicinity.city.** The Meteora DBC partner-metadata account `2be9mDcn…si11` names this address on chain
    (rebrand-inventory.md C04). After step 4 it gets no answer from this site; the file itself stays and is served on citycoin.dev.
    Whether DBC lets the fee-claimer wallet update that record was not verified. The policy keeps this file under
