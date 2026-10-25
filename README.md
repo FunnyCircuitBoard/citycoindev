@@ -130,8 +130,12 @@ Requires Node.js 22.13+ (the tests use the built-in SQLite).
 npm install
 npm test          # automated tests
 npm run pages     # rebuild public/*.html after editing scripts/pages/
-npm run dev       # local copy at http://localhost:8787
+npm run dev       # local copy at http://localhost:8787 (read the note below first)
 ```
+Since stage S06 `wrangler.jsonc` sets `DEPLOYMENT_ENV=production` and lists `citycoin.dev` as the first route. A plain `npm run dev` then
+presents every local visit as `http://citycoin.dev` (served as `https://citycoin.dev`): pages and reads work, every write from the browser (sign-in, sign-up,
+posts) answers `403 wrong_origin`. For a local copy that signs in and saves: `cp .dev.vars.example .dev.vars` (it sets `DEPLOYMENT_ENV=test`),
+then `npm run dev -- --local-upstream localhost:8787` and open http://localhost:8787.
 
 ## City boundaries
 Every listed city gets one area, and areas never overlap:

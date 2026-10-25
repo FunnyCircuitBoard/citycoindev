@@ -109,8 +109,11 @@
     // the line: keep_vars would keep the old value).
     "SITE_ORIGINS": "https://citycoin.dev https://vicinity.city",
     // The production Worker (src/site-config.js localDevAllowed): turns off the local development exemption here; the v5 configuration
-    // check wants it for any changed switch. `wrangler dev` reads these values too, so localhost is refused (421) there; a local run sets
-    // another DEPLOYMENT_ENV in its own git-ignored .dev.vars.
+    // check wants it for any changed switch. With it, a v5 switch whose only missing input was the environment counts when set alone, here
+    // or as a dashboard variable (keep_vars): WALLET_ONLY=on, held before (every sign-in 503), would take effect at once; PUBLIC_V5=on too
+    // (docs/citycoin-master/implementation-report.md, S06 deploy checklist, item 3). `wrangler dev` reads these values and presents every
+    // local visit as http://citycoin.dev (the first route below), served as https://citycoin.dev: reads work, a local browser's writes answer 403
+    // wrong_origin. A local run puts DEPLOYMENT_ENV=test in its git-ignored .dev.vars and uses --local-upstream localhost:8787 (README).
     "DEPLOYMENT_ENV": "production",
     // The official Citycoin.dev X account (owner amendment 01; src/maintoken.js officialLinks): supplied by the owner in writing
     // on 24 Oct 2026 ("the twitter handle is @CityCoinDev"); verification record in docs/citycoin-master/amendment-01-new-main-token.md
