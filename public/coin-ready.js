@@ -79,9 +79,7 @@
     else if (gate) state = ["Not available now", "tag--warn"];
     else if (r.inUse) {
       state = ["Your coin", "tag--ok"];
-      // COIN_V2_BATCH (approvalRound): the owner approves ready coins in rounds; never a time
-      note = r.approvalRound === true ? "This is your coin's design now. Its launch opens after the owner's next approval round; then you launch it from your Founder tab."
-        : "This is your coin's design now. Next, Vicinity's owner approves it on the blockchain; then you launch it from your Founder tab.";
+      note = "This is your coin's design now. Next, Vicinity's owner approves it on the blockchain; then you launch it from your Founder tab.";
     }
     else if (chosen && chosen.current && !chosen.mine) note = "A former founder of this city chose this coin. Use it to make it yours: Vicinity's owner approves only the current founder's choice.";
     else if (chosen && chosen.current) note = "Vicinity's design or the city list changed since you chose your coin. This is the new version: use it to keep your coin up to date.";

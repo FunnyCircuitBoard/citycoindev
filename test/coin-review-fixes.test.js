@@ -127,7 +127,7 @@ test("SEC-4: an approval built from the founder's coin does not stop a request o
   assert.equal((await w.status()).state, "ready");
   let v = await w.ready();
   assert.deepEqual([v.review.can.request, v.review.can.describe, v.review.blocked], [true, true, null], "approved on chain: the buttons stay");
-  // a request: accepted; the launch pauses while it waits (the owner's next round withdraws the approval: test/lp-batch.test.js)
+  // a request: accepted; the launch pauses while it waits (the owner revokes the approval and approves the coin again)
   const p = await w.request({ name: "Utica Falls" });
   let st = await w.status();
   assert.deepEqual([st.state, st.why], ["paused", "paused_request"]);
@@ -250,13 +250,12 @@ test("SEC-9: a ticker another city requested is only 'not available' (never 'req
   assert.deepEqual([t.available, t.code, t.message], [false, "ticker_taken", "$UTICANY is not available. Pick another ticker."]);
 });
 
-test("UX-1: not approved yet with a request waiting (or a ticker waiting for the list): the launch says the pause, never 'after the next round'", async () => {
+test("UX-1: not approved yet with a request waiting (or a ticker waiting for the list): the launch says the pause, never 'not approved'", async () => {
   const w = await reviewWorld();
-  w.env.COIN_V2_BATCH = "on";
   await w.useCoin();
   let st = await w.status();
   assert.deepEqual([st.state, st.why], ["not_approved", "not_approved"]);
-  assert.match(st.message, /next approval round/);
+  assert.equal(st.message, "An admin approves your coin on chain first; your pair must be SOL.");
   const p = await w.request({ name: "Utica Falls" });
   st = await w.status();
   assert.deepEqual([st.state, st.why], ["paused", "paused_request"], JSON.stringify(st));

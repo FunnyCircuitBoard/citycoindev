@@ -49,7 +49,7 @@ import { tickerOf, tickersAvailable } from "./tickers.js";
 import { DEFAULT_PAIR, SOURCE, coinDefaults } from "./coindefaults.js";
 import { TEMPLATE_VERSION, coinSvg, sha256Hex } from "./coinart.js";
 import { approvedBasis, approvedDescription, approvedRequest, artBySvg, artPath, chosenOf, cityDescription, ensureReadySchema, storeArtStatement } from "./coinart-store.js";
-import { coinV2BatchOn, coinV2ReadyOn, coinV2ReviewOn } from "./flags.js";
+import { coinV2ReadyOn, coinV2ReviewOn } from "./flags.js";
 import { pendingRequest, reviewState } from "./coinreview.js";
 
 export const PREVIEW_LABEL = "Preview, not launched";
@@ -367,10 +367,8 @@ async function founderView(env, { u, seat, cityId, fetchImpl, now, live, chain =
 /** The founder's answer: their view, and with COIN_V2_REVIEW on the review state (src/coinreview.js reviewState: requests, description, holds). */
 export async function founderAnswer(env, { u, seat, cityId, fetchImpl = fetch, now = Date.now(), live = true, chain = true }) {
   const view = await founderView(env, { u, seat, cityId, fetchImpl, now, live, chain });
-  // COIN_V2_BATCH: approvals come in the owner's rounds (src/lpbatch.js); the card says the launch opens after the next one (no time)
-  const round = coinV2BatchOn(env) ? { approvalRound: true } : null;
-  if (!coinV2ReviewOn(env)) return round ? { ...view, ...round } : view;
-  return { ...view, review: await reviewState(env, { u, seat, cityId, view, now }), ...(round || {}) };
+  if (!coinV2ReviewOn(env)) return view;
+  return { ...view, review: await reviewState(env, { u, seat, cityId, view, now }) };
 }
 async function previewView(env, cityId) {
   const seat = await liveSeatOfCity(env.DB, cityId);

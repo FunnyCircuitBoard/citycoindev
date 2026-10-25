@@ -536,9 +536,9 @@ async function founderPost(request, env, now, fetchImpl, kind, { max = 2048 } = 
 }
 /**
  * The coin may change only while nothing on chain fixes it: { error } (launched, held, chain unreadable) or null. An approval on chain
- * built from this founder's ready-made coin (approved_hash: the owner's round or card built it from their chosen version) does not stop
+ * built from this founder's ready-made coin (approved_hash: the owner's card built it from their chosen version) does not stop
  * a request or a description: the launch pauses while a request waits or while the coin differs from what was approved (launchHold),
- * and the owner's next round withdraws or renews that approval (src/lpbatch.js). Any other approval (one given by hand for an earlier
+ * and the owner revokes that approval and approves the coin again (src/lpadmin.js). Any other approval (one given by hand for an earlier
  * studio design, or for another founder) still fixes the coin as it was approved.
  */
 async function notFrozen(env, w, fetchImpl, now) {
@@ -810,7 +810,7 @@ async function editRoute(request, env, fetchImpl, now) {
 async function select(env, { w, v, log, now, before = [], noPending = true, after = [] }) {
   const db = env.DB;
   // keepApproved: the hash an approval on chain was built from stays on the row (never equal to a new version's), so the launch pauses
-  // and the owner's next round renews the approval for the coin as it is now (src/lpbatch.js)
+  // until the owner approves the coin as it is now (src/lpadmin.js)
   const { stmts, at } = await choiceStatements(env, { cityId: w.cityId, seat: w.seat, userId: w.userId || w.u.id, v, log, now, keepApproved: true });
   const cond = `EXISTS (SELECT 1 FROM coin_ready WHERE city_id = ? AND content_hash = ? AND chosen_at = ?)${noPending ? ` AND ${NO_PENDING}` : ""}`;
   const args = [w.cityId, v.hash, at, ...(noPending ? [w.cityId, w.cityId] : [])];
