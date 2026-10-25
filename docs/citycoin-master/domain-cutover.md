@@ -355,6 +355,22 @@ are rehearsed first.
   `https://VICINITY.CITY` now answers 403; browsers never send those spellings). Its e-mails are byte for byte as before.
 - The synthetic probes of S54 are green on both hosts.
 
+*Go-live note (the go-live pull request, PR #106, not merged; owner's go of 25 Oct 2026).* These checks were written for S06. They are first
+run after S06's deploy attaches citycoin.dev, with S06's version live and before the go-live merge (its deploy checklist item 2). Run after
+the go-live's deploy (`WALLET_ONLY=on`, `BRAND=citycoin`, `SITE_ORIGIN=https://citycoin.dev`), they read as follows:
+- Replaced by the go-live: the code e-mail and "Continue with Google". Neither is offered, and the e-mail and Google sign-in routes answer
+  404. In their place: the wallet sign-in check above and the go-live's own checks (implementation-report.md section 11, go-live deploy
+  checklist item 8: `GET /api/auth/google/start` answers 404; a wallet registers, and signs in again, on citycoin.dev).
+- Replaced by the go-live: "vicinity.city answers exactly as before". After the go-live vicinity.city serves the Citycoin.dev pages with
+  `x-robots-tag: noindex`. In its place: the go-live's checks of vicinity.city and www.vicinity.city (item 8: 200 with
+  `x-robots-tag: noindex`, and `node scripts/check-live.mjs https://vicinity.city` passes).
+- The `x-robots-tag` line: the other way round, as its own note says.
+- Not met: the synthetic probes of S54. S54 is not built (external E15), so this check cannot be met; it is recorded as not met and
+  blocks nothing.
+- Unchanged: 200 over a certificate for citycoin.dev with the main pages and `/api/health`, the byte hashes of the legacy files on both
+  hosts, the host binding (a wallet sign-in, the copied `vs` cookie, the cross-host `Origin`), www.citycoin.dev,
+  `node scripts/check-live.mjs https://citycoin.dev` and "Check a link".
+
 **Before step 4:**
 
 - The legacy launch path is closed: a read-only RPC read of the legacy launchpad PDA shows `launches_paused = 1` (signed by
