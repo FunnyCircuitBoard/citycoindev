@@ -25,7 +25,8 @@
  *   Safety   an admin can take down a logo or text that breaks the rules, with a public reason.
  *   Closed   LEGACY_LAUNCH=off (stage S23, src/legacylaunch.js): the studio (POST /api/coins/design), a founder's LaunchLab contract (POST
  *            /api/coins/mint) and recording one (POST /api/coins/mint/decide with approve true) answer 410 legacy_launch_closed (src/index.js
- *            before any read; here again for a direct call). Every read, a rejection of a waiting contract and every takedown stay.
+ *            before any read; here again for a direct call). Every read, a rejection of a waiting contract and every takedown stay, and so
+ *            does a founder taking their own picture down (a design body of exactly { removeLogo: true }: removeOwnLogo).
  */
 import { json, readJson } from "./http.js";
 import { access } from "./access.js";
@@ -49,7 +50,7 @@ import { coinV2ReadyOn } from "./flags.js";
 import { boundArtOf, chosenOf, madeByOf } from "./coinart-store.js";
 import { choiceHolds } from "./coinready.js";
 import { v2Takedown } from "./cointakedown.js";
-import { launchClosed } from "./legacylaunch.js";
+import { launchClosed, logoRemovalOnly, peek } from "./legacylaunch.js";
 
 const C = POLICY.coins;
 
@@ -167,13 +168,16 @@ export async function handleCoins(request, env, fetchImpl = fetch, now = Date.no
 
 /** POST /api/coins/design { name, pitch, pair, color, image?, removeLogo? } — the founder designs their city's coin. */
 export async function handleDesign(request, env, fetchImpl = fetch, now = Date.now()) {
-  const closed = launchClosed(env); // the legacy launch path closed (stage S23): the studio is closed, before any read
-  if (closed) return closed;
+  // the legacy launch path closed (stage S23): the studio is closed, before any read (the body peeked from a copy aside); only a body that is
+  // exactly { removeLogo: true } goes through, and then only the founder's own picture comes down (review finding SEC-S23-3)
+  const closed = launchClosed(env);
+  if (closed && !logoRemovalOnly(await peek(request))) return closed;
   const f = await founder(request, env, now, fetchImpl);
   if (f.error) return f.error;
   const { u, seat } = f, db = env.DB;
   const body = await readJson(request, 300_000);
   if (!body) return json({ ok: false, error: "bad_json" }, 400);
+  if (closed) return logoRemovalOnly(body) ? removeOwnLogo(env, { u, seat, fetchImpl, now }) : closed;
   const old = await coinOf(db, seat.city_id);
   if (old && old.mint) return json({ ok: false, error: "coin_locked" }, 409);
   let frozen = null;
@@ -224,6 +228,30 @@ export async function handleDesign(request, env, fetchImpl = fetch, now = Date.n
   ].filter(Boolean);
   await log(db, { actor: u.id, role: "founder", action: "coin_design", user: u.id, country: seat.country, place: seat.city_id, reason: "design",
     note: `${seat.city_name}: ${changed.join(", ") || "saved"}`, at: iso(now) });
+  return json({ ok: true, coin: coinView(await coinOf(db, seat.city_id), { mine: true }) });
+}
+
+/**
+ * While the legacy launch path is closed (stage S23; review finding SEC-S23-3): the founder takes their own coin picture down, and nothing else
+ * changes (name, pitch, pair and colour stay; no new picture). The same rules as the studio's "Remove logo": the founder's session and seat
+ * (founder above), no picture of a launched coin or of a design approved on chain (it is fixed there), the studio's daily edit count, and the
+ * public log line "logo removed". It builds nothing toward an approval.
+ */
+async function removeOwnLogo(env, { u, seat, fetchImpl, now }) {
+  const db = env.DB;
+  const old = await coinOf(db, seat.city_id);
+  if (!old || (!old.media_id && !old.approved_media_id)) return json({ ok: false, error: "not_found" }, 404);
+  if (old.mint) return json({ ok: false, error: "coin_locked" }, 409);
+  let frozen = null;
+  try { frozen = await designFrozen(env, seat.city_id, fetchImpl, now); }
+  catch (e) { console.error("coin logo removal: approval check failed", String((e && e.message) || e).slice(0, 80)); return json({ ok: false, error: "chain_unavailable" }, 503); }
+  if (frozen === "launched") return json({ ok: false, error: "coin_locked" }, 409);
+  if (frozen) return json({ ok: false, error: frozen === "held" ? "coin_being_approved" : "coin_approved" }, 409);
+  if (await countRecent(env, u.id, "coin_design", now - DAY) >= C.editsPerDay) return json({ ok: false, error: "slow_down" }, 429);
+  await db.batch([db.prepare("UPDATE city_coins SET media_id = NULL, updated_at = ? WHERE city_id = ?").bind(iso(now), seat.city_id), clearedStatement(db, seat.city_id)]);
+  await noteEvent(env, u.id, "coin_design", now);
+  await log(db, { actor: u.id, role: "founder", action: "coin_design", user: u.id, country: seat.country, place: seat.city_id, reason: "design",
+    note: `${seat.city_name}: logo removed`, at: iso(now) });
   return json({ ok: true, coin: coinView(await coinOf(db, seat.city_id), { mine: true }) });
 }
 

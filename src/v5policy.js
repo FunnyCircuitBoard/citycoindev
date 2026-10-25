@@ -497,6 +497,8 @@ export const LEGACY_LAUNCH_CODES = Object.freeze(["CONFIG_CHECK_FAILED", "DEPLOY
  *   LEGACY_LAUNCH_VALUE_REFUSED   LEGACY_LAUNCH holds a value outside the switch's set (not blank, "on" or "off" once trimmed, any letter case:
  *                                 "of", "false", "closed", a typo), which the v5 check also refuses by name (FLAG_VALUE_INVALID); the page build
  *                                 stops on it in wrangler.jsonc (scripts/pages/build.mjs pageV5Config), so it comes from the Cloudflare dashboard.
+ *   LEGACY_LAUNCH_CHECK_FAILED    LEGACY_LAUNCH=off and the v5 check itself threw (it is not expected to): the switch cannot be shown to be
+ *                                 accepted, so it is held.
  * A refusal never reopens the path: legacyLaunch answers "held" and the writers keep answering 410 (see legacyLaunch for the master's lines).
  */
 export function legacyLaunchRefusals(env) {
@@ -523,6 +525,10 @@ export function legacyLaunchRefusals(env) {
  *   "on"    LEGACY_LAUNCH unset, blank or "on" (trimmed, any letter case): today's site exactly, whatever any other setting says (an error in
  *           another input, LAUNCH_V5 refused for LAUNCH_V5_WITH_LEGACY_LAUNCH, a refused MAIN_TOKEN_MINT: none of them closes it).
  * Never throws. With LEGACY_LAUNCH unset this reads one setting and nothing else.
+ * The one deliberate exception to "set but not readable as on is closed": a setting that cannot be READ at all (reading it throws) counts as
+ * unset, as for LEGACY_SEATS (legacySeats). Worker variables are plain strings, so that cannot happen on Cloudflare; were it to,
+ * it would be a platform fault, not a value anyone set, and closing the live site's launches on it would be a silent switch-off by an unrelated
+ * error, which the gate must never do. Everything that can be read and is not unset, blank or "on" is closed ("off") or held.
  */
 export function legacyLaunch(env) {
   let value = "";

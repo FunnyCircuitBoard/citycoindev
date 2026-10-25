@@ -1,9 +1,9 @@
 // City coins step 3 (COIN_V2_REVIEW), the fixes of the security, rollback and founder-words review, through the real API and real SQL with
 // the launchpad's fake chain: the screener's evasions never reach a coin (and never its public preview); a change request never vouches
 // for a description it did not change; an approval on chain built from the founder's own coin does not stop requests or descriptions
-// (the launch pauses and the owner's round renews it); a proposed name is screened with the coin's own reviewed words and a proposed
+// (the launch pauses until the owner approves the coin again); a proposed name is screened with the coin's own reviewed words and a proposed
 // ticker like a word; an approved upload is cached briefly and can be taken down until a launched coin carries it; an upload is a whole
-// square PNG; another city's request is never named; the launch status says the review pause, not "after the next round"; the reason
+// square PNG; another city's request is never named; the launch status says the review pause, not only "an admin approves it first"; the reason
 // fits the request; "Keep the default" puts the flagged card away; the request cards follow the coin; turning the switch off after use
 // keeps every review-made version checked.
 import { test, before, beforeEach, after } from "node:test";
@@ -145,13 +145,14 @@ test("SEC-4: an approval built from the founder's coin does not stop a request o
   assert.equal((await w.rv("cancel", { requestId: rs.review.request.id })).ok, true);
   assert.equal((await w.status()).state, "ready", "cancelled: the approved coin launches");
   // a description used by itself (an older engine's pass: a stand-in plays it) changes the coin under the approval: the launch waits
-  // for the next round
+  // until the owner approves it again (no approval round exists: the owner's daily round was deleted in stage S23, review finding S23-COPY-1)
   _setScreener((text) => ({ result: "pass", issues: [], rulesVersion: RULES_VERSION, text }));
   const d = await w.rv("description", { text: "The Handshake City on the Mohawk River, home of tomato pie." });
   assert.equal(d.used, true, JSON.stringify(d));
   st = await w.status();
   assert.deepEqual([st.state, st.why], ["paused", "approval_changed"]);
-  assert.match(st.message, /changed after the owner approved it on the blockchain.*at the owner's next approval round/);
+  assert.equal(st.message, "Your coin changed after the owner approved it on the blockchain, so it can't launch until the owner approves it again as it is now.");
+  assert.doesNotMatch(st.message, /round/);
   assert.doesNotMatch(st.message, /24 hours|tomorrow|within/);
   v = await w.ready();
   assert.equal(v.gate.code, "approved_changed");
@@ -259,7 +260,7 @@ test("UX-1: not approved yet with a request waiting (or a ticker waiting for the
   const p = await w.request({ name: "Utica Falls" });
   st = await w.status();
   assert.deepEqual([st.state, st.why], ["paused", "paused_request"], JSON.stringify(st));
-  assert.doesNotMatch(st.message, /opens after the owner's next approval round/);
+  assert.doesNotMatch(st.message, /round/);
   const tx = await w.post(w.f, "/api/lp/launch/tx", { cityId: UTICA, cluster: "devnet", mint: fresh() });
   assert.deepEqual([tx.status, tx.error], [409, "paused_request"]);
   // an approved ticker the city list does not carry yet: the same
@@ -321,16 +322,16 @@ test("UX-6 and UX-7: the approved card follows the chain; a waiting description 
   const p = await w.request({ name: "Utica Falls" });
   assert.equal((await w.decide({ id: p.id, action: "approve", contentHash: p.contentHash })).ok, true);
   let v = await w.ready();
-  assert.match(v.review.request.message, /It launches after the owner approves it on the blockchain, at the owner's next approval round\./);
+  assert.match(v.review.request.message, /It is now your coin\. It launches after the owner approves it on the blockchain\.$/);
   // NIT-1: while the owner builds the approval (the five-minute hold) the card says it is happening right now, as the coin card does
-  // (GATES.held), never "at the owner's next approval round"
+  // (GATES.held), never that the owner still has to approve it
   const c = await w.card();
   assert.equal((await w.post(w.owner, "/api/admin/lp/approve/tx", { cluster: "devnet", ...seenOf(c), expiryDays: 7 })).ok, true);
   v = await w.ready();
   assert.equal(v.gate.code, "held");
   assert.match(v.gate.message, /^The owner is approving your coin right now/);
   assert.equal(v.review.request.message, `Version ${p.version} was approved. It is now your coin. The owner is approving it on the blockchain right now.`);
-  assert.doesNotMatch(JSON.stringify([v.review.request, v.review.hold, v.review.blocked, v.gate]), /next approval round/);
+  assert.doesNotMatch(JSON.stringify([v.review.request, v.review.hold, v.review.blocked, v.gate]), /round|after the owner approves it/);
   advance(6 * 60_000);
   await reprove(w.f);
   w.lp.S.accounts[await w.L.approval(BigInt(UTICA))] = approvalAccount({ cityId: UTICA, founder: w.f.w.address, rentPayer: w.owner.w.address, name: c.name, symbol: c.symbol, expiresAt: Math.floor(Date.now() / 1000) + 7 * 86_400 });

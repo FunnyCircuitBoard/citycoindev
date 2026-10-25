@@ -106,7 +106,8 @@ test("not launched: the founder's own description (a reviewer approved it) goes 
   assert.equal(t.ok, true, JSON.stringify(t));
   assert.match(t.changed[0], /^Taken down: the founder's description of \$UTICA\.$/);
   assert.match(t.message, new RegExp(`uses Vicinity's own sentence now \\(“${DEFAULT.replace(/\./g, "\\.")}”\\); its name, ticker and picture stay\\.`));
-  assert.match(t.message, /the launch waits until the owner approves the coin as it is now, at the next approval round/);
+  assert.match(t.message, /the launch waits until the owner approves the coin again as it is now\./);
+  assert.doesNotMatch(t.message, /round/);
   assert.match(t.message, /The founder was told in their notifications\./);
   assert.equal(t.coin.pitch, DEFAULT);
   // every page falls back to Vicinity's own sentence (never NULL, never the founder's words)

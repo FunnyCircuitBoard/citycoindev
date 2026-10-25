@@ -81,7 +81,7 @@ export const GATES = Object.freeze({
   request_pending: "Your change request is waiting for review. Launch and other changes wait until a reviewer decides; you can cancel the request.",
   description_pending: "Your description is waiting for review. Launch and other changes wait until a reviewer decides; you can cancel the review.",
   // COIN_V2_REVIEW: the founder changed the coin (a description, or back to the defaults) after the owner approved it on the blockchain
-  approved_changed: "Your coin changed after the owner approved it on the blockchain, so it can't launch until the owner approves it as it is now, at the owner's next approval round.",
+  approved_changed: "Your coin changed after the owner approved it on the blockchain, so it can't launch until the owner approves it again as it is now.",
   // LEGACY_LAUNCH=off (stage S23, src/legacylaunch.js): the launch path this coin is chosen for is closed
   legacy_launch_closed: LEGACY_LAUNCH_LINE,
 });
@@ -373,12 +373,12 @@ async function founderView(env, { u, seat, cityId, fetchImpl, now, live, chain =
 }
 /**
  * The founder's answer: their view, and with COIN_V2_REVIEW on the review state (src/coinreview.js reviewState: requests, description, holds).
- * While the legacy launch path is closed (stage S23) there is no review state: its card would offer requests for an approval nobody builds (its
- * routes answer 410); the requests on record stay readable in the admin's Coin reviews queue.
+ * While the legacy launch path is closed (stage S23) the review state is read-only history (closed: true): the founder's own request on record is
+ * shown with its words, and Cancel withdraws it (POST /api/coins/review/cancel stays open); nothing else is offered (review finding S23-OFF-4).
  */
 export async function founderAnswer(env, { u, seat, cityId, fetchImpl = fetch, now = Date.now(), live = true, chain = true }) {
   const view = await founderView(env, { u, seat, cityId, fetchImpl, now, live, chain });
-  if (!coinV2ReviewOn(env) || legacyLaunchClosed(env)) return view;
+  if (!coinV2ReviewOn(env)) return view;
   return { ...view, review: await reviewState(env, { u, seat, cityId, view, now }) };
 }
 async function previewView(env, cityId) {
@@ -572,7 +572,7 @@ export async function choiceStatements(env, { cityId, seat, userId, v, log, now,
   }
   // a new choice is not approved by anyone yet: approved_hash is set only by the owner's approval built from it (src/lpadmin.js).
   // keepApproved (the review routes, src/coinreview.js): the hash an earlier approval was built from stays, never equal to the new
-  // version's, so the launch knows the coin changed under an approval on chain and the owner's next round renews it
+  // version's, so the launch knows the coin changed under an approval on chain and waits until the owner approves the coin again
   stmts.push(db.prepare(`INSERT INTO coin_ready (city_id, version_id, content_hash, symbol, design_at, seat_id, user_id, chosen_at, approved_hash)
       SELECT ?, (SELECT id FROM coin_versions WHERE city_id = ? AND content_hash = ?), ?, ?, ?, ?, ?, ?, NULL WHERE ${ours}
       ON CONFLICT(city_id) DO UPDATE SET version_id = excluded.version_id, content_hash = excluded.content_hash, symbol = excluded.symbol,

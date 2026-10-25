@@ -246,11 +246,12 @@
     });
     box.append(pre, copy);
     const next = el("ol", "lp-next");
+    // (closed: no city is approved here any more, so the list ends before that step; review finding S23-OFF-3)
     for (const t of [
       "Copy this box and send it to the team (it holds only public addresses and transaction ids, nothing secret).",
       "The team checks every address against the blockchain, read only.",
       "The team switches on city-coin trading with a change you approve (it names the price curve and the speed table above).",
-      "Then approve your first city below. Its founder launches the coin from their Founder tab.",
+      ...(closedNow() ? [] : ["Then approve your first city below. Its founder launches the coin from their Founder tab."]),
     ]) next.append(el("li", null, t));
     box.append(el("p", "lp-strong", "What happens next"), next);
     D.api(q("/api/admin/lp/summary")).then((r) => { pre.textContent = r && r.ok ? JSON.stringify(r.summary, null, 2) : words(r); });
@@ -278,8 +279,8 @@
     const r = await D.api(q("/api/admin/lp/candidates"));
     if (!r || !r.ok) { body.replaceChildren(el("p", "lp-error", words(r))); return; }
     body.replaceChildren();
+    // (closed: the section's own line under its heading says it, once; no second note here and none on each card: review finding S23-OFF-3)
     const closed = closedNow();
-    if (closed) body.append(el("p", "lp-note", LAUNCH_CLOSED));
     if (!closed && r.global && r.global.length) { const g = el("div", "lp-note"); g.append(el("p", "lp-strong", "Approving is not possible yet:"), reasonList(r.global)); body.append(g); }
     if (!closed && r.paused) body.append(el("p", "lp-warn", "Launches are paused: approved founders cannot launch until you resume them (below)."));
     // Meteora's programs not the tested builds (or not checkable): a city can be fine while every approval waits; the button says so
@@ -314,7 +315,7 @@
       }
       for (const wmsg of c.warnings || []) card.append(el("p", "lp-warn", wmsg));
       const box = el("div", "lp-step__box");
-      if (closed) card.append(el("p", "muted small", LAUNCH_CLOSED));
+      if (closed) { /* history: listed, nothing to do (the section says why, once) */ }
       else if (c.ok) {
         const sel = el("select", "lp-select"); sel.setAttribute("aria-label", "How long the approval lasts");
         for (const d of [1, 3, 7, 14, 30]) { const o = el("option", null, `${d} day${d === 1 ? "" : "s"}`); o.value = String(d); sel.append(o); }
@@ -335,7 +336,7 @@
       card.append(box);
       body.append(card);
     }
-    body.append(el("h4", null, "Approved, waiting for the founder"));
+    body.append(el("h4", null, closed ? "Approvals on record" : "Approved, waiting for the founder"));
     if (!r.approvals.length) body.append(el("p", "muted", "None."));
     for (const a of r.approvals) {
       const card = el("div", "lp-card");
@@ -422,7 +423,7 @@
       : `Solana ${cluster} (test network): nothing here is real money.`);
     banner.setAttribute("role", "note");
     top.append(banner, el("h2", null, "City coins"),
-      el("p", "muted", "Set up the launchpad once, then approve cities. Every step asks your wallet for one signature. Before your wallet opens, this page shows exactly what you will sign and how much SOL it costs; compare it with your wallet's screen."));
+      el("p", "muted", `${closedNow() ? "" : "Set up the launchpad once, then approve cities. "}Every step asks your wallet for one signature. Before your wallet opens, this page shows exactly what you will sign and how much SOL it costs; compare it with your wallet's screen.`));
     root.replaceChildren(top);
     await retryPending();
     const left = readPending().filter((x) => x.cluster === cluster);

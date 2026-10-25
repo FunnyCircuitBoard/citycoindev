@@ -48,6 +48,10 @@
   // opening and test-lab seed answer 410, so their buttons give way to one line; the lists stay (history). Without the key: as before
   const seatsFrozenNow = () => { const m = window.V.me(); return Boolean(m && m.legacySeats === "frozen"); };
   const CLOSED = "Founder seats, squads and elections are closed for changes.";
+  // the legacy launch path closed (/api/me says legacyLaunch "off"; Citycoin.dev master v5 stage S23): a coin review can no longer be approved
+  // (410), so its card offers "Ask for changes" only, with one line saying why; the queue stays (history). Without the key: as before
+  const launchClosedNow = () => { const m = window.V.me(); return Boolean(m && m.legacyLaunch === "off"); };
+  const LAUNCH_CLOSED = "New city-coin launches on this launchpad are closed. Coins already launched keep trading.";
   // (a failed /api/me answer reads as today's sign-in, never as an error of its own; review finding PAR-04)
   const walletOnlyLate = async () => { try { return ((await window.V.ready) || {}).walletOnly === true; } catch { return false; } };
   /** The text the wallet signs while WALLET_ONLY counts: an "admin" challenge (two minutes, once). null when it could not be had. */
@@ -405,6 +409,7 @@
     window_closed: "That claim window is closed.",
     needs_second_person: "A city's own founder can't decide their own coin. Another admin or the owner decides.",
     version_changed: "The founder changed this request since you opened it. Reload.", not_pending: "This request was decided, cancelled or withdrawn meanwhile. Reload.",
+    legacy_launch_closed: "New city-coin launches on this launchpad are closed, so a coin change can't be approved now. Nothing was changed.",
   };
   const okMsg = (r, what) => { if (r && r.ok) { toast(`${what} ✓`); refresh(); } else toast(r && ERRORS[r.error] ? ERRORS[r.error] : `Failed: ${r && r.error ? r.error : "unknown"}`); };
   const walletOf = (w) => (!w ? "no wallet" : w.includes("*") ? w : short(w)); // an account may have no wallet yet (it links one from its dashboard)
@@ -1092,7 +1097,9 @@
     reason.value = "";
     const note = textInput("Note for the founder (optional, 3 to 300 characters)"); note.maxLength = 300; note.className = "adm-pic__note"; note.setAttribute("aria-label", "Note for the founder");
     const form = el("div", "adm-pic__reject"); form.append(reason, note); act.append(form);
-    act.append(btn("Approve this version", async () => {
+    // (closed: approving answers 410, so the card says why instead; asking for changes stays: review findings S23-OFF-2, CL-1)
+    if (launchClosedNow()) act.append(el("p", "small muted adm-coinrev__closed", `${LAUNCH_CLOSED} This request can't be approved now; you can ask for changes, or the founder can cancel it.`));
+    else act.append(btn("Approve this version", async () => {
       if (sure(`Approve version ${x.version} exactly as shown? ${x.kind === "description" ? "Its description becomes" : "Its picture, ticker and name become"} the coin's (the launch still needs the owner's approval on the blockchain).`)) {
         okMsg(await post("/api/admin/coins/reviews/decide", { id: x.id, action: "approve", contentHash: x.contentHash }), "Approved");
       }

@@ -66,6 +66,9 @@
   // with the ready-made coin on (readyOn below) a city's coin is made by Vicinity and chosen by its founder; an older studio design may
   // still be listed, so the note names both
   const TAB_NOTE_READY = { upcoming: "Upcoming: chosen or designed, not launched yet." };
+  // with the legacy launch path closed (closedOn below: /api/official legacyLaunch "off", stage S23) nothing designed here launches any more:
+  // the tab lists designs on record, never as upcoming (review finding S23-OFF-6)
+  const TAB_NOTE_CLOSED = { upcoming: "Designs on record, not launched. New city-coin launches on this launchpad are closed." };
   const SOL_MINT = "So11111111111111111111111111111111111111112";
   const ADDR_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
   const isAddr = (a) => typeof a === "string" && ADDR_RE.test(a);
@@ -189,6 +192,7 @@
   // path is closed: src/coins.js). Set once that answer is in, before any card is drawn (the cards wait for the same answer).
   let lpOn = false;
   let readyOn = false; // /api/official coinV2Ready (COIN_V2_READY=on): set once that answer is in
+  let closedOn = false; // /api/official legacyLaunch "off" (LEGACY_LAUNCH=off, stage S23): set once that answer is in
   const STATUS = { live: ["Live", "tag--ok"], waiting: ["Contract being checked", "tag--warn"], designed: ["Designed", ""], upcoming: ["Opens soon", "tag--gold"] };
   const WAITING_LP = ["Old contract waiting", "tag--warn"]; // with the launchpad set up nobody checks such a contract: it can only be rejected
   /**
@@ -417,7 +421,7 @@
     return `Read from the price-curve settings on Solana${shortAddr(f && f.config) ? ` (${shortAddr(f.config)})` : ""}${hhmm(f && f.readAt) ? ` at\u00a0${hhmm(f.readAt)}` : ""}${halves}`;
   };
 
-  const pure = { NEW_DAYS, TABS, SORTS, TAB_NOTE, TAB_NOTE_LP, TAB_NOTE_READY, norm, searchText, matches, inTab, isNew, counts, rowsFor, money, fullMoney, count, fullCount, pct, communityText,
+  const pure = { NEW_DAYS, TABS, SORTS, TAB_NOTE, TAB_NOTE_LP, TAB_NOTE_READY, TAB_NOTE_CLOSED, norm, searchText, matches, inTab, isNew, counts, rowsFor, money, fullMoney, count, fullCount, pct, communityText,
     countdownText, ageSeconds, agoText, statusLabel, notLiveWhy, founderText, pairText, links, viewHref, logoSrc, colorOf, initialsOf, cardKey, stateFromUrl, urlFor,
     coinHref, chipOf, priceSource, shortSource, statCells, curveFoot, curveView, venueLine, shapeOf, sparkPick, sparkGeometry, sparkLabel, sparkWhy, hhmm, feesSource };
   window.VLaunchpad = { pure };
@@ -697,7 +701,7 @@
     const n = Object.fromEntries(TABS.map((t) => [t, rowsFor(cards, { ...opts, tab: t }).length]));
     tabs().forEach((b) => { const on = b.dataset.tab === state.tab; b.setAttribute("aria-selected", String(on)); b.tabIndex = on ? 0 : -1; const c = b.querySelector("[data-count]"); if (c) { c.textContent = String(n[b.dataset.tab] || 0); c.classList.toggle("is-zero", !n[b.dataset.tab]); } });
     $("#lp-panel").setAttribute("aria-labelledby", `lp-tab-${state.tab}`);
-    $("#lp-tabnote").textContent = (readyOn && TAB_NOTE_READY[state.tab]) || (lpOn && TAB_NOTE_LP[state.tab]) || TAB_NOTE[state.tab];
+    $("#lp-tabnote").textContent = (closedOn && TAB_NOTE_CLOSED[state.tab]) || (readyOn && TAB_NOTE_READY[state.tab]) || (lpOn && TAB_NOTE_LP[state.tab]) || TAB_NOTE[state.tab];
     const rows = rowsFor(cards, opts);
     const cities = rows.filter((c) => c.kind !== "vicinity").length; // the city coins drawn (the empty card speaks when there is none)
     const keep = focusKey();
@@ -863,5 +867,5 @@
   // the coin page and the admin tab follow): the sources fold names it instead of Raydium LaunchLab. Without it nothing changes.
   // The section ships visible (its placeholders hold the room: nothing jumps); with the switch off it goes, and nothing is asked for.
   const lpCopy = (on) => { for (const e of $$("[data-launchlab-copy]")) e.hidden = on; for (const e of $$("[data-lp-only]")) e.hidden = !on; };
-  official.then((o) => { swapOn = Boolean(o && o.swap === true); lpOn = Boolean(o && o.cityCoins); readyOn = Boolean(o && o.coinV2Ready === true); if (lpOn) { lpCopy(true); paintFees(); } if (o && o.launchpadV2 === true) start(); else sec.hidden = true; });
+  official.then((o) => { swapOn = Boolean(o && o.swap === true); lpOn = Boolean(o && o.cityCoins); readyOn = Boolean(o && o.coinV2Ready === true); closedOn = Boolean(o && o.legacyLaunch === "off"); if (lpOn) { lpCopy(true); paintFees(); } if (o && o.launchpadV2 === true) start(); else sec.hidden = true; });
 })();

@@ -32,6 +32,7 @@ import { launchpadCluster, launchpadTradingOn, lpSetup, solscanTx, swapCluster }
 import { STATUS_LIMIT, keyLimit, publicLimit } from "./guards.js";
 import { limitKey } from "./limits.js";
 import { readJson } from "./http.js";
+import { closedLaunchTx } from "./legacylaunch.js";
 
 const TIMEOUT_MS = 8000;
 const SIG = /^[1-9A-HJ-NP-Za-km-z]{64,88}$/;
@@ -157,6 +158,10 @@ export async function handleSend(request, env, fetchImpl = fetch, now = Date.now
   if (!decoded.signaturesFilled.every(Boolean)) return json({ ok: false, error: "unsigned" }, 400);
   // only what THIS Worker built goes to the owner's RPC: a signed transaction from anywhere else is refused before any node is asked
   if (!(await checkTicket(env, bytes, body.ticket, now))) return json({ ok: false, error: "bad_ticket", message: "Only a transaction built on this site can be relayed. Press Swap again." }, 400);
+  // the legacy launch path closed (LEGACY_LAUNCH=off, stage S23, src/legacylaunch.js): an approval or a launch on the legacy launchpad built
+  // before the switch closed is not sent for it now (review finding SEC-S23-4). With the switch unset this reads one setting and nothing else
+  const gone = closedLaunchTx(env, decoded);
+  if (gone) return gone;
   const cluster = clusterOf(env, body.cluster);
   // the transaction's id: the fee payer's (the wallet's) own signature, the first of the 1 to 4 checked above (the count is one
   // byte below 128, so the first signature is bytes 1..64; the one-time browser keys sign the later slots)

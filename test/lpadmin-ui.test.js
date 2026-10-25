@@ -349,3 +349,30 @@ test("LEGACY_LAUNCH=off: a confirmed approval the server will not record any mor
   assert.deepEqual(JSON.parse(t.storage.get("vicinity_lp_pending")), [], "and let go of");
   assert.doesNotMatch(t.text(), /not recorded here yet/);
 });
+
+test("LEGACY_LAUNCH=off: the closed line once per section (never on every card), no 'then approve cities' in the intro or step 8, 'Approvals on record' (review findings S23-OFF-3, CL-2)", async () => {
+  const LINE = "New city-coin launches on this launchpad are closed. Coins already launched keep trading.";
+  const answers = { "/api/admin/lp/status": statusOf(), "/api/admin/lp/candidates": { ...CANDIDATES, global: [LINE], candidates: CANDIDATES.candidates.map((c) => ({ ...c, ok: false, reasons: [LINE, ...c.reasons] })) },
+    "/api/admin/lp/coins": { ok: true, coins: [] }, "/api/admin/lp/platform/plan": { ok: true, claims: [], totals: { quote: "0", lamports: "0" }, transactions: 0, isDevWallet: false },
+    "/api/admin/lp/summary": { ok: true, summary: { cluster: "mainnet" } } };
+  const closed = await tab({ probe: { ok: true, cluster: "mainnet", legacyLaunch: "off" }, answers });
+  const sectionOf = (t, title) => [...t.panel.querySelectorAll("section.lp-section")].find((s) => s.querySelector("h3").textContent === title);
+  const count = (node, s) => node.textContent.split(s).length - 1;
+  const cities = sectionOf(closed, "Cities");
+  assert.equal(count(cities, LINE), 1, "once, under the section's heading");
+  assert.ok(cities.querySelectorAll(".lp-card").length >= 3, "the designs and the approval on record are still listed");
+  assert.equal([...cities.querySelectorAll(".lp-card")].some((c) => c.textContent.includes(LINE)), false, "no card repeats it");
+  assert.doesNotMatch(cities.textContent, /Not yet:/, "the candidates' reasons are not listed while closed (the section says why)");
+  assert.match(cities.textContent, /Approvals on record/);
+  assert.doesNotMatch(cities.textContent, /Approved, waiting for the founder/);
+  assert.ok(closed.button("Revoke"), "Revoke stays");
+  assert.doesNotMatch(closed.text(), /Set up the launchpad once, then approve cities\./);
+  assert.match(closed.text(), /Every step asks your wallet for one signature\./);
+  assert.doesNotMatch(closed.text(), /Then approve your first city below/);
+  // without the key: today's words
+  const open = await tab({ answers: { ...answers, "/api/admin/lp/candidates": CANDIDATES } });
+  assert.match(open.text(), /Set up the launchpad once, then approve cities\. Every step asks your wallet for one signature\./);
+  assert.match(open.text(), /Then approve your first city below\. Its founder launches the coin from their Founder tab\./);
+  assert.match(sectionOf(open, "Cities").textContent, /Approved, waiting for the founder/);
+  assert.equal(count(open.panel, LINE), 0);
+});

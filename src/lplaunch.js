@@ -305,8 +305,8 @@ async function launchStatus(request, env, fetchImpl, now) {
   // COIN_V2_REVIEW: a change request or a description waiting for review pauses the launch; the approved coin must still be launchable
   // (src/coinreview.js launchHold; nothing with the switch off)
   if (!p) { const h = await launchHold(env, String(cityId), st.approval); if (h) p = h; }
-  // not approved yet (or expired): when the review rules keep the next round from approving it (a request waiting, a ticker the city
-  // list does not carry yet...), that is what the founder is told, never "it opens after the next round" (src/coinreview.js reviewPause)
+  // not approved yet (or expired): when the review rules keep the owner from approving it (a request waiting, a ticker the city list does
+  // not carry yet...), that is what the founder is told, never only "an admin approves your coin on chain first" (src/coinreview.js reviewPause)
   else if (p.error === "not_approved" || p.error === "approval_expired") { const h = await reviewPause(env, String(cityId)); if (h) p = h; }
   // otherwise ready: Meteora's programs must still be the tested builds (the card says why launches wait, before the founder presses)
   if (!p) { const h = await meteoraHold(env, fetchImpl, now); if (h) p = { state: "paused", error: h.error, message: h.message }; }

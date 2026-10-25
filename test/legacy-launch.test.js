@@ -149,12 +149,19 @@ function spies(env, fetchImpl) {
 const WRITERS = [
   ["/api/lp/launch/tx", { cityId: UTICA, cluster: "devnet", mint: "11111111111111111111111111111112" }],
   ["/api/coins/design", { name: "Utica Coin", pitch: "", pair: "SOL", color: "gold" }],
+  // a picture removal goes through only as exactly { removeLogo: true } (review finding SEC-S23-3): with any other field it is the studio
+  ["/api/coins/design", { removeLogo: true, name: "Utica Coin" }],
+  ["/api/coins/design", { removeLogo: "true" }],
   ["/api/coins/mint", { mint: "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU" }],
   ["/api/coins/mint/decide", { city: UTICA, approve: true, mint: "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU" }],
   ["/api/coins/ready/art", { cityId: UTICA }],
   ["/api/coins/ready/use", { cityId: UTICA, contentHash: "a".repeat(64) }],
-  ...["draft", "submit", "cancel", "edit", "reset", "description", "description/review", "description/default"].map((r) => [`/api/coins/review/${r}`, { cityId: UTICA }]),
+  // (cancel stays open: it only withdraws the founder's own request; review findings CL-1, SEC-S23-3)
+  ...["draft", "submit", "edit", "reset", "description", "description/review", "description/default"].map((r) => [`/api/coins/review/${r}`, { cityId: UTICA }]),
+  // (asking for changes stays open; an approval, or anything that is not exactly action changes_needed, is refused: CL-1, S23-OFF-2)
   ["/api/admin/coins/reviews/decide", { id: 1, action: "approve", contentHash: "a".repeat(64) }],
+  ["/api/admin/coins/reviews/decide", { id: 1, action: "Changes_Needed", contentHash: "a".repeat(64) }],
+  ["/api/admin/coins/reviews/decide", { id: 1 }],
   ["/api/admin/lp/approve/tx", { cluster: "devnet", cityId: UTICA }],
   ...LP_SETUP_CLOSED.map((step) => ["/api/admin/lp/tx", { cluster: "devnet", step }]),
   ...LP_RECORD_CLOSED.map((step) => ["/api/admin/lp/record", { cluster: "devnet", step, signature: "1".repeat(64), params: { cityId: UTICA } }]),
@@ -236,10 +243,23 @@ test("closed: what stays open (reads, revoke, pause, the hand-over, collect, gra
   set(w.env, CLOSED);
   _resetLpKit(); _resetLpAdmin(); _resetLpCoins();
   const closed = await run();
-  for (const k of Object.keys(unset)) assert.deepEqual(closed[k], unset[k], k);
+  // the candidates list says first that nothing is approvable while closed, and so no candidate is (review finding S23-OFF-6); the rest of
+  // that answer (the approvals on record, the launched coins, the config, the Meteora check) is as with the switch unset
+  const CAND = "/api/admin/lp/candidates?cluster=devnet";
+  const { candidates: cc, global: cg, ...restClosed } = closed[CAND];
+  const { candidates: uc, global: ug, ...restUnset } = unset[CAND];
+  assert.deepEqual(cg, [LEGACY_LAUNCH_LINE, ...ug]);
+  assert.deepEqual(restClosed, restUnset);
+  assert.equal(cc.length, uc.length);
+  for (const [i, c] of cc.entries()) {
+    assert.deepEqual([c.ok, c.reasons[0]], [false, LEGACY_LAUNCH_LINE], c.cityId);
+    const { ok: _a, reasons: _b, ...cRest } = c; const { ok: _c, reasons: _d, ...uRest } = uc[i];
+    assert.deepEqual(cRest, uRest, c.cityId);
+  }
+  for (const k of Object.keys(unset).filter((x) => x !== CAND)) assert.deepEqual(closed[k], unset[k], k);
   assert.equal(closed["/api/admin/lp/revoke/tx {\"cityId\":\"5142056\"}"].ok, true, "the owner can still revoke an approval on record");
   assert.equal(closed["/api/admin/lp/pause/tx {\"launches\":true}"].ok, true, "and pause launches on chain (stage S58 starts with it)");
-  assert.equal(closed["/api/admin/lp/candidates?cluster=devnet"].approvals.length, 1, "the approval on record is read as before");
+  assert.equal(closed[CAND].approvals.length, 1, "the approval on record is read as before");
 });
 
 /* ---------------------------------------------------------------- closed: what the pages read */
@@ -280,7 +300,7 @@ test("closed: /api/me and the admin's probe carry legacyLaunch 'off' (held too);
   assert.deepEqual(await keys(), [undefined, undefined, undefined]);
 });
 
-test("closed: the ready-made coin says the closed line instead of 'Use this coin' and carries no review card; a launched coin is still 'launched'", async () => {
+test("closed: the ready-made coin says the closed line instead of 'Use this coin'; its review card is read-only history; a launched coin is still 'launched'", async () => {
   const w = await world();
   w.env.COIN_V2_REVIEW = "on";
   const open = await w.get(w.f, `/api/coins/ready?city=${UTICA}`);
@@ -289,7 +309,11 @@ test("closed: the ready-made coin says the closed line instead of 'Use this coin
   set(w.env, CLOSED);
   const shut = await w.get(w.f, `/api/coins/ready?city=${UTICA}`);
   assert.deepEqual(shut.gate, { code: "legacy_launch_closed", message: LEGACY_LAUNCH_LINE });
-  assert.equal("review" in shut, false, "no request card for an approval nobody builds");
+  // the review card is history (review finding S23-OFF-4): nothing that builds toward the approval is offered, the closed line says why
+  assert.equal(shut.review.closed, true);
+  assert.deepEqual(shut.review.can, { request: false, describe: false, reset: false, cancel: false, edit: false });
+  assert.deepEqual([shut.review.blocked, shut.review.hold], [LEGACY_LAUNCH_LINE, null]);
+  assert.equal("closed" in open.review, false, "unset: no such key");
   assert.deepEqual(shut.coin, open.coin, "the coin itself is shown as before");
   // the admin's queue of requests on record stays readable
   const q = await w.get(w.owner, "/api/admin/coins/reviews");

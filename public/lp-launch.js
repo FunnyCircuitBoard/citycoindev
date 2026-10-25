@@ -256,6 +256,12 @@
     if (!more) return false;
     return !(isSlot(f.slot) && isSlot(r.source.slot) && r.source.slot >= f.slot);
   }
+  /** An approval on chain while the legacy launch path is closed: on record, read only (its date, or that it ran out). */
+  function onRecord(st, ticker) {
+    const a = st.approval, until = dateText(a.expiresAt);
+    return Number(a.secondsLeft) > 0 ? `On record: the owner's approval on the blockchain for ${ticker}${until ? `, until ${until}` : ""}. Nothing is launched here.`
+      : `On record: the owner's approval on the blockchain for ${ticker}${until ? ` ran out on ${until}` : " ran out"}.`;
+  }
   /** The one step left before an approval while the ready-made coin is on (COIN_V2_READY): the studio is closed then. */
   const READY_STEP = "Choose your city coin above (Use this coin); then Vicinity's owner approves it on the blockchain.";
   /** What the card says for a status answer: { state, tag: [text, class], lines: [...], canLaunch }. `ready`: COIN_V2_READY is on. */
@@ -267,8 +273,9 @@
       case "launched": return { state: s, tag: ["● Live", "tag--ok"], canLaunch: false, lines: [`${ticker} is live on the Vicinity launchpad.`] };
       case "expired": return { state: s, tag: ["Approval expired", "tag--warn"], canLaunch: false, lines: [st.message || "Your approval expired. Ask an admin to approve your coin again."] };
       case "paused": return { state: s, tag: ["Paused", "tag--warn"], canLaunch: false, lines: [st.message || "Launches are paused for now. Your approval stays; try again later."] };
-      // the legacy launch path closed (LEGACY_LAUNCH=off, stage S23): a neutral line, no launch control (a launched coin keeps its own card)
-      case "closed": return { state: s, tag: ["Closed", ""], canLaunch: false, lines: [st.message || CLOSED] };
+      // the legacy launch path closed (LEGACY_LAUNCH=off, stage S23): a neutral line, no launch control (a launched coin keeps its own card); an
+      // approval still on chain is shown as on record, read only (review finding S23-OFF-4)
+      case "closed": return { state: s, tag: ["Closed", ""], canLaunch: false, lines: [st.message || CLOSED, ...(st.approval ? [onRecord(st, ticker)] : [])] };
       case "not_approved": {
         const lines = [st.message || NOT_APPROVED];
         if (ready) { if (!design || (design.pair && design.pair !== "SOL")) lines.push(READY_STEP); }
@@ -460,7 +467,9 @@
     if (v.state === "ready") readyView(body, st, p, again);
     else if (v.state === "launched") restored.set(card, { ...launchedView(body, st, p, again), again });
     // why it is paused, in the server's words (the Founder card says the same thing: a review pause is not "launches are paused")
-    return { on: true, state: v.state, ...(st && st.ok && st.why ? { why: st.why, message: st.message || null } : {}) };
+    return { on: true, state: v.state, ...(st && st.ok && st.why ? { why: st.why, message: st.message || null } : {}),
+      // closed only: an approval still on record on chain (the Founder card's fact says "Approved (closed)", public/dashboard-v2.js)
+      ...(v.state === "closed" && st.approval && Number(st.approval.secondsLeft) > 0 ? { approval: true } : {}) };
   }
   /**
    * The launched cards on this page, for the page the browser brings back from its back/forward cache (Back or Forward in this

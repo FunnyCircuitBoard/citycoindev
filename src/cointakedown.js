@@ -114,7 +114,7 @@ const told = (n, card = false) => (n ? "The founder was told in their notificati
 async function writeChoice(t, v, { log, before = [], after = [] }) {
   const seat = { id: t.c.seat_id, city_name: t.coin.city_name, country: t.coin.country };
   // keepApproved: an approval the owner built from the earlier version stays recorded as that (never equal to this version's hash), so
-  // the launch waits for the owner's next round to approve the coin as it is now (src/coinreview.js launchHold)
+  // the launch waits until the owner approves the coin again as it is now (src/coinreview.js launchHold)
   const { stmts, at } = await choiceStatements(t.env, { cityId: t.cityId, seat, userId: t.c.user_id, v, log, now: t.now, before: t.c, keepApproved: true });
   try {
     await t.db.batch([...before, ...stmts, ...after, guard(t.db, "EXISTS (SELECT 1 FROM coin_ready WHERE city_id = ? AND content_hash = ? AND chosen_at = ?)", [t.cityId, v.hash, at])]);
@@ -128,7 +128,7 @@ async function writeChoice(t, v, { log, before = [], after = [] }) {
   return null;
 }
 const approvalWords = (t) => (t.c.approved_hash
-  ? "The owner's approval was built from the earlier version, so the launch waits until the owner approves the coin as it is now, at the next approval round."
+  ? "The owner's approval was built from the earlier version, so the launch waits until the owner approves the coin again as it is now."
   : "Nothing of it is on the blockchain yet.");
 
 /* ---------------------------------------------------------------- "text" */

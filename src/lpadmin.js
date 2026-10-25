@@ -64,7 +64,7 @@ import { settleLegacyContract } from "./coins.js";
 import { feeSchedule } from "./fees.js";
 import { _forgetProgramHashes, fingerprint, programHashes, programRefusal, programSummary } from "./programpins.js";
 import * as IX from "./sol/lpadmin-ix.js";
-import { launchClosed, lpAdminWrite } from "./legacylaunch.js";
+import { LEGACY_LAUNCH_LINE, launchClosed, lpAdminWrite } from "./legacylaunch.js";
 import { legacyLaunchClosed } from "./v5policy.js";
 
 const DEV = ADDRESSES.feeRecipient;
@@ -471,7 +471,7 @@ async function recentSlot(env, fetchImpl) {
   return tip - 8;
 }
 /** Does this instruction list fit one transaction (with the two compute-budget instructions buildTx adds)? */
-export function fits(payer, instructions, signers = 1) {
+function fits(payer, instructions, signers = 1) {
   try {
     const budget = [{ programAddress: PROGRAM_IDS.computeBudget, accounts: [], data: new Uint8Array(5) }, { programAddress: PROGRAM_IDS.computeBudget, accounts: [], data: new Uint8Array(9) }];
     const m = compileLegacy({ payer, instructions: [...budget, ...instructions], blockhash: PROGRAM_IDS.system });
@@ -777,6 +777,9 @@ export async function candidateList(env, ctx, fetchImpl, now) {
   const config = s.dbcConfigs[0] || null;
   const lc = config ? decodeLaunchConfig((await readAccounts(env, [await L.launchConfig(config)], fetchImpl)).values().next().value || null, s.programId) : null;
   const global = [];
+  // the legacy launch path closed (stage S23): nothing is approvable here, whatever else holds, so the list says so first and every candidate
+  // carries it (ok false); the cards are history (review finding S23-OFF-6). With the switch unset this line adds nothing
+  if (legacyLaunchClosed(env)) global.push(LEGACY_LAUNCH_LINE);
   if (!s.configsSet) global.push("City-coin trading is not switched on yet: the team switches it on after your setup steps and their read-only check.");
   else if (!lc || !lc.enabled) global.push("The price curve in the settings is not allowed on the launchpad yet (setup step 4).");
   else if (lc.quoteMint !== WSOL) global.push("The price curve in the settings is not priced in SOL.");

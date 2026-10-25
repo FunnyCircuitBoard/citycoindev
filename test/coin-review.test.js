@@ -94,7 +94,7 @@ test("the founder's card: the ready-made coin, read-only, with Request changes a
   assert.deepEqual(v.review.can, { request: true, describe: true, reset: false, cancel: false, edit: false });
   assert.equal(v.review.selected.origin, "default");
   assert.equal(v.review.rulesVersion, RULES_VERSION);
-  assert.match(v.review.nextRound, /at the owner's next approval round/);
+  assert.equal("nextRound" in v.review, false, "no approval round exists (the owner's daily round was deleted in stage S23): no round words");
   assert.doesNotMatch(JSON.stringify(v), /24 hours|within a day|tomorrow/i, "no time is ever promised");
   assert.equal((await w.get(w.owner, "/api/admin/me")).coinReviews, true);
   assert.equal((await w.get(w.owner, "/api/admin/overview")).pendingCoinReviews, 0);
@@ -199,11 +199,11 @@ test("deciding: moderators look but don't decide; never the city's own founder; 
   assert.deepEqual([cr.content_hash, cr.approved_hash, cr.name], [p.contentHash, null, "Utica Falls"], "chosen; the owner's on-chain approval is still to come");
   const pub = await meta(w.env, `/coin-meta/art/${sha}.png`);
   assert.equal(pub.status, 200, "approved: in the public store now");
-  // the founder's card: Approved, it is their coin, the launch waits for the owner's next round (no time promised)
+  // the founder's card: Approved, it is their coin, the launch waits for the owner's approval on the blockchain (no time, no round promised)
   const v = await w.ready();
   assert.deepEqual([v.coin.name, v.coin.ticker, v.inUse, v.coin.art], ["Utica Falls", "UTICA", true, `/coin-meta/art/${sha}.png`]);
   assert.deepEqual([v.review.request.status, v.review.request.label], ["approved", "Approved"]);
-  assert.match(v.review.request.message, /^Version [0-9a-f]{8} was approved\. It is now your coin\. It launches after the owner approves it on the blockchain, at the owner's next approval round\.$/);
+  assert.match(v.review.request.message, /^Version [0-9a-f]{8} was approved\. It is now your coin\. It launches after the owner approves it on the blockchain\.$/);
   assert.equal(v.review.hold, null);
   assert.deepEqual(v.review.can, { request: true, describe: true, reset: true, cancel: false, edit: false });
   // the public log: one line, no note; the founder's notice
@@ -323,11 +323,11 @@ test("a ticker change: free tickers only; approved, it waits for the city list (
   assert.deepEqual(q.waitingRegistry.map((x) => [x.ticker, x.registryPatch]), [["UTICANY", { [UTICA]: "UTICANY" }]]);
   let v = await w.ready();
   assert.deepEqual([v.coin.ticker, v.review.request.registryState], ["UTICANY", "waiting"]);
-  // nothing is automatic: an admin adds it in a site update, and then the coin goes into the owner's next round (never "launch opens then")
-  const waits = "Your new ticker $UTICANY is approved. It goes into the Vicinity city list once an admin adds it in a site update; then your coin goes into the owner's next approval round.";
+  // nothing is automatic: an admin adds it in a site update, and then the owner can approve the coin (never "launch opens then", no round)
+  const waits = "Your new ticker $UTICANY is approved. It goes into the Vicinity city list once an admin adds it in a site update; then the owner can approve your coin on the blockchain.";
   assert.ok(v.review.request.message.includes(waits), v.review.request.message);
   assert.deepEqual(v.review.hold, { code: "registry_waiting", message: waits });
-  assert.ok((await w.notices()).includes("Your coin change was approved. $UTICANY goes into the Vicinity city list once an admin adds it; then your coin goes into the owner's next approval round."));
+  assert.ok((await w.notices()).includes("Your coin change was approved. $UTICANY goes into the Vicinity city list once an admin adds it; then the owner can approve your coin on the blockchain."));
   assert.doesNotMatch(JSON.stringify(v), /launch opens then|with the next site update/);
   const c = await w.card();
   assert.equal(c.ok, false);

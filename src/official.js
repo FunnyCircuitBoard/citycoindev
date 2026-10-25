@@ -4,7 +4,7 @@
  * Change it only by a public commit so everyone can see the history.
  */
 import { coinV2ReadyOn, launchpadV2On } from "./flags.js";
-import { mainTokenV5 } from "./v5policy.js";
+import { legacyLaunchClosed, mainTokenV5 } from "./v5policy.js";
 import { launchpadCluster, launchpadTradingOn, lpSetup, swapOn } from "./cluster.js";
 import { ADDRESSES } from "./sol/pda.js";
 import { LEGACY_TOKENS, LEGACY_X_URL, MAIN_TOKEN_LABEL, isLegacyMint, mainMint, officialLinks } from "./maintoken.js";
@@ -502,7 +502,10 @@ export function officialFor(env) {
   const withLp = lp.on ? { ...withTrading, cityCoins: { cluster: lp.cluster } } : withTrading;
   // the ready-made city coin (COIN_V2_READY=on, src/coinready.js): the Launchpad page words a coin that is not live yet as chosen by the
   // founder and launched on the Vicinity launchpad, not designed and launched on Raydium LaunchLab; off, the key does not exist
-  return coinV2ReadyOn(env) ? { ...withLp, coinV2Ready: true } : withLp;
+  const withReady = coinV2ReadyOn(env) ? { ...withLp, coinV2Ready: true } : withLp;
+  // the legacy launch path closed (LEGACY_LAUNCH=off or held, stage S23): the Launchpad page says a coin designed and not launched is on record,
+  // never upcoming (review finding S23-OFF-6); unset, the key does not exist
+  return legacyLaunchClosed(env) ? { ...withReady, legacyLaunch: "off" } : withReady;
 }
 
 // Founding Supporter snapshot cutoff (always 00:00 UTC), announced ahead of time. The setting

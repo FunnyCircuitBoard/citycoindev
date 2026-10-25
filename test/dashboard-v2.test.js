@@ -301,7 +301,7 @@ test("dashboard.js fetches dashboard-v2.js only when /api/me says dashboardV2 ==
   // every call into v2 is guarded, so with v2 === null (the flag off, or the script failing to load) the old code runs exactly as before
   for (const call of ["v2.render(d)", "v2.mod(d)", "v2.coinQueue(list.length, closed)"]) assert.ok(dash.includes(`if (v2) ${call}`), call);
   assert.match(dash, /const v2Coin = \(\) => \{ if \(v2\) v2\.coin\(\{ coin: coinData, vicMint, launchLabClosed: labClosed \}\); \};/);
-  assert.equal((dash.match(/v2Coin\(\);/g) || []).length, 3, "after the coin loads, after a design is saved, after a contract is sent");
+  assert.equal((dash.match(/v2Coin\(\);/g) || []).length, 4, "after the coin loads, after a design is saved, after a contract is sent, after the founder takes their picture down (LEGACY_LAUNCH=off only, stage S23)");
   assert.match(dash, /seat\.status === "active" \|\| \(v2 && seat\.status === "steward"\)/, "a Seed Steward gets the studio only under v2 (the server allows both)");
   assert.match(dash, /if \(!tabbed\) \{ \$\("#dash-skel"\)\.hidden = true; if \(d\._status === 200 && \(d\.dashboardV2 !== true \|\| !d\.signedIn\)\) \{ try \{ localStorage\.removeItem\(V2_KEY\); \} catch \{\} \} \}/, "the skeleton hint is dropped the moment the switch is off (on a real answer: review EDGE-4)");
   assert.match(dash, /setTimeout\(\(\) => done\(null\), 4000\)/, "a slow or failing script falls back to today's dashboard");

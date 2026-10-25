@@ -79,7 +79,7 @@
   // its way, or could not be asked)
   let lp = { on: false, state: null };
   // the launch status's reasons that come from the coin's review (src/coinreview.js, COIN_V2_REVIEW): said in the server's words, never as
-  // "launches are paused" (that is the owner's switch) nor as "your launch opens after the next round" (the round won't approve it yet)
+  // "launches are paused" (that is the owner's switch) nor as "an admin approves your coin on chain first" (the owner can't approve it yet)
   const REVIEW_PAUSE = new Set(["paused_request", "paused_description", "not_reviewed", "registry_waiting", "description_recheck", "description_unchecked", "bad_content", "art_missing", "approval_mismatch", "approval_changed"]);
   // the old Raydium LaunchLab path as the server says it in the coin's own answer (GET /api/coins launchLabClosed, through dashboard.js
   // coin() and coinQueue()): true closed (the launchpad's settings are there), false open, null not said yet. The old path's words show
@@ -121,7 +121,11 @@
   // (with the ready-made coin on, nobody designs a coin: the founder chooses it, then it is chosen and not launched yet; a city with
   // no founder has nobody to choose it)
   const unchosen = () => { const m = me(), s = m && m.community && m.community.seat; return !s ? "No founder yet" : s.you ? "Ready to choose" : "Not chosen yet"; };
-  const coinState = () => (!coin ? (readyOn() ? unchosen() : "Not designed yet") : coin.launched || (lp.on && lp.state === "launched") ? "Live" : coin.waiting ? (lpEra() ? "Old contract waiting" : "Contract being checked")
+  // the legacy launch path closed (LEGACY_LAUNCH=off, stage S23): a coin not launched is "Closed", or "Approved (closed)" while the launch card
+  // shows an approval still on record on chain; never "Designed", "Ready to choose" or "Not designed yet" (review finding CL-2)
+  const shutState = () => (coin && coin.waiting ? (lpEra() ? "Old contract waiting" : "Contract being checked") : lp.on && lp.approval ? "Approved (closed)" : "Closed");
+  const coinState = () => (launchClosed() && !(coin && coin.launched) && !(lp.on && lp.state === "launched") ? shutState()
+    : !coin ? (readyOn() ? unchosen() : "Not designed yet") : coin.launched || (lp.on && lp.state === "launched") ? "Live" : coin.waiting ? (lpEra() ? "Old contract waiting" : "Contract being checked")
     : lp.on && lp.state === "ready" ? "Approved" : readyOn() ? "Not launched yet" : "Designed");
 
   /* ---------- set-up: the cards move into their panels, the old two-column tools retire ---------- */
@@ -734,7 +738,9 @@
     else if (st === "provisional") { note.textContent = "No founder powers yet. Locals can object until then; if no objection is upheld, you become the founder."; button("Founder path", "btn btn--primary", () => goTo("#progress")); }
     else if (st === "grace") { note.textContent = `Hold ${fmt(seat.threshold)} $VICINITY again before the deadline or the seat reopens. Moderation is paused meanwhile.`; button("Buy & swap", "btn btn--primary", () => goTo("#trade")); }
     else if (!coinKnown) { note.textContent = ""; go.hidden = true; fcardAction = null; }
-    else if (launchClosed() && !(coin && coin.launched) && !(lp.on && lp.state === "launched")) { note.textContent = LAUNCH_CLOSED; go.hidden = true; fcardAction = null; }
+    // (closed: the launch card or the ready-made coin's card right under this one says the closed line, so it is said here only when neither
+    // shows: once per tab, review finding S23-OFF-3)
+    else if (launchClosed() && !(coin && coin.launched) && !(lp.on && lp.state === "launched")) { note.textContent = lp.on || readyOn() ? "" : LAUNCH_CLOSED; go.hidden = true; fcardAction = null; }
     // the ready-made coin (COIN_V2_READY): until the founder has chosen it ("Use this coin"), the card sends them to it, BEFORE the
     // launch's words (an approval of an earlier studio design aside: that one launches as approved)
     else if (readyOn() && readyFirst()) {
@@ -979,7 +985,8 @@
 
   /** The launch card's state (dashboard.js after LPLaunch.founder): the Today strip and the Founder card follow it. */
   function setLp(info) {
-    lp = { on: Boolean(info && info.on), state: (info && info.state) || null, why: (info && info.why) || null, message: (info && info.message) || null };
+    lp = { on: Boolean(info && info.on), state: (info && info.state) || null, why: (info && info.why) || null, message: (info && info.message) || null,
+      ...(info && info.approval ? { approval: true } : {}) }; // (closed only: an approval still on record on chain, public/lp-launch.js)
     const d = me(); if (d) { today(d); founderCard(d); }
   }
 
