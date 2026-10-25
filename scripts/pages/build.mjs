@@ -43,7 +43,7 @@
 // if any built page still says "vicinity" in any letter case (brandResidue): nothing is shipped half renamed.
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { SOCIAL_PROFILES, officialAddresses, socialProfiles } from "../../src/official.js";
+import { LEGACY_ADDRESS_GROUPS, SOCIAL_PROFILES, brandAddressNote, officialAddresses, socialProfiles } from "../../src/official.js";
 import { BRANDS, brandFromSettings, brandLabels } from "../../src/brand.js";
 import { esc, escBrand, rewriteSocialLinks, socialList } from "../../src/footer-social.js";
 import { hostRedirectOn, legacyLinkOn, legacySeatsFrozenOn, mainTokenV5On, walletOnlyOn } from "../../src/flags.js";
@@ -292,10 +292,9 @@ export const addressSections = (groups) => groups.map((g) => [
  */
 export function brandAddressGroups(groups, brand) {
   if (!lookOf(brand)) return groups;
-  const note = (n) => (n == null ? n : n.replace(/^vicinity_[a-z_]+\.\s*/, "").replace(/\s*It is also the team's public wallet, listed under Team\./, "")
-    .replace(/\bVicinity's\b/g, `${brand.productName}'s`).trim() || null);
   // (MAIN_TOKEN_V5's groups too: its "legacy" group and the team wallets it lists for the legacy token, src/official.js mainTokenAddressGroups)
-  return groups.filter((g) => g.id !== "vicinity" && g.id !== "team" && g.id !== "legacy").map((g) => ({ ...g, rows: g.rows.map((r) => ({ ...r, note: note(r.note) })) }));
+  // the notes in the label set's words by the link checker's own function (src/official.js brandAddressNote: rebrand review finding RB-2)
+  return groups.filter((g) => !LEGACY_ADDRESS_GROUPS.includes(g.id)).map((g) => ({ ...g, rows: g.rows.map((r) => ({ ...r, note: brandAddressNote(r.note, brand) })) }));
 }
 // the /official groups follow the build's own switch decision (the switch in wrangler.jsonc, which pageSocials accepts only after S48)
 const FILLS = { "official-addresses": ({ brand }) => { const vars = deployedVars(); return addressSections(brandAddressGroups(officialAddresses(vars, mainTokenV5On(vars)), brand)); } };

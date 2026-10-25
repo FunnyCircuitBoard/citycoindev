@@ -279,6 +279,27 @@ export function officialAddresses(env = {}, mainToken = mainTokenV5(env)) {
   return groups;
 }
 
+/** The legacy token's own /official groups (its mint, and the team's lock and wallets, published for that token): a label set with a look leaves
+ *  them out (scripts/pages/build.mjs brandAddressGroups). */
+export const LEGACY_ADDRESS_GROUPS = Object.freeze(["vicinity", "team", "legacy"]);
+/**
+ * An /official note in the words of a label set with a look: no crate name (the deployed programs' names are permanent: rebrand-inventory.md,
+ * plan item 4), no pointer to the Team group it leaves out, the product's name the label set's. The page build writes /official with it
+ * (brandAddressGroups) and the link checker answers with it (currentAddressRow), so the two never say different things.
+ */
+export const brandAddressNote = (n, brand) => (n == null ? n : n.replace(/^vicinity_[a-z_]+\.\s*/, "").replace(/\s*It is also the team's public wallet, listed under Team\./, "")
+  .replace(/\bVicinity's\b/g, `${brand.productName}'s`).trim() || null);
+/** The row /official lists for `address` under a label set with a look (the programs, their upgrade authority, the fee wallet, the price-curve
+ *  settings: never a legacy group), with its note in that label set's words; null when it lists none. */
+function currentAddressRow(env, address, brand) {
+  for (const g of officialAddresses(env, mainTokenV5(env))) {
+    if (LEGACY_ADDRESS_GROUPS.includes(g.id)) continue;
+    const r = g.rows.find((x) => x.address === address);
+    if (r) return { ...r, note: brandAddressNote(r.note, brand) };
+  }
+  return null;
+}
+
 /** The live mint: the Cloudflare setting VICINITY_MINT wins over the line above (so launch needs no code change). */
 export const activeMint = (env) => (env && env.VICINITY_MINT) || VICINITY_MINT;
 
@@ -484,6 +505,11 @@ function checkOfficialV5(input, isSolanaAddress, env) {
     if (main && raw === main) return { verdict: "official", kind: "contract", message: "This is the official main token contract address." };
     if (legacyMint(raw)) return { verdict: "warning", kind: "contract", legacy: true,
       message: bw.on ? `This is the contract of an earlier token of ours (history only). It is not the ${P} token: no swap or purchase is offered for it here, and holders keep their tokens.` : LEGACY_CONTRACT };
+    // under a label set other than today's, an address /official lists as current is answered with that role, in the page's words, before any
+    // legacy answer (rebrand review finding RB-2: the fee wallet is also a team wallet published for the earlier token, but it is the fee wallet)
+    const row = bw.on ? currentAddressRow(env, raw, bw.brand) : null;
+    if (row) return { verdict: "official", kind: row.kind === "token" ? "contract" : "address", current: true,
+      message: `This is an official ${P} address: ${row.label}.${row.note ? ` ${row.note.replace(/, linked here,/, "")}` : ""}` };
     if (OFFICIAL.teamWallets.includes(raw)) {
       const name = teamWalletName(raw), named = name ? ` (${name.what})` : "";
       return { verdict: "official", kind: "wallet", message: bw.on ? `This is a published team wallet${named}, listed for an earlier token of ours (history only).`
