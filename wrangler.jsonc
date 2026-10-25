@@ -101,12 +101,6 @@
     // "Coin reviews". Needs COIN_V2_READY on as well. OFF: built and tested dark on 23 Oct 2026. "on" only after the owner's go; anything
     // else than "on" is the site exactly as before (change the value, do not delete the line: keep_vars).
     "COIN_V2_REVIEW": "off",
-    // The owner's daily launch-approval round (src/flags.js coinV2BatchOn, src/lpbatch.js; DESIGN 6.5 and 9.4): in the admin's City coins
-    // tab, "Launch approvals to sign" lists every founder whose chosen coin passes every check (Approve), approvals to renew or revoke,
-    // and what is blocked and why; the Worker builds UNSIGNED transactions (up to 5 cities each) and the owner's own wallet signs them
-    // (the website never holds a key). Needs COIN_V2_READY on as well. OFF: built and tested dark on 23 Oct 2026. "on" only after the
-    // owner's go; anything else than "on" is the site exactly as before (change the value, do not delete the line: keep_vars).
-    "COIN_V2_BATCH": "off",
     // The official Citycoin.dev X account (owner amendment 01; src/maintoken.js officialLinks): supplied by the owner in writing
     // on 24 Oct 2026 ("the twitter handle is @CityCoinDev"); verification record in docs/citycoin-master/amendment-01-new-main-token.md
     // section 4. Shown only where the master switches show official links (MAIN_TOKEN_V5, BRAND=citycoin); with those off the only

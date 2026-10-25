@@ -59,6 +59,11 @@
   // routes answer 410), and no old founder rule (the seven-day hold, the founder amount, the Seed Steward probation, grace, elections) is told as
   // current. A seat or a term on record is shown as recorded. Without the key (today) every line below reads as before.
   const seatsFrozen = (d = me) => Boolean(d && d.legacySeats === "frozen");
+  // the legacy launch path closed (LEGACY_LAUNCH=off: /api/me says legacyLaunch "off"; Citycoin.dev master v5 stage S23): the coin studio is not
+  // shown (its route answers 410), the coin card says the closed line until a coin has launched, and the old-contract queue offers Reject only.
+  // Without the key (today) every line below reads as before.
+  const launchClosed = (d = me) => Boolean(d && d.legacyLaunch === "off");
+  const LAUNCH_CLOSED = "New city-coin launches on this launchpad are closed. Coins already launched keep trading.";
   // the launch on our own launchpad (lpMount below): is it switched on here (the server's word in every GET /api/coins answer,
   // launchLabClosed, or the probe asked once); the city whose launch card is shown
   let lpOn = false, lpProbed = false, lpCity = null;
@@ -864,8 +869,9 @@
     $("#cc-founder").textContent = c.seat ? (c.seat.you ? `You 👑${c.seat.status !== "active" ? ` (${c.seat.status})` : ""}` : `${c.seat.name}${c.seat.status !== "active" ? ` (${c.seat.status})` : ""}`)
       : frozen ? "None" : c.window ? `Choosing · ${c.window.applicants.length} applying` : "Open seat 🔥";
     const others = c.members - 1;
+    // (the legacy launch path closed: no coin is designed or chosen there any more, so none is promised; review finding S23-OFF-1)
     $("#cc-fomo").textContent = c.seat && c.seat.you
-      ? `You're ${c.name}'s founder. Bring your locals in, and ${d.coinV2Ready === true ? "check and use" : "design"} ${c.name}'s coin so they can see what's coming.`
+      ? (launchClosed(d) ? `You're ${c.name}'s founder. Bring your locals in.` : `You're ${c.name}'s founder. Bring your locals in, and ${d.coinV2Ready === true ? "check and use" : "design"} ${c.name}'s coin so they can see what's coming.`)
       : c.seat
       ? `${c.name} has a founder. Climb the local board: the top holders here are the first people the city sees.`
       : frozen ? (others <= 0 ? `You're the first member of ${c.name}. Bring your locals in.` : `${fmt(others)} other ${others === 1 ? "person" : "people"} from ${c.name} ${others === 1 ? "is" : "are"} here.`)
@@ -1250,6 +1256,8 @@
     chain_unavailable: "The blockchain could not be asked just now. Nothing was recorded; try again in a minute.",
     // the server's own words: a founder's "can't be added here", an admin's "can only be rejected, not recorded"
     launchpad_only: (d) => d.message || "City coins launch on the Vicinity launchpad now. Nothing was changed.",
+    // the legacy launch path closed (LEGACY_LAUNCH=off, stage S23): the server's own words
+    legacy_launch_closed: (d) => d.message || LAUNCH_CLOSED,
   };
   let coinData = null, coinPairs = null, vicMint = null, logoData = null, dropLogo = false, studioDirty = false;
   let coinP = null; // the /api/coins answer on its way (render starts it; the Wallet tab waits for it, its mints come from there)
@@ -1281,7 +1289,7 @@
     discText(face, cityDisc()); face.hidden = Boolean(logo);
     $("#coin-name").textContent = name;
     $("#coin-ticker").textContent = cityTk();
-    $("#coin-pair").textContent = pair || "chosen by the founder";
+    $("#coin-pair").textContent = pair || (launchClosed() ? "—" : "chosen by the founder"); // (closed: no founder chooses one any more)
   }
   function renderCoin() {
     const c = me.community, tk = cityTk(), cd = coinData, seat = c.seat;
@@ -1298,10 +1306,13 @@
     const rdy = me.coinV2Ready === true, founded = Boolean(seat && ["active", "steward", "grace"].includes(seat.status));
     const byV = Boolean(cd && cd.madeBy === "vicinity"), chosenV = byV && cd.chosen !== false;
     st.className = "tag " + (cd && cd.launched ? "tag--ok" : cd && cd.waiting ? "tag--warn" : cd ? "tag--gold" : "");
+    // (the legacy launch path closed, LEGACY_LAUNCH=off: a city with no coin on record is said as closed, never "not designed yet", and the card
+    // names nobody who designs it; review finding S23-OFF-1)
+    const shut = launchClosed() && !cd;
     st.textContent = cd && cd.launched ? "● Live" : cd && cd.waiting ? (lpOn ? "Old contract waiting" : "Contract being checked")
-      : cd ? (byV ? (!founded ? "Not launched" : chosenV ? "Chosen" : "Not chosen yet") : "Designed") : rdy ? (founded ? "Not chosen yet" : "No founder yet") : "Not designed yet";
+      : cd ? (byV ? (!founded ? "Not launched" : chosenV ? "Chosen" : "Not chosen yet") : "Designed") : shut ? "Closed" : rdy ? (founded ? "Not chosen yet" : "No founder yet") : "Not designed yet";
     const kick = $("#coin-kicker"); // coin-ready.js names Vicinity here while its preview stands in, and puts these words back after
-    kick.dataset.base = (rdy && !cd) || byV ? "City coin · made by Vicinity" : "City coin · designed by the City Founder";
+    kick.dataset.base = shut ? "City coin" : (rdy && !cd) || byV ? "City coin · made by Vicinity" : "City coin · designed by the City Founder";
     kick.textContent = kick.dataset.base;
     // the founder sees their working picture (the server sends logoDraft to them and the staff only); everyone else the approved one or none
     if (!(mine && studioDirty)) paintCoin(cd ? { ...cd, logo: mine ? cd.logoDraft || cd.logo : cd.logo } : { name: c.name, color: "gold", logo: null, pair: null });
@@ -1314,7 +1325,8 @@
     if (cd && cd.mint) { $("#coin-mint").textContent = cd.mint; $("#coin-mint").title = cd.mint; $("#coin-mint-copy").setAttribute("aria-label", `Copy the contract address ${cd.mint}`); }
     tickerLine();
     const MADE = "Every city coin is made by Vicinity from the city list; the founder chooses it and launches it once Vicinity's owner approves it on the blockchain.";
-    $("#coin-note").textContent = rdy && !cd
+    $("#coin-note").textContent = launchClosed() && !(cd && cd.launched) ? LAUNCH_CLOSED
+      : rdy && !cd
       ? (mine ? `${c.name}'s coin is ready in your Founder tab: check it, then use it.` : seat ? `${MADE} ${seat.name}, ${c.name}'s ${founded ? "founder" : "chosen founder"}, hasn't chosen it yet.` : (seatsFrozen() ? MADE : `${MADE} The seat is still open: see the founder path.`))
       : mine
       ? (cd ? (cd.launched ? `${c.name}'s coin is live. Its design is locked, as the rules promise.`
@@ -1328,7 +1340,7 @@
       : seat ? `${seat.name}, ${c.name}'s founder, hasn't designed the coin yet. It'll appear here the moment they do.`
       : `${c.name}'s founder designs this coin: its name, logo, colour and what it's paired with.${seatsFrozen() ? "" : " The seat is still open: see the founder path."}`;
     // with the ready-made coin on (COIN_V2_READY), the coin is made by Vicinity and chosen in its own card: the old studio stays hidden
-    $("#coin-studio").hidden = !mine || Boolean(cd && cd.launched) || me.coinV2Ready === true;
+    $("#coin-studio").hidden = !mine || Boolean(cd && cd.launched) || me.coinV2Ready === true || launchClosed();
     if (mine && !studioDirty) fillStudio();
     if (cready) cready.repaint(); // the ready-made coin's preview, painted earlier, stands in this card again
   }
@@ -1346,13 +1358,40 @@
     if (s === "pending") {
       text = cd.logo ? "Your new picture is being checked. Until it is approved, your coin keeps showing the picture approved before."
         : "Your picture is being checked. Until it is approved, nobody else sees it: your coin shows its initials on the site and the Vicinity badge in wallets.";
-      if (!cd.launched) text += " Your coin can still be approved and launched meanwhile.";
+      if (!cd.launched && !launchClosed()) text += " Your coin can still be approved and launched meanwhile."; // (closed: nothing is launched there)
     } else if (s === "rejected") {
-      text = `Not approved: ${REASON_WORDS[cd.logoReason] || cd.logoReason || "breaks the rules"}.${cd.logoNote ? ` ${cd.logoNote}${/[.!?]$/.test(cd.logoNote) ? "" : "."}` : ""} Replace it to try again.`;
+      text = `Not approved: ${REASON_WORDS[cd.logoReason] || cd.logoReason || "breaks the rules"}.${cd.logoNote ? ` ${cd.logoNote}${/[.!?]$/.test(cd.logoNote) ? "" : "."}` : ""}${launchClosed() ? "" : " Replace it to try again."}`;
       if (cd.logo) text += " Your coin keeps showing the picture approved before.";
     } else if (s === "approved") text = "Approved.";
     p.textContent = text; p.hidden = !text;
     p.className = `tiny coin-logo-state${s ? ` is-${s}` : ""}`;
+    logoTakeDown(cd);
+  }
+  /**
+   * The legacy launch path closed (LEGACY_LAUNCH=off, stage S23): the studio is gone, but the founder can still take their own picture down
+   * (POST /api/coins/design with exactly { removeLogo: true }: the one studio write the server still accepts; review finding SEC-S23-3). The
+   * button is made here only then, under the picture's state line; without the key nothing is made and the card is as before.
+   */
+  let takeDownBtn = null;
+  function logoTakeDown(cd) {
+    const want = Boolean(launchClosed() && cd && !cd.launched && (cd.logoDraft || cd.logo));
+    if (!want) { if (takeDownBtn) takeDownBtn.hidden = true; return; }
+    if (!takeDownBtn) {
+      takeDownBtn = el("button", "link-btn coin-logo-takedown", "Take my picture down");
+      takeDownBtn.type = "button"; takeDownBtn.id = "coin-logo-takedown";
+      takeDownBtn.addEventListener("click", async () => {
+        if (!window.confirm("Take your coin's picture down? Your coin shows its initials on the site again. Nothing else changes.")) return;
+        takeDownBtn.disabled = true;
+        try {
+          const r = await sensitive(() => api("/api/coins/design", { removeLogo: true }));
+          if (!r || !r.ok) { toast(errText(COIN_ERR, r || {}, "Couldn't take the picture down. Please try again.")); return; }
+          coinData = r.coin; renderCoin(); v2Coin();
+          toast("Your picture is down.");
+        } finally { takeDownBtn.disabled = false; }
+      });
+      $("#coin-logo-state").after(takeDownBtn);
+    }
+    takeDownBtn.hidden = false;
   }
   function fillStudio() {
     const cd = coinData;
@@ -1468,7 +1507,7 @@
   async function loadCoinQueue() {
     const r = await api("/api/coins?waiting=1");
     const list = r && r.ok ? r.waiting : [];
-    const closed = Boolean(r && r.launchLabClosed === true) || lpOn;
+    const closed = Boolean(r && r.launchLabClosed === true) || lpOn || launchClosed();
     $("#coin-admin").hidden = !list.length;
     const title = closed ? "Old LaunchLab contracts to settle" : "Contracts waiting for a check";
     $("#coin-admin-title").textContent = title;
@@ -1640,11 +1679,15 @@
     amt.disabled = Boolean(missing);
     if (missing) {
       const mine = me.community.seat && me.community.seat.you;
-      go.textContent = !vicMint ? "How to get ready →" : mine ? "Design & launch your coin ↓" : `See ${tk}'s design ↓`;
+      // (the legacy launch path closed: nothing is designed or launched there any more, so the link only shows the coin card, and the note
+      // promises no launch; review finding S23-OFF-1)
+      const shut = launchClosed();
+      go.textContent = !vicMint ? "How to get ready →" : shut ? `See ${tk}'s card ↓` : mine ? "Design & launch your coin ↓" : `See ${tk}'s design ↓`;
       go.href = !vicMint ? "/token#buy" : "#coin"; go.removeAttribute("target");
       go2.hidden = true;
       $("#tr-note").textContent = !vicMint
         ? "Trading opens the moment $VICINITY launches on Raydium LaunchLab. Its contract is published on the Token page first."
+        : shut ? LAUNCH_CLOSED
         : lpOn ? `${tk} trades once an admin approves it on chain and ${me.community.name}'s founder launches it on the Vicinity launchpad.`
           : `${tk} trades once ${me.community.name}'s founder launches it and an admin records its contract.`;
     } else {

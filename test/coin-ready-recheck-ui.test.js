@@ -232,6 +232,6 @@ test("S1R-1: the Launchpad never calls a ready-made coin 'Designed': its tag say
   // the built page: with the switch off the sentence reads exactly as before (the second wording hidden)
   assert.match(LP_HTML, /the others are <span data-designed-copy>designed and waiting<\/span><span data-ready-copy hidden>chosen or designed, not launched yet<\/span>\./);
   // the page: the note, the filter and the sentence follow readyOn (/api/official coinV2Ready, read before the first card is drawn)
-  assert.match(LP_SRC, /\$\("#lp-tabnote"\)\.textContent = \(readyOn && TAB_NOTE_READY\[state\.tab\]\) \|\| \(lpOn && TAB_NOTE_LP\[state\.tab\]\) \|\| TAB_NOTE\[state\.tab\];/);
+  assert.match(LP_SRC, /\$\("#lp-tabnote"\)\.textContent = \(closedOn && TAB_NOTE_CLOSED\[state\.tab\]\) \|\| \(readyOn && TAB_NOTE_READY\[state\.tab\]\) \|\| \(lpOn && TAB_NOTE_LP\[state\.tab\]\) \|\| TAB_NOTE\[state\.tab\];/);
   assert.match(LP_SRC, /if \(readyOn\) for \(const o of \$\$\("#lp-status option"\)\) if \(o\.value === "designed"\) o\.textContent = "Chosen or designed";\n\s+for \(const e of \$\$\("\[data-designed-copy\]"\)\) e\.hidden = readyOn;\n\s+for \(const e of \$\$\("\[data-ready-copy\]"\)\) e\.hidden = !readyOn;/);
 });

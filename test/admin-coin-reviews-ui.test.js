@@ -32,11 +32,12 @@ const REVIEWS = {
   ],
 };
 
-async function open(role, { reviews = true, hash = "#moderation" } = {}) {
-  const page = await openPage("admin.html", { agreed: "2026-10-01" });
+async function open(role, { reviews = true, hash = "#moderation", me = {}, decide = null } = {}) {
+  // (site.js reads /api/me once, at its start: V.me() is that answer, so a key for the page goes in here too)
+  const page = await openPage("admin.html", { agreed: "2026-10-01", me: { ok: true, signedIn: false, ...me } });
   const win = page.window, doc = page.doc, calls = [], posts = [];
   const A = {
-    "/api/me": { ok: true, signedIn: true, user: { handle: "boss", wallet: W } },
+    "/api/me": { ok: true, signedIn: true, user: { handle: "boss", wallet: W }, ...me },
     "/api/admin/me": { ok: true, wallet: W, role, ...(reviews ? { coinReviews: true } : {}) },
     "/api/admin/config": { ok: true, siteMode: "live", flags: {} },
     "/api/admin/lp": { ok: false, error: "not_enabled" },
@@ -47,7 +48,7 @@ async function open(role, { reviews = true, hash = "#moderation" } = {}) {
     "/api/admin/claims": { ok: true, claims: [] }, "/api/admin/reports": { ok: true, reports: [] }, "/api/admin/logos": { ok: true, waiting: 0, logos: [] },
     "/api/admin/objections": { ok: true, objections: [] }, "/api/admin/appeals": { ok: true, appeals: [] },
     "/api/admin/coins/reviews": REVIEWS,
-    "/api/admin/coins/reviews/decide": { ok: true, id: 7, status: "approved" },
+    "/api/admin/coins/reviews/decide": decide || { ok: true, id: 7, status: "approved" },
   };
   win.fetch = async (path, init = {}) => {
     const p = String(path).split("?")[0];
@@ -234,4 +235,29 @@ test("COPY-1: approving asks in plain grammar: a description 'becomes' the coin'
   approve(1); await tick();
   assert.match(t.asked.at(-1), / Its picture, ticker and name become the coin's \(the launch still needs the owner's approval on the blockchain\)\.$/);
   assert.deepEqual(t.posts.slice(-2).map(([p, b]) => [p, b.id, b.action]), [["/api/admin/coins/reviews/decide", 11, "approve"], ["/api/admin/coins/reviews/decide", 12, "approve"]]);
+});
+
+test("LEGACY_LAUNCH=off (/api/me legacyLaunch off): a pending request offers 'Ask for changes' only, with the line saying why; the server's 410 has plain words; unset: Approve as before", async () => {
+  const LINE = "New city-coin launches on this launchpad are closed. Coins already launched keep trading.";
+  // (its own queue: one pending change request, the reasons that fit it; the tests above change REVIEWS as they go)
+  REVIEWS.reasons = [{ code: "name_misleading", text: "The name could be mistaken for another city, a company, a public body or Vicinity.", kinds: ["change"] }];
+  REVIEWS.reviews = [{ id: 7, kind: "change", status: "pending", label: "Pending", city: { id: "5142056", name: "Utica", country: "US" }, founder: { handle: "uticafounder", wallet: "7Np41*****4K2" },
+    submittedAt: ago(90), decidedAt: null, version: HASH.slice(0, 8), contentHash: HASH, current: { name: "Utica", symbol: "UTICA" }, proposed: { name: "Utica Falls", symbol: "UTICA" },
+    diff: [{ field: "name", from: "Utica", to: "Utica Falls" }], checks: [], why: null, decision: null, registryState: null, registryPatch: null }];
+  const t = await open("admin", { me: { legacyLaunch: "off" }, decide: { ok: false, error: "legacy_launch_closed" } });
+  const card = t.doc.querySelectorAll(".adm-coinrev__item")[0];
+  const labels = card.querySelectorAll("button").map((b) => b.textContent);
+  assert.equal(labels.includes("Approve this version"), false, "no approval offered while closed (review finding S23-OFF-2)");
+  assert.ok(labels.includes("Ask for changes"), "asking for changes stays (it closes the request)");
+  assert.match(card.querySelector(".adm-coinrev__closed").textContent, new RegExp(`^${LINE.replace(/\./g, "\\.")} This request can't be approved now; you can ask for changes, or the founder can cancel it\\.$`));
+  card.querySelector("select").value = "name_misleading";
+  card.querySelectorAll("button").find((b) => b.textContent === "Ask for changes").click(); await tick();
+  assert.deepEqual(t.posts.at(-1), ["/api/admin/coins/reviews/decide", { id: 7, action: "changes_needed", contentHash: HASH, reasonCode: "name_misleading" }]);
+  // a page opened before the switch closed (no key yet) still offers Approve; the server's 410 is said in plain words, never as its code
+  const stale = await open("admin", { decide: { ok: false, error: "legacy_launch_closed" } });
+  stale.doc.querySelectorAll(".adm-coinrev__item")[0].querySelectorAll("button").find((b) => b.textContent === "Approve this version").click(); await tick();
+  assert.equal(stale.doc.querySelector("#toast").textContent, "New city-coin launches on this launchpad are closed, so a coin change can't be approved now. Nothing was changed.");
+  const open2 = await open("admin");
+  assert.ok(open2.doc.querySelectorAll(".adm-coinrev__item")[0].querySelectorAll("button").some((b) => b.textContent === "Approve this version"), "unset: as before");
+  assert.equal(open2.doc.querySelector(".adm-coinrev__closed"), null);
 });

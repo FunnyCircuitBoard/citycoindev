@@ -102,20 +102,6 @@ export const coinV2ReadyOn = (env) => String((env && env.COIN_V2_READY) ?? "").t
 export const coinV2ReviewOn = (env) => coinV2ReadyOn(env) && String((env && env.COIN_V2_REVIEW) ?? "").trim().toLowerCase() === "on";
 
 /**
- * COIN_V2_BATCH=on turns on the owner's daily launch-approval round for the live launchpad program (src/lpbatch.js; DESIGN 6.5 / 9.4; it
- * does nothing unless COIN_V2_READY is on too): in the admin's City coins tab a card "Launch approvals to sign" lists every city in four
- * groups (Approve: a founder whose chosen coin passes every check; Renew: an approval with under 48 hours left, or one whose wallet lost
- * the seat to a new eligible founder; Revoke: an approval whose wallet lost the seat, whose founder is banned or whose coin may not launch
- * now; Blocked, with the reasons), and "Sign today's approvals" builds UNSIGNED transactions (up to 5 cities each, within Solana's size
- * limit) that the owner's own wallet signs: the website never signs and never holds a key. A pre-approved founder then launches with no
- * per-launch step, and every founder-facing line says the launch opens after the owner's next approval round (never a time). The routes
- * GET /api/admin/lp/batch and POST /api/admin/lp/batch/tx, the record step "batch", the key batch on GET /api/admin/lp and
- * approvalRound on GET /api/coins/ready exist only then; no table or column is added. Exactly "on" (trimmed, any letter case) AND
- * COIN_V2_READY on; anything else is the site exactly as before.
- */
-export const coinV2BatchOn = (env) => coinV2ReadyOn(env) && String((env && env.COIN_V2_BATCH) ?? "").trim().toLowerCase() === "on";
-
-/**
  * MAIN_TOKEN_V5=on (owner amendment 01, Citycoin.dev master v5 stage S02A) moves every main-token consumer from the legacy setting
  * VICINITY_MINT to the configured, shape-checked MAIN_TOKEN_MINT (src/maintoken.js mainMint; src/official.js tokenMint), shows $VICINITY
  * as a legacy token (its team wallets, its Jupiter Lock and its Raydium LaunchLab launch are its own facts, never the new token's), takes
@@ -192,3 +178,15 @@ export const legacySeatsFrozenOn = (env) => String((env && env.LEGACY_SEATS) ?? 
  * frozen (review fix SEC-S16-3 of stage S16: a typo never reopens the legacy writers). Read it there, never alone.
  */
 export const legacySeatsValue = (env) => String((env && env.LEGACY_SEATS) ?? "").trim().toLowerCase();
+
+/**
+ * LEGACY_LAUNCH=off (Citycoin.dev master v5, stage S23; master section 15 "Keep historical records readable, but do not let historical rules
+ * authorize new actions", section 27 "Keep a narrow legacy compatibility module only if existing assets require it; prevent new launches from
+ * using that route", section 37 step 9 "legacy new-launch disable") closes the legacy launch path on the live launchpad program (vicinity_launchpad,
+ * src/lplaunch.js and src/lpadmin.js): no approval, launch or founder studio write is built or accepted (410 legacy_launch_closed), while every
+ * history read (launched coins, approvals on record, fees, graduation and the founder's fee collection of coins already launched) stays.
+ * Read it through src/v5policy.js legacyLaunch(env), never alone: that is where the v5 configuration check is applied (an "off" whose own inputs
+ * are refused, or a value outside the switch's set, holds the path closed). Unset, blank and "on" (trimmed, any letter case) are the site exactly as
+ * before; it stays so until stage S58.
+ */
+export const legacyLaunchValue = (env) => String((env && env.LEGACY_LAUNCH) ?? "").trim().toLowerCase();

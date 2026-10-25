@@ -22,6 +22,9 @@
  *        collected first (harvest_curve_fees, anyone may), then claim_founder_fees, then the SOL is unwrapped
  * Every POST echoes the cluster the page shows (body.cluster) and is refused on a mismatch (a GET may leave it out: the page learns the
  * cluster from that answer, and a GET that names another cluster is refused too); the RPC's genesis hash is checked before any read. Approving, launching and graduating also need the price-curve settings set explicitly (lpSetup().configsSet).
+ * LEGACY_LAUNCH=off (stage S23, src/legacylaunch.js): POST /api/lp/launch/tx answers 410 legacy_launch_closed before any read, and the status of
+ * a city whose coin is not launched says state "closed" (why legacy_launch_closed, the neutral line) instead of anything about an approval; a
+ * launched coin's status, graduation and the founder's fee collection are unchanged.
  * A launch is also refused (409 program_changed; 503 program_check_unavailable when it cannot be read) while a Meteora program on the
  * cluster is not the build the team tested (src/programpins.js, read fresh for the build): a launch on an untested build is as bad as
  * an approval on one. The founder is told in plain words (no fingerprints) that their approval stays. This holds launches from this
@@ -32,7 +35,7 @@ import { access } from "./access.js";
 import { isSolanaAddress } from "./solana.js";
 import { codeOf } from "./sources.js";
 import { lpSetup } from "./cluster.js";
-import { coinV2BatchOn, coinV2ReadyOn } from "./flags.js";
+import { coinV2ReadyOn } from "./flags.js";
 import { launchHold, reviewPause } from "./coinreview.js";
 import { buildTx, checkCluster, checkGenesis, checkedRoute, readAccounts, respond } from "./lpkit.js";
 import { liveSeatOfUser } from "./roles.js";
@@ -52,6 +55,8 @@ import { formatAmount } from "./sol/input.js";
 import { LAYOUT } from "./sol/layout.js";
 import { harvestCurveFees } from "./sol/lpadmin-ix.js";
 import * as IX from "./sol/lplaunch-ix.js";
+import { LEGACY_LAUNCH_LINE, launchClosed } from "./legacylaunch.js";
+import { legacyLaunchClosed } from "./v5policy.js";
 
 const WSOL = ADDRESSES.wsol;
 /** The most SOL a founder's first buy may spend (raw lamports): 10 SOL. */
@@ -226,16 +231,6 @@ function launchProblem(st, s, wallet, nowS, { slack = 0 } = {}) {
 }
 
 /**
- * COIN_V2_BATCH=on (src/lpbatch.js): approvals come in the owner's rounds, so "not approved" and "expired" are said as that, and never with
- * a time (the owner signs each round himself). Off: the words are the ones above, unchanged.
- */
-const ROUND_WORDS = Object.freeze({
-  not_approved: "Your launch opens after the owner's next approval round, once your coin is chosen and passes every check.",
-  approval_expired: "Your approval ran out before you launched. It is renewed at the owner's next approval round.",
-});
-const inRounds = (env, p) => (p && coinV2BatchOn(env) && ROUND_WORDS[p.error] ? { ...p, message: ROUND_WORDS[p.error] } : p);
-
-/**
  * One city, one coin, whatever the switches say: a contract sent for this city through the old Raydium LaunchLab path (src/coins.js
  * city_coins.pending_mint) that still waits for a check may be a coin already, so nothing launches here until an admin settles it.
  * It is the first thing the founder is told (before "not approved" and the rest: no approval is given while it waits), after only a
@@ -298,14 +293,20 @@ async function launchStatus(request, env, fetchImpl, now) {
     out.yours = st.coin.founder === who.wallet;
     return json(out, 200, { "Cache-Control": "no-store" });
   }
-  let p = inRounds(env, launchProblem(st, s, who.wallet, nowS));
+  // the legacy launch path closed (stage S23): nothing is launched here any more, so nothing about a launch's cost, a first buy, a review or a
+  // pause is said; an approval on record is still shown as recorded on chain
+  if (legacyLaunchClosed(env)) {
+    const { cost: _cost, firstBuy: _firstBuy, ...rest } = out;
+    return json({ ...rest, state: "closed", why: "legacy_launch_closed", message: LEGACY_LAUNCH_LINE }, 200, { "Cache-Control": "no-store" });
+  }
+  let p = launchProblem(st, s, who.wallet, nowS);
   if (p && p.error === "founder_mismatch") return err(p.error, p.message, 403, { state: p.state, approval: out.approval });
   if (await legacyContractWaiting(env, cityId)) p = { state: "paused", error: "legacy_contract", message: LEGACY_CONTRACT_WAITING };
   // COIN_V2_REVIEW: a change request or a description waiting for review pauses the launch; the approved coin must still be launchable
   // (src/coinreview.js launchHold; nothing with the switch off)
   if (!p) { const h = await launchHold(env, String(cityId), st.approval); if (h) p = h; }
-  // not approved yet (or expired): when the review rules keep the next round from approving it (a request waiting, a ticker the city
-  // list does not carry yet...), that is what the founder is told, never "it opens after the next round" (src/coinreview.js reviewPause)
+  // not approved yet (or expired): when the review rules keep the owner from approving it (a request waiting, a ticker the city list does
+  // not carry yet...), that is what the founder is told, never only "an admin approves your coin on chain first" (src/coinreview.js reviewPause)
   else if (p.error === "not_approved" || p.error === "approval_expired") { const h = await reviewPause(env, String(cityId)); if (h) p = h; }
   // otherwise ready: Meteora's programs must still be the tested builds (the card says why launches wait, before the founder presses)
   if (!p) { const h = await meteoraHold(env, fetchImpl, now); if (h) p = { state: "paused", error: h.error, message: h.message }; }
@@ -345,7 +346,7 @@ async function launchTx(request, env, fetchImpl, now) {
 
   let st;
   try { st = await launchState(env, s, cityId, fetchImpl); } catch (e) { console.error("launch read failed", codeOf(e)); return err("rpc_unavailable", "The blockchain could not be reached just now. Nothing was built. Try again in a minute.", 503); }
-  const p = inRounds(env, launchProblem(st, s, who.wallet, Math.floor(now / 1000), { slack: EXPIRY_SLACK_S }));
+  const p = launchProblem(st, s, who.wallet, Math.floor(now / 1000), { slack: EXPIRY_SLACK_S });
   // the same order as the status: a coin already on chain, an approval for another wallet, then a contract still waiting from the
   // old LaunchLab path (before anything is built), then the rest
   if (p && (p.error === "already_launched" || p.error === "founder_mismatch")) return err(p.error, p.message, p.status || 409, { state: p.state, ...(st.coin ? { mint: st.coin.mint } : {}) });
@@ -584,6 +585,8 @@ export async function handleLaunchApi(request, env, fetchImpl = fetch, now = Dat
   const r = routes[path];
   if (!r) return json({ error: "not_found" }, 404);
   if (method !== r[0]) return json({ error: "method_not_allowed" }, 405);
+  // the legacy launch path closed (stage S23, src/legacylaunch.js; src/index.js asks first): the launch build, before any read
+  if (path === "/api/lp/launch/tx") { const closed = launchClosed(env); if (closed) return closed; }
   try { return await r[1](request, env, fetchImpl, now); }
   catch (e) { console.error("lp launch route failed", path, codeOf(e)); return err("unavailable", "Something went wrong on the site. Nothing was built. Try again in a minute.", 503); }
 }

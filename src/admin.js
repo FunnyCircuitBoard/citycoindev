@@ -34,6 +34,7 @@ import { mainTokenStatus } from "./maintoken.js";
 import { mainTokenRefusals, mainTokenV5 } from "./v5policy.js";
 import { lpSetup } from "./cluster.js";
 import { handleLpAdmin } from "./lpadmin.js";
+import { decisionOpen, launchClosed, peek } from "./legacylaunch.js";
 import { rpcHealth } from "./rpcpool.js";
 import { dropLogins } from "./logins.js";
 import { decidePicture, listPictures, logDecision, waitingPictures } from "./logos.js";
@@ -810,7 +811,9 @@ export async function handleAdmin(request, env, now = Date.now(), fetchImpl = fe
     if (rel === "coins/reviews") { const b = only("GET"); return b || run(need("moderator"), async (c) => json(await listReviews(env, c.now, fetchImpl), 200, { "Cache-Control": "no-store" })); }
     if (rel === "coins/reviews/art") { const b = only("GET"); return b || run(need("moderator"), () => reviewArt(env, request.url)); }
     if (rel === "coins/reviews/decide") {
-      const b = only("POST");
+      // the legacy launch path closed (stage S23, src/legacylaunch.js): an approval would make a version the coin for its approval, so it answers
+      // 410 before the session; asking for changes only closes the request and stays open (review findings CL-1, S23-OFF-2)
+      const b = only("POST") || (launchClosed(env) && !decisionOpen(await peek(request)) ? launchClosed(env) : null);
       return b || run(await needPost("admin"), async (c) => {
         const r = await decideReview(env, c, await readJson(request, 4096), fetchImpl);
         if (!r.ok) return json({ ok: false, error: r.error, ...(r.message ? { message: r.message } : {}) }, r.status, { "Cache-Control": "no-store" });

@@ -79,7 +79,7 @@
   // its way, or could not be asked)
   let lp = { on: false, state: null };
   // the launch status's reasons that come from the coin's review (src/coinreview.js, COIN_V2_REVIEW): said in the server's words, never as
-  // "launches are paused" (that is the owner's switch) nor as "your launch opens after the next round" (the round won't approve it yet)
+  // "launches are paused" (that is the owner's switch) nor as "an admin approves your coin on chain first" (the owner can't approve it yet)
   const REVIEW_PAUSE = new Set(["paused_request", "paused_description", "not_reviewed", "registry_waiting", "description_recheck", "description_unchecked", "bad_content", "art_missing", "approval_mismatch", "approval_changed"]);
   // the old Raydium LaunchLab path as the server says it in the coin's own answer (GET /api/coins launchLabClosed, through dashboard.js
   // coin() and coinQueue()): true closed (the launchpad's settings are there), false open, null not said yet. The old path's words show
@@ -109,18 +109,23 @@
   const notifyOn = () => { const m = me(); return Boolean(m && typeof m.unread === "number"); };
   // the ready-made city coin (COIN_V2_READY=on): /api/me carries coinV2Ready only while the switch is on; the coin is then chosen in #coin-ready
   const readyOn = () => { const m = me(); return Boolean(m && m.coinV2Ready === true); };
+  // the legacy launch path closed (LEGACY_LAUNCH=off, stage S23): /api/me carries legacyLaunch "off" only then; the Founder card says the closed
+  // line instead of a design or launch step (the studio is hidden and the launch card says the same). Without the key every line reads as before
+  const launchClosed = () => { const m = me(); return Boolean(m && m.legacyLaunch === "off"); };
+  const LAUNCH_CLOSED = "New city-coin launches on this launchpad are closed. Coins already launched keep trading.";
   // the last answer of GET /api/coins/ready (public/coin-ready.js tells it through dashboard.js; COIN_V2_READY=on): the founder's own
   // view ({ mode: "founder", coin, inUse, gate, ... }) or a preview; null until it is known
   let readyCoin = null, readyKnown = false;
   const readyFounder = () => (readyCoin && readyCoin.mode === "founder" ? readyCoin : null);
-  // the owner's approval rounds (COIN_V2_BATCH=on: the founder's coin answer carries approvalRound): the launch opens after the owner's
-  // next round, never with a time
-  const inRounds = () => { const rf = readyFounder(); return Boolean(rf && rf.approvalRound === true); };
   // with the city-coin launch on (lp, public/lp-launch.js): the chain's word wins, so this fact agrees with the launch card's tag
   // (with the ready-made coin on, nobody designs a coin: the founder chooses it, then it is chosen and not launched yet; a city with
   // no founder has nobody to choose it)
   const unchosen = () => { const m = me(), s = m && m.community && m.community.seat; return !s ? "No founder yet" : s.you ? "Ready to choose" : "Not chosen yet"; };
-  const coinState = () => (!coin ? (readyOn() ? unchosen() : "Not designed yet") : coin.launched || (lp.on && lp.state === "launched") ? "Live" : coin.waiting ? (lpEra() ? "Old contract waiting" : "Contract being checked")
+  // the legacy launch path closed (LEGACY_LAUNCH=off, stage S23): a coin not launched is "Closed", or "Approved (closed)" while the launch card
+  // shows an approval still on record on chain; never "Designed", "Ready to choose" or "Not designed yet" (review finding CL-2)
+  const shutState = () => (coin && coin.waiting ? (lpEra() ? "Old contract waiting" : "Contract being checked") : lp.on && lp.approval ? "Approved (closed)" : "Closed");
+  const coinState = () => (launchClosed() && !(coin && coin.launched) && !(lp.on && lp.state === "launched") ? shutState()
+    : !coin ? (readyOn() ? unchosen() : "Not designed yet") : coin.launched || (lp.on && lp.state === "launched") ? "Live" : coin.waiting ? (lpEra() ? "Old contract waiting" : "Contract being checked")
     : lp.on && lp.state === "ready" ? "Approved" : readyOn() ? "Not launched yet" : "Designed");
 
   /* ---------- set-up: the cards move into their panels, the old two-column tools retire ---------- */
@@ -533,9 +538,10 @@
     // the ready-made coin (COIN_V2_READY): said only once the founder's coin answer has a coin (a city the list has no ticker for gets none)
     const rf = readyFounder(), rcoin = Boolean(rf && rf.coin);
     if (readyOn()) { if (seated && coinKnown && rcoin && !rf.inUse && !rf.gate && (!coin || (!coin.launched && !coin.waiting))) add(...readyStep(rf, seat.city), "ok", "founder", "#coin-ready"); }
-    else if (seated && coinKnown && !coin) add(`Design ${seat.city}'s coin`, "Name, pitch, pair, colour, logo (shown once checked). Public and logged.", "ok", "founder", "#coin-studio");
+    // (the legacy launch path closed: the studio is not offered, so neither is this step)
+    else if (seated && coinKnown && !coin && !launchClosed()) add(`Design ${seat.city}'s coin`, "Name, pitch, pair, colour, logo (shown once checked). Public and logged.", "ok", "founder", "#coin-studio");
     // the old path's step only while the server says that path is open (never from a guess: a status call still on its way, a probe that failed)
-    if (seated && coin && !coin.mint && !coin.waiting && labOpen() && !readyOn()) add("Add your coin's contract", "Launched it on Raydium LaunchLab? Send the address for a check.", "ok", "founder", "#cs-mint");
+    if (seated && coin && !coin.mint && !coin.waiting && labOpen() && !readyOn() && !launchClosed()) add("Add your coin's contract", "Launched it on Raydium LaunchLab? Send the address for a check.", "ok", "founder", "#cs-mint");
     if (seated && lp.on && lp.state === "ready") add("Launch your city coin", "An admin approved it. One signature in your wallet.", "ok", "founder", "#lp-launch");
     // with the Vicinity launchpad set up, a contract sent through the old LaunchLab path is never recorded, only rejected (src/coins.js)
     if (seated && coin && coin.waiting && lpEra()) add("Old contract waiting", LEGACY_CONTRACT, "info", "city", "#coin", true);
@@ -732,6 +738,9 @@
     else if (st === "provisional") { note.textContent = "No founder powers yet. Locals can object until then; if no objection is upheld, you become the founder."; button("Founder path", "btn btn--primary", () => goTo("#progress")); }
     else if (st === "grace") { note.textContent = `Hold ${fmt(seat.threshold)} $VICINITY again before the deadline or the seat reopens. Moderation is paused meanwhile.`; button("Buy & swap", "btn btn--primary", () => goTo("#trade")); }
     else if (!coinKnown) { note.textContent = ""; go.hidden = true; fcardAction = null; }
+    // (closed: the launch card or the ready-made coin's card right under this one says the closed line, so it is said here only when neither
+    // shows: once per tab, review finding S23-OFF-3)
+    else if (launchClosed() && !(coin && coin.launched) && !(lp.on && lp.state === "launched")) { note.textContent = lp.on || readyOn() ? "" : LAUNCH_CLOSED; go.hidden = true; fcardAction = null; }
     // the ready-made coin (COIN_V2_READY): until the founder has chosen it ("Use this coin"), the card sends them to it, BEFORE the
     // launch's words (an approval of an earlier studio design aside: that one launches as approved)
     else if (readyOn() && readyFirst()) {
@@ -755,10 +764,12 @@
       const s = lp.on ? lp.state : null;
       note.textContent = s === "ready" ? "An admin approved your coin. Launch it on the Vicinity launchpad: one signature in your wallet."
         : s === "launched" ? "Your coin is live on the Vicinity launchpad."
-          : s === "expired" ? (inRounds() ? "Your approval ran out before you launched. It is renewed at the owner's next approval round." : "Your approval expired. Ask an admin to approve your coin again.")
+          : s === "expired" ? "Your approval expired. Ask an admin to approve your coin again."
             : s === "paused" ? (REVIEW_PAUSE.has(lp.why) && lp.message ? lp.message : "Launches are paused for now. Your approval stays.")
-              : s === "not_approved" ? (inRounds() ? "Your launch opens after the owner's next approval round. Then you launch it here." : "An admin approves your coin on chain first; your pair must be SOL. Then you launch it here.") : LP_PENDING;
-      if (s) button(s === "ready" ? "Launch your city coin" : s === "launched" ? "See your coin" : "See the launch", s === "ready" ? "btn btn--primary" : "btn btn--glass", () => goTo("#lp-launch"));
+              : s === "not_approved" ? "An admin approves your coin on chain first; your pair must be SOL. Then you launch it here."
+                : s === "closed" ? lp.message || LAUNCH_CLOSED : LP_PENDING;
+      if (s === "closed") { go.hidden = true; fcardAction = null; }
+      else if (s) button(s === "ready" ? "Launch your city coin" : s === "launched" ? "See your coin" : "See the launch", s === "ready" ? "btn btn--primary" : "btn btn--glass", () => goTo("#lp-launch"));
       else { go.hidden = true; fcardAction = null; }
     }
     else if (readyOn()) { note.textContent = "Your coin is made by Vicinity from the city list. Check the coin you chose; Vicinity's owner approves it on the blockchain before it can launch."; button("See your city coin", "btn btn--primary", () => goTo("#coin-ready")); }
@@ -974,7 +985,8 @@
 
   /** The launch card's state (dashboard.js after LPLaunch.founder): the Today strip and the Founder card follow it. */
   function setLp(info) {
-    lp = { on: Boolean(info && info.on), state: (info && info.state) || null, why: (info && info.why) || null, message: (info && info.message) || null };
+    lp = { on: Boolean(info && info.on), state: (info && info.state) || null, why: (info && info.why) || null, message: (info && info.message) || null,
+      ...(info && info.approval ? { approval: true } : {}) }; // (closed only: an approval still on record on chain, public/lp-launch.js)
     const d = me(); if (d) { today(d); founderCard(d); }
   }
 

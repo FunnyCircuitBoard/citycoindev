@@ -16,6 +16,10 @@
   const tabbed = () => Boolean(window.VDash);
   // the legacy seats frozen (LEGACY_SEATS=frozen: /api/me says legacySeats "frozen", stage S16): see frozenProfile below. Without the key: as before
   const frozenSeats = (d) => Boolean(d && d.legacySeats === "frozen");
+  // the legacy launch path closed (LEGACY_LAUNCH=off: /api/me says legacyLaunch "off", stage S23): no coin is designed, chosen or launched there
+  // any more, so the card offers no jump to the coin and its lead promises none (review finding S23-OFF-1). Without the key: as before
+  const launchShut = (d) => Boolean(d && d.legacyLaunch === "off");
+  const LAUNCH_SHUT = "New city-coin launches on this launchpad are closed.";
 
   /* ---------- the shared icon set (SPEC "Icons": 24 viewBox, stroke 1.7, currentColor), built as SVG nodes, never from text ---------- */
   const ICONS = {
@@ -108,7 +112,7 @@
       // a seat keeps the bar it was claimed under, even if the ladder has moved since
       p.meters.push(meter(`Your holding vs your bar (${fmt(seat.threshold)})`, pct(d.holding.amount, seat.threshold), `${fmt(d.holding.amount)} $VICINITY`, d.holding.amount >= seat.threshold ? "ok" : "bad"));
       if (seat.graceUntil) p.notes.push(`⚠️ You're below ${fmt(seat.threshold)} $VICINITY. Top up before ${when(seat.graceUntil)} or the seat is released. Moderation pauses while you're short.`);
-      p.tools.push(jump("Design the city's coin", "#coin"), jump("Moderator tools", "#mod"), invite); resign(seat);
+      p.tools.push(...(launchShut(d) ? [] : [jump("Design the city's coin", "#coin")]), jump("Moderator tools", "#mod"), invite); resign(seat);
     } else if (seat && seat.status === "provisional") {
       p.icon = "👑"; p.ico = ["crown", "gold"]; p.title = `Chosen founder of ${seat.city}`;
       p.tag = { text: "Objection period", cls: "tag--warn" };
@@ -125,9 +129,11 @@
       p.tag = { text: "Active", cls: "tag--ok" };
       // with the ready-made coin on (COIN_V2_READY), the founder chooses the coin Vicinity made from the city list, never designs one
       const ready = d.coinV2Ready === true;
-      p.lead = `You moderate ${seat.city}, ${ready ? "choose and launch its coin (made by Vicinity from the city list)" : "design its coin"} and your vote counts ×${weight}. Keep ${fmt(seat.threshold)} $VICINITY: below it, moderation pauses at once.`;
+      const shut = launchShut(d);
+      p.lead = shut ? `You moderate ${seat.city} and your vote counts ×${weight}. ${LAUNCH_SHUT} Keep ${fmt(seat.threshold)} $VICINITY: below it, moderation pauses at once.`
+        : `You moderate ${seat.city}, ${ready ? "choose and launch its coin (made by Vicinity from the city list)" : "design its coin"} and your vote counts ×${weight}. Keep ${fmt(seat.threshold)} $VICINITY: below it, moderation pauses at once.`;
       p.meters.push(meter(`Your holding vs your bar (${fmt(seat.threshold)})`, pct(d.holding.amount, seat.threshold), `${fmt(d.holding.amount)} $VICINITY`, d.holding.amount >= seat.threshold ? "ok" : "bad"));
-      p.tools.push(ready ? jump("Your city coin", "#coin-ready") : jump("Design the city's coin", "#coin"), jump("Moderator tools", "#mod"), invite); resign(seat);
+      p.tools.push(...(shut ? [] : [ready ? jump("Your city coin", "#coin-ready") : jump("Design the city's coin", "#coin")]), jump("Moderator tools", "#mod"), invite); resign(seat);
     } else if (d.level === "holder") {
       p.icon = "🏅"; p.ico = ["medal", "ok"]; p.title = `Holder in ${city}`;
       // (the tabbed dashboard drops the pill: the meter right under it says the same percentage)
@@ -190,9 +196,11 @@
       p.icon = "👑"; p.ico = ["crown", "gold"];
       p.title = { steward: `Seed Steward of ${seat.city}`, provisional: `Chosen founder of ${seat.city}` }[seat.status] || `City Founder of ${seat.city}`;
       p.tag = { text: "On record", cls: "tag--gold" };
-      p.lead = live ? `Your founder seat for ${seat.city} is on record. You ${ready ? "choose and launch its coin (made by Vicinity from the city list)" : "design its coin"} and your vote counts ×${weight}. ${ON_RECORD}`
+      const shut = launchShut(d);
+      p.lead = live && shut ? `Your founder seat for ${seat.city} is on record. Your vote counts ×${weight}. ${LAUNCH_SHUT} ${ON_RECORD}`
+        : live ? `Your founder seat for ${seat.city} is on record. You ${ready ? "choose and launch its coin (made by Vicinity from the city list)" : "design its coin"} and your vote counts ×${weight}. ${ON_RECORD}`
         : `Your founder seat for ${seat.city} is on record as it was. ${ON_RECORD}`;
-      if (live) p.tools.push(ready ? jump("Your city coin", "#coin-ready") : jump("Design the city's coin", "#coin"));
+      if (live && !shut) p.tools.push(ready ? jump("Your city coin", "#coin-ready") : jump("Design the city's coin", "#coin"));
       p.tools.push(invite);
     } else if (d.level === "holder") {
       p.icon = "🏅"; p.ico = ["medal", "ok"]; p.title = `Holder in ${city}`;

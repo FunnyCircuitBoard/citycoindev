@@ -514,3 +514,147 @@ test("launched, the chain's symbol not in the answer: the city's ticker, never '
   await bare.L.founder(bare.$("#lp-launch"), { cityId: "5140405" });
   assert.match(text(bare.$("#lp-launch")), /Your coin is live\./);
 });
+
+/* ---------- LEGACY_LAUNCH=off (Citycoin.dev master v5 stage S23): the closed line, read from /api/me and the status answer ---------- */
+const CLOSED_LINE = "New city-coin launches on this launchpad are closed. Coins already launched keep trading.";
+test("pure: the 'closed' status is a neutral line with no launch control (the server's words, or the same line)", () => {
+  const P = pure();
+  assert.equal(P.CLOSED, CLOSED_LINE);
+  assert.deepEqual(plain(P.view({ ok: true, state: "closed", why: "legacy_launch_closed", message: CLOSED_LINE })), { state: "closed", tag: ["Closed", ""], canLaunch: false, lines: [CLOSED_LINE] });
+  assert.deepEqual(plain(P.view({ ok: true, state: "closed" }).lines), [CLOSED_LINE]);
+});
+
+test("the dashboard with the legacy launch path closed: the launch card says the closed line, the studio is gone, the Founder card says it with no button; without the key: today's", async () => {
+  const closedStatus = { ...READY, wallet: ADDR, state: "closed", why: "legacy_launch_closed", message: CLOSED_LINE };
+  delete closedStatus.cost; delete closedStatus.firstBuy;
+  const run = async (closed, { design = DESIGN } = {}) => {
+    const lpCalls = [];
+    const me = founderMe();
+    if (closed) me.legacyLaunch = "off";
+    const page = await openDashboard({
+      me, official: { ok: true, cityCoins: { cluster: "mainnet" } },
+      api: async (path) => {
+        if (path.startsWith("/api/lp/")) { lpCalls.push(path); return path.includes("city=") ? (closed ? closedStatus : { ...READY, wallet: ADDR }) : { ok: true, on: true, cluster: "mainnet", configsSet: true, speedTable: true }; }
+        if (path.startsWith("/api/coins")) return { ...design, launchLabClosed: true };
+        return undefined;
+      },
+    });
+    page.win.LP = { supported: async () => true, say: (c, x) => (x && x.message) || c, renderSummary() {}, prepare: async () => { throw new Error("not in this test"); } };
+    vm.runInContext(LP_LAUNCH, page.win, { filename: "public/lp-launch.js" });
+    await page.advance(61_000);
+    await page.flush(60);
+    return page;
+  };
+  // a founder with no design yet: the Founder card never offers "Design the city coin" while closed
+  const bare = await run(true, { design: { ...DESIGN, coin: null } });
+  // the launch card right under it says the closed line, so the Founder card does not say it again (review finding S23-OFF-3)
+  assert.equal(bare.text("#fcard-note"), "");
+  assert.equal(bare.$("#fcard-go").hidden, true);
+  assert.equal(bare.$("#coin-studio").hidden, true);
+  assert.doesNotMatch(bare.text("#today-list"), /Design Utica's coin/, "Today offers no studio step");
+  const bareOpen = await run(false, { design: { ...DESIGN, coin: null } });
+  assert.equal(bareOpen.text("#fcard-go"), "Design the city coin", "without the key: today's words");
+  assert.match(bareOpen.text("#today-list"), /Design Utica's coin/);
+  const page = await run(true);
+  const card = page.$("#lp-launch");
+  assert.equal(card.hidden, false);
+  assert.equal(card.querySelector("[data-lp-state]").textContent, "Closed");
+  assert.equal(card.querySelector("h2").textContent, "Your city coin");
+  assert.match(text(card), new RegExp(CLOSED_LINE.replace(/\./g, "\\.")));
+  assert.equal(card.querySelectorAll("button").length, 0, "no launch control");
+  assert.equal(page.$("#coin-studio").hidden, true, "the studio is not offered (its route answers 410)");
+  assert.equal(page.text("#coin-note"), CLOSED_LINE);
+  assert.equal(page.text("#fcard-note"), "", "said once in the Founder tab: on the launch card");
+  assert.equal(page.$("#fcard-go").hidden, true);
+  const open = await run(false);
+  assert.equal(open.$("#lp-launch").querySelector("[data-lp-state]").textContent, "Approved");
+  assert.equal(open.$("#coin-studio").hidden, false, "the founder's studio as today");
+  assert.equal(open.text("#fcard-go"), "Launch your city coin");
+  assert.doesNotMatch(open.text("#coin-note"), /launches on this launchpad are closed/);
+});
+
+/* ---------- the review fixes of S23 (S23-OFF-1, S23-OFF-3, S23-OFF-4, CL-2, SEC-S23-3): no studio promise anywhere while closed ---------- */
+test("pure: the 'closed' view shows an approval still on chain as on record (its date, or that it ran out); without one only the line", () => {
+  const P = pure();
+  const st = { ok: true, state: "closed", why: "legacy_launch_closed", message: CLOSED_LINE, coin: { name: "Utica Coin", symbol: "UTICA", pair: "SOL" },
+    approval: { founder: WALLET, expiresAt: "2026-10-27T12:00:00.000Z", secondsLeft: 86400 } };
+  const v = plain(P.view(st));
+  assert.equal(v.lines[0], CLOSED_LINE);
+  assert.match(v.lines[1], /^On record: the owner's approval on the blockchain for \$UTICA, until Oct 27, 2026, .+\. Nothing is launched here\.$/);
+  assert.match(plain(P.view({ ...st, approval: { ...st.approval, secondsLeft: 0 } })).lines[1], /^On record: the owner's approval on the blockchain for \$UTICA ran out on Oct 27, 2026/);
+  assert.deepEqual(plain(P.view({ ok: true, state: "closed", message: CLOSED_LINE })).lines, [CLOSED_LINE]);
+});
+
+test("the dashboard while closed offers no coin studio anywhere: role card, City tab, coin card, trade card and Founder card; the founder can take their picture down; unset: today's", async () => {
+  const closedStatus = (approval) => { const x = { ...READY, wallet: ADDR, state: "closed", why: "legacy_launch_closed", message: CLOSED_LINE }; delete x.cost; delete x.firstBuy; if (!approval) delete x.approval; return x; };
+  const run = async (closed, { design = DESIGN, approval = true, posts = [], frozen = false } = {}) => {
+    const me = founderMe();
+    if (closed) me.legacyLaunch = "off";
+    if (frozen) me.legacySeats = "frozen";
+    const page = await openDashboard({
+      me, official: { ok: true, cityCoins: { cluster: "mainnet" } },
+      api: async (path, body) => {
+        if (path.startsWith("/api/lp/")) return path.includes("city=") ? (closed ? closedStatus(approval) : { ...READY, wallet: ADDR }) : { ok: true, on: true, cluster: "mainnet", configsSet: true, speedTable: true };
+        if (path === "/api/coins/design") { posts.push(body); return { ok: true, coin: { ...design.coin, logo: null, logoDraft: null, logoStatus: null } }; }
+        if (path.startsWith("/api/coins")) return { ...design, launchLabClosed: true };
+        return undefined;
+      },
+    });
+    page.win.LP = { supported: async () => true, say: (c, x) => (x && x.message) || c, renderSummary() {}, prepare: async () => { throw new Error("not in this test"); } };
+    vm.runInContext(LP_LAUNCH, page.win, { filename: "public/lp-launch.js" });
+    await page.advance(61_000);
+    await page.flush(60);
+    return page;
+  };
+  const NO_STUDIO = /Design the city's coin|design its coin|Design & launch|choose and launch|designed by the City Founder|chosen by the founder|Not designed yet|so they can see what's coming/;
+  // a founder with no design yet (Utica): nothing in Home, City or Founder offers or promises a design
+  const bare = await run(true, { design: { ...DESIGN, coin: null }, approval: false });
+  for (const sel of ["#role-home", "#community", "#coin", "#trade", "#fcard", "#today"]) { const n = bare.$(sel); if (n) assert.doesNotMatch(n.textContent, NO_STUDIO, sel); }
+  assert.match(bare.text("#role-home"), /You moderate Utica and your vote counts ×\d+\. New city-coin launches on this launchpad are closed\./);
+  assert.equal([...bare.$("#role-home").querySelectorAll("button")].some((b) => /coin/i.test(b.textContent)), false, "no jump to the coin from the role card");
+  assert.equal(bare.text("#cc-fomo"), "You're Utica's founder. Bring your locals in.");
+  assert.deepEqual([bare.text("#coin-status"), bare.text("#coin-kicker"), bare.text("#coin-pair")], ["Closed", "City coin", "—"]);
+  assert.equal(bare.text("#fcard-coin"), "Closed");
+  // a founder with a design, an approval still on chain, and a picture: the facts are history, the picture can come down
+  const posts = [];
+  // ($VICINITY's own mint known, so the trade card speaks about the city coin, not about $VICINITY's launch)
+  const withLogo = { ...DESIGN, vicinity: "VicM1nt111111111111111111111111111111111111", coin: { ...DESIGN.coin, logo: "/api/media/9", logoDraft: "/api/media/9", logoStatus: "approved" } };
+  const page = await run(true, { design: withLogo, posts });
+  for (const sel of ["#role-home", "#trade", "#fcard", "#today"]) assert.doesNotMatch(page.$(sel).textContent, NO_STUDIO, sel);
+  // (the coin card keeps the design on record as history, "Designed by …", and says the closed line instead of any next step)
+  assert.equal(page.text("#coin-note"), CLOSED_LINE);
+  assert.equal(page.$("#coin-studio").hidden, true);
+  assert.equal(page.text("#fcard-coin"), "Approved (closed)", "never 'Designed' while an approval is on record (CL-2)");
+  assert.match(text(page.$("#lp-launch")), /On record: the owner's approval on the blockchain for \$UTICA/);
+  page.$('#trade [data-route="city"]').click(); await page.flush(10); // the city coin's route: not live yet
+  assert.equal(page.text("#tr-note"), CLOSED_LINE);
+  assert.match(page.text("#tr-go"), /^See \$UTICA's card [↓→]$/, "(the tabbed dashboard points the arrow at the City tab)");
+  const founderTab = ["#fcard", "#coin-ready", "#lp-launch"].map((s) => (page.$(s) && !page.$(s).hidden ? page.$(s).textContent : "")).join(" ");
+  assert.equal(founderTab.split(CLOSED_LINE).length - 1, 1, "the closed line once in the Founder tab (S23-OFF-3)");
+  const down = page.$("#coin-logo-takedown");
+  assert.ok(down && !down.hidden, "the founder's own picture can still come down (SEC-S23-3)");
+  page.win.confirm = () => true;
+  down.click(); await page.flush(30);
+  assert.deepEqual(posts, [{ removeLogo: true }], "exactly { removeLogo: true }, nothing else");
+  assert.equal(page.$("#coin-logo-takedown").hidden, true, "gone once the picture is down");
+  // unset: today's words, and no take-down button is made
+  const open = await run(false, { design: withLogo });
+  assert.match(open.text("#role-home"), /design its coin/);
+  assert.ok([...open.$("#role-home").querySelectorAll("button")].some((b) => b.textContent === "Design the city's coin"));
+  assert.match(open.text("#cc-fomo"), /design Utica's coin so they can see what's coming/);
+  assert.equal(open.text("#coin-kicker"), "City coin · designed by the City Founder");
+  assert.equal(open.$("#coin-logo-takedown"), null);
+  assert.equal(open.text("#fcard-coin"), "Approved");
+  open.$('#trade [data-route="city"]').click(); await open.flush(10);
+  assert.match(open.text("#tr-go"), /^Design & launch your coin [↓→]$/, "unset: today's trade card");
+  // the seats frozen too (stage S16's panel): the seat on record, no coin jump, no "design its coin"
+  const both = await run(true, { design: { ...DESIGN, coin: null }, approval: false, frozen: true });
+  assert.match(both.text("#role-home"), /Your founder seat for Utica is on record\. Your vote counts ×\d+\. New city-coin launches on this launchpad are closed\./);
+  assert.doesNotMatch(both.text("#role-home"), NO_STUDIO);
+  assert.equal([...both.$("#role-home").querySelectorAll("button")].some((b) => /coin/i.test(b.textContent)), false);
+  const frozenOpen = await run(false, { design: { ...DESIGN, coin: null }, frozen: true });
+  assert.ok([...frozenOpen.$("#role-home").querySelectorAll("button")].some((b) => b.textContent === "Design the city's coin"), "seats frozen, launches open: as stage S16 left it");
+  const openBare = await run(false, { design: { ...DESIGN, coin: null } });
+  assert.deepEqual([openBare.text("#coin-status"), openBare.text("#coin-pair")], ["Not designed yet", "chosen by the founder"]);
+  assert.equal(openBare.text("#fcard-coin"), "Not designed yet");
+});

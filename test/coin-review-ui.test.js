@@ -15,7 +15,7 @@ const CITY = { id: "5142056", name: "Utica", region: "New York", regionCode: "NY
 const COIN = { ticker: "UTICA", name: "Utica", description: "The city coin of Utica, New York, United States.", pair: "SOL", templateVersion: "t1", source: "Vicinity city list", art: ART, contentHash: HASH, version: HASH.slice(0, 8) };
 const CHOSEN = { contentHash: HASH, version: HASH.slice(0, 8), at: "2026-10-18T10:00:00Z", current: true, art: ART, launched: false, ticker: "UTICA", name: "Utica", mine: true };
 const REVIEW = (over = {}) => ({
-  on: true, rulesVersion: "s1-test", nextRound: "at the owner's next approval round",
+  on: true, rulesVersion: "s1-test",
   defaults: { name: "Utica", symbol: "UTICA", description: COIN.description },
   selected: { origin: "default", contentHash: HASH, version: HASH.slice(0, 8), name: "Utica", symbol: "UTICA", description: COIN.description, art: ART, descriptionSource: "default", upload: false },
   request: null, description: { source: "default", text: COIN.description, screening: null }, hold: null,
@@ -127,7 +127,7 @@ test("switch on: Request changes and Write your own description; the caption say
 
 test("every status: Approved and Changes needed with the reason and note; Revise, Cancel and keep, one Request changes; Edit asks first", async () => {
   const approved = REVIEW({ selected: { ...REVIEW().selected, origin: "change", name: "Utica Falls" }, request: { id: 4, kind: "change", status: "approved", label: "Approved",
-    message: "Version 77aa11bb was approved. It is now your coin. It launches after the owner approves it on the blockchain, at the owner's next approval round.", version: "77aa11bb", contentHash: HASH2,
+    message: "Version 77aa11bb was approved. It is now your coin. It launches after the owner approves it on the blockchain.", version: "77aa11bb", contentHash: HASH2,
     diff: [{ field: "name", from: "Utica", to: "Utica Falls" }], proposed: {}, registryState: null, draft: null, nameIssues: [] }, can: { request: true, describe: true, reset: true, cancel: false, edit: false } });
   const needs = REVIEW({ request: { id: 5, kind: "change", status: "changes_needed", label: "Changes needed", reasonCode: "name_misleading",
     reason: "The name could be mistaken for another city, a company, a public body or Vicinity.", note: "Please drop the word Official.",
@@ -136,7 +136,7 @@ test("every status: Approved and Changes needed with the reason and note; Revise
   let view = answer({}, approved);
   const { page, posts } = await open((path) => (path.startsWith("/api/coins/ready") ? view : { ...view, ok: true }));
   assert.equal(page.text("#crv-req-tag"), "Approved");
-  assert.match(page.text("#crv-req-msg"), /It launches after the owner approves it on the blockchain, at the owner's next approval round\./);
+  assert.match(page.text("#crv-req-msg"), /It launches after the owner approves it on the blockchain\./);
   assert.doesNotMatch(page.text("#coin-ready"), /24 hours|within a day|tomorrow|launch now/i, "no time promised; nothing says launch now");
   assert.deepEqual(buttons(page, "#crv-status"), [], "one Request changes button, not two");
   assert.deepEqual(buttons(page, "#crv-actions"), ["Request changes", "Write your own description", "Reset to Vicinity defaults"]);
@@ -286,4 +286,41 @@ test("NEW-1: after an admin's takedown the description line says what happened, 
   const { page } = await open(() => answer({}, REVIEW({ description: { source: "default", text: COIN.description, screening: null, takenDown: { at: "2026-10-20T12:00:00Z", message } } })));
   assert.equal(page.text("#crv-desc-info"), `Description: Vicinity's default. ${message}`);
   assert.equal(page.$("#crv-desc-info").children.length, 0, "text only");
+});
+
+test("LEGACY_LAUNCH=off (review.closed): the card is read-only history: no form, no Request changes, no Write your own; a draft has Discard only, a pending request Cancel; the caption offers no change (review findings S23-OFF-4, SEC-S23-3)", async () => {
+  const LINE = "New city-coin launches on this launchpad are closed. Coins already launched keep trading.";
+  const gate = { code: "legacy_launch_closed", message: LINE };
+  const draftReq = { id: 4, kind: "change", status: "draft", label: "Draft", message: "Your draft is private and was never sent. New city-coin launches on this launchpad are closed, so it can't be sent now. You can discard it.",
+    version: null, contentHash: null, diff: [{ field: "name", from: "Utica", to: "Utica Falls" }], proposed: { name: "Utica Falls", symbol: "UTICA" }, registryState: null,
+    draft: { name: "Utica Falls", symbol: null, picture: "vicinity", art: "/api/media/9", reason: "why", updatedAt: "2026-10-23T10:00:00.000Z" }, nameIssues: [] };
+  const closed = (request) => answer({ gate }, REVIEW({ closed: true, request, blocked: LINE, hold: null, can: { request: false, describe: false, reset: false, cancel: Boolean(request), edit: false } }));
+  let view = closed(draftReq);
+  const { page, posts } = await open((path) => {
+    if (path === "/api/coins/review/cancel") { view = closed(null); return { ...view, cancelled: true }; }
+    return view;
+  });
+  assert.equal(page.$("#crv-name"), null, "no draft form while closed (its routes answer 410)");
+  assert.equal(page.$("#crv-submit"), null);
+  assert.match(page.text("#crv-req-msg"), /never sent.*You can discard it\./);
+  assert.deepEqual(buttons(page, "#crv-status"), ["Discard draft"]);
+  assert.equal(buttons(page, "#crv").includes("Request changes"), false);
+  assert.equal(buttons(page, "#crv").includes("Write your own description"), false);
+  assert.match(page.text("#crv"), new RegExp(LINE.replace(/\./g, "\\.")));
+  assert.doesNotMatch(page.text(".coin-ready__caption"), /request changes and a reviewer decides/);
+  page.$$("#crv-status button")[0].click(); await page.advance(100);
+  assert.deepEqual(posts.at(-1), ["/api/coins/review/cancel", { cityId: "5142056", requestId: 4 }]);
+  assert.equal(page.$("#crv-req-msg"), null, "the draft is gone");
+  // a pending request: Cancel only (no Edit); a description that needed changes: no Revise, only put away
+  const pending = { ...draftReq, id: 5, status: "pending", label: "Pending", version: HASH.slice(0, 8), contentHash: HASH, draft: null, submittedAt: "2026-10-23T11:00:00.000Z",
+    message: `Version ${HASH.slice(0, 8)} was sent for review. New city-coin launches on this launchpad are closed, so it can't be approved now. You can cancel it.` };
+  const p2 = await open(() => closed(pending));
+  assert.deepEqual(buttons(p2.page, "#crv-status"), ["Cancel request"]);
+  const needs = { ...pending, id: 6, kind: "description", status: "changes_needed", label: "Changes needed", message: "Changes needed: It isn't about your city. Your coin stays as it was." };
+  const p3 = await open(() => answer({ gate }, REVIEW({ closed: true, request: needs, blocked: LINE, can: { request: false, describe: false, reset: false, cancel: false, edit: false } })));
+  assert.deepEqual(buttons(p3.page, "#crv-status"), ["Cancel and keep the coin as it is"]);
+  // without the key a draft opens its form as before
+  const p4 = await open(() => answer({}, REVIEW({ request: { ...draftReq, message: "Your draft is private." }, can: { request: false, describe: true, reset: false, cancel: true, edit: false } })));
+  assert.ok(p4.page.$("#crv-name"), "unset: the draft's form");
+  assert.match(p4.page.text(".coin-ready__caption"), /request changes and a reviewer decides/);
 });

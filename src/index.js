@@ -140,6 +140,7 @@ import { handleFeedback } from "./feedback.js";
 import { lpSetup } from "./cluster.js";
 import { handleLpCoin, handleLpRecord } from "./lpcoins.js";
 import { handleLaunchApi } from "./lplaunch.js";
+import { closedBeforeRead, closedWriter } from "./legacylaunch.js";
 import { handleFees } from "./fees.js";
 import { EDGE_SECONDS as FEE_STATUS_SECONDS, handleFeeStatus } from "./feestatus.js";
 import { handleCoinMeta } from "./coinmeta.js";
@@ -323,6 +324,11 @@ export async function handleApi(request, env = {}, fetchImpl = fetch, ctx = null
 
   // WALLET_ONLY set on but refused (src/v5policy.js walletOnlyHeld): fail closed, never today's logins (review finding SEC-1). Unset: no-op.
   if (walletOnlyHeld(env)) { const held = heldAnswer(path); if (held) return held; }
+
+  // the legacy launch path closed (LEGACY_LAUNCH=off, or held closed: src/v5policy.js legacyLaunch, stage S23): its approval, launch, studio and
+  // LaunchLab writers answer 410 legacy_launch_closed before any read, each only where its route exists (src/legacylaunch.js lists them). Unset
+  // (today): no-op, nothing read, no request copied
+  { const closed = closedWriter(env, path, method) || (await closedBeforeRead(request, env, path)); if (closed) return closed; }
 
   // wallet-only sign-in (WALLET_ONLY counting: src/v5policy.js walletOnly; stages S09 and S10): the server challenge exists, and the routes of
   // WALLET_ONLY_GONE answer what an unknown path answers (before any method check, so nothing can be probed). With the switch off, or set but

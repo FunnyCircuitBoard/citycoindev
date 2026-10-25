@@ -112,8 +112,11 @@
     paintStatus(p.status, R);
     paintActions(p.actions, R);
     const req = R.request;
-    if (req && req.status === "draft" && !formDirty) fromDraft(req.draft);
-    if (req && req.status === "draft") formOpen = true;
+    // the legacy launch path closed (R.closed, stage S23): the card is read-only history; no form or editor opens (their routes answer 410), a
+    // draft is shown with Discard only, and Cancel withdraws a pending request (review finding S23-OFF-4)
+    if (R.closed) { formOpen = false; formDirty = false; confirmOpen = false; describeOpen = false; screening = null; }
+    else if (req && req.status === "draft" && !formDirty) fromDraft(req.draft);
+    if (req && req.status === "draft" && !R.closed) formOpen = true;
     if (req && req.status === "pending") { formOpen = false; formDirty = false; confirmOpen = false; }
     paintForm(p.form, R);
     paintDescription(p.desc, R);
@@ -134,9 +137,11 @@
     const sel = R && R.selected, defs = R && R.defaults;
     const renamed = Boolean(sel && defs && (sel.name !== defs.name || sel.symbol !== defs.symbol));
     const own = Boolean(sel && (sel.upload || renamed));
+    // (closed, R.closed: no change can be requested any more, so the caption offers none)
+    const how = R && R.closed ? "" : " You can't edit these yourself: request changes and a reviewer decides.";
     const words = own
-      ? "Set by Vicinity, with the changes a reviewer approved for your coin. You can't edit these yourself: request changes and a reviewer decides."
-      : "Set by Vicinity. Every city coin uses the same Vicinity design, filled in from the Vicinity city list. You can't edit these yourself: request changes and a reviewer decides.";
+      ? `Set by Vicinity, with the changes a reviewer approved for your coin.${how}`
+      : `Set by Vicinity. Every city coin uses the same Vicinity design, filled in from the Vicinity city list.${how}`;
     const src = document.querySelector(".coin-ready__src");
     if (src) {
       if (on && renamed) { if (srcWas == null) srcWas = src.textContent; src.textContent = "The place comes from the Vicinity city list; the ticker and the name are the ones a reviewer approved for your coin."; }
@@ -180,11 +185,11 @@
   function paintStatus(box, R) {
     const req = R.request;
     // the same request in the same state is not drawn again (the live region would read it twice, and the keyboard would lose its place)
-    const key = req && req.status !== "draft" ? JSON.stringify([req.id, req.status, req.contentHash, req.message, req.diff, R.can.edit]) : "";
+    const key = req && (req.status !== "draft" || R.closed) ? JSON.stringify([req.id, req.status, req.contentHash, req.message, req.diff, R.can.edit]) : "";
     if (box.dataset.key === key && (key === "" || box.firstChild)) return;
     box.dataset.key = key;
     box.replaceChildren();
-    if (!req || req.status === "draft") return;
+    if (!req || (req.status === "draft" && !R.closed)) return;
     const card = el("section", `crv-card crv-card--${req.status}`); card.setAttribute("aria-labelledby", "crv-req-title");
     const head = el("div", "crv-card__head");
     const title = el("h3", "h3--sm", req.kind === "description" ? "Description review" : "Change request"); title.id = "crv-req-title";
@@ -195,7 +200,8 @@
     if (req.submittedAt && req.status === "pending") card.append(el("p", "tiny muted", `Sent ${when(req.submittedAt)} · version ${req.version}`));
     if (req.diff && req.diff.length) card.append(diffTable(req.diff, req.status));
     const row = el("div", "crv-row");
-    if (req.status === "pending") {
+    if (req.status === "draft") row.append(button("Discard draft", () => send("cancel", { requestId: req.id }, "Draft discarded").then((r) => { if (r && r.ok) wantFocus("actions"); })));
+    else if (req.status === "pending") {
       row.append(button("Cancel request", () => send("cancel", { requestId: req.id }, "Request cancelled: your coin is as it was").then((r) => { if (r && r.ok) wantFocus("actions"); })));
       if (req.kind === "change" && R.can.edit) {
         row.append(button("Edit", () => {
@@ -206,7 +212,7 @@
       }
     } else if (req.status === "changes_needed") {
       if (req.kind === "change" && R.can.edit) row.append(button("Revise", () => { formDirty = false; send("edit", { requestId: req.id }, "A new draft, from your last version").then((r) => { if (r && r.ok) wantFocus("form"); }); }, "btn btn--primary"));
-      else if (req.kind === "description") row.append(button("Revise", () => openDescribe(req.proposed && req.proposed.description)));
+      else if (req.kind === "description" && !R.closed) row.append(button("Revise", () => openDescribe(req.proposed && req.proposed.description)));
       row.append(button("Cancel and keep the coin as it is", () => send("cancel", { requestId: req.id }).then((r) => { if (r && r.ok) wantFocus("actions"); })));
     } // approved: nothing here (Request changes, under the card, makes the next request; one button for one thing)
     if (row.childNodes.length) card.append(row);

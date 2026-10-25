@@ -27,12 +27,15 @@
  *                           build, and with 503 program_check_unavailable while that cannot be read: never an approval blind. Both
  *                           read the programs' deploy slots fresh (src/programpins.js `fresh`), not the pages' ten-minute answer
  *   POST revoke/tx          { cityId }
- *   GET  batch | POST batch/tx   the owner's daily approval round (COIN_V2_BATCH on, src/lpbatch.js); record step "batch". Off: unknown paths
  *   GET  coins              launched coins: stage, fees waiting, holder rewards set up or not
  *   POST collect/tx | init-city/tx | forward/tx { cityId }     POST pause/tx { launches }
  *   GET  platform/plan      the dev wallet's platform fees waiting       POST platform/tx  the next claim transaction (13qRam only)
  * Every request echoes the cluster the page shows (?cluster= / body.cluster) and is refused on a mismatch; the RPC's genesis hash
  * is checked against the cluster first (src/lpkit.js checkGenesis).
+ * LEGACY_LAUNCH=off (stage S23, src/legacylaunch.js): approve/tx, the setup steps start, config and allow (tx and record), the record of an
+ * approval and pause/tx with launches false answer 410 legacy_launch_closed (src/index.js before any read; here again for a direct call), and the
+ * probe carries legacyLaunch "off" so the tab shows the closed line instead of those controls. Every read, revoke, pause, collect, holder
+ * rewards, forward, platform fees, the hand-over, the fee accounts, the speed table and the partner entry stay.
  * D1: lp_setup (cluster, program_id, step) -> the address and signature a setup step produced; lp_approvals_log, append only.
  */
 import { json, readJson } from "./http.js";
@@ -43,8 +46,7 @@ import { displayTicker, tickerOf } from "./tickers.js";
 import { iso } from "./policy.js";
 import { lpSetup } from "./cluster.js";
 import { ensureLogoSchema } from "./store.js";
-import { coinV2BatchOn, coinV2ReadyOn, coinV2ReviewOn } from "./flags.js";
-import { batchList, batchTx, recordBatch, tellFounders } from "./lpbatch.js";
+import { coinV2ReadyOn, coinV2ReviewOn } from "./flags.js";
 import { candidateProblem, pendingRequest } from "./coinreview.js";
 import { BLANK_CHARS, FORMAT_CHARS } from "./text.js";
 import { chosenOf, cityDescription, clearApproved, ensureReadySchema, markApprovedStatement } from "./coinart-store.js";
@@ -62,6 +64,8 @@ import { settleLegacyContract } from "./coins.js";
 import { feeSchedule } from "./fees.js";
 import { _forgetProgramHashes, fingerprint, programHashes, programRefusal, programSummary } from "./programpins.js";
 import * as IX from "./sol/lpadmin-ix.js";
+import { LEGACY_LAUNCH_LINE, launchClosed, lpAdminWrite } from "./legacylaunch.js";
+import { legacyLaunchClosed } from "./v5policy.js";
 
 const DEV = ADDRESSES.feeRecipient;
 const WSOL = ADDRESSES.wsol;
@@ -467,7 +471,7 @@ async function recentSlot(env, fetchImpl) {
   return tip - 8;
 }
 /** Does this instruction list fit one transaction (with the two compute-budget instructions buildTx adds)? */
-export function fits(payer, instructions, signers = 1) {
+function fits(payer, instructions, signers = 1) {
   try {
     const budget = [{ programAddress: PROGRAM_IDS.computeBudget, accounts: [], data: new Uint8Array(5) }, { programAddress: PROGRAM_IDS.computeBudget, accounts: [], data: new Uint8Array(9) }];
     const m = compileLegacy({ payer, instructions: [...budget, ...instructions], blockhash: PROGRAM_IDS.system });
@@ -614,7 +618,7 @@ async function confirmedTx(env, signature, wallet, fetchImpl) {
 async function recordStep(env, ctx, body, fetchImpl, now, route = null) {
   const s = lpSetup(env), wallet = ctx.wallet, db = env.DB;
   const id = body.step, params = body.params && typeof body.params === "object" ? body.params : {};
-  const PER_CITY = ["approve", "revoke", "initCity", "collect", "forward", "platform", "pause", ...(coinV2BatchOn(env) ? ["batch"] : [])];
+  const PER_CITY = ["approve", "revoke", "initCity", "collect", "forward", "platform", "pause"];
   if (!STEPS.includes(id) && !PER_CITY.includes(id)) return err("bad_step", "Unknown step.", 400);
   // a hand-over done earlier (or by hand): recorded without a transaction once the chain shows both programs under the vault
   const adopt = id === "handoff" && (body.signature === null || body.signature === undefined || body.signature === "");
@@ -628,7 +632,6 @@ async function recordStep(env, ctx, body, fetchImpl, now, route = null) {
   // of steps 3 and 4, never the pages' ten-minute answer): see the "config" case
   const st = await readState(env, s, wallet, fetchImpl, id === "config" ? { now, fresh: true, route } : { now });
   const writes = [];
-  let told = null; // the owner's daily round (step "batch"): the founders to tell once it is recorded
   const done = (msg, extra = {}) => json({ ok: true, step: id, message: msg, ...extra }, 200, { "Cache-Control": "no-store" });
   switch (id) {
     case "start": {
@@ -698,19 +701,8 @@ async function recordStep(env, ctx, body, fetchImpl, now, route = null) {
         ap ? iso(ap.expiresAt * 1000) : null, signature, wallet, iso(now)));
       break;
     }
-    case "batch": { // the owner's daily approval round (COIN_V2_BATCH on, src/lpbatch.js): up to 5 cities in one transaction
-      await ensureLpAdminSchema(db);
-      const b = await recordBatch(env, { wallet, signature, params, tx, now, fetchImpl });
-      if (b.error) return b.error;
-      writes.push(...b.writes);
-      writes.push(audit(db, wallet, "lp/batch", "batch", `${s.cluster} ${signature}: ${b.cities.map((c) => `${c.action} ${c.cityId}`).join(", ")}`, now));
-      await db.batch(writes);
-      told = b.notices;
-      break;
-    }
     default: break; // initCity, collect, forward, platform, pause: the audit line only (the chain is the record)
   }
-  if (told) { await tellFounders(env, told, now, fetchImpl); return done("Recorded.", { signature }); }
   await ensureLpAdminSchema(db);
   writes.push(audit(db, wallet, `lp/${id}`, params.cityId ? `city:${params.cityId}` : id, `${s.cluster} ${signature || "adopted"}`, now));
   await db.batch(writes);
@@ -764,13 +756,8 @@ export function nameProblem(name) {
 }
 const symbolOk = (t) => typeof t === "string" && /^[A-Z0-9]{1,10}$/.test(t);
 
-/**
- * Every city with a coin design: its founder, name, ticker, pair and what keeps it from being approved now.
- * `keep` (the owner's daily batch, src/lpbatch.js, COIN_V2_BATCH): the answer also carries, NOT for the candidates route's JSON, `assessed`
- * (Map city id -> the same checks run for EVERY listed row, a city that holds an approval on chain included: { reasons, ready, chosen,
- * row }) and `onChain` (every Approval of the program, decoded). Without it the answer is exactly the route's.
- */
-export async function candidateList(env, ctx, fetchImpl, now, { keep = false } = {}) {
+/** Every city with a coin design: its founder, name, ticker, pair and what keeps it from being approved now. */
+export async function candidateList(env, ctx, fetchImpl, now) {
   const s = lpSetup(env), db = env.DB;
   await ensureLogoSchema(db);
   const rows = (await db.prepare(`SELECT cc.city_id, cc.city_name, cc.country, cc.name, cc.pitch, cc.media_id, cc.approved_media_id, cc.logo_status, cc.updated_at, cc.pair, cc.mint, cc.pending_mint, cc.seat_id,
@@ -778,7 +765,7 @@ export async function candidateList(env, ctx, fetchImpl, now, { keep = false } =
     FROM city_coins cc
     LEFT JOIN seats s ON s.city_id = cc.city_id AND s.status IN ('provisional', 'active', 'grace', 'steward')
     LEFT JOIN users u ON u.id = s.user_id
-    ORDER BY cc.updated_at DESC LIMIT ${keep ? -1 : 200}`).all()).results; // the card lists the 200 saved last; the owner's round reads every one
+    ORDER BY cc.updated_at DESC LIMIT 200`).all()).results; // the card lists the 200 saved last
   const L = launchpadPdas(s.programId);
   const ids = rows.map((r) => cityIdOf(r.city_id));
   const addrs = [];
@@ -790,6 +777,9 @@ export async function candidateList(env, ctx, fetchImpl, now, { keep = false } =
   const config = s.dbcConfigs[0] || null;
   const lc = config ? decodeLaunchConfig((await readAccounts(env, [await L.launchConfig(config)], fetchImpl)).values().next().value || null, s.programId) : null;
   const global = [];
+  // the legacy launch path closed (stage S23): nothing is approvable here, whatever else holds, so the list says so first and every candidate
+  // carries it (ok false); the cards are history (review finding S23-OFF-6). With the switch unset this line adds nothing
+  if (legacyLaunchClosed(env)) global.push(LEGACY_LAUNCH_LINE);
   if (!s.configsSet) global.push("City-coin trading is not switched on yet: the team switches it on after your setup steps and their read-only check.");
   else if (!lc || !lc.enabled) global.push("The price curve in the settings is not allowed on the launchpad yet (setup step 4).");
   else if (lc.quoteMint !== WSOL) global.push("The price curve in the settings is not priced in SOL.");
@@ -803,15 +793,13 @@ export async function candidateList(env, ctx, fetchImpl, now, { keep = false } =
   const takenBy = new Map(); // symbol -> Set of the city ids that launched with it or hold an approval naming it
   const take = (symbol, city) => { if (symbol) { if (!takenBy.has(symbol)) takenBy.set(symbol, new Set()); takenBy.get(symbol).add(String(city)); } };
   let unknown = []; // cities whose launched coin's symbol this site could not read: any ticker may be theirs
-  let onChain = null; // every Approval of the program (read when the ready-made coin is on, or for the batch)
   if (ready) {
     unknown = await unknownSymbols(env, "", fetchImpl);
     try {
       for (const x of (await db.prepare("SELECT city_id, symbol FROM lp_coins WHERE symbol IS NOT NULL AND cluster = ? AND program_id = ?").bind(s.cluster, s.programId).all()).results) take(x.symbol, x.city_id);
     } catch (e) { if (!/no such table/i.test(String((e && e.message) || e))) throw e; }
     // EVERY approval on chain, not only those of the cities listed here (the 200 designs saved last): one more read of the program
-    onChain = await approvalRecords(env, s, fetchImpl);
-    for (const ap of onChain) take(ap.symbol, ap.cityId);
+    for (const ap of await approvalRecords(env, s, fetchImpl)) take(ap.symbol, ap.cityId);
   }
   /** What keeps row r's current design from being approved now: { reasons (the global ones first), readyCoin, chosen }. */
   const assess = async (r, id, t) => {
@@ -846,7 +834,6 @@ export async function candidateList(env, ctx, fetchImpl, now, { keep = false } =
     }
     return { reasons, readyCoin, chosen: c };
   };
-  const assessed = keep ? new Map() : null;
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i], id = ids[i];
     if (!id) continue;
@@ -874,10 +861,9 @@ export async function candidateList(env, ctx, fetchImpl, now, { keep = false } =
       }
       approvals.push({ ...base, approval: { founder: ap.founder, name: ap.name, symbol: ap.symbol, expiresAt: iso(ap.expiresAt * 1000), expired, rentPayer: ap.rentPayer },
         seat: { wallet: r.seat_wallet || null, status: r.live_seat ? r.seat_status : null }, warnings });
-      if (keep) assessed.set(String(id), { ...(await assess(r, id, t)), row: r, base, symbol: t ? t.ticker : null });
       continue;
     }
-    const { reasons, readyCoin, chosen } = await assess(r, id, t);
+    const { reasons, readyCoin } = await assess(r, id, t);
     const warnings = [];
     if (r.seat_wallet && lp && r.seat_wallet === lp.admin) warnings.push("The founder is the launchpad admin's own wallet.");
     // logo: a picture exists; logoStatus: where the working picture's check stands; approved: an approved picture shows to everyone
@@ -885,12 +871,10 @@ export async function candidateList(env, ctx, fetchImpl, now, { keep = false } =
     candidates.push({ ...base, symbol: t ? t.ticker : null, pitch: r.pitch || "", logo: Boolean(r.media_id), logoStatus: r.media_id ? r.logo_status || "pending" : null,
       approved: Boolean(r.approved_media_id), designAt: r.updated_at || null,
       nameBytes: new TextEncoder().encode(r.name || "").length, ok: reasons.length === 0, reasons, warnings, ...(ready ? { ready: readyCoin } : {}) });
-    if (keep) assessed.set(String(id), { reasons, readyCoin, chosen, row: r, base, symbol: t ? t.ticker : null });
   }
   // Meteora's programs against the tested builds: a city can be fine (ok) while every approval waits; the page says so on its button
   const meteora = programSummary(await programHashes(env, fetchImpl, now));
   const out = { candidates, approvals, launched, global, config, admin: lp ? lp.admin : null, paused: lp ? lp.launchesPaused : null, meteora };
-  if (keep) Object.defineProperties(out, { assessed: { value: assessed }, onChain: { value: onChain || (await approvalRecords(env, s, fetchImpl)) }, launchpad: { value: lp } });
   return out;
 }
 
@@ -1214,20 +1198,24 @@ export async function handleLpAdmin(request, ctx, sub, now = Date.now()) {
   const s = lpSetup(env);
   if (!s.on) return json({ ok: false, error: "not_enabled" }, 404);
   const method = request.method;
-  // the owner's daily approval round (COIN_V2_BATCH, src/lpbatch.js): with the switch off these are unknown paths, answered as any other
-  const batch = coinV2BatchOn(env);
-  const isGet = GET.has(sub) || (batch && sub === "batch"), isPost = POST.has(sub) || (batch && sub === "batch/tx");
+  const isGet = GET.has(sub), isPost = POST.has(sub);
   if (!isGet && !isPost) return json({ ok: false, error: "not_found" }, 404);
   if ((isGet && method !== "GET") || (isPost && method !== "POST")) return json({ ok: false, error: "method_not_allowed" }, 405);
+  // the legacy launch path closed (stage S23): the owner's approval is refused before anything else (src/index.js asks first, before the session)
+  if (sub === "approve/tx") { const closed = launchClosed(env); if (closed) return closed; }
   if (!isSolanaAddress(ctx.wallet)) return json({ ok: false, error: "sign_in" }, 401);
   if (sub === "") {
-    return json({ ok: true, on: true, cluster: s.cluster, programId: s.programId, rewardsProgramId: s.rewardsProgramId, wallet: ctx.wallet, isDevWallet: ctx.wallet === DEV, configsSet: s.configsSet, ...(batch ? { batch: true } : {}) }, 200, { "Cache-Control": "no-store" });
+    return json({ ok: true, on: true, cluster: s.cluster, programId: s.programId, rewardsProgramId: s.rewardsProgramId, wallet: ctx.wallet, isDevWallet: ctx.wallet === DEV, configsSet: s.configsSet,
+      // the legacy launch path closed (stage S23): the tab shows the closed line instead of the approve, setup and resume controls. Open: no key
+      ...(legacyLaunchClosed(env) ? { legacyLaunch: "off" } : {}) }, 200, { "Cache-Control": "no-store" });
   }
   const url = new URL(request.url);
   let body = {};
   if (isPost) {
-    body = await readJson(request, sub === "batch/tx" ? 32_768 : 8192); // the round echoes up to 40 rows
+    body = await readJson(request, 8192);
     if (!body || typeof body !== "object") return json({ ok: false, error: "bad_json" }, 400);
+    // the legacy launch path closed (stage S23): a setup step that serves new launches only, its record or an approval's, or resuming launches
+    if (lpAdminWrite(sub, body)) { const closed = launchClosed(env); if (closed) return closed; }
   }
   const mismatch = checkCluster(env, isPost ? body.cluster : url.searchParams.get("cluster"));
   if (mismatch) return respond(mismatch);
@@ -1267,8 +1255,6 @@ export async function handleLpAdmin(request, ctx, sub, now = Date.now()) {
       case "record": return await recordStep(env, ctx, body, fetchImpl, now, checkedRoute(env, g));
       case "approve/tx": return await approveTx(env, ctx, body, fetchImpl, now, checkedRoute(env, g));
       case "revoke/tx": return await revokeTx(env, ctx, body, fetchImpl, now);
-      case "batch": return await batchList(env, ctx, fetchImpl, now);
-      case "batch/tx": return await batchTx(env, ctx, body, fetchImpl, now, checkedRoute(env, g));
       case "collect/tx": return await collectTx(env, ctx, body, fetchImpl, now);
       case "init-city/tx": return await initCityTx(env, ctx, body, fetchImpl, now);
       case "forward/tx": return await forwardTx(env, ctx, body, fetchImpl, now);

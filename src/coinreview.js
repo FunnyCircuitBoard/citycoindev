@@ -63,6 +63,8 @@ import { IMAGE_TYPES } from "./logos.js";
 import { toBytes } from "./blobs.js";
 import { notify, pictureReason } from "./notify.js";
 import { coinV2ReviewOn } from "./flags.js";
+import { LEGACY_LAUNCH_LINE, REVIEW_OPEN, launchClosed } from "./legacylaunch.js";
+import { legacyLaunchClosed } from "./v5policy.js";
 
 /* ---------------------------------------------------------------- the words */
 /** Per account, counted atomically BEFORE the work (src/limits.js). */
@@ -90,12 +92,14 @@ export const REASON_KINDS = Object.freeze({
   offensive: ["change", "description"], financial_claim: ["description"], contact_or_link: ["change", "description"], not_about_city: ["description"], other: ["change", "description"],
 });
 export const STATUS_LABEL = Object.freeze({ draft: "Draft", pending: "Pending", approved: "Approved", changes_needed: "Changes needed" });
-/** The next approval round, in the only words the site may use for it (the owner signs every approval; no time is promised). */
-export const NEXT_ROUND = "at the owner's next approval round";
-/** An approved ticker change, until the city list carries it (DESIGN D8: an admin adds it in a pull request; nothing is automatic). */
-const registryWords = (symbol) => `Your new ticker $${symbol} is approved. It goes into the Vicinity city list once an admin adds it in a site update; then your coin goes into the owner's next approval round.`;
+/**
+ * An approved ticker change, until the city list carries it (DESIGN D8: an admin adds it in a pull request; nothing is automatic). The owner
+ * approves each city on the blockchain on its own (src/lpadmin.js); the owner's daily round was deleted in stage S23, so no time and no
+ * round is promised.
+ */
+const registryWords = (symbol) => `Your new ticker $${symbol} is approved. It goes into the Vicinity city list once an admin adds it in a site update; then the owner can approve your coin on the blockchain.`;
 /** The launch pause after the coin changed under an approval on chain (src/coinready.js GATES.approved_changed says the same). */
-export const APPROVAL_CHANGED = `Your coin changed after the owner approved it on the blockchain, so it can't launch until the owner approves it as it is now, ${NEXT_ROUND}.`;
+export const APPROVAL_CHANGED = "Your coin changed after the owner approved it on the blockchain, so it can't launch until the owner approves it again as it is now.";
 const ERRORS = Object.freeze({
   not_founder: "Only the city's founder can change its coin.",
   no_wallet: "Link a wallet first: your coin is launched and paid from it.",
@@ -318,7 +322,7 @@ async function storedArtOf(env, d) {
  * that no longer passes the screening (under the current rules) and that no reviewer approved; a picture that no longer hashes to its
  * name; content the metadata JSON would refuse.
  */
-export async function selectionProblem(env, cityId, { c = undefined, d = null, country = null, pending = true } = {}) {
+async function selectionProblem(env, cityId, { c = undefined, d = null, country = null, pending = true } = {}) {
   const db = env.DB;
   const pend = pending ? await pendingRequest(db, cityId) : null;
   if (pend) return pend.kind === "change"
@@ -393,9 +397,14 @@ function takenDownWords(rows) {
   const what = name && text ? "coin name and description" : name ? "coin name" : "description";
   return { at: rows[0].created_at, message: `Vicinity took down your ${what} (${pictureReason(why)}). Your coin uses Vicinity's ${name ? "coin for your city" : "own description"} now. If you send the same words again, a person reviews them first.` };
 }
-/** The founder's card: the request, the description and what holds the launch (only with COIN_V2_REVIEW on: src/coinready.js founderAnswer). */
+/**
+ * The founder's card: the request, the description and what holds the launch (only with COIN_V2_REVIEW on: src/coinready.js founderAnswer).
+ * While the legacy launch path is closed (stage S23; review findings S23-OFF-4, SEC-S23-3) the card is read-only history: `closed: true`, the
+ * coin gate's closed line in `blocked`, nothing that would build toward an approval (no request, description, reset or edit; no launch hold
+ * and no screening to act on), and Cancel for the founder's own open request, which only withdraws it.
+ */
 export async function reviewState(env, { seat, cityId, view }) {
-  const db = env.DB;
+  const db = env.DB, closed = legacyLaunchClosed(env);
   const d = await coinDefaults(env, cityId, seat.country);
   const c = await chosenOf(db, cityId, { fresh: true });
   const sel = c && c.current && c.seat_id === seat.id && c.content ? c : null;
@@ -415,17 +424,17 @@ export async function reviewState(env, { seat, cityId, view }) {
       ORDER BY id DESC`).bind(String(cityId), sel.chosen_at).all()) : null;
   const downRows = (down && down.results) || [];
   return {
-    on: true, rulesVersion: await rulesVersion(), nextRound: NEXT_ROUND,
+    on: true, rulesVersion: await rulesVersion(), ...(closed ? { closed: true } : {}),
     defaults: d.ok ? { name: d.name, symbol: d.ticker, description: d.description } : null,
     selected: sel ? { origin: sel.origin || "default", contentHash: sel.content_hash, version: versionLabel(sel.content_hash), name: sel.name, symbol: sel.symbol,
       description: sel.description, art: artPath(sel.art_sha256), descriptionSource: descSource, upload: sel.template_version === "upload" } : null,
-    request: req ? await requestView(env, req, { d, sel, gate: view && view.gate }) : null,
+    request: req ? await requestView(env, req, { d, sel, gate: view && view.gate, closed }) : null,
     description: {
       source: descSource, text: sel ? sel.description : d.ok ? d.description : null, takenDown: takenDownWords(downRows),
-      screening: lastShown ? { id: last.id, result: last.result, text: last.text, at: last.created_at, current: last.rules_version === (await rulesVersion()),
+      screening: lastShown && !closed ? { id: last.id, result: last.result, text: last.text, at: last.created_at, current: last.rules_version === (await rulesVersion()),
         issues: await explained(JSON.parse(last.issues_json || "[]"), d.ok ? d.city.name : seat.city_name) } : null,
     },
-    hold: problem,
+    hold: closed ? null : problem,
     can: {
       request: !gate && !open && d.ok, describe: !gate && !pending && d.ok, reset: !gate && !pending && Boolean(sel && sel.origin !== "default"),
       cancel: Boolean(open), edit: Boolean(req && ["pending", "changes_needed"].includes(req.status)) && !gate,
@@ -449,7 +458,7 @@ async function cardRequest(db, cityId, seatId, sel) {
   return rows;
 }
 /** A request as the founder sees it: its status in words, the version, what it changes, the reviewer's reason and note. */
-async function requestView(env, r, { d, sel, gate = null }) {
+async function requestView(env, r, { d, sel, gate = null, closed = false }) {
   const db = env.DB;
   const v = await versionById(db, r.version_id);
   const base = (await versionByHash(db, r.city_id, r.base_hash)) || (sel ? { name: sel.name, symbol: sel.symbol, art_sha256: sel.art_sha256, description: sel.description } : d.ok ? { name: d.name, symbol: d.ticker, art_sha256: null, description: d.description } : null);
@@ -464,16 +473,22 @@ async function requestView(env, r, { d, sel, gate = null }) {
     if (r.kind === "description" || proposed.description !== base.description) diff.push({ field: "description", from: base.description, to: proposed.description });
   }
   const registry = r.status === "approved" && v && d.ok && v.symbol !== d.ticker ? "waiting" : r.status === "approved" && r.registry_state ? "live" : null;
-  // the approved card follows the coin's state: once the owner's approval is on the blockchain (or the coin launched) the round is behind it,
+  // the approved card follows the coin's state: once the owner's approval is on the blockchain (or the coin launched) that step is behind it,
   // and while the owner builds that approval (the five-minute hold) it is happening right now, as the coin card says (GATES.held)
   const onChain = Boolean(gate && ["approved", "launched"].includes(gate.code));
   const beingApproved = Boolean(gate && gate.code === "held");
-  const words = {
+  // closed (LEGACY_LAUNCH=off): nothing is sent, approved or launched for the legacy approval any more, so no word promises it
+  const words = closed ? {
+    draft: "Your draft is private and was never sent. New city-coin launches on this launchpad are closed, so it can't be sent now. You can discard it.",
+    pending: `Version ${versionLabel(r.content_hash)} was sent for review. New city-coin launches on this launchpad are closed, so it can't be approved now. You can cancel it.`,
+    approved: r.kind === "change" ? `Version ${versionLabel(r.content_hash)} was approved. It is now your coin.` : `Your description (version ${versionLabel(r.content_hash)}) was approved. It is now your coin's description.`,
+    changes_needed: `Changes needed: ${REASONS[r.reason_code] || REASONS.other}${r.note ? ` Note from the reviewer: ${r.note}` : ""} Your coin stays as it was.`,
+  } : {
     draft: "Your draft is private. Your coin stays as it is until a reviewer approves the change. Submitting pauses your launch until they decide.",
     pending: `Version ${versionLabel(r.content_hash)} · a reviewer checks exactly this version. Launch is paused until they decide.`,
     approved: r.kind === "change"
       ? `Version ${versionLabel(r.content_hash)} was approved. It is now your coin.${registry === "waiting" ? ` ${registryWords(v.symbol)}` : onChain ? " It is approved on the blockchain too."
-        : beingApproved ? " The owner is approving it on the blockchain right now." : ` It launches after the owner approves it on the blockchain, ${NEXT_ROUND}.`}`
+        : beingApproved ? " The owner is approving it on the blockchain right now." : " It launches after the owner approves it on the blockchain."}`
       : `Your description (version ${versionLabel(r.content_hash)}) was approved. It is now your coin's description.`,
     changes_needed: `Changes needed: ${REASONS[r.reason_code] || REASONS.other}${r.note ? ` Note from the reviewer: ${r.note}` : ""} Your coin stays as it was.`,
   };
@@ -536,9 +551,9 @@ async function founderPost(request, env, now, fetchImpl, kind, { max = 2048 } = 
 }
 /**
  * The coin may change only while nothing on chain fixes it: { error } (launched, held, chain unreadable) or null. An approval on chain
- * built from this founder's ready-made coin (approved_hash: the owner's round or card built it from their chosen version) does not stop
+ * built from this founder's ready-made coin (approved_hash: the owner's card built it from their chosen version) does not stop
  * a request or a description: the launch pauses while a request waits or while the coin differs from what was approved (launchHold),
- * and the owner's next round withdraws or renews that approval (src/lpbatch.js). Any other approval (one given by hand for an earlier
+ * and the owner revokes that approval and approves the coin again (src/lpadmin.js). Any other approval (one given by hand for an earlier
  * studio design, or for another founder) still fixes the coin as it was approved.
  */
 async function notFrozen(env, w, fetchImpl, now) {
@@ -810,7 +825,7 @@ async function editRoute(request, env, fetchImpl, now) {
 async function select(env, { w, v, log, now, before = [], noPending = true, after = [] }) {
   const db = env.DB;
   // keepApproved: the hash an approval on chain was built from stays on the row (never equal to a new version's), so the launch pauses
-  // and the owner's next round renews the approval for the coin as it is now (src/lpbatch.js)
+  // until the owner approves the coin as it is now (src/lpadmin.js)
   const { stmts, at } = await choiceStatements(env, { cityId: w.cityId, seat: w.seat, userId: w.userId || w.u.id, v, log, now, keepApproved: true });
   const cond = `EXISTS (SELECT 1 FROM coin_ready WHERE city_id = ? AND content_hash = ? AND chosen_at = ?)${noPending ? ` AND ${NO_PENDING}` : ""}`;
   const args = [w.cityId, v.hash, at, ...(noPending ? [w.cityId, w.cityId] : [])];
@@ -975,6 +990,11 @@ export async function handleReview(request, env, sub, fetchImpl = fetch, now = D
   const route = ROUTES[sub];
   if (!route) return json({ error: "not_found" }, 404);
   if (request.method !== "POST") return json({ ok: false, error: "method_not_allowed" }, 405);
+  // the legacy launch path closed (LEGACY_LAUNCH=off, stage S23, src/legacylaunch.js): every request and description here is for its approval,
+  // so each route answers 410 legacy_launch_closed before it reads anything; the ticker check above only reads. Cancel stays open: it only
+  // withdraws the founder's own draft or pending request (or puts a decided one away), so nothing waits for ever (review findings CL-1, SEC-S23-3)
+  const closed = REVIEW_OPEN.includes(sub) ? null : launchClosed(env);
+  if (closed) return closed;
   return route(request, env, fetchImpl, now);
 }
 
@@ -1207,7 +1227,7 @@ export async function decideReview(env, ctx, body, fetchImpl = fetch) {
   }
   await notify(env, { to: r.user_id, kind: "founder", ref: r.city_id, href: "/dashboard#founder", now,
     text: r.kind === "change"
-      ? (registry ? `Your coin change was approved. $${v.symbol} goes into the Vicinity city list once an admin adds it; then your coin goes into the owner's next approval round.` : "Your coin change was approved. It is your coin now.")
+      ? (registry ? `Your coin change was approved. $${v.symbol} goes into the Vicinity city list once an admin adds it; then the owner can approve your coin on the blockchain.` : "Your coin change was approved. It is your coin now.")
       : "Your description was approved." });
   return { ok: true, id, status: "approved", ...(registry ? { registryPatch: { [String(r.city_id)]: v.symbol } } : {}) };
 }
@@ -1236,12 +1256,12 @@ export async function launchHold(env, cityId, approval) {
   if (!on && !reviewMade(c)) return null;
   if (approval && (approval.name !== c.name || approval.symbol !== c.symbol)) {
     if (c.origin && c.origin !== "default") {
-      return { state: "paused", error: "approval_mismatch", message: `Your launch approval on the blockchain is for your earlier coin, not the one you have now. The owner approves your current coin ${NEXT_ROUND}.` };
+      return { state: "paused", error: "approval_mismatch", message: "Your launch approval on the blockchain is for your earlier coin, not the one you have now. The owner has to approve your current coin on the blockchain first." };
     }
     return null;
   }
   // the approval was built from an earlier version of this coin (a description or the defaults chosen since): what launches now would
-  // not be what the owner approved, so it waits for the owner's next round to approve the coin as it is
+  // not be what the owner approved, so it waits until the owner approves the coin again as it is
   if (approval && c.approved_hash && c.approved_hash !== c.content_hash) return { state: "paused", error: "approval_changed", message: APPROVAL_CHANGED };
   if (c.approved_hash === c.content_hash) {
     const p = await selectionProblem(env, cityId, { c, pending: on });
@@ -1252,10 +1272,10 @@ export async function launchHold(env, cityId, approval) {
 /** A chosen version that only the review paths make: a founder's description, an approved change, or a hash kept from an earlier approval. */
 const reviewMade = (c) => Boolean((c.origin && c.origin !== "default") || (c.approved_hash && c.approved_hash !== c.content_hash));
 /**
- * Why the founder's launch, not approved on chain yet (or expired), will not be approved at the next round either: a request or a
+ * Why the founder's launch, not approved on chain yet (or expired), cannot be approved by the owner now either: a request or a
  * description waiting for review, an approved ticker the city list does not carry yet, a description that no longer passes... (the
  * owner's list blocks it for the same reason: candidateProblem). null, or { state: "paused", error, message }. The launch status says
- * this instead of "your launch opens after the owner's next approval round", which would not be true.
+ * this instead of "an admin approves your coin on chain first", which would not be the whole truth.
  */
 export async function reviewPause(env, cityId) {
   const on = coinV2ReviewOn(env);
@@ -1298,7 +1318,9 @@ export async function registryStep(env, now = Date.now()) {
     const res = await env.DB.prepare("UPDATE coin_requests SET registry_state = 'live', updated_at = ? WHERE id = ? AND registry_state = 'waiting'").bind(iso(now), r.id).run();
     if (!res.meta.changes) continue;
     live++;
-    await notify(env, { to: r.user_id, kind: "founder", ref: r.city_id, href: "/dashboard#founder", now, text: `Your new ticker $${r.symbol} is in the Vicinity city list now. Your coin launches after the owner's approval on the blockchain.` });
+    // (the legacy launch path closed, stage S23: no launch is promised; the neutral line instead. Review findings S23-OFF-5, SEC-S23-2)
+    const next = legacyLaunchClosed(env) ? LEGACY_LAUNCH_LINE : "Your coin launches after the owner's approval on the blockchain.";
+    await notify(env, { to: r.user_id, kind: "founder", ref: r.city_id, href: "/dashboard#founder", now, text: `Your new ticker $${r.symbol} is in the Vicinity city list now. ${next}` });
   }
   return { live };
 }

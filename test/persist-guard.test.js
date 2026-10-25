@@ -129,10 +129,13 @@ test("browser storage keys are unchanged (P10: renaming one forgets what a membe
     ["public/theme.js", "vicinity-theme"], ["public/site.js", "vicinity.walletApp"], ["public/swap.js", "vicinity.walletApp"],
     ["public/swap.js", "vicinity.swapAuto"], ["public/swap.js", "vicinity.swapWallet"], ["public/dashboard.js", "vicinity:dash-v2"],
     ["public/dashboard-v2.js", "vicinity:dash-v2"], ["public/site.js", "vicinity:dash-v2"], ["public/dashboard.js", "vicinity:inapp-tip"],
-    ["public/dashboard.js", "vicinity:wcard-skip"], ["public/admin-lp.js", "vicinity_lp_batch_one"], ["public/admin-lp.js", "vicinity_lp_pending"],
+    ["public/dashboard.js", "vicinity:wcard-skip"], ["public/admin-lp.js", "vicinity_lp_pending"],
     ["public/site.js", "vicinity_terms"],
   ];
   for (const [f, k] of KEYS) pinned(f, `"${k}"`, "browser storage key");
+  // retired with the feature, not renamed: "vicinity_lp_batch_one" belonged to the owner's daily approval round (COIN_V2_BATCH), deleted in
+  // Citycoin.dev master v5 stage S23; a browser that still holds it keeps a value nothing reads
+  assert.doesNotMatch(readFileSync(new URL("../public/admin-lp.js", import.meta.url), "utf8"), /vicinity_lp_batch_one/);
 });
 
 test("cookie names are unchanged (P11 and the session cookies)", async () => {
