@@ -23,6 +23,9 @@
  *            surface shows no picture (the site the city's initials, /coin-meta/<mint>.png the Vicinity badge for wallets); the
  *            founder and the staff see the working picture and its state.
  *   Safety   an admin can take down a logo or text that breaks the rules, with a public reason.
+ *   Closed   LEGACY_LAUNCH=off (stage S23, src/legacylaunch.js): the studio (POST /api/coins/design), a founder's LaunchLab contract (POST
+ *            /api/coins/mint) and recording one (POST /api/coins/mint/decide with approve true) answer 410 legacy_launch_closed (src/index.js
+ *            before any read; here again for a direct call). Every read, a rejection of a waiting contract and every takedown stay.
  */
 import { json, readJson } from "./http.js";
 import { access } from "./access.js";
@@ -46,6 +49,7 @@ import { coinV2ReadyOn } from "./flags.js";
 import { boundArtOf, chosenOf, madeByOf } from "./coinart-store.js";
 import { choiceHolds } from "./coinready.js";
 import { v2Takedown } from "./cointakedown.js";
+import { launchClosed } from "./legacylaunch.js";
 
 const C = POLICY.coins;
 
@@ -163,6 +167,8 @@ export async function handleCoins(request, env, fetchImpl = fetch, now = Date.no
 
 /** POST /api/coins/design { name, pitch, pair, color, image?, removeLogo? } — the founder designs their city's coin. */
 export async function handleDesign(request, env, fetchImpl = fetch, now = Date.now()) {
+  const closed = launchClosed(env); // the legacy launch path closed (stage S23): the studio is closed, before any read
+  if (closed) return closed;
   const f = await founder(request, env, now, fetchImpl);
   if (f.error) return f.error;
   const { u, seat } = f, db = env.DB;
@@ -264,6 +270,8 @@ export async function settleLegacyContract(env, { cityId, mint = "", actorId, no
 
 /** POST /api/coins/mint { mint } — the founder: "our coin is live, this is its contract". An admin checks it. */
 export async function handleProposeMint(request, env, fetchImpl = fetch, now = Date.now()) {
+  const gone = launchClosed(env); // the legacy launch path closed (stage S23), before any read
+  if (gone) return gone;
   const closed = launchLabClosed(env, "a Raydium LaunchLab contract can't be added here");
   if (closed) return closed;
   const f = await founder(request, env, now, fetchImpl);
@@ -298,6 +306,8 @@ export async function handleDecideMint(request, env, fetchImpl = fetch, now = Da
   const a = await admin(request, env, now, fetchImpl);
   if (a.error) return a.error;
   const db = env.DB, body = await readJson(request);
+  // the legacy launch path closed (stage S23): a contract is never recorded (src/index.js refuses before any read); a rejection goes through
+  if (body && body.approve === true) { const gone = launchClosed(env); if (gone) return gone; }
   const coin = body && await coinOf(db, String(body.city || ""));
   if (!coin || !coin.pending_mint) return json({ ok: false, error: "not_found" }, 404);
   // while the launchpad is set up a rejection only clears what waits (nothing can be recorded then), so the coin's designer may make

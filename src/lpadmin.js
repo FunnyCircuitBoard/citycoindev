@@ -32,6 +32,10 @@
  *   GET  platform/plan      the dev wallet's platform fees waiting       POST platform/tx  the next claim transaction (13qRam only)
  * Every request echoes the cluster the page shows (?cluster= / body.cluster) and is refused on a mismatch; the RPC's genesis hash
  * is checked against the cluster first (src/lpkit.js checkGenesis).
+ * LEGACY_LAUNCH=off (stage S23, src/legacylaunch.js): approve/tx, the setup steps start, config and allow (tx and record), the record of an
+ * approval and pause/tx with launches false answer 410 legacy_launch_closed (src/index.js before any read; here again for a direct call), and the
+ * probe carries legacyLaunch "off" so the tab shows the closed line instead of those controls. Every read, revoke, pause, collect, holder
+ * rewards, forward, platform fees, the hand-over, the fee accounts, the speed table and the partner entry stay.
  * D1: lp_setup (cluster, program_id, step) -> the address and signature a setup step produced; lp_approvals_log, append only.
  */
 import { json, readJson } from "./http.js";
@@ -60,6 +64,8 @@ import { settleLegacyContract } from "./coins.js";
 import { feeSchedule } from "./fees.js";
 import { _forgetProgramHashes, fingerprint, programHashes, programRefusal, programSummary } from "./programpins.js";
 import * as IX from "./sol/lpadmin-ix.js";
+import { launchClosed, lpAdminWrite } from "./legacylaunch.js";
+import { legacyLaunchClosed } from "./v5policy.js";
 
 const DEV = ADDRESSES.feeRecipient;
 const WSOL = ADDRESSES.wsol;
@@ -1192,15 +1198,21 @@ export async function handleLpAdmin(request, ctx, sub, now = Date.now()) {
   const isGet = GET.has(sub), isPost = POST.has(sub);
   if (!isGet && !isPost) return json({ ok: false, error: "not_found" }, 404);
   if ((isGet && method !== "GET") || (isPost && method !== "POST")) return json({ ok: false, error: "method_not_allowed" }, 405);
+  // the legacy launch path closed (stage S23): the owner's approval is refused before anything else (src/index.js asks first, before the session)
+  if (sub === "approve/tx") { const closed = launchClosed(env); if (closed) return closed; }
   if (!isSolanaAddress(ctx.wallet)) return json({ ok: false, error: "sign_in" }, 401);
   if (sub === "") {
-    return json({ ok: true, on: true, cluster: s.cluster, programId: s.programId, rewardsProgramId: s.rewardsProgramId, wallet: ctx.wallet, isDevWallet: ctx.wallet === DEV, configsSet: s.configsSet }, 200, { "Cache-Control": "no-store" });
+    return json({ ok: true, on: true, cluster: s.cluster, programId: s.programId, rewardsProgramId: s.rewardsProgramId, wallet: ctx.wallet, isDevWallet: ctx.wallet === DEV, configsSet: s.configsSet,
+      // the legacy launch path closed (stage S23): the tab shows the closed line instead of the approve, setup and resume controls. Open: no key
+      ...(legacyLaunchClosed(env) ? { legacyLaunch: "off" } : {}) }, 200, { "Cache-Control": "no-store" });
   }
   const url = new URL(request.url);
   let body = {};
   if (isPost) {
     body = await readJson(request, 8192);
     if (!body || typeof body !== "object") return json({ ok: false, error: "bad_json" }, 400);
+    // the legacy launch path closed (stage S23): a setup step that serves new launches only, its record or an approval's, or resuming launches
+    if (lpAdminWrite(sub, body)) { const closed = launchClosed(env); if (closed) return closed; }
   }
   const mismatch = checkCluster(env, isPost ? body.cluster : url.searchParams.get("cluster"));
   if (mismatch) return respond(mismatch);

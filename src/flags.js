@@ -178,3 +178,15 @@ export const legacySeatsFrozenOn = (env) => String((env && env.LEGACY_SEATS) ?? 
  * frozen (review fix SEC-S16-3 of stage S16: a typo never reopens the legacy writers). Read it there, never alone.
  */
 export const legacySeatsValue = (env) => String((env && env.LEGACY_SEATS) ?? "").trim().toLowerCase();
+
+/**
+ * LEGACY_LAUNCH=off (Citycoin.dev master v5, stage S23; master section 15 "Keep historical records readable, but do not let historical rules
+ * authorize new actions", section 27 "Keep a narrow legacy compatibility module only if existing assets require it; prevent new launches from
+ * using that route", section 37 step 9 "legacy new-launch disable") closes the legacy launch path on the live launchpad program (vicinity_launchpad,
+ * src/lplaunch.js and src/lpadmin.js): no approval, launch or founder studio write is built or accepted (410 legacy_launch_closed), while every
+ * history read (launched coins, approvals on record, fees, graduation and the founder's fee collection of coins already launched) stays.
+ * Read it through src/v5policy.js legacyLaunch(env), never alone: that is where the v5 configuration check is applied (an "off" whose own inputs
+ * are refused, or a value outside the switch's set, holds the path closed). Unset, blank and "on" (trimmed, any letter case) are the site exactly as
+ * before; it stays so until stage S58.
+ */
+export const legacyLaunchValue = (env) => String((env && env.LEGACY_LAUNCH) ?? "").trim().toLowerCase();

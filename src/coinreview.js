@@ -63,6 +63,7 @@ import { IMAGE_TYPES } from "./logos.js";
 import { toBytes } from "./blobs.js";
 import { notify, pictureReason } from "./notify.js";
 import { coinV2ReviewOn } from "./flags.js";
+import { launchClosed } from "./legacylaunch.js";
 
 /* ---------------------------------------------------------------- the words */
 /** Per account, counted atomically BEFORE the work (src/limits.js). */
@@ -975,6 +976,10 @@ export async function handleReview(request, env, sub, fetchImpl = fetch, now = D
   const route = ROUTES[sub];
   if (!route) return json({ error: "not_found" }, 404);
   if (request.method !== "POST") return json({ ok: false, error: "method_not_allowed" }, 405);
+  // the legacy launch path closed (LEGACY_LAUNCH=off, stage S23, src/legacylaunch.js): every request and description here is for its approval,
+  // so each route answers 410 legacy_launch_closed before it reads anything; the ticker check above only reads
+  const closed = launchClosed(env);
+  if (closed) return closed;
   return route(request, env, fetchImpl, now);
 }
 

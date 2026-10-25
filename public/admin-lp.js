@@ -12,6 +12,13 @@
     unclear: "Sent, but the network's answer did not come back. Watching the blockchain for it: do not send it again." };
   const STAGE = { curve: "On the price curve", full: "Curve full: ready to move to the open market", graduated: "On the open market (Meteora pool)", unknown: "Its curve could not be read" };
   let D = null, cluster = null, root = null, probe = null;
+  // the legacy launch path closed (LEGACY_LAUNCH=off, Citycoin.dev master v5 stage S23): the probe (GET /api/admin/lp) carries legacyLaunch "off"
+  // only then. The tab shows one neutral line instead of the approve controls, the setup steps that serve new launches only (start, the price
+  // curve, the allow-list) and "Resume launches"; their routes answer 410. Approvals on record (with Revoke), launched coins, fees, pausing and
+  // every other step stay. Without the key every line below reads as before.
+  const LAUNCH_CLOSED = "New city-coin launches on this launchpad are closed. Coins already launched keep trading.";
+  const SETUP_CLOSED = ["start", "config", "allow"];
+  const closedNow = () => Boolean(probe && probe.legacyLaunch === "off");
 
   const el = (...a) => D.el(...a);
   const sol = (lamports) => `${(Number(lamports) / 1e9).toLocaleString("en-US", { maximumFractionDigits: 6 })} SOL`;
@@ -39,7 +46,8 @@
       if (!r || !["not_confirmed", "not_done", "rpc_unavailable", "dbc_unreadable", "offline"].includes(r.error)) break;
       await new Promise((ok) => setTimeout(ok, 2500));
     }
-    if (r && ["bad_signature", "failed", "wrong_transaction", "not_yours", "bad_step"].includes(r.error)) forget(entry.signature);
+    // (legacy_launch_closed: LEGACY_LAUNCH=off refuses to record an approval or a launch-only setup step; the chain stays the record)
+    if (r && ["bad_signature", "failed", "wrong_transaction", "not_yours", "bad_step", "legacy_launch_closed"].includes(r.error)) forget(entry.signature);
     return r;
   }
   async function retryPending() {
@@ -181,6 +189,7 @@
       li.append(head, el("p", "lp-step__why", x.reason));
       const box = el("div", "lp-step__box");
       if (x.id === "handoff" && (x.state === "ready" || x.adoptable)) li.append(handoffForm(box, x));
+      else if (x.state === "ready" && closedNow() && SETUP_CLOSED.includes(x.id)) li.append(el("p", "muted small", LAUNCH_CLOSED));
       else if (x.state === "ready") li.append(btn(`Prepare step ${x.n}`, () => signFlow(box, { path: "/api/admin/lp/tx", body: { step: x.id }, ephemeral: x.ephemeral || 0, after: rerender })));
       li.append(box);
       steps.append(li);
@@ -269,11 +278,13 @@
     const r = await D.api(q("/api/admin/lp/candidates"));
     if (!r || !r.ok) { body.replaceChildren(el("p", "lp-error", words(r))); return; }
     body.replaceChildren();
-    if (r.global && r.global.length) { const g = el("div", "lp-note"); g.append(el("p", "lp-strong", "Approving is not possible yet:"), reasonList(r.global)); body.append(g); }
-    if (r.paused) body.append(el("p", "lp-warn", "Launches are paused: approved founders cannot launch until you resume them (below)."));
+    const closed = closedNow();
+    if (closed) body.append(el("p", "lp-note", LAUNCH_CLOSED));
+    if (!closed && r.global && r.global.length) { const g = el("div", "lp-note"); g.append(el("p", "lp-strong", "Approving is not possible yet:"), reasonList(r.global)); body.append(g); }
+    if (!closed && r.paused) body.append(el("p", "lp-warn", "Launches are paused: approved founders cannot launch until you resume them (below)."));
     // Meteora's programs not the tested builds (or not checkable): a city can be fine while every approval waits; the button says so
     const hold = r.meteora && r.meteora.state !== "ok" ? (r.meteora.state === "changed" ? r.meteora.message : "Meteora's programs could not be checked just now, so approvals wait. Reload in a minute.") : null;
-    body.append(el("h4", null, "Approve a city coin"));
+    body.append(el("h4", null, closed ? "Coin designs on record" : "Approve a city coin"));
     if (!r.candidates.length) body.append(el("p", "muted", "No city has a coin design waiting."));
     for (const c of r.candidates) {
       const card = el("div", `lp-card${c.ok ? "" : " lp-card--blocked"}`);
@@ -303,7 +314,8 @@
       }
       for (const wmsg of c.warnings || []) card.append(el("p", "lp-warn", wmsg));
       const box = el("div", "lp-step__box");
-      if (c.ok) {
+      if (closed) card.append(el("p", "muted small", LAUNCH_CLOSED));
+      else if (c.ok) {
         const sel = el("select", "lp-select"); sel.setAttribute("aria-label", "How long the approval lasts");
         for (const d of [1, 3, 7, 14, 30]) { const o = el("option", null, `${d} day${d === 1 ? "" : "s"}`); o.value = String(d); sel.append(o); }
         sel.value = "7";
@@ -395,6 +407,8 @@
     if (!st.launchpad) { s.append(el("p", "muted", "The launchpad is not started yet.")); return; }
     const paused = st.launchpad.launchesPaused;
     s.append(el("p", null, paused ? "Launches are PAUSED: approved founders cannot launch." : "Launches are running."));
+    // closed (LEGACY_LAUNCH=off): launches are never resumed from here (410); pausing them stays (the chain's own stop, stage S58)
+    if (closedNow()) { s.append(el("p", "muted small", LAUNCH_CLOSED)); if (paused) return; }
     const box = el("div", "lp-step__box");
     s.append(btn(paused ? "Resume launches" : "Pause launches", () => signFlow(box, { path: "/api/admin/lp/pause/tx", body: { launches: !paused }, after: rerender })), box);
   }
@@ -428,7 +442,7 @@
     const setup = section("Setup", "Do the steps in order. Step 1 needs both programs' upgrade authority in your wallet (the guide's step 10); step 2 hands them to your Squads right after.");
     setup.append(cards);
     await setupSection(setup, st);
-    const cities = section("Cities", "A founder can launch only after you approve their city on chain. The name and ticker are fixed at approval.");
+    const cities = section("Cities", closedNow() ? LAUNCH_CLOSED : "A founder can launch only after you approve their city on chain. The name and ticker are fixed at approval.");
     const coins = section("Launched coins", "These buttons do what a keeper would do. Anyone may pay for them; nobody can move the city's money anywhere else.");
     const platform = section("Platform fees", "Vicinity's share of every trade and launch waits on Meteora until the dev wallet collects it.");
     const pause = section("Launches", "Pausing stops new launches only. Trading and fees go on.");

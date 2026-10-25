@@ -22,6 +22,9 @@
  *        collected first (harvest_curve_fees, anyone may), then claim_founder_fees, then the SOL is unwrapped
  * Every POST echoes the cluster the page shows (body.cluster) and is refused on a mismatch (a GET may leave it out: the page learns the
  * cluster from that answer, and a GET that names another cluster is refused too); the RPC's genesis hash is checked before any read. Approving, launching and graduating also need the price-curve settings set explicitly (lpSetup().configsSet).
+ * LEGACY_LAUNCH=off (stage S23, src/legacylaunch.js): POST /api/lp/launch/tx answers 410 legacy_launch_closed before any read, and the status of
+ * a city whose coin is not launched says state "closed" (why legacy_launch_closed, the neutral line) instead of anything about an approval; a
+ * launched coin's status, graduation and the founder's fee collection are unchanged.
  * A launch is also refused (409 program_changed; 503 program_check_unavailable when it cannot be read) while a Meteora program on the
  * cluster is not the build the team tested (src/programpins.js, read fresh for the build): a launch on an untested build is as bad as
  * an approval on one. The founder is told in plain words (no fingerprints) that their approval stays. This holds launches from this
@@ -52,6 +55,8 @@ import { formatAmount } from "./sol/input.js";
 import { LAYOUT } from "./sol/layout.js";
 import { harvestCurveFees } from "./sol/lpadmin-ix.js";
 import * as IX from "./sol/lplaunch-ix.js";
+import { LEGACY_LAUNCH_LINE, launchClosed } from "./legacylaunch.js";
+import { legacyLaunchClosed } from "./v5policy.js";
 
 const WSOL = ADDRESSES.wsol;
 /** The most SOL a founder's first buy may spend (raw lamports): 10 SOL. */
@@ -287,6 +292,12 @@ async function launchStatus(request, env, fetchImpl, now) {
     out.founderFees = await founderFees(env, s, st.coin, fetchImpl).catch(() => null);
     out.yours = st.coin.founder === who.wallet;
     return json(out, 200, { "Cache-Control": "no-store" });
+  }
+  // the legacy launch path closed (stage S23): nothing is launched here any more, so nothing about a launch's cost, a first buy, a review or a
+  // pause is said; an approval on record is still shown as recorded on chain
+  if (legacyLaunchClosed(env)) {
+    const { cost: _cost, firstBuy: _firstBuy, ...rest } = out;
+    return json({ ...rest, state: "closed", why: "legacy_launch_closed", message: LEGACY_LAUNCH_LINE }, 200, { "Cache-Control": "no-store" });
   }
   let p = launchProblem(st, s, who.wallet, nowS);
   if (p && p.error === "founder_mismatch") return err(p.error, p.message, 403, { state: p.state, approval: out.approval });
@@ -574,6 +585,8 @@ export async function handleLaunchApi(request, env, fetchImpl = fetch, now = Dat
   const r = routes[path];
   if (!r) return json({ error: "not_found" }, 404);
   if (method !== r[0]) return json({ error: "method_not_allowed" }, 405);
+  // the legacy launch path closed (stage S23, src/legacylaunch.js; src/index.js asks first): the launch build, before any read
+  if (path === "/api/lp/launch/tx") { const closed = launchClosed(env); if (closed) return closed; }
   try { return await r[1](request, env, fetchImpl, now); }
   catch (e) { console.error("lp launch route failed", path, codeOf(e)); return err("unavailable", "Something went wrong on the site. Nothing was built. Try again in a minute.", 503); }
 }

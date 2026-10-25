@@ -59,6 +59,11 @@
   // routes answer 410), and no old founder rule (the seven-day hold, the founder amount, the Seed Steward probation, grace, elections) is told as
   // current. A seat or a term on record is shown as recorded. Without the key (today) every line below reads as before.
   const seatsFrozen = (d = me) => Boolean(d && d.legacySeats === "frozen");
+  // the legacy launch path closed (LEGACY_LAUNCH=off: /api/me says legacyLaunch "off"; Citycoin.dev master v5 stage S23): the coin studio is not
+  // shown (its route answers 410), the coin card says the closed line until a coin has launched, and the old-contract queue offers Reject only.
+  // Without the key (today) every line below reads as before.
+  const launchClosed = (d = me) => Boolean(d && d.legacyLaunch === "off");
+  const LAUNCH_CLOSED = "New city-coin launches on this launchpad are closed. Coins already launched keep trading.";
   // the launch on our own launchpad (lpMount below): is it switched on here (the server's word in every GET /api/coins answer,
   // launchLabClosed, or the probe asked once); the city whose launch card is shown
   let lpOn = false, lpProbed = false, lpCity = null;
@@ -1314,7 +1319,8 @@
     if (cd && cd.mint) { $("#coin-mint").textContent = cd.mint; $("#coin-mint").title = cd.mint; $("#coin-mint-copy").setAttribute("aria-label", `Copy the contract address ${cd.mint}`); }
     tickerLine();
     const MADE = "Every city coin is made by Vicinity from the city list; the founder chooses it and launches it once Vicinity's owner approves it on the blockchain.";
-    $("#coin-note").textContent = rdy && !cd
+    $("#coin-note").textContent = launchClosed() && !(cd && cd.launched) ? LAUNCH_CLOSED
+      : rdy && !cd
       ? (mine ? `${c.name}'s coin is ready in your Founder tab: check it, then use it.` : seat ? `${MADE} ${seat.name}, ${c.name}'s ${founded ? "founder" : "chosen founder"}, hasn't chosen it yet.` : (seatsFrozen() ? MADE : `${MADE} The seat is still open: see the founder path.`))
       : mine
       ? (cd ? (cd.launched ? `${c.name}'s coin is live. Its design is locked, as the rules promise.`
@@ -1328,7 +1334,7 @@
       : seat ? `${seat.name}, ${c.name}'s founder, hasn't designed the coin yet. It'll appear here the moment they do.`
       : `${c.name}'s founder designs this coin: its name, logo, colour and what it's paired with.${seatsFrozen() ? "" : " The seat is still open: see the founder path."}`;
     // with the ready-made coin on (COIN_V2_READY), the coin is made by Vicinity and chosen in its own card: the old studio stays hidden
-    $("#coin-studio").hidden = !mine || Boolean(cd && cd.launched) || me.coinV2Ready === true;
+    $("#coin-studio").hidden = !mine || Boolean(cd && cd.launched) || me.coinV2Ready === true || launchClosed();
     if (mine && !studioDirty) fillStudio();
     if (cready) cready.repaint(); // the ready-made coin's preview, painted earlier, stands in this card again
   }
@@ -1468,7 +1474,7 @@
   async function loadCoinQueue() {
     const r = await api("/api/coins?waiting=1");
     const list = r && r.ok ? r.waiting : [];
-    const closed = Boolean(r && r.launchLabClosed === true) || lpOn;
+    const closed = Boolean(r && r.launchLabClosed === true) || lpOn || launchClosed();
     $("#coin-admin").hidden = !list.length;
     const title = closed ? "Old LaunchLab contracts to settle" : "Contracts waiting for a check";
     $("#coin-admin-title").textContent = title;

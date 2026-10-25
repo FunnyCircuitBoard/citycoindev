@@ -53,6 +53,11 @@
  *                            never unfreezes it.
  *   legacySeatsFrozen(env)   legacySeats(env) is "frozen" or "held": every legacy seat, squad, endorsement, objection, resign and election
  *                            writer answers 410, the job skips its seats and elections steps, and the founder hold streaks stop.
+ *   legacyLaunch(env)        LEGACY_LAUNCH as the Worker applies it (stage S23, src/legacylaunch.js): "off" while LEGACY_LAUNCH=off is accepted by the
+ *                            v5 check for the switch's OWN inputs (DEPLOYMENT_ENV); "held" while LEGACY_LAUNCH=off is set but refused, or while it
+ *                            holds a value outside the switch's set (the path stays closed: never reopened by a configuration mistake); "on" with
+ *                            LEGACY_LAUNCH unset, blank or "on", which is today's site. An error in an unrelated input never closes it.
+ *   legacyLaunchClosed(env)  legacyLaunch(env) is "off" or "held": every legacy approval, launch and founder studio writer answers 410.
  *   IDENTITY_POLICY          the two identity lifetimes of the policy (policy.identity: a 120-second single-use challenge, a 300-second
  *                            single-use hand-off), so the challenge service reads the master's numbers, never its own; and the policy
  *                            version a location verified under this master records (users.loc_policy, stage S11).
@@ -67,7 +72,7 @@
  * which reads MAIN_TOKEN_MINT, OFFICIAL_X_URL and OFFICIAL_TELEGRAM_URL (none of them supplied by the owner yet).
  */
 import { FLAG_VALUES, MASTER_POLICY, nextSelectionBoundary, validatePolicy } from "./masterpolicy.js";
-import { hostRedirectOn, legacyLinkOn, legacySeatsValue, mainTokenV5On, publicV5On, walletOnlyOn } from "./flags.js";
+import { hostRedirectOn, legacyLaunchValue, legacyLinkOn, legacySeatsValue, mainTokenV5On, publicV5On, walletOnlyOn } from "./flags.js";
 import { deploymentAccepted, mainMint, officialLinks } from "./maintoken.js";
 import { DEFAULT_SITE_ORIGIN, DEFAULT_SITE_ORIGINS, normalizeOrigin, siteConfig } from "./site-config.js";
 import { brandOf } from "./brand.js";
@@ -191,6 +196,9 @@ export function checkPolicyConfig(env, { log = (...args) => console.error(...arg
   // the legacy seat freeze held rather than accepted (stage S16: LEGACY_SEATS=frozen refused, a value outside the switch's set, or pages built
   // frozen without it): the freeze holds, and the log says why the configuration is wrong. Unset with pages built without it (today): no line
   for (const code of legacySeatsRefusals(env)) say(`seats|${code}`, "legacy seats switch refused", code, "(held frozen)");
+  // the legacy launch path held closed rather than accepted (stage S23: LEGACY_LAUNCH=off refused, or a value outside the switch's set): the
+  // path stays closed, and the log says why the configuration is wrong. Unset, blank or "on" (today): no line
+  for (const code of legacyLaunchRefusals(env)) say(`launch|${code}`, "legacy launch switch refused", code, "(held off)");
   return { ok: r.ok, codes: r.errors.map((e) => e.code) };
 }
 
@@ -470,6 +478,61 @@ export function legacySeats(env) {
 
 /** The legacy seat machinery is frozen ("frozen" or "held" above): the one test every writer, job step and reader asks. Never throws. */
 export const legacySeatsFrozen = (env) => legacySeats(env) !== "on";
+
+/* ---------------------------------------------------------------- LEGACY_LAUNCH as the Worker applies it */
+
+/**
+ * The v5 check's codes that belong to LEGACY_LAUNCH itself: the environment a deployment that changes a switch must name, or a check that could
+ * not run. Any error on the switch's own path (deployment.flags.LEGACY_LAUNCH) is its own too. Every other code (another switch's input, an
+ * official link, the main token, the site origins, LAUNCH_V5's own inputs) refuses only its own feature: an unrelated mistake never closes the
+ * legacy launch path, and never reopens it.
+ */
+export const LEGACY_LAUNCH_CODES = Object.freeze(["CONFIG_CHECK_FAILED", "DEPLOYMENT_MISSING", "ENVIRONMENT_INVALID", "ENVIRONMENT_UNSET"]);
+
+/**
+ * Why the legacy launch path is HELD closed rather than accepted closed in this environment: [] when it is accepted or not set at all, else the
+ * reasons (codes only, never a value).
+ *   LEGACY_LAUNCH_POLICY_REFUSED  LEGACY_LAUNCH=off and the v5 configuration check refuses one of the switch's own inputs (LEGACY_LAUNCH_CODES:
+ *                                 DEPLOYMENT_ENV unset or not a known environment). An error elsewhere in the deployment is not a reason here.
+ *   LEGACY_LAUNCH_VALUE_REFUSED   LEGACY_LAUNCH holds a value outside the switch's set (not blank, "on" or "off" once trimmed, any letter case:
+ *                                 "of", "false", "closed", a typo), which the v5 check also refuses by name (FLAG_VALUE_INVALID); the page build
+ *                                 stops on it in wrangler.jsonc (scripts/pages/build.mjs pageV5Config), so it comes from the Cloudflare dashboard.
+ * A refusal never reopens the path: legacyLaunch answers "held" and the writers keep answering 410 (see legacyLaunch for the master's lines).
+ */
+export function legacyLaunchRefusals(env) {
+  let value = "";
+  try { value = legacyLaunchValue(env); } catch { /* a setting that cannot be read reads as unset */ }
+  if (value === "" || value === "on") return [];
+  if (value !== "off") return ["LEGACY_LAUNCH_VALUE_REFUSED"];
+  try { return ownErrors(env, LEGACY_LAUNCH_CODES, "LEGACY_LAUNCH").length ? ["LEGACY_LAUNCH_POLICY_REFUSED"] : []; }
+  catch { return ["LEGACY_LAUNCH_CHECK_FAILED"]; }
+}
+
+/**
+ * The legacy launch path as the Worker applies it (stage S23): "off", "held" or "on".
+ *   "off"   LEGACY_LAUNCH=off (trimmed, any letter case) and the v5 check accepts the switch's own inputs (DEPLOYMENT_ENV). The live launchpad's
+ *           approvals, launches and the founder studio are closed (src/legacylaunch.js); history reads stay.
+ *   "held"  LEGACY_LAUNCH=off with its own inputs refused, or LEGACY_LAUNCH set to a value outside the switch's set: the path is closed all the
+ *           same. The direction is the master's: section 15, "Keep historical records readable, but do not let historical rules authorize new
+ *           actions" (master-v5.txt line 924); section 27, "Keep a narrow legacy compatibility module only if existing assets require it;
+ *           prevent new launches from using that route" (lines 1566-1567); section 37 step 9, "Coordinate legacy new-launch disable" and step 10,
+ *           "Deploy production flags disabled where required" (lines 2099-2101); section 16, "Runtime validation rejects incompatible flags and
+ *           missing required deployment inputs with named errors" (line 982). A setting that says something other than "on" is never read as a
+ *           reason to keep building launches on the program the master retires; closing ends no coin, and nothing launched is touched. The
+ *           reason is logged once per isolate (checkPolicyConfig: "legacy launch switch refused <code> (held off)").
+ *   "on"    LEGACY_LAUNCH unset, blank or "on" (trimmed, any letter case): today's site exactly, whatever any other setting says (an error in
+ *           another input, LAUNCH_V5 refused for LAUNCH_V5_WITH_LEGACY_LAUNCH, a refused MAIN_TOKEN_MINT: none of them closes it).
+ * Never throws. With LEGACY_LAUNCH unset this reads one setting and nothing else.
+ */
+export function legacyLaunch(env) {
+  let value = "";
+  try { value = legacyLaunchValue(env); } catch { /* a setting that cannot be read reads as unset */ }
+  if (value === "" || value === "on") return "on";
+  return legacyLaunchRefusals(env).length ? "held" : "off";
+}
+
+/** The legacy launch path is closed ("off" or "held" above): the one test every legacy launch writer and builder asks. Never throws. */
+export const legacyLaunchClosed = (env) => legacyLaunch(env) !== "on";
 
 /* ---------------------------------------------------------------- the public policy */
 

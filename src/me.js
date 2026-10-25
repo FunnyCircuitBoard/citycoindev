@@ -24,7 +24,7 @@ import { communityById } from "./community.js";
 import { displayTicker } from "./tickers.js";
 import { latestBalances } from "./ledger.js";
 import { coinV2ReadyOn, dashboardV2On, feedV2On, notifyOn, profilesOn, v2On, walletSendOn } from "./flags.js";
-import { IDENTITY_POLICY, legacySeatsFrozen, mainTokenV5, walletOnly, walletOnlyHeld } from "./v5policy.js";
+import { IDENTITY_POLICY, legacyLaunchClosed, legacySeatsFrozen, mainTokenV5, walletOnly, walletOnlyHeld } from "./v5policy.js";
 import { legacyNotice } from "./legacy.js";
 import { unreadCount } from "./notify.js";
 import { countsOf } from "./profile-core.js";
@@ -235,7 +235,10 @@ export async function handleMe(request, env, fetchImpl = fetch, now = Date.now()
     ...(coinV2ReadyOn(env) ? { coinV2Ready: true } : {}), ...(only ? { walletOnly: true } : {}), ...(legacy ? { legacyLink: legacy } : {}),
     // the legacy seats frozen (stage S16, src/v5policy.js legacySeats), so a page can leave out the founder path, the endorsements, the squads
     // and the elections. With the switch off: no key
-    ...(legacySeatsFrozen(env) ? { legacySeats: "frozen" } : {}) };
+    ...(legacySeatsFrozen(env) ? { legacySeats: "frozen" } : {}),
+    // the legacy launch path closed (stage S23, src/legacylaunch.js), so the dashboard shows its closed line instead of the coin studio and the
+    // launch steps. With the switch unset: no key
+    ...(legacyLaunchClosed(env) ? { legacyLaunch: "off" } : {}) };
   const flag = pf ? { ...v2Flag, profilesFlag: true } : v2Flag;
   if (!s) return json({ signedIn: false, providers: prov, ...flag });
   if (!s.user) {

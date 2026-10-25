@@ -514,3 +514,60 @@ test("launched, the chain's symbol not in the answer: the city's ticker, never '
   await bare.L.founder(bare.$("#lp-launch"), { cityId: "5140405" });
   assert.match(text(bare.$("#lp-launch")), /Your coin is live\./);
 });
+
+/* ---------- LEGACY_LAUNCH=off (Citycoin.dev master v5 stage S23): the closed line, read from /api/me and the status answer ---------- */
+const CLOSED_LINE = "New city-coin launches on this launchpad are closed. Coins already launched keep trading.";
+test("pure: the 'closed' status is a neutral line with no launch control (the server's words, or the same line)", () => {
+  const P = pure();
+  assert.equal(P.CLOSED, CLOSED_LINE);
+  assert.deepEqual(plain(P.view({ ok: true, state: "closed", why: "legacy_launch_closed", message: CLOSED_LINE })), { state: "closed", tag: ["Closed", ""], canLaunch: false, lines: [CLOSED_LINE] });
+  assert.deepEqual(plain(P.view({ ok: true, state: "closed" }).lines), [CLOSED_LINE]);
+});
+
+test("the dashboard with the legacy launch path closed: the launch card says the closed line, the studio is gone, the Founder card says it with no button; without the key: today's", async () => {
+  const closedStatus = { ...READY, wallet: ADDR, state: "closed", why: "legacy_launch_closed", message: CLOSED_LINE };
+  delete closedStatus.cost; delete closedStatus.firstBuy;
+  const run = async (closed, { design = DESIGN } = {}) => {
+    const lpCalls = [];
+    const me = founderMe();
+    if (closed) me.legacyLaunch = "off";
+    const page = await openDashboard({
+      me, official: { ok: true, cityCoins: { cluster: "mainnet" } },
+      api: async (path) => {
+        if (path.startsWith("/api/lp/")) { lpCalls.push(path); return path.includes("city=") ? (closed ? closedStatus : { ...READY, wallet: ADDR }) : { ok: true, on: true, cluster: "mainnet", configsSet: true, speedTable: true }; }
+        if (path.startsWith("/api/coins")) return { ...design, launchLabClosed: true };
+        return undefined;
+      },
+    });
+    page.win.LP = { supported: async () => true, say: (c, x) => (x && x.message) || c, renderSummary() {}, prepare: async () => { throw new Error("not in this test"); } };
+    vm.runInContext(LP_LAUNCH, page.win, { filename: "public/lp-launch.js" });
+    await page.advance(61_000);
+    await page.flush(60);
+    return page;
+  };
+  // a founder with no design yet: the Founder card never offers "Design the city coin" while closed
+  const bare = await run(true, { design: { ...DESIGN, coin: null } });
+  assert.equal(bare.text("#fcard-note"), CLOSED_LINE);
+  assert.equal(bare.$("#fcard-go").hidden, true);
+  assert.equal(bare.$("#coin-studio").hidden, true);
+  assert.doesNotMatch(bare.text("#today-list"), /Design Utica's coin/, "Today offers no studio step");
+  const bareOpen = await run(false, { design: { ...DESIGN, coin: null } });
+  assert.equal(bareOpen.text("#fcard-go"), "Design the city coin", "without the key: today's words");
+  assert.match(bareOpen.text("#today-list"), /Design Utica's coin/);
+  const page = await run(true);
+  const card = page.$("#lp-launch");
+  assert.equal(card.hidden, false);
+  assert.equal(card.querySelector("[data-lp-state]").textContent, "Closed");
+  assert.equal(card.querySelector("h2").textContent, "Your city coin");
+  assert.match(text(card), new RegExp(CLOSED_LINE.replace(/\./g, "\\.")));
+  assert.equal(card.querySelectorAll("button").length, 0, "no launch control");
+  assert.equal(page.$("#coin-studio").hidden, true, "the studio is not offered (its route answers 410)");
+  assert.equal(page.text("#coin-note"), CLOSED_LINE);
+  assert.equal(page.text("#fcard-note"), CLOSED_LINE);
+  assert.equal(page.$("#fcard-go").hidden, true);
+  const open = await run(false);
+  assert.equal(open.$("#lp-launch").querySelector("[data-lp-state]").textContent, "Approved");
+  assert.equal(open.$("#coin-studio").hidden, false, "the founder's studio as today");
+  assert.equal(open.text("#fcard-go"), "Launch your city coin");
+  assert.doesNotMatch(open.text("#coin-note"), /launches on this launchpad are closed/);
+});
