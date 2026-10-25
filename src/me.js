@@ -13,7 +13,7 @@ import { cleanEmail, consumeEmailCode, getSession, isFresh, providers, renewSess
 import { linkLocked, linkWindow, lockedAnswer, mayDisown, ownerCould, ownerFresh } from "./walletlink.js";
 import { access } from "./access.js";
 import { countRecent, noteEvent, useAttestation } from "./attest.js";
-import { teamFor, tokenMint } from "./official.js";
+import { configuredSocialProfiles, teamFor, tokenMint } from "./official.js";
 import { getHolding, holderSnapshot, isTeamWallet, rankOf } from "./chain.js";
 import { DAY, HOUR, POLICY, iso } from "./policy.js";
 import { VOTE_WEIGHT, activeBan, adminWallets, amountsFor, liveSeatOfUser, managerOf } from "./roles.js";
@@ -29,7 +29,7 @@ import { legacyNotice } from "./legacy.js";
 import { unreadCount } from "./notify.js";
 import { countsOf } from "./profile-core.js";
 import { googleAdded, removeGoogle } from "./logins.js";
-import { SAME, brandWords } from "./brandwords.js";
+import { SAME, brandWords, ownWords } from "./brandwords.js";
 
 const HOME_LOCK_DAYS = 7; // a home community can be changed once a week
 const mask = (w) => (w ? `${w.slice(0, 5)}*****${w.slice(-3)}` : null);
@@ -338,15 +338,37 @@ export function nameSkeleton(s) {
 //   · one of the staff words as the first or last WORD of the name (Admin_Sakib, SupportTeam, TheOfficial)
 //   · starting with admin / administrator / moderator
 //   · member followed by digits only (member12): the name the wallet link statement gives an account without a username
+//   · under a label set other than today's, its own name and the official accounts' handles too (brandReserve below)
 const STAFF_WORDS = ["admin", "administrator", "moderator", "mod", "mods", "support", "official", "staff", "owner", "system", "security", "help", "founder", "root", "team"];
 const STAFF_AS_WORD = ["admin", "administrator", "moderator", "mod", "mods", "support", "official", "staff"].map(nameSkeleton);
 const STAFF_SKELETONS = STAFF_WORDS.map(nameSkeleton);
 const STAFF_PREFIXES = ["admin", "administrator", "moderator"].map(nameSkeleton);
 const STAFF_EXACT = new RegExp(`^(${STAFF_WORDS.join("|")})[0-9]*$`);
-export const reservedUsername = (s) => {
+const NO_RESERVE = Object.freeze({ contains: Object.freeze([]), exact: Object.freeze([]) });
+/**
+ * What a label set other than today's reserves on top of the rules below (go-live review finding GL-1: with 0 members, the first person to
+ * register after the switch could otherwise take "CityCoinDev", the official X handle, and show a pass with the "Verified account" badge):
+ *   · anything that looks like the label set's own words (src/brandwords.js ownWords: "citycoin", "citycoindev"), look-alike letters included,
+ *     the same rule as "vicinity" (Citycoin, Citycoin_dev, CitycoinTeam, C1tyc0inDev)
+ *   · exactly the handle of an official account the configuration names (OFFICIAL_X_URL, OFFICIAL_TELEGRAM_URL; src/official.js
+ *     configuredSocialProfiles), look-alike letters included
+ * The label set is the Worker's reading (src/brandwords.js brandWords, from src/brand.js brandOf): the deployed pages' set, so a BRAND set
+ * only in the Cloudflare dashboard over today's pages reserves nothing new, and pages built with the Citycoin.dev set keep these names
+ * reserved even if BRAND goes missing. With today's label set: nothing on top, so today's rule is unchanged.
+ */
+export function brandReserve(env) {
+  const b = brandWords(env).brand;
+  if (!b.key) return NO_RESERVE;
+  let handles = [];
+  try { handles = configuredSocialProfiles(env).map((p) => nameSkeleton(p.handle)).filter(Boolean); } catch { /* an unreadable link reserves nothing more */ }
+  return Object.freeze({ contains: Object.freeze(ownWords(b).map(nameSkeleton).filter(Boolean)), exact: Object.freeze(handles) });
+}
+/** Is `s` a name nobody may take? `extra`: what the deployment's label set reserves on top (brandReserve(env)); none by default. */
+export const reservedUsername = (s, extra = NO_RESERVE) => {
   if (/^member\d+$/i.test(String(s))) return true; // "member<id>" is how the wallet link statement names an account that has no username (src/walletlink.js accountName)
   const k = nameSkeleton(s);
   if (k.includes(nameSkeleton("vicinity"))) return true;
+  if (extra.contains.some((w) => k.includes(w)) || extra.exact.includes(k)) return true;
   if (STAFF_EXACT.test(String(s).toLowerCase().replace(/[^a-z0-9]/g, "")) || STAFF_SKELETONS.includes(k)) return true;
   const words = String(s).replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean).map(nameSkeleton);
   if (words.length > 1 && (STAFF_AS_WORD.includes(words[0]) || STAFF_AS_WORD.includes(words[words.length - 1]))) return true;
@@ -373,7 +395,7 @@ export async function handleUsername(request, env, now = Date.now()) {
   if (a.u.handle && a.u.handle.toLowerCase() === username.toLowerCase()) return json({ ok: true, username: a.u.handle });
   const taken = await env.DB.prepare("SELECT id FROM users WHERE lower(handle) = lower(?) AND id != ?").bind(username, a.u.id).first();
   if (taken) return json({ ok: false, error: "username_taken" }, 409);
-  if (reservedUsername(username)) return json({ ok: false, error: "username_reserved" }, 400);
+  if (reservedUsername(username, brandReserve(env))) return json({ ok: false, error: "username_reserved" }, 400);
   // Limits first: the look-alike check below reads every username, so it must not be repeatable at will.
   if (await countRecent(env, a.u.id, "rename", now - DAY) >= RENAMES_PER_DAY) return json({ ok: false, error: "slow_down" }, 429);
   if (await countRecent(env, a.u.id, "rename_try", now - HOUR) >= RENAME_TRIES_PER_HOUR) return json({ ok: false, error: "slow_down" }, 429);

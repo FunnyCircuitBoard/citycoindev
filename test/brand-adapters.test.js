@@ -849,24 +849,19 @@ test("area d, BRAND=citycoin without the main-token switch: no social account is
     assert.deepEqual(check("https://x.com/ZqSomeoneElse"), { verdict: "not_official", kind: "social", message: "This X account is not on the official list. Citycoin.dev lists no official X account right now." });
     assert.deepEqual(check("@ZqSomeoneElse"), { verdict: "not_official", kind: "social", message: "This account is not on the official list: Citycoin.dev lists no official social accounts right now." });
     assert.equal(check("@VicinityCitySOL").message, "This is a former account of ours (legacy), not a current official account.");
-    // the label set's own address: on the official list since stage S06 (main 46c5825 attaches citycoin.dev and lists it in OFFICIAL.websites,
-    // its www. form checked as the name itself, as today's label set answers: test/s06-review.test.js R1), so the official website in the
-    // label set's words
+    // the label set's own address while this Worker does not serve it (SITE_ORIGINS without citycoin.dev): the planned address, which does not
+    // serve the site yet (src/site-config.js CUTOVER_HOSTS, F9), although OFFICIAL.websites lists it since stage S06: under this label set
+    // "official" is only a host the Worker serves (go-live review finding GL-8)
+    assert.ok(OFFICIAL.websites.includes("citycoin.dev"));
     for (const q of ["citycoin.dev", "https://www.citycoin.dev/connect"]) {
-      assert.deepEqual(check(q), { verdict: "official", kind: "website", message: "This is the official Citycoin.dev website." }, q);
+      assert.deepEqual(check(q), { verdict: "warning", kind: "website", message: "This is the address planned for Citycoin.dev. It does not serve the site yet, so nothing there is official until it does." }, q);
     }
-    // a list without it (as before S06): the planned address, which does not serve the site yet (src/site-config.js CUTOVER_HOSTS, F9)
-    const at = OFFICIAL.websites.indexOf("citycoin.dev");
-    assert.ok(at >= 0);
-    OFFICIAL.websites.splice(at, 1);
-    try {
-      for (const q of ["citycoin.dev", "https://www.citycoin.dev/connect"]) {
-        assert.deepEqual(check(q), { verdict: "warning", kind: "website", message: "This is the address planned for Citycoin.dev. It does not serve the site yet, so nothing there is official until it does." }, q);
-      }
-    } finally { OFFICIAL.websites.splice(at, 0, "citycoin.dev"); }
-    // once SITE_ORIGINS lists it, it is the official website, and the public list names it (never the old names: review finding CRAWL-3)
+    // once SITE_ORIGINS lists it, it is the official website, and the public list names it (never the old names: review finding CRAWL-3); its
+    // www. is never served (it moves to the apex: domain-cutover.md section 2), so it is an address of ours, not the official website
     const moved = { ...env, SITE_ORIGIN: "https://citycoin.dev", SITE_ORIGINS: "https://citycoin.dev https://vicinity.city" };
     assert.equal(checkOfficial("citycoin.dev", isSolanaAddress, moved).verdict, "official");
+    assert.deepEqual(checkOfficial("https://www.citycoin.dev/connect", isSolanaAddress, moved),
+      { verdict: "warning", kind: "website", ours: true, message: "This is an address of ours, but it does not serve the Citycoin.dev site, so nothing there is official." });
     assert.deepEqual(withMint(moved).websites, ["citycoin.dev"]);
     for (const q of CHECK_INPUTS) nothingLegacy(check(q), `checker ${JSON.stringify(q)}`);
     // the former account as the configured link is refused (amendment 01): no account at all, never the old one

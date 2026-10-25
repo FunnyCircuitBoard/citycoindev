@@ -1060,7 +1060,11 @@ function run(text, ctx, { rules, lists }) {
   }
   if (rules.has("staff")) {
     const staff = new Set(lists.STAFF_WORDS.flatMap(phraseWords));
-    const vic = [...toks, ...joins].filter((t) => skel(t.w) === skel("vicinity") || skel(t.w) === skel("vicinitys"));
+    // "Vicinity", and under a label set other than today's its own words too (ctx.brandNames, src/brandwords.js ownWords: "citycoin",
+    // "citycoindev"; go-live review finding GL-1). A deployment input, not a reviewed list, so RULES_VERSION stays the lists' hash: the rule
+    // only flags, and a person reads every founder description anyway (review, below)
+    const ours = ["vicinity", ...(ctx && Array.isArray(ctx.brandNames) ? ctx.brandNames.filter((n) => typeof n === "string" && n) : [])].flatMap((n) => [skel(n), skel(`${n}s`)]);
+    const vic = [...toks, ...joins].filter((t) => ours.includes(skel(t.w)));
     push(vic.filter((t) => near(toks, { start: t.s, end: t.e }, 3).some((w) => staff.has(w))).map((t) => ({ code: "staff", start: t.s, end: t.e })));
     push(tag("staff", matchList(lists.STAFF_ALONE, toks, [], own)));
   }
@@ -1087,7 +1091,7 @@ const verdict = (issues) => (issues.some((x) => x.severity === "block") ? "block
 /**
  * Screen `raw` as a `target` ("description", "name", "ticker", "reason"). `ctx`: { city: { name, region, countryName, country }, ticker,
  * otherCity?(name) => bool, rulesVersion? (the version the caller expects: another one is an error), lists? (tests: a stand-in for
- * src/screen-words.js) }. Never throws.
+ * src/screen-words.js), brandNames? (the label set's own words, src/brandwords.js ownWords: none under today's) }. Never throws.
  */
 export function screen(target, raw, ctx = {}) {
   let text = null, rulesVersion = RULES_VERSION;

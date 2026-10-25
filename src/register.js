@@ -41,7 +41,7 @@ import { handleChoice, handleLocation, handleStart, handleState, handleTerms, li
 import { recheckLocation } from "./signup-finish.js";
 import { ensureHostSchema, ensureRegisterSchema } from "./store.js";
 import { hostWrite, onThisHost, servedHost } from "./hostbind.js";
-import { nameSkeleton, reservedUsername, validUsername } from "./me.js";
+import { brandReserve, nameSkeleton, reservedUsername, validUsername } from "./me.js";
 import { OPENER_COOKIE, RELAY_OPEN_MS, UL_APPS, appOf, carryNet, openerHash, presented, relayAsn, relayCountry } from "./walletlink.js";
 import { bindOf, challengeGate, forgetLocation, handoffGate, handoffLocationOk, handoffRef, notReady, parseRef, register, registerPin, usableHandoff } from "./register-core.js";
 
@@ -81,7 +81,7 @@ async function handleName(request, env, x) {
   if (raw != null && raw !== "") {
     name = typeof raw === "string" ? raw.trim() : "";
     if (!validUsername(name)) return json({ ok: false, error: "bad_username" }, 400);
-    if (reservedUsername(name)) return json({ ok: false, error: "username_reserved" }, 400);
+    if (reservedUsername(name, brandReserve(env))) return json({ ok: false, error: "username_reserved" }, 400);
     if (await env.DB.prepare("SELECT id FROM users WHERE lower(handle) = lower(?)").bind(name).first()) return json({ ok: false, error: "username_taken" }, 409);
     const skeleton = nameSkeleton(name);
     const others = (await env.DB.prepare("SELECT handle FROM users WHERE handle IS NOT NULL").all()).results;

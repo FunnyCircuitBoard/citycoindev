@@ -361,6 +361,9 @@ const NO_PROFILES = Object.freeze([]);
  * SITE_ORIGIN unset. The link checker's own verdict still knows the legacy names (checkOfficialV5: "Right site").
  */
 const brandWebsites = (env) => siteConfig(env).hosts.filter((h) => !LEGACY_HOSTS.includes(h));
+/** Every website name of ours, each with and without www. (the published list, the legacy hosts and the cutover's own): the link checker
+ *  under a label set other than today's says "an address of ours" for one this Worker does not serve (checkOfficialV5). */
+const OUR_SITE_NAMES = Object.freeze([...new Set([...OFFICIAL.websites, ...LEGACY_HOSTS, ...CUTOVER_HOSTS].flatMap((h) => { const apex = h.replace(/^www\./, ""); return [apex, `www.${apex}`]; }))]);
 /**
  * The official social accounts the configuration names: what OFFICIAL_X_URL and OFFICIAL_TELEGRAM_URL hold after the policy's shape check
  * (src/maintoken.js officialLinks; amendment 01: owner-supplied and verified before they are configured, empty means not shown), as
@@ -542,13 +545,21 @@ function checkOfficialV5(input, isSolanaAddress, env) {
   if (url && url.hostname.includes(".")) {
     const host = url.hostname.toLowerCase().replace(/^www\./, "");
     const hostPath = (host + url.pathname.toLowerCase()).replace(/\/+$/, "");
-    // under a label set other than today's the site may be served on a configured host too (src/site-config.js SITE_ORIGINS)
-    const websites = bw.on ? [...new Set([...OFFICIAL.websites, ...siteConfig(env).hosts])] : OFFICIAL.websites;
-    if (url.protocol === "http:" && websites.includes(host)) return { verdict: "warning", kind: "website", message: "Right site, but the link uses http. Use the https version." };
-    if (websites.includes(host)) return { verdict: "official", kind: "website", message: bw`This is the official Vicinity website.` };
-    // the label set's own planned address (src/site-config.js CUTOVER_HOSTS), not served by this Worker yet: said as it is (review finding F9).
-    // Since stage S06 OFFICIAL.websites lists citycoin.dev (answered "official" above), so this answers only for a list without it
-    if (bw.on && CUTOVER_HOSTS.includes(host)) return { verdict: "warning", kind: "website", message: `This is the address planned for ${P}. It does not serve the site yet, so nothing there is official until it does.` };
+    if (bw.on) {
+      // under a label set other than today's, "official" only for a host this Worker serves in place (src/site-config.js SITE_ORIGINS), exactly
+      // as written: www. is a host of its own (go-live review finding GL-8: www.citycoin.dev and vicinitycity.net are not attached, and
+      // vicinitycity.com serves nothing). Every other name of ours is said as it is, never "official"; the vicinity.city names stay official only
+      // while SITE_ORIGINS lists them (stage S55 removes them)
+      const name = url.hostname.toLowerCase(), served = siteConfig(env).hosts;
+      if (served.includes(name)) return url.protocol === "http:" ? { verdict: "warning", kind: "website", message: "Right site, but the link uses http. Use the https version." }
+        : { verdict: "official", kind: "website", message: bw`This is the official Vicinity website.` };
+      // the label set's own planned address (src/site-config.js CUTOVER_HOSTS) while this Worker does not serve it yet (review finding F9)
+      if (CUTOVER_HOSTS.includes(name) && !served.includes(CUTOVER_HOSTS[0])) return { verdict: "warning", kind: "website", message: `This is the address planned for ${P}. It does not serve the site yet, so nothing there is official until it does.` };
+      if (OUR_SITE_NAMES.includes(name)) return { verdict: "warning", kind: "website", ours: true, message: `This is an address of ours, but it does not serve the ${P} site, so nothing there is official.` };
+    } else {
+      if (url.protocol === "http:" && OFFICIAL.websites.includes(host)) return { verdict: "warning", kind: "website", message: "Right site, but the link uses http. Use the https version." };
+      if (OFFICIAL.websites.includes(host)) return { verdict: "official", kind: "website", message: bw`This is the official Vicinity website.` };
+    }
     const lockPage = OFFICIAL.teamLocks.find((l) => { const u = new URL(l.url); return host === u.hostname && url.pathname.replace(/\/+$/, "") === u.pathname; });
     if (lockPage && url.protocol === "http:") return { verdict: "warning", kind: "lock", message: "Right lock page, but the link uses http. Use the https version." };
     if (lockPage) return { verdict: "official", kind: "lock", legacy: true, message: bw.on ? ourLockMessage(lockPage) : legacyLockMessage(lockPage) };

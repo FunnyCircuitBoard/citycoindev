@@ -458,7 +458,9 @@ export async function handleApi(request, env = {}, fetchImpl = fetch, ctx = null
     if (blocked) return blocked;
     const mint = url.searchParams.get("mint");
     if (mint !== null && !isSolanaAddress(mint)) return json({ ok: false, error: "bad_mint" }, 400);
-    return cached(`fees-${mint || "live"}`, 300, async () => (await publicLimit(env, request, "fees")) || handleFees(request, env, fetchImpl));
+    // the key names the label set's mode too (mainCacheTag: "" with today's, so today's key is unchanged): the fee words carry the product's
+    // name, and an answer kept at the edge before a label-set change is never served after it (go-live review finding GL-DEP-8)
+    return cached(`fees-${mint || "live"}${mainCacheTag(env)}`, 300, async () => (await publicLimit(env, request, "fees")) || handleFees(request, env, fetchImpl));
   }
   // one official city coin's fees so far (lpSetup), read from the chain (src/feestatus.js). With the settings missing it is simply not
   // there (before any method check); the public limiter counts a cache miss; a 404 or a 503 is never kept at the edge
@@ -482,8 +484,9 @@ export async function handleApi(request, env = {}, fetchImpl = fetch, ctx = null
     }
     const blocked = method === "HEAD" ? null : only("GET");
     if (blocked) return blocked;
-    // the key names the configs too (officialCacheKey): a config added to LAUNCHPAD_DBC_CONFIGS is a new list at once
-    return cached(officialCacheKey(s, csv), BROWSER_SECONDS,
+    // the key names the configs too (officialCacheKey): a config added to LAUNCHPAD_DBC_CONFIGS is a new list at once; and the label set's
+    // mode (mainCacheTag, "" with today's): the JSON's rule sentence carries the product's name (go-live review finding GL-DEP-8)
+    return cached(officialCacheKey(s, csv) + mainCacheTag(env), BROWSER_SECONDS,
       async () => (await publicLimit(env, request, "official_coins")) || (csv ? officialCoinsCsv(env, fetchImpl) : officialCoinsJson(env, fetchImpl)), { edge: EDGE_SECONDS });
   }
   // city coins on our own launchpad (lpSetup): with the settings missing they are simply not there (before any method check)

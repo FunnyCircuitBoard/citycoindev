@@ -37,6 +37,14 @@ export function wordsOf(b) {
   return Object.freeze(w);
 }
 
+/**
+ * The words a label set other than today's is known by, lower case and letters and digits only ("citycoin", "citycoindev" for the
+ * Citycoin.dev set), for the name rules: no member takes a username that passes for the product (src/me.js brandReserve), and a coin text
+ * that puts the product's name next to a staff word goes to a person (src/screen.js, the staff rule). None for today's label set: its own
+ * "vicinity" rules stay exactly as written (go-live review finding GL-1). A label, never a persistent identifier.
+ */
+export const ownWords = (b) => (b && b.key ? Object.freeze([...new Set([b.shortName, b.productName].map((s) => String(s).toLowerCase().replace(/[^a-z0-9]/g, "")))].filter(Boolean)) : Object.freeze([]));
+
 /** Today's words: every text exactly as written (the default of every function that takes words). */
 export const SAME = wordsOf(LEGACY_BRAND);
 

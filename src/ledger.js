@@ -235,8 +235,14 @@ export async function ledgerStatus(env, now) {
   return { running: Boolean(last), lastSample: last || null, samplesLast24h: day?.n || 0 };
 }
 
-/** Forget balance history older than 45 days. */
+/**
+ * Forget balance history older than 45 days. Under a label set other than today's without the switch (src/official.js legacyHidden) nothing
+ * is sampled (maybeSample: not_launched), so nothing is forgotten either: the $VICINITY days and samples stay whole, as history, until a
+ * main token counts (go-live review finding GL-HON-7: otherwise the series restarted on 24 Oct 2026 would be gone within 45 days of the
+ * switch). With today's label set, and under MAIN_TOKEN_V5, the batch is exactly as before.
+ */
 export async function pruneLedger(env, now) {
+  if (!mainTokenV5(env) && legacyHidden(env)) return;
   const cutoff = dayOf(now - 45 * DAY);
   await env.DB.batch([
     env.DB.prepare("DELETE FROM blobs WHERE key LIKE 'day:%' AND key < ?").bind(`day:${cutoff}`),

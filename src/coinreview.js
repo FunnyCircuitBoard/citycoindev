@@ -65,7 +65,7 @@ import { notify, pictureReason } from "./notify.js";
 import { coinV2ReviewOn } from "./flags.js";
 import { LEGACY_LAUNCH_LINE, REVIEW_OPEN, launchClosed } from "./legacylaunch.js";
 import { legacyLaunchClosed } from "./v5policy.js";
-import { SAME, brandWords } from "./brandwords.js";
+import { SAME, brandWords, ownWords } from "./brandwords.js";
 
 /* ---------------------------------------------------------------- the words */
 /** Per account, counted atomically BEFORE the work (src/limits.js). */
@@ -236,8 +236,11 @@ async function screenCtx(env, d, sel = null) {
   const names = await cityNames(env);
   const own = new Set([d.city && d.city.name, sel && sel.name, d.name].filter(Boolean).map(normName));
   return { city: d.city, ticker: sel ? sel.symbol : d.ticker, name: sel ? sel.name : d.name, vicinityText: d.description || null,
-    otherCity: (n) => !own.has(normName(n)) && names.has(normName(n)) };
+    otherCity: (n) => !own.has(normName(n)) && names.has(normName(n)), ...brandCtx(env) };
 }
+/** The label set's own words for the screener's staff rule (src/brandwords.js ownWords; go-live review finding GL-1): nothing under today's, so
+ *  today's context is exactly as before. */
+const brandCtx = (env) => { const names = ownWords(brandWords(env).brand); return names.length ? { brandNames: names } : {}; };
 const normName = (s) => String(s || "").normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 let namesCache = null; // every registry city's name (normalized), once per server
 async function cityNames(env) {
@@ -359,7 +362,7 @@ async function selectionProblem(env, cityId, { c = undefined, d = null, country 
   if (c.description !== cityDescription(c.content.city) && !(await approvedDescription(db, cityId, c.description))) {
     // an admin took this text down (src/cointakedown.js): only a person's review decided since brings it back (approvedDescription above)
     if (await takenDownAt(db, cityId, c.description)) return { code: "description_recheck", message: bw`Your description was taken down by Vicinity. Use the default description, or write a new one.` };
-    const r = await screenText(c.description, d.ok ? await screenCtx(env, d, c) : { city: c.content.city, ticker: c.symbol, name: c.name });
+    const r = await screenText(c.description, d.ok ? await screenCtx(env, d, c) : { city: c.content.city, ticker: c.symbol, name: c.name, ...brandCtx(env) });
     if (r.result === "error") return { code: "description_unchecked", message: "We couldn't re-check your description just now. Try again in a minute, or use the default description." };
     // a founder's own words pass only through a person's review now (src/screen.js "review"): one chosen before that is reviewed too
     if (r.result !== "pass") return { code: "description_recheck", message: "A person reads every description a founder writes before it can launch, and yours wasn't reviewed. Check it again and send it for review, or use the default description." };
