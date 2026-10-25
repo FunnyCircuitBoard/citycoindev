@@ -3,7 +3,8 @@
 // against a fake D1 that records every statement: the production shape with synthetic rows (test/helpers/cc5-d1copy.js; no member data).
 // With every switch at its default, and with the switches as committed in wrangler.jsonc, no statement touches a cc5 object, no table is
 // created, and the Worker's statements are the same either way. Nothing in the Worker imports src/cc5schema.js. (Since stage S06 the
-// committed site settings turn on the host binding, whose additive migrations add a nullable host column; that is the only object change.)
+// committed site settings turn on the host binding, whose additive migrations add a nullable host column; that is the only object change.
+// Since stage S55 the committed settings serve citycoin.dev alone, so the run asks citycoin.dev, as a member who signed in there.)
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -13,14 +14,18 @@ import { FLAG_VALUES } from "../src/masterpolicy.js";
 import { buildCopy, nodeEngine, rootPath, synthSessionToken, synthWallet } from "./helpers/cc5-d1copy.js";
 import { recorder } from "./helpers/cc5-d1copy-worker.js";
 import { chain, newWorld, realClock, setHolding, useClock } from "./helpers/world.js";
+import { servesLegacy, siteConfig } from "../src/site-config.js";
+import { hostBound } from "../src/hostbind.js";
 
 const read = (p) => readFileSync(rootPath(p), "utf8");
 const VARS = JSON.parse(read("wrangler.jsonc").replace(/^\s*\/\/.*$/gm, "").replace(/,(\s*[}\]])/g, "$1")).vars;
 const objectName = (s) => (/^CREATE (?:TABLE|INDEX|UNIQUE INDEX|TRIGGER) IF NOT EXISTS (\w+)/.exec(s) || [])[1];
 const CC5_NAMES = [...new Set(Object.values(CC5_GROUPS).flatMap((g) => g.statements).map(objectName))];
 const CC5_WORD = new RegExp(`\\b(${CC5_NAMES.join("|")})\\b|cc5-`, "i");
-const SITE = "https://vicinity.city";
-/** Stage S06: the committed SITE_ORIGINS lists citycoin.dev beside vicinity.city, so the session and challenge host binding counts
+/** The origin the run asks: the canonical origin of the settings (vicinity.city with no setting at all; citycoin.dev as committed since the
+ *  go-live, and its only host since stage S55). */
+const siteOf = (vars) => siteConfig(vars).origin;
+/** Stage S06: the committed SITE_ORIGINS lists citycoin.dev (since stage S55 alone), so the session and challenge host binding counts
  *  (src/hostbind.js, docs/citycoin-master/domain-cutover.md section 1.2). Its lazy additive migrations (src/store.js HOST_MIGRATIONS and
  *  HOST_SIGNUP_MIGRATION: not cc5 objects) add a nullable `host` column to each of these tables that the run uses; nothing else may change. */
 const HOST_TABLES = ["sessions", "pairs", "handoffs", "signups"];
@@ -34,7 +39,7 @@ function seeded(seed) {
 }
 
 /** The requests a visitor and a signed-in member make, and the job: through the Worker's real entry points. */
-async function runWorker(env) {
+async function runWorker(env, SITE) {
   const pending = [];
   const ctx = { waitUntil: (p) => pending.push(Promise.resolve(p).catch(() => {})), passThroughOnException: () => {} };
   const cookie = `vs=${synthSessionToken(1)}`;
@@ -78,6 +83,14 @@ async function traceWith(vars) {
   const raw = engine.env.W;
   const objects = () => raw.prepare("SELECT type, name, tbl_name, sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY type, name").all().then((r) => r.results);
   const before = await objects();
+  // stage S55: a session row with no host is vicinity.city's (src/hostbind.js NULL_HOST), and vicinity.city is no longer served, so on
+  // citycoin.dev member 1 is a member who signed in there: its row records citycoin.dev (the column the binding's migration adds, written
+  // here behind the recorder and after `before` is read; the Worker's own migration still runs, finds the column and records itself)
+  const site = siteConfig(vars);
+  if (hostBound(site) && !servesLegacy(site)) {
+    await raw.prepare("ALTER TABLE sessions ADD COLUMN host TEXT").run();
+    await raw.prepare("UPDATE sessions SET host = ?").bind(site.host).run();
+  }
   const rec = recorder(raw);
   const env = { ...vars, DB: rec.db, ASSETS: newWorld().ASSETS };
   setHolding(synthWallet(1), 250000); // member 1 holds the token on the fake chain, so the member paths go all the way (a post, a vote)
@@ -87,7 +100,7 @@ async function traceWith(vars) {
   console.log = console.error = console.warn = () => {};
   useClock("2026-10-24T12:00:00Z");
   let statuses;
-  try { statuses = await runWorker(env); }
+  try { statuses = await runWorker(env, siteOf(vars)); }
   finally {
     realClock();
     Object.assign(console, { log: saved.log, error: saved.error, warn: saved.warn });

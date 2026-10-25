@@ -85,17 +85,40 @@ test("GL-1: the screener's staff rule flags the label set's name next to a staff
 /* ---------------------------------------------------------------- GL-8: the link checker's websites */
 
 const GOLIVE_SITE = Object.freeze({ SITE_ORIGIN: "https://citycoin.dev", SITE_ORIGINS: "https://citycoin.dev https://vicinity.city", DEPLOYMENT_ENV: "production" });
+/** Stage S55's site settings (committed since): citycoin.dev the one host served in place. */
+const S55_SITE = Object.freeze({ SITE_ORIGIN: "https://citycoin.dev", SITE_ORIGINS: "https://citycoin.dev", DEPLOYMENT_ENV: "production" });
+const FORMER_CC = "This was an earlier address of Citycoin.dev. It no longer serves the Citycoin.dev site, so nothing there is official.";
+const OURS_CC = "This is an address of ours, but it does not serve the Citycoin.dev site, so nothing there is official.";
 
+// (Stage S55 took vicinity.city, vicinitycity.com and vicinitycity.net off the official list before the owner puts them to other use,
+// domain-cutover.md section 0, item 6: the checker never vouches for them again. Until S55, vicinitycity.net and vicinitycity.com, and
+// vicinity.city once not served, were "an address of ours"; since S55 they are former addresses of the site, never "ours" (the owner may use
+// them for anything) and never "a copy of our name". www.citycoin.dev, the owner's own zone, stays "an address of ours".)
 test("GL-8: under BRAND=citycoin only a served host (SITE_ORIGINS, exactly) is the official website; the other names of ours are said as they are", () => {
   cc();
+  // as committed since stage S55: citycoin.dev alone
+  const s55 = (u) => checkOfficial(u, isSolanaAddress, { ...CC, ...S55_SITE });
+  for (const u of ["citycoin.dev", "https://citycoin.dev/rules"]) assert.deepEqual([s55(u).verdict, s55(u).message], ["official", "This is the official Citycoin.dev website."], u);
+  for (const u of ["vicinity.city", "https://vicinity.city/launchpad", "http://vicinity.city", "https://www.vicinity.city", "vicinitycity.net", "www.vicinitycity.net", "vicinitycity.com", "www.vicinitycity.com", "http://vicinitycity.net"]) {
+    const a = s55(u);
+    assert.deepEqual([a.verdict, a.former, a.ours, a.message], ["warning", true, undefined, FORMER_CC], u);
+  }
+  assert.deepEqual([s55("www.citycoin.dev").verdict, s55("www.citycoin.dev").ours, s55("www.citycoin.dev").message], ["warning", true, OURS_CC]);
+  for (const u of ["vicinity.city.evil.com", "vicinitycity.net.evil.io", "v1cinity.city"]) assert.equal(s55(u).verdict, "not_official", u);
+  // the go-live's settings (both hosts listed: what a rollback of S55 puts back): vicinity.city official again, its www "ours", the other two
+  // former names former
   const env = { ...CC, ...GOLIVE_SITE };
   const ask = (u) => checkOfficial(u, isSolanaAddress, env);
   for (const u of ["citycoin.dev", "https://citycoin.dev/rules", "vicinity.city"]) assert.deepEqual([ask(u).verdict, ask(u).message], ["official", "This is the official Citycoin.dev website."], u);
   assert.equal(ask("http://citycoin.dev").verdict, "warning");
   assert.match(ask("http://citycoin.dev").message, /^Right site, but the link uses http/);
-  for (const u of ["www.citycoin.dev", "https://www.vicinity.city", "vicinitycity.net", "vicinitycity.com", "www.vicinitycity.com", "http://vicinitycity.net"]) {
+  for (const u of ["www.citycoin.dev", "https://www.vicinity.city"]) {
     const a = ask(u);
-    assert.deepEqual([a.verdict, a.ours, a.message], ["warning", true, "This is an address of ours, but it does not serve the Citycoin.dev site, so nothing there is official."], u);
+    assert.deepEqual([a.verdict, a.ours, a.message], ["warning", true, OURS_CC], u);
+  }
+  for (const u of ["vicinitycity.net", "vicinitycity.com", "www.vicinitycity.com", "http://vicinitycity.net"]) {
+    const a = ask(u);
+    assert.deepEqual([a.verdict, a.former, a.message], ["warning", true, FORMER_CC], u);
   }
   for (const u of ["evil.citycoin.dev", "app.citycoin.dev", "citycoin.dev.evil.com", "https://citycoin.dev@evil.com/", "t.me/CityCoinDev"]) assert.equal(ask(u).verdict, "not_official", u);
   // before SITE_ORIGINS names citycoin.dev: the planned address, as before (review finding F9), for the apex and its www
@@ -103,10 +126,19 @@ test("GL-8: under BRAND=citycoin only a served host (SITE_ORIGINS, exactly) is t
   assert.equal(checkOfficial("vicinity.city", isSolanaAddress, CC).verdict, "official", "SITE_ORIGINS unset: today's host is the one served");
 });
 
-test("GL-8: with BRAND unset every website answer is today's (the published list, www. stripped)", () => {
-  for (const env of [{}, GOLIVE_SITE]) {
-    for (const u of ["citycoin.dev", "www.citycoin.dev", "vicinity.city", "www.vicinity.city", "vicinitycity.net", "vicinitycity.com"]) {
-      assert.deepEqual([checkOfficial(u, isSolanaAddress, env).verdict, checkOfficial(u, isSolanaAddress, env).message], ["official", "This is the official Vicinity website."], u);
+// (Until stage S55 all six names below were "official" with BRAND unset: they were the published list. S55 took vicinitycity.net and
+// vicinitycity.com off it, and vicinity.city with them; today's label set now calls official a name on the list (citycoin.dev, www. stripped)
+// or a host this Worker serves in place, which is vicinity.city with the site settings unset or listing it, so a rollback is answered right.)
+test("GL-8: with BRAND unset every website answer is today's (the published list, www. stripped, and the hosts served in place), the names S55 took off the list excepted", () => {
+  const FORMER = "This was an earlier address of Vicinity. It no longer serves the Vicinity site, so nothing there is official.";
+  for (const env of [{}, GOLIVE_SITE, S55_SITE]) {
+    const vicinityServed = env !== S55_SITE;
+    for (const u of ["citycoin.dev", "www.citycoin.dev", ...(vicinityServed ? ["vicinity.city", "www.vicinity.city"] : [])]) {
+      assert.deepEqual([checkOfficial(u, isSolanaAddress, env).verdict, checkOfficial(u, isSolanaAddress, env).message], ["official", "This is the official Vicinity website."], `${JSON.stringify(env)} ${u}`);
+    }
+    for (const u of ["vicinitycity.net", "vicinitycity.com", "www.vicinitycity.net", ...(vicinityServed ? [] : ["vicinity.city", "www.vicinity.city"])]) {
+      const a = checkOfficial(u, isSolanaAddress, env);
+      assert.deepEqual([a.verdict, a.former, a.message], ["warning", true, FORMER], `${JSON.stringify(env)} ${u}`);
     }
   }
 });

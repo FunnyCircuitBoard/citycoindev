@@ -1,5 +1,8 @@
-# Deploys vicinity.city from GitHub: every push to `main` (or a manual run) builds, runs every test, deploys the
-# Worker with the settings in wrangler.jsonc, and then checks the live site's security headers.
+# Deploys the Citycoin.dev site (Worker "vicinity-map", custom domain citycoin.dev) from GitHub: every push to `main` (or a manual
+# run) builds, runs every test, deploys the Worker with the settings in wrangler.jsonc, and then checks the live site's security
+# headers on citycoin.dev: scripts/check-live.mjs reads the canonical origin from wrangler.jsonc (SITE_ORIGIN, https://citycoin.dev;
+# falls back to https://citycoin.dev). Since stage S55 vicinity.city and www.vicinity.city are not routed to this Worker any more
+# (docs/citycoin-master/domain-cutover.md section 3, step 4), so nothing here checks them.
 # One-time setup and the launch checklist: docs/DEPLOY.md
 name: Deploy
 on:
@@ -40,5 +43,6 @@ jobs:
         run: npx wrangler deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      - name: Check the live site sends its security headers
+      # No address given: the check reads SITE_ORIGIN from wrangler.jsonc (https://citycoin.dev).
+      - name: Check the live site (citycoin.dev) sends its security headers
         run: node scripts/check-live.mjs || (sleep 20 && node scripts/check-live.mjs) || (sleep 40 && node scripts/check-live.mjs)

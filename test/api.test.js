@@ -35,16 +35,21 @@ test("official list: no token yet, X account listed", async () => {
   assert.deepEqual(data.socials, ["@VicinityCitySOL"]);
 });
 
+// (Until stage S55 vicinitycity.com and vicinitycity.net, with their www., were "official": they were on the published list. S55 took them
+// off it, with vicinity.city, before the owner puts the names to other use (domain-cutover.md section 0, item 6): a former address of the
+// site now gets a warning that nothing there is official. vicinity.city is still official here because these settings are unset, so it is
+// the host this Worker serves; citycoin.dev is on the list.)
 test("link checker: official site, official GitHub, fakes", async () => {
   const check = async (q) => (await (await handleApi(req("/api/check?q=" + encodeURIComponent(q)))).json()).verdict;
-  assert.equal(await check("https://vicinitycity.com"), "official", "the team's other public address");
-  assert.equal(await check("https://www.vicinitycity.com/"), "official");
+  assert.equal(await check("https://citycoin.dev"), "official", "the site's address (src/official.js websites)");
+  assert.equal(await check("https://vicinitycity.com"), "warning", "a former address of the site: never official again");
+  assert.equal(await check("https://www.vicinitycity.com/"), "warning");
   assert.equal(await check("https://vicinity-map.noyonsakibul.workers.dev/"), "not_official", "workers.dev names are not on the list: anyone can claim a released one");
   assert.equal(await check("https://vicinity-map.sakibul-noyon.workers.dev/"), "not_official");
-  assert.equal(await check("https://vicinitycity.net"), "official");
-  assert.equal(await check("https://vicinity.city/launchpad"), "official");
+  assert.equal(await check("https://vicinitycity.net"), "warning");
+  assert.equal(await check("https://vicinity.city/launchpad"), "official", "the host served with the site settings unset");
   assert.equal(await check("vicinity.city.evil.io"), "not_official");
-  assert.equal(await check("www.vicinitycity.net/whatever"), "official");
+  assert.equal(await check("www.vicinitycity.net/whatever"), "warning");
   assert.equal(await check("vicinitycity.net.evil.io"), "not_official");
   assert.equal(await check("https://github.com/someone/vicinity-map"), "not_official");
   assert.equal(await check("vicinity-airdrop.xyz"), "not_official");

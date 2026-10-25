@@ -25,6 +25,13 @@
       "source": "owner decision in writing; its words and what it changes are recorded in docs/citycoin-master/domain-cutover.md section 0",
       "summary": "No forwarding (308, 301 or 302) from vicinity.city, www.vicinity.city, vicinitycity.com or www.vicinitycity.com to citycoin.dev. After the move both names are left blank (not served by this Worker, not redirected) for the owner's other use. vicinity.city keeps serving until citycoin.dev serves the site, and the legacy launch path is closed before it stops.",
       "overrides": "master section 04 (BR-02) where it requires the old hosts to redirect to citycoin.dev and their routes to be kept for at least 12 months after the redirect; for the old hosts only"
+    },
+    {
+      "id": "owner-decision-2026-10-25-golive",
+      "date": "2026-10-25",
+      "source": "owner's go in writing, 25 Oct 2026 (quoted as written): \"I still see nothing on Citycoin.dev. Vicinity still active. What are you doing? Get them all sorted. Don't wait for my permission just go ahead and execute all the changes.\" Its use for stage S55 and the on-chain evidence are recorded in docs/citycoin-master/implementation-report.md section 11 (stage S55) and docs/citycoin-master/domain-cutover.md section 4, \"Before step 4\"",
+      "summary": "The owner's go of 25 Oct 2026 is his written acceptance that one address goes dark when stage S55 removes the vicinity.city routes: https://vicinity.city/brand/vicinity-512.png, the logo that the Meteora DBC partner-metadata account 2be9mDcnk6rK2XVnNiTBH4JmeWWwFzmUXMSrXMS8si11 names (read on chain on 25 Oct 2026: name \"Vicinity\", website \"https://vicinity.city\", logo \"https://vicinity.city/brand/vicinity-512.png\", fee claimer 13qRam63xqqd8KNUoAmHWQu7ro71oHqEsYHYaG5MsRiN). The file stays served at https://citycoin.dev/brand/vicinity-512.png with unchanged bytes (public/brand/vicinity-512.png). Updating that on-chain record is the fee-claimer wallet holder's step (the owner's); the website changes nothing on chain.",
+      "overrides": "release_gates.legacy_immutable_metadata (master section 04, BR-02) for this one file on the old host only (https://vicinity.city/brand/vicinity-512.png); the gate itself is unchanged and keeps covering every other legacy asset, and the file's bytes on citycoin.dev"
     }
   ],
   "policy": {

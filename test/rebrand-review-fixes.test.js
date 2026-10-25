@@ -362,10 +362,11 @@ test("final check finding 2: prerequisites committed before BRAND (the freeze, D
       if (varsOf(text).DEPLOYMENT_ENV === "production") assert.ok(kept.includes("DEPLOYMENT_ENV"), `${at}: a committed production environment is kept`);
     }
   }
-  // the committed file of today, as the CI job sees it: written, exit 0
+  // the committed file of today, as the CI job sees it: written, exit 0 (SITE_ORIGINS as committed: since stage S55 citycoin.dev alone, before
+  // it "https://citycoin.dev https://vicinity.city")
   const r = cli(WRANGLER);
   assert.equal(r.status, 0, r.err);
-  assert.match(r.out, /^switch-trial: wrangler\.jsonc now sets EMAIL_FROM=Citycoin\.dev <noreply@example\.com>, BRAND=citycoin, LEGACY_SEATS=frozen, DEPLOYMENT_ENV=production, WALLET_ONLY=on, SITE_ORIGINS=https:\/\/citycoin\.dev https:\/\/vicinity\.city, SITE_ORIGIN=https:\/\/citycoin\.dev \(this copy only/);
+  assert.match(r.out, /^switch-trial: wrangler\.jsonc now sets EMAIL_FROM=Citycoin\.dev <noreply@example\.com>, BRAND=citycoin, LEGACY_SEATS=frozen, DEPLOYMENT_ENV=production, WALLET_ONLY=on, SITE_ORIGINS=https:\/\/citycoin\.dev, SITE_ORIGIN=https:\/\/citycoin\.dev \(this copy only/);
   assert.equal(r.text, withTrialSettings(WRANGLER));
 });
 

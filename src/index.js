@@ -837,9 +837,10 @@ export function withSecurityHeaders(response) {
 }
 
 /** Which host answers (Citycoin.dev master v5, stage S03).
- *  HOST_REDIRECT off (unset, any other value, or refused by src/v5policy.js hostRedirect): exactly as before. The old names
- *  (www.vicinity.city, vicinitycity.net, www.vicinitycity.net; src/site-config.js forwardHosts, which leaves out a name SITE_ORIGINS serves
- *  in place) forward to today's canonical host, vicinity.city, keeping the path, for every method. The target is a constant, never the
+ *  HOST_REDIRECT off (unset, any other value, or refused by src/v5policy.js hostRedirect): exactly as before. While vicinity.city is served
+ *  in place, the old names (www.vicinity.city, vicinitycity.net, www.vicinitycity.net; src/site-config.js forwardHosts, which leaves out a
+ *  name SITE_ORIGINS serves in place, and is empty once SITE_ORIGINS leaves vicinity.city out, as from stage S55: the binding below then
+ *  refuses them with 421 first) forward to vicinity.city, keeping the path, for every method. The target is a constant, never the
  *  request and not SITE_ORIGIN, so setting SITE_ORIGIN alone never moves it. Plain http:// visits are sent to https:// (except on this
  *  computer, for `wrangler dev`, which presents local visits as http://vicinity.city from a local address: src/hostroute.js isLocal).
  *  HOST_REDIRECT counting: src/hostroute.js hostAnswer decides first (308 to SITE_ORIGIN for ordinary public GET and HEAD on every other
@@ -867,9 +868,10 @@ export default {
       }
       const url = new URL(request.url);
       const site = siteConfig(env);
-      // stage S04 (src/hostbind.js): once SITE_ORIGINS lists a second host, a host outside the allowlist (SITE_ORIGINS and the legacy hosts;
-      // outside production, a local development host is served) is refused before any route and before the 301s below, so no address is
-      // ever built from its Host header. With SITE_ORIGINS unset: only the cutover's own hosts (citycoin.dev and its www, not attached today).
+      // stage S04 (src/hostbind.js): once SITE_ORIGINS lists a host other than vicinity.city, a host outside the allowlist (SITE_ORIGINS, and
+      // the legacy hosts only while it lists vicinity.city: since stage S55 citycoin.dev alone; outside production, a local development host
+      // is served) is refused before any route and before the 301s below, so no address is ever built from its Host header. With
+      // SITE_ORIGINS unset: only the cutover's own hosts (citycoin.dev and its www).
       const served = servedHost(env, request);
       if (served.refused) return wrongHost(site);
       if (hostRedirect(env)) {

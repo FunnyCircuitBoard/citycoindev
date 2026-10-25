@@ -31,14 +31,16 @@ export const SOCIAL_PROFILES = [
 ];
 
 export const OFFICIAL = {
-  updated: "2026-10-25", // vicinity.city is the main address; citycoin.dev serves the same site (stage S06); vicinitycity.net forwards to vicinity.city
+  updated: "2026-10-25", // citycoin.dev is the one address (stage S55); vicinity.city, vicinitycity.com and vicinitycity.net left the list
   // Only addresses we control for sure. (The two workers.dev addresses were listed before: a workers.dev name can be
   // claimed by anyone once it is released, so a name on this list that is not ours would vouch for a fake site.)
-  // citycoin.dev: the owner's own zone on the site's Cloudflare account, attached to this Worker by stage S06 (wrangler.jsonc routes) in the
-  // same change that lists it here, so the "Check a link" box on the site says the new address is ours (S06 review, finding R1). Like every
-  // name here, its www. form is checked as the name itself (the zone is the owner's; www.citycoin.dev is not attached, docs/citycoin-master/
-  // domain-cutover.md section 2). The old names leave this list before the owner puts them to their other use (section 0, item 6).
-  websites: ["vicinity.city", "citycoin.dev", "vicinitycity.com", "vicinitycity.net"],
+  // citycoin.dev: the owner's own zone on the site's Cloudflare account, attached to this Worker by stage S06 (wrangler.jsonc routes), the
+  // site's canonical origin since the go-live and its only host since stage S55. Like every name here, its www. form is checked as the
+  // name itself (the zone is the owner's; www.citycoin.dev is not attached, docs/citycoin-master/domain-cutover.md section 2).
+  // vicinity.city, vicinitycity.com and vicinitycity.net were here until stage S55: they left the list in the change that removes the
+  // vicinity.city routes, before the owner puts the names to their other use (domain-cutover.md section 0, item 6), so the link checker
+  // never vouches for them again (FORMER_WEBSITES below says what it answers for them instead).
+  websites: ["citycoin.dev"],
   github: [],             // code is private
   socials: [...new Set(SOCIAL_PROFILES.map((p) => p.handle))], // the official accounts' @handles (see SOCIAL_PROFILES)
   tokenContract: VICINITY_MINT,
@@ -116,6 +118,31 @@ const lockMessage = (lock) => `This is the Vicinity team lock on ${lock.platform
 // same raydium.io page shows any coin, fakes included.
 export const MARKETS = { "raydium.io": "Raydium", "jup.ag": "Jupiter", "dexscreener.com": "DEX Screener", "solscan.io": "Solscan" };
 
+/**
+ * The site's former addresses (stage S55): on OFFICIAL.websites until the vicinity.city routes were removed, and the owner's to put to other
+ * use since (docs/citycoin-master/domain-cutover.md section 0: not forwarded, left blank). The link checker never calls them official
+ * again: while this Worker does not serve one in place (src/site-config.js SITE_ORIGINS; a rollback of S55 lists vicinity.city again), a
+ * link to it, or to its www. form, gets formerAnswer: an earlier address of this site that no longer serves it, so nothing there is
+ * official. Never "ours" (the owner may use them for anything) and never "a copy of our name" (they are not look-alikes).
+ */
+export const FORMER_WEBSITES = Object.freeze(["vicinity.city", "vicinitycity.com", "vicinitycity.net"]);
+/** Is the exact host `name` (lower case) a former address, or its www. form, that `served` (the hosts served in place) leaves out, apex
+ *  and www. alike? */
+const isFormerName = (name, served) => {
+  const apex = name.replace(/^www\./, "");
+  return FORMER_WEBSITES.includes(apex) && !served.includes(name) && !served.includes(apex);
+};
+/** The checker's answer for a former address (FORMER_WEBSITES), in the words of the label set's product (`P`). */
+const formerAnswer = (P) => ({ verdict: "warning", kind: "website", former: true,
+  message: `This was an earlier address of ${P}. It no longer serves the ${P} site, so nothing there is official.` });
+/** Today's label set's "official website" test: a name on OFFICIAL.websites (www. stripped, as `host`), or a host this Worker serves in place
+ *  (SITE_ORIGINS, exactly as written, or `host`): with the site settings unset that is vicinity.city, as it always was, and after a rollback
+ *  of S55 vicinity.city again, whatever the list says. */
+const officialWebsite = (env, host, name) => {
+  const served = siteConfig(env).hosts;
+  return OFFICIAL.websites.includes(host) || served.includes(name) || served.includes(host);
+};
+
 /** A link to one of MARKETS: { host, name, addresses } with every Solana address in its path and query (jup.ag/swap/SOL-<mint>
  *  and raydium.io/...?mint=<mint> included), or null for any other link. Exact host only (www. allowed): raydium.io.evil.io is not it. */
 export function marketLink(input, isSolanaAddress) {
@@ -191,10 +218,13 @@ export function checkOfficial(input, isSolanaAddress, env) {
   if (url && url.hostname.includes(".")) {
     const host = url.hostname.toLowerCase().replace(/^www\./, "");
     const hostPath = (host + url.pathname.toLowerCase()).replace(/\/+$/, "");
-    if (url.protocol === "http:" && OFFICIAL.websites.includes(host))
+    const name = url.hostname.toLowerCase();
+    if (url.protocol === "http:" && officialWebsite(env, host, name))
       return { verdict: "warning", kind: "website", message: "Right site, but the link uses http. Use the https version." };
-    if (OFFICIAL.websites.includes(host))
+    if (officialWebsite(env, host, name))
       return { verdict: "official", kind: "website", message: bw`This is the official Vicinity website.` };
+    // a former address of the site (stage S55): never official again, never called a copy of our name
+    if (isFormerName(name, siteConfig(env).hosts)) return formerAnswer(bw.brand.productName);
     // the team lock's own page (the token page's "See the lock"): exact host and path, the address in it case and all
     const lockPage = (OFFICIAL.teamLocks || []).find((l) => { const u = new URL(l.url); return host === u.hostname && url.pathname.replace(/\/+$/, "") === u.pathname; });
     if (lockPage && url.protocol === "http:") return { verdict: "warning", kind: "lock", message: "Right lock page, but the link uses http. Use the https version." };
@@ -548,17 +578,21 @@ function checkOfficialV5(input, isSolanaAddress, env) {
     if (bw.on) {
       // under a label set other than today's, "official" only for a host this Worker serves in place (src/site-config.js SITE_ORIGINS), exactly
       // as written: www. is a host of its own (go-live review finding GL-8: www.citycoin.dev and vicinitycity.net are not attached, and
-      // vicinitycity.com serves nothing). Every other name of ours is said as it is, never "official"; the vicinity.city names stay official only
-      // while SITE_ORIGINS lists them (stage S55 removes them)
+      // vicinitycity.com serves nothing). Every other name of ours is said as it is, never "official"; since stage S55 SITE_ORIGINS lists
+      // citycoin.dev only, so the vicinity.city names are former addresses (FORMER_WEBSITES), never official
       const name = url.hostname.toLowerCase(), served = siteConfig(env).hosts;
       if (served.includes(name)) return url.protocol === "http:" ? { verdict: "warning", kind: "website", message: "Right site, but the link uses http. Use the https version." }
         : { verdict: "official", kind: "website", message: bw`This is the official Vicinity website.` };
       // the label set's own planned address (src/site-config.js CUTOVER_HOSTS) while this Worker does not serve it yet (review finding F9)
       if (CUTOVER_HOSTS.includes(name) && !served.includes(CUTOVER_HOSTS[0])) return { verdict: "warning", kind: "website", message: `This is the address planned for ${P}. It does not serve the site yet, so nothing there is official until it does.` };
+      // a former address of the site (stage S55: vicinity.city, vicinitycity.com, vicinitycity.net and their www.), while not served
+      if (isFormerName(name, served)) return formerAnswer(P);
       if (OUR_SITE_NAMES.includes(name)) return { verdict: "warning", kind: "website", ours: true, message: `This is an address of ours, but it does not serve the ${P} site, so nothing there is official.` };
     } else {
-      if (url.protocol === "http:" && OFFICIAL.websites.includes(host)) return { verdict: "warning", kind: "website", message: "Right site, but the link uses http. Use the https version." };
-      if (OFFICIAL.websites.includes(host)) return { verdict: "official", kind: "website", message: bw`This is the official Vicinity website.` };
+      const name = url.hostname.toLowerCase();
+      if (url.protocol === "http:" && officialWebsite(env, host, name)) return { verdict: "warning", kind: "website", message: "Right site, but the link uses http. Use the https version." };
+      if (officialWebsite(env, host, name)) return { verdict: "official", kind: "website", message: bw`This is the official Vicinity website.` };
+      if (isFormerName(name, siteConfig(env).hosts)) return formerAnswer(P);
     }
     const lockPage = OFFICIAL.teamLocks.find((l) => { const u = new URL(l.url); return host === u.hostname && url.pathname.replace(/\/+$/, "") === u.pathname; });
     if (lockPage && url.protocol === "http:") return { verdict: "warning", kind: "lock", message: "Right lock page, but the link uses http. Use the https version." };

@@ -5,6 +5,9 @@
 //   R3  the code e-mail and the wallet and Google notices sent a citycoin.dev visitor to vicinity.city, where a sign-up or session made on
 //       citycoin.dev does not exist (src/hostbind.js);
 //   R5  citycoin.dev served the same pages as vicinity.city with nothing asking search engines not to index the copy.
+// Since stage S55 the committed settings serve citycoin.dev alone (SITE_ORIGINS https://citycoin.dev, the vicinity.city routes removed): the
+// two-host behaviour is checked with S06's and the go-live's SITE_ORIGINS (TWO_HOSTS, what a rollback of S55 puts back), and the committed
+// settings are checked to refuse vicinity.city. The noindex rule of R5 left public/_headers with the vicinity.city routes.
 // No request here leaves this process: the fake chain answers RPC, a stand-in answers Google and Resend. Every address is a fake fixture.
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
@@ -22,6 +25,8 @@ import { ACCEPTED, pagesAsCommitted, pagesBuiltWithSwitch } from "./helpers/main
 const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
 const VARS = JSON.parse(read("wrangler.jsonc").replace(/^\s*\/\/.*$/gm, "").replace(/,(\s*[}\]])/g, "$1")).vars;
 const CC = "https://citycoin.dev", VC = "https://vicinity.city";
+/** S06's and the go-live's SITE_ORIGINS (both hosts served in place): what a rollback of stage S55 puts back. */
+const TWO_HOSTS = Object.freeze({ SITE_ORIGINS: "https://citycoin.dev https://vicinity.city" });
 
 // the outside world, faked: Resend (each mail lands in `mails`), Google's token endpoint (one Google account), the test chain for the rest
 const mails = [];
@@ -74,24 +79,36 @@ async function signupMail(env, site, email) {
 
 /* ---------------------------------------------------------------- R1: the link checker */
 
-const OURS = ["citycoin.dev", "https://citycoin.dev", "https://citycoin.dev/launchpad?tab=new", "CITYCOIN.DEV/token", "https://vicinity.city/launchpad"];
+const OURS = ["citycoin.dev", "https://citycoin.dev", "https://citycoin.dev/launchpad?tab=new", "CITYCOIN.DEV/token"];
+// the names stage S55 took off the official list (src/official.js FORMER_WEBSITES): never official again while not served
+const FORMER = ["https://vicinity.city/launchpad", "vicinity.city", "www.vicinity.city", "vicinitycity.net", "vicinitycity.com", "www.vicinitycity.com"];
 // the same rule as every listed name: its www. form is the name itself (www.vicinity.city, www.vicinitycity.net); the zone is the owner's
 const WWW = ["www.citycoin.dev", "https://www.citycoin.dev/connect"];
 const LOOKALIKES = ["citycoin.dev.evil.example", "https://evilcitycoin.dev", "citycoin.de", "citycoin.devv", "city-coin.dev", "citycoin.app",
   "https://citycoin.dev@evil.example/", "https://evil.example/citycoin.dev", "citycoin.dev.co"];
 
-test("R1: on both served hosts the link checker calls citycoin.dev official, http a warning, and no look-alike official", async () => {
+// (Until stage S55 this test ran on both served hosts, OURS held https://vicinity.city/launchpad, and /api/official listed vicinity.city,
+// citycoin.dev, vicinitycity.com and vicinitycity.net. S55 serves citycoin.dev alone and takes the three old names off the list, before the
+// owner puts them to other use: domain-cutover.md section 0, item 6.)
+test("R1: on the served host the link checker calls citycoin.dev official, http a warning, the old names former, and no look-alike official", async () => {
   const env = world();
-  for (const site of [CC, VC]) {
+  for (const site of [CC]) {
     const b = browser(env, site);
-    const verdict = async (q) => (await b.get("/api/check?q=" + encodeURIComponent(q))).verdict;
-    for (const q of [...OURS, ...WWW]) assert.equal(await verdict(q), "official", `${site}: ${q}`);
-    assert.equal(await verdict("http://citycoin.dev"), "warning", `${site}: the right site over http`);
-    for (const q of LOOKALIKES) assert.equal(await verdict(q), "not_official", `${site}: ${q}`);
+    const answer = async (q) => b.get("/api/check?q=" + encodeURIComponent(q));
+    for (const q of [...OURS, ...WWW]) assert.equal((await answer(q)).verdict, "official", `${site}: ${q}`);
+    assert.equal((await answer("http://citycoin.dev")).verdict, "warning", `${site}: the right site over http`);
+    for (const q of FORMER) {
+      const a = await answer(q);
+      assert.deepEqual([a.verdict, a.former], ["warning", true], `${site}: ${q} is a former address, never official`);
+    }
+    for (const q of LOOKALIKES) assert.equal((await answer(q)).verdict, "not_official", `${site}: ${q}`);
     const official = await b.get("/api/official");
-    assert.deepEqual(official.websites, ["vicinity.city", "citycoin.dev", "vicinitycity.com", "vicinitycity.net"], `${site}: /api/official`);
+    assert.deepEqual(official.websites, ["citycoin.dev"], `${site}: /api/official`);
   }
-  assert.deepEqual(OFFICIAL.websites, ["vicinity.city", "citycoin.dev", "vicinitycity.com", "vicinitycity.net"]);
+  assert.deepEqual(OFFICIAL.websites, ["citycoin.dev"]);
+  // vicinity.city is no longer served: its checker answers nothing (421 before any route)
+  const old = await browser(env, VC).send("/api/check?q=citycoin.dev");
+  assert.deepEqual([old.status, (await old.json()).error], [421, "wrong_host"]);
 });
 
 test("R1: the v5 checker (MAIN_TOKEN_V5 counting, a stand-in for its page build) reads the same list", () => {
@@ -124,8 +141,13 @@ test("R3: a sign-up started on citycoin.dev gets a code e-mail that names cityco
   assert.equal(done.isNew, true);
 });
 
-test("R3: on vicinity.city the code e-mail is today's, byte for byte", async () => {
-  const env = world();
+test("R3: on vicinity.city the code e-mail is today's, byte for byte (while it is served: S06 and the go-live); since stage S55 no sign-up starts there", async () => {
+  // as committed (S55): refused before any route, so nothing is started and no mail is sent
+  const committed = world(), before = mails.length;
+  const refused = await browser(committed, VC).send("/api/signup/start", { method: "POST", body: {} });
+  assert.deepEqual([refused.status, await refused.json()], [421, { error: "wrong_host", origin: CC }]);
+  assert.equal(mails.length, before, "no e-mail");
+  const env = world(TWO_HOSTS);
   const { mail, code } = await signupMail(env, VC, "bea.s06@example.com");
   const today = verificationEmail(code, "signup"); // no origin: the e-mail as it has always been
   assert.deepEqual([mail.subject, mail.text, mail.html], [today.subject, today.text, today.html]);
@@ -159,8 +181,10 @@ test("R3: Google added on citycoin.dev: the notice's links and words name cityco
 test("R3: mailOrigin is the host the request is served as while the binding counts, and today's vicinity.city otherwise", () => {
   const env = world();
   const at = (url, e = env) => mailOrigin(servedHost(e, new Request(url)));
-  assert.equal(at("https://citycoin.dev/api/signup/email"), CC);
-  assert.equal(at("https://vicinity.city/api/signup/email"), VC);
+  assert.equal(at("https://citycoin.dev/api/signup/email"), CC, "as committed: the e-mails name citycoin.dev");
+  // since stage S55 vicinity.city is refused (it never reaches a route, so no e-mail is built there); while both hosts were listed it named itself
+  assert.equal(servedHost(env, new Request("https://vicinity.city/api/signup/email")).refused, true);
+  assert.equal(at("https://vicinity.city/api/signup/email", world(TWO_HOSTS)), VC);
   assert.equal(at("https://www.citycoin.dev/api/x"), MAIL_ORIGIN, "a refused host (it never reaches a route) names nothing of its own");
   assert.equal(at("https://evil.example/api/x"), MAIL_ORIGIN);
   // the binding does not count (the settings main had before S06): today's address, whatever host the request came in on
@@ -222,18 +246,17 @@ const matches = (pattern, url) => {
 const headersFor = (url) => headerRules().filter((r) => matches(r.pattern, url)).flatMap((r) => r.headers);
 
 // The go-live (the owner's go of 25 Oct 2026) moved the rule: citycoin.dev is the canonical site (SITE_ORIGIN) and is indexed (master v5
-// section 06: "Production is indexable as intended"), and the copies vicinity.city and www.vicinity.city serve until S55 carry the noindex.
-test("R5, as moved by the go-live: vicinity.city's and www.vicinity.city's pages and files carry X-Robots-Tag: noindex; citycoin.dev's carry none, and their other headers are unchanged", () => {
+// section 06: "Production is indexable as intended"), and the copies vicinity.city and www.vicinity.city carried the noindex while they served.
+// Stage S55 removed their routes and, with them, the two host rules (domain-cutover.md section 4, "Before step 4"): public/_headers has no
+// host rule and no X-Robots-Tag at all, as before S06. (Until S55 this test asserted the two vicinity.city rules.)
+test("R5, as ended by stage S55: no page or file carries X-Robots-Tag; citycoin.dev is indexed, and the security headers are the same for every path", () => {
   const rules = headerRules();
-  assert.deepEqual(rules.filter((r) => r.pattern.startsWith("https://")), [
-    { pattern: "https://vicinity.city/*", headers: [["X-Robots-Tag", "noindex"]] }, { pattern: "https://www.vicinity.city/*", headers: [["X-Robots-Tag", "noindex"]] }],
-    "two host rules, for the old names served in place, with the one header");
+  assert.deepEqual(rules.filter((r) => r.pattern.startsWith("https://")), [], "no host rule");
+  assert.deepEqual(rules.filter((r) => r.headers.some(([k]) => k === "X-Robots-Tag")), [], "no X-Robots-Tag rule");
+  assert.deepEqual(rules.map((r) => r.pattern), ["/*", "/fonts/*"], "the two path rules, as before S06");
   for (const path of ["/", "/token", "/connect", "/style.css", "/fonts/x.woff2", "/no-such-page"]) {
-    const cc = headersFor(CC + path), vc = headersFor(VC + path), www = headersFor(`https://www.vicinity.city${path}`);
+    const cc = headersFor(CC + path);
     assert.deepEqual(cc.filter(([k]) => k === "X-Robots-Tag"), [], `citycoin.dev${path}: indexed`);
-    assert.deepEqual(vc.filter(([k]) => k === "X-Robots-Tag"), [["X-Robots-Tag", "noindex"]], `vicinity.city${path}`);
-    assert.deepEqual(www.filter(([k]) => k === "X-Robots-Tag"), [["X-Robots-Tag", "noindex"]], `www.vicinity.city${path}`);
-    assert.deepEqual(vc.filter(([k]) => k !== "X-Robots-Tag"), cc, `${path}: the security headers are the same on both hosts`);
+    for (const host of ["vicinity.city", "www.vicinity.city", "www.citycoin.dev"]) assert.deepEqual(headersFor(`https://${host}${path}`), cc, `${host}${path}: no rule names a host`);
   }
-  for (const host of ["www.citycoin.dev", "citycoin.dev.evil.example", "vicinity.city.evil.example"]) assert.deepEqual(headersFor(`https://${host}/`).filter(([k]) => k === "X-Robots-Tag"), [], host);
 });

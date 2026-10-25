@@ -20,6 +20,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import "../../public/ticker.js";
+import { defaultBase } from "../check-live.mjs";
 
 const pub = (p) => fileURLToPath(new URL(`../../public/${p}`, import.meta.url));
 export const PINS_FILE = fileURLToPath(new URL("./ticker-pins.json", import.meta.url));
@@ -126,8 +127,10 @@ export async function readApprovals(settings, fetchImpl = fetch) {
 export const wranglerVars = (file = fileURLToPath(new URL("../../wrangler.jsonc", import.meta.url))) =>
   JSON.parse(readFileSync(file, "utf8").replace(/^\s*\/\/.*$/gm, "").replace(/,(\s*[}\]])/g, "$1")).vars || {};
 
-/** Where the official list is read from by default: the live site (mainnet), which reads it from the chain. */
-export const OFFICIAL_URL = "https://vicinity.city/api/official-coins";
+/** Where the official list is read from by default: the live site (mainnet), which reads it from the chain. Its address is the canonical
+ *  origin the committed wrangler.jsonc configures (SITE_ORIGIN, https://citycoin.dev; scripts/check-live.mjs defaultBase), never a fixed
+ *  vicinity.city: stage S55 removes the vicinity.city routes, after which that name no longer answers for this site. */
+export const OFFICIAL_URL = `${defaultBase()}/api/official-coins`;
 export const PUBLIC_PINS = pub("data/ticker-pins.json");
 /** The published copy of the pins (public/data/ticker-pins.json): the same map, for the Cities page's fallback. */
 export const publicPins = (pins = loadPins()) => JSON.stringify({ pins });

@@ -9,16 +9,3 @@
 
 /fonts/*
   Cache-Control: public, max-age=31536000, immutable
-
-# citycoin.dev is the canonical site since the go-live (SITE_ORIGIN=https://citycoin.dev in wrangler.jsonc; the owner's go of 25 Oct 2026) and is
-# indexed (master v5 section 06: "Production is indexable as intended"; stage S53: indexing for production). vicinity.city and www.vicinity.city
-# still serve the same pages in place until stage S55 removes their routes, so search engines are asked not to index those copies.
-# Host-qualified rules: the static-assets engine matches each against https://<host><path> (absolute URLs are allowed in _headers), so they
-# apply on those two hosts only and citycoin.dev's pages carry no X-Robots-Tag. (From S06 until the go-live the rule was the other way round:
-# https://citycoin.dev/* had noindex.) To roll back the go-live, put that rule back in place of these two. Stage S55 removes these two rules
-# with the routes (docs/citycoin-master/domain-cutover.md section 4).
-https://vicinity.city/*
-  X-Robots-Tag: noindex
-
-https://www.vicinity.city/*
-  X-Robots-Tag: noindex

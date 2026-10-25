@@ -357,8 +357,10 @@ test("validatePolicy: a complete production configuration passes, and assertVali
 /* ------------------------------------------------------------------ amendment 01: new main token and official links */
 
 test("amendment 01: the main token is configured centrally and empty, and $VICINITY is a legacy token only", () => {
+  // (stage S55 added the third: the owner's go of 25 Oct 2026 as the acceptance that https://vicinity.city/brand/vicinity-512.png goes dark;
+  // its content is checked in test/s55-cutover.test.js)
   assert.deepEqual(MASTER_POLICY.amendments.map((a) => [a.id, a.date, a.values_supplied]),
-    [["amendment-01", "2026-10-24", false], ["owner-decision-2026-10-24-domains", "2026-10-24", undefined]]);
+    [["amendment-01", "2026-10-24", false], ["owner-decision-2026-10-24-domains", "2026-10-24", undefined], ["owner-decision-2026-10-25-golive", "2026-10-25", undefined]]);
   // values_supplied means all three values: the owner supplied only the X address (24 Oct 2026, Worker settings only); the policy keeps null
   assert.match(MASTER_POLICY.amendments[0].values_supplied_note, /^false: not all three values are supplied\. OFFICIAL_X_URL was supplied/);
   const m = P.main_token;

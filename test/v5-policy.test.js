@@ -45,22 +45,24 @@ beforeEach(() => {
 afterEach(() => { console.error = realError; W.realClock(); });
 
 const answer = async (res) => ({ status: res.status, headers: [...res.headers.entries()].sort(([a], [b]) => (a < b ? -1 : 1)), body: await res.text() });
-const call = async (env, path, init = {}) => answer(await handleApi(new Request(`https://vicinity.city${path}`, init), env, W.chain(), { waitUntil() {} }));
+// asked on the canonical origin of the settings: vicinity.city with none (or a refused one), citycoin.dev as committed (since stage S55 the one
+// host served in place; until S55 every call here asked vicinity.city, which the committed settings served too)
+const call = async (env, path, init = {}) => answer(await handleApi(new Request(`${siteConfig(env).origin}${path}`, init), env, W.chain(), { waitUntil() {} }));
 const policyLines = () => errors.filter((e) => e.startsWith("policy config refused"));
 
 /* ---------------------------------------------------------------- with the switch off: today's site */
 
 test("the default: today's settings describe the policy's own default deployment, which validates; the fast answer equals the full check", () => {
   // the v5 inputs today's settings carry: the official X link the owner supplied on 24 Oct 2026 (amendment 01), shown only while a master
-  // switch counts, and since stage S06 (owner's go of 25 Oct 2026) the production environment and the two hosts the Worker serves; since the
-  // go-live (the same go) citycoin.dev is canonical and the legacy launch path is closed. (The suite reads wrangler.jsonc through its stand-in
+  // switch counts, and since stage S06 (owner's go of 25 Oct 2026) the production environment and the hosts the Worker serves (both until
+  // stage S55, citycoin.dev alone since); since the go-live (the same go) citycoin.dev is canonical and the legacy launch path is closed. (The suite reads wrangler.jsonc through its stand-in
   // for today's site, test/helpers/today-build.mjs, which takes the label set, the freeze and wallet-only sign-in back: they are tested on
   // their own.) Every other switch stays at its default
   assert.equal(LIVE.OFFICIAL_X_URL, "https://x.com/CityCoinDev");
-  assert.deepEqual([LIVE[ENVIRONMENT_SETTING], LIVE.SITE_ORIGINS, LIVE.SITE_ORIGIN, LIVE.LEGACY_LAUNCH], ["production", "https://citycoin.dev https://vicinity.city", "https://citycoin.dev", "off"]);
+  assert.deepEqual([LIVE[ENVIRONMENT_SETTING], LIVE.SITE_ORIGINS, LIVE.SITE_ORIGIN, LIVE.LEGACY_LAUNCH], ["production", "https://citycoin.dev", "https://citycoin.dev", "off"]);
   const withX = { ...MASTER_POLICY.deployment, inputs: { ...MASTER_POLICY.deployment.inputs, OFFICIAL_X_URL: LIVE.OFFICIAL_X_URL } };
   const open = { ...withX, environment: "production",
-    inputs: { ...withX.inputs, SITE_ORIGIN: "https://citycoin.dev", SITE_ORIGINS: ["https://citycoin.dev", "https://vicinity.city"] } };
+    inputs: { ...withX.inputs, SITE_ORIGIN: "https://citycoin.dev", SITE_ORIGINS: ["https://citycoin.dev"] } };
   const golive = { ...open, flags: { ...open.flags, LEGACY_LAUNCH: "off" } };
   for (const [env, want] of [[{}, MASTER_POLICY.deployment], [LIVE, golive], [{ ...LIVE, PUBLIC_V5: "off" }, golive], [{ ...LIVE, PUBLIC_V5: "", MAIN_TOKEN_V5: "  " }, golive],
     [{ ...LIVE, ...NO_ENVIRONMENT, SITE_ORIGINS: [], SITE_ORIGIN: "", LEGACY_LAUNCH: "" }, withX], [{ ...LIVE, LEGACY_SEATS: "On", LEGACY_LAUNCH: "on", MAIN_TOKEN_V5: "OFF " }, open]]) {
@@ -226,13 +228,14 @@ test("the site origins are read as src/site-config.js reads them: whatever it re
 
 test("the Worker's first request runs the check once per isolate; the answer is unchanged", async () => {
   const env = W.newWorld({ ...LIVE, PUBLIC_V5: "on", ...NO_ENVIRONMENT }); // refused: no environment named (the committed one, stage S06, taken out)
-  const a = await answer(await worker.fetch(new Request("https://vicinity.city/api/health"), env, { waitUntil() {} }));
-  const b = await answer(await worker.fetch(new Request("https://vicinity.city/api/health"), env, { waitUntil() {} }));
+  // (on citycoin.dev, the one host the committed settings serve since stage S55)
+  const a = await answer(await worker.fetch(new Request("https://citycoin.dev/api/health"), env, { waitUntil() {} }));
+  const b = await answer(await worker.fetch(new Request("https://citycoin.dev/api/health"), env, { waitUntil() {} }));
   assert.deepEqual(a, b);
   assert.equal(a.status, 200);
   assert.deepEqual(policyLines(), ["policy config refused ENVIRONMENT_UNSET deployment.environment"]);
-  assert.deepEqual(await answer(await worker.fetch(new Request("https://vicinity.city/api/policy/master"), env, { waitUntil() {} })),
-    await answer(await worker.fetch(new Request("https://vicinity.city/api/nope"), env, { waitUntil() {} })), "refused: still an unknown path");
+  assert.deepEqual(await answer(await worker.fetch(new Request("https://citycoin.dev/api/policy/master"), env, { waitUntil() {} })),
+    await answer(await worker.fetch(new Request("https://citycoin.dev/api/nope"), env, { waitUntil() {} })), "refused: still an unknown path");
 });
 
 /* ---------------------------------------------------------------- with the switch on */

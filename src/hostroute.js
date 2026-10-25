@@ -3,9 +3,12 @@
  * docs/citycoin-master/rebrand-inventory.md U01, C01, C02, C04, C05, C09 and C10; docs/citycoin-master/domain-cutover.md).
  *
  * Read only while HOST_REDIRECT counts (src/v5policy.js hostRedirect: the switch is on, the v5 configuration check accepts the deployment,
- * SITE_ORIGIN is https://citycoin.dev, and the deployed wrangler.jsonc sends every page through the Worker). Otherwise src/index.js never
- * calls hostAnswer and answers exactly as before: www.vicinity.city, vicinitycity.net and www.vicinitycity.net answer 301 to vicinity.city
- * and plain http answers 301 to https, for every method; every other host is served in place.
+ * SITE_ORIGIN is https://citycoin.dev, and the deployed wrangler.jsonc sends every page through the Worker). NOT TO BE SWITCHED ON: the
+ * owner decided on 24 Oct 2026 that the old names are not forwarded (docs/citycoin-master/domain-cutover.md section 0), so the switch stays
+ * unset and this file waits for the cleanup stage (S65). Otherwise src/index.js never calls hostAnswer: while vicinity.city is served in
+ * place, www.vicinity.city, vicinitycity.net and www.vicinitycity.net answer 301 to vicinity.city and plain http answers 301 to https, for
+ * every method; from stage S55 on (SITE_ORIGINS https://citycoin.dev only) the host binding (src/hostbind.js) refuses every host but
+ * citycoin.dev with 421 before any of that.
  *
  * hostAnswer(request, url, site, local, dev) runs before any route and returns the answer, or null to serve the request as usual:
  *
@@ -34,9 +37,11 @@
  * Every 421 is JSON {"error":"wrong_host","origin":SITE_ORIGIN}: the page (or a person reading it) learns where the site is now, from the
  * configuration, never from the request.
  *
- * The accepted hosts are SITE_ORIGINS and the legacy hosts (vicinity.city and its three old names, src/site-config.js LEGACY_HOSTS): those
- * stay attached for at least 12 months after the cutover, so their immutable files and read-only API keep answering whatever SITE_ORIGINS
- * lists. Plain http is never an accepted origin of its own: on the canonical host it is a "non-canonical" request like any other.
+ * The accepted hosts are SITE_ORIGINS and, only while SITE_ORIGINS lists vicinity.city, the legacy hosts (vicinity.city and its three old
+ * names, src/site-config.js LEGACY_HOSTS and servesLegacy). Master section 04 kept the old routes at least 12 months after the cutover; the
+ * owner's decision of 24 Oct 2026 replaced that: no forwarding, and stage S55 removes vicinity.city from SITE_ORIGINS and its routes, so
+ * from then on a legacy host is an unknown host here too (421), never redirected to citycoin.dev. Plain http is never an accepted origin of
+ * its own: on the canonical host it is a "non-canonical" request like any other.
  *
  * Nothing here builds an address from the request's Host header. A redirect target is SITE_ORIGIN (validated by src/site-config.js and the
  * v5 check), or, for plain http to an accepted host, that host's own allowlist entry over https; the path is appended as text, never

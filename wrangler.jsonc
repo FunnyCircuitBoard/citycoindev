@@ -1,4 +1,4 @@
-// Cloudflare settings for Vicinity.
+// Cloudflare settings for the Citycoin.dev site (the Worker keeps its first name, "vicinity-map").
 // "main" = backend code. "assets" = public website files.
 // "build" runs before every deploy: fonts and the QR library are copied in, pages are built,
 // then every test must pass.
@@ -8,8 +8,8 @@
   "account_id": "bb77f7451b478e895fa1efb10aaccc35",
   "main": "src/index.js",
   "compatibility_date": "2026-09-01",
-  // Off: the workers.dev address served the whole site (admin included) outside the vicinity.city protections,
-  // and sign-in cannot work there anyway. Turn it back on only for a short test.
+  // Off: the workers.dev address served the whole site (admin included) outside the site's own host protections,
+  // and sign-in cannot work there anyway (src/hostbind.js refuses any host but citycoin.dev). Turn it back on only for a short test.
   "workers_dev": false,
   "preview_urls": false,
   "build": { "command": "npm run build" },
@@ -106,14 +106,18 @@
     // "Coin reviews". Needs COIN_V2_READY on as well. OFF: built and tested dark on 23 Oct 2026. "on" only after the owner's go; anything
     // else than "on" is the site exactly as before (change the value, do not delete the line: keep_vars).
     "COIN_V2_REVIEW": "off",
-    // The hosts this Worker serves in place (src/site-config.js; stage S06, docs/citycoin-master/domain-cutover.md section 2 item 2):
-    // citycoin.dev, attached as a custom domain below, and vicinity.city, which keeps serving the same site until stage S55 removes its
-    // routes (citycoin.dev is the canonical origin since the go-live, SITE_ORIGIN below). With a second host listed, sessions, pairings,
-    // hand-offs and sign-ups are bound to the host they were made on (src/hostbind.js). www.citycoin.dev is not listed and not attached.
-    // Owner's go on 25 Oct 2026 ("go ahead and execute all the changes"). Unchanged by the go-live. To roll back S06, change the value to
-    // "https://vicinity.city" and remove the citycoin.dev route in the same pull request (do not delete the line: keep_vars would keep
-    // the old value); SITE_ORIGIN must then be "" too, since it must be one of these origins.
-    "SITE_ORIGINS": "https://citycoin.dev https://vicinity.city",
+    // The hosts this Worker serves in place (src/site-config.js): citycoin.dev only, since stage S55, the last step of the domain cutover
+    // (docs/citycoin-master/domain-cutover.md section 3, step 4). S55 takes vicinity.city out of this list and removes the vicinity.city
+    // and www.vicinity.city routes below, with no redirect: the owner's decision of 24 Oct 2026 ("i dont want any domain forward from
+    // vicinty. leve that blank both. vicinity.city and vicinitycity.com i wil need them for other purpose.", domain-cutover.md section 0),
+    // carried out on the owner's go of 25 Oct 2026 (his words are quoted once, with the go-live settings below). Sessions, pairings, hand-offs and
+    // sign-ups stay bound to the host they were made on (src/hostbind.js): every new one is citycoin.dev's, and any other host that ever
+    // reaches this Worker (vicinity.city and its old names included, www.citycoin.dev, a workers.dev address) answers 421 wrong_host on
+    // the Worker paths, never a redirect. (From S06 until S55 the value was "https://citycoin.dev https://vicinity.city".)
+    // Rollback of S55, only while the owner has not put vicinity.city to its other use: change this value back to
+    // "https://citycoin.dev https://vicinity.city" and put both vicinity.city routes back below, in one pull request (change the value,
+    // never delete the line: keep_vars would keep the old value in Cloudflare), with the noindex rules of public/_headers.
+    "SITE_ORIGINS": "https://citycoin.dev",
     // The production Worker (src/site-config.js localDevAllowed): turns off the local development exemption here; the v5 configuration
     // check wants it for any changed switch. With it, a v5 switch whose only missing input was the environment counts when set alone, here
     // or as a dashboard variable (keep_vars): WALLET_ONLY=on, held before (every sign-in 503), would take effect at once; PUBLIC_V5=on too
@@ -132,10 +136,11 @@
     // permission just go ahead and execute all the changes." Rollback: one pull request that puts back the earlier values (the line's value
     // changed to "", "on" or the old text as each comment says; never delete a line: keep_vars would keep the old value in Cloudflare).
     //
-    // The canonical origin (src/site-config.js): citycoin.dev, while vicinity.city still serves the same site in place (SITE_ORIGINS above,
-    // unchanged; stage S55 removes the vicinity.city routes). Links the Worker builds from the configuration (mail buttons with no served
-    // host, the social image of the pages, the Citycoin.dev websites list, new coins' metadata) name citycoin.dev; the old names' 301 keeps
-    // its constant target, vicinity.city (src/index.js). Owner's go of 25 Oct 2026 (above). Was unset; to roll back, set it to "".
+    // The canonical origin (src/site-config.js): citycoin.dev, the one host this Worker serves since stage S55 (SITE_ORIGINS above). Links
+    // the Worker builds from the configuration (mail buttons, the social image of the pages, the Citycoin.dev websites list, new coins'
+    // metadata) name citycoin.dev. Nothing forwards an old name to it: the old names reach this Worker no more, and one that did would be
+    // refused (421), never redirected. Owner's go of 25 Oct 2026 (above). Was unset; to roll back the go-live, set it to "" (and first roll
+    // back S55: SITE_ORIGINS must list vicinity.city again).
     "SITE_ORIGIN": "https://citycoin.dev",
     // The Citycoin.dev labels (stage S48; owner directive of 24 Oct 2026, "there should be no existience of vicinty. only citycoin."): the
     // pages are built with them (src/pages-built.js) and the Worker uses them only while the deployed pages were built with them
@@ -171,20 +176,21 @@
     // The Worker runs first only for /api/*, /coin-meta/* and /official-coins.csv (the official city coins read from the chain,
     // src/officialcoins.js), which are handled in code. Pages and files are served straight
     // from the static assets (free, no Worker call) and get their security headers from public/_headers.
-    // (To also forward www / old addresses and force https from inside the Worker, set this to true:
-    // every request then counts as a Worker request, which matters on the free plan.)
+    // (Setting this to true would send every request through the Worker, which counts on the free plan; no stage needs it: the old names
+    // are not forwarded, docs/citycoin-master/domain-cutover.md section 0.)
     "run_worker_first": ["/api/*", "/coin-meta/*", "/official-coins.csv"],
     "not_found_handling": "404-page"
   },
-  // citycoin.dev (stage S06, listed in SITE_ORIGINS above) serves the site and is its canonical origin since the go-live (SITE_ORIGIN).
-  // vicinity.city still serves the same site in place; www.vicinity.city forwards to vicinity.city on the Worker-first paths (src/index.js).
-  // Both vicinity routes stay until stage S55 removes them, with no redirect (owner decision of 24 Oct 2026,
-  // docs/citycoin-master/domain-cutover.md section 0); their pages carry X-Robots-Tag noindex meanwhile (public/_headers).
-  // www.citycoin.dev: not attached (domain-cutover.md section 2 item 2). vicinitycity.net and www.vicinitycity.net: not attached.
+  // citycoin.dev (attached by stage S06, listed in SITE_ORIGINS above) is the one route: the site and its canonical origin (SITE_ORIGIN).
+  // Stage S55 removed the vicinity.city and www.vicinity.city custom domains (they were here from the start until S55), with no redirect:
+  // the owner's decision of 24 Oct 2026 (quoted at SITE_ORIGINS above) and his go of 25 Oct 2026 (quoted with the go-live settings above;
+  // docs/citycoin-master/domain-cutover.md section 0 and section 3, step 4). After the deploy Cloudflare sends neither name to this Worker;
+  // they are the owner's, for his other use.
+  // Rollback, only while the owner has not reused vicinity.city: put back { "pattern": "vicinity.city", "custom_domain": true } and
+  // { "pattern": "www.vicinity.city", "custom_domain": true } after this entry, together with SITE_ORIGINS above (section 5).
+  // www.citycoin.dev: not attached (domain-cutover.md section 2 item 2). vicinitycity.com, vicinitycity.net and their www: never this Worker's.
   "routes": [
-    { "pattern": "citycoin.dev", "custom_domain": true },
-    { "pattern": "vicinity.city", "custom_domain": true },
-    { "pattern": "www.vicinity.city", "custom_domain": true }
+    { "pattern": "citycoin.dev", "custom_domain": true }
   ],
   // The two fonts the city-coin picture is drawn with (src/coinart-wasm.js imports them): plain bytes, not code. The renderer's wasm
   // (@resvg/resvg-wasm/index_bg.wasm) is a CompiledWasm module by wrangler's default rule: compiled when the isolate starts (about 5 ms);

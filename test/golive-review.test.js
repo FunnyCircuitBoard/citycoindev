@@ -52,15 +52,17 @@ after(() => { W.realClock(); _pagesBuiltForTests(null); });
 
 test("GL-SAFE-2: over the committed (wallet-only) pages, WALLET_ONLY missing, blank, 'off' or a typo holds sign-in closed; it never reopens Google, e-mail or a Google-only session", async () => {
   assert.equal(BUILT.walletOnly, true, "the committed pages are built wallet-only");
-  // a member made by today's sign-up before the switch (today's pages: the suite's stand-in), signed in with Google only
-  // (made with today's settings on the same database, as production had them before the switch; its session, made with no host
-  // configured, is vicinity.city's: src/hostbind.js)
+  // a member made by today's sign-up before the switch (today's pages: the suite's stand-in), signed in with Google only, on citycoin.dev
+  // (made on the same database with the settings production had before the switch: S06's, both hosts listed, SITE_ORIGIN unset; its session
+  // is citycoin.dev's, src/hostbind.js). Until stage S55 this member was made with no host configured, a vicinity.city session read on
+  // vicinity.city; S55 serves citycoin.dev alone, where a vicinity.city session is signed out whatever the switch says, so the member whose
+  // session the held switch must refuse is one made on citycoin.dev
   const env = W.V2({ ...V, SOLANA_RPC_URL: "https://rpc.test", GOOGLE_CLIENT_ID: "gid" }); // (the fake Google's client id)
   delete env.WALLET_ONLY;
-  const today = { ...env };
-  for (const k of ["SITE_ORIGIN", "SITE_ORIGINS", "DEPLOYMENT_ENV", "BRAND", "LEGACY_SEATS", "LEGACY_LAUNCH", "EMAIL_FROM"]) delete today[k];
-  const made = await member(today, outbox(), { via: "google", sub: "gsafe2" });
-  const g = { b: W.browser(env, { site: "https://vicinity.city" }) };
+  const today = { ...env, SITE_ORIGINS: "https://citycoin.dev https://vicinity.city" };
+  for (const k of ["SITE_ORIGIN", "BRAND", "LEGACY_SEATS", "LEGACY_LAUNCH", "EMAIL_FROM"]) delete today[k];
+  const made = await member(today, outbox(), { via: "google", sub: "gsafe2", net: { site: "https://citycoin.dev" } });
+  const g = { b: W.browser(env, { site: "https://citycoin.dev" }) };
   for (const [k, v] of made.b.jar) g.b.jar.set(k, v);
   assert.equal((await g.b.get("/api/me")).signedIn, true, "today's pages, the switch unset: today's site");
   _pagesBuiltForTests(BUILT);

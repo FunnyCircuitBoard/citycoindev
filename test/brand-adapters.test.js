@@ -135,9 +135,12 @@ test("the old-name redirect: unset settings answer exactly as before; the target
   }
   assert.equal((await go("https://evil.example/api/health"))[0], 200, "an unknown host is served in place as today, never a redirect target");
   // a fixture configuration (clearly fake): SITE_ORIGIN alone never makes the permanent redirect cross domains (that is HOST_REDIRECT's,
-  // stage S03, with its own policy check), so the old names keep forwarding to vicinity.city; a host listed in SITE_ORIGINS is served in place
+  // stage S03, with its own policy check), so the old names forward to vicinity.city, and only while vicinity.city itself is served in place
+  // (stage S55, src/site-config.js servesLegacy: until S55 this fixture, which lists www.vicinity.city but not vicinity.city, still forwarded
+  // vicinitycity.net there; now it refuses it, 421 with no Location, never a redirect anywhere); a host listed in SITE_ORIGINS is served in place
   const env = { SITE_ORIGIN: "https://example.test", SITE_ORIGINS: "https://example.test https://www.vicinity.city" };
-  assert.deepEqual(await go("https://vicinitycity.net/x", env), [301, "https://vicinity.city/x", "public, max-age=3600"]);
+  assert.deepEqual(await go("https://vicinitycity.net/x", env), [421, null, "no-store"], "vicinity.city not served: its old names are not forwarded to it");
+  assert.deepEqual(await go("https://vicinitycity.net/x", { ...env, SITE_ORIGINS: "https://example.test https://www.vicinity.city https://vicinity.city" }), [301, "https://vicinity.city/x", "public, max-age=3600"]);
   assert.deepEqual(await go("http://www.vicinity.city/x?y=1", { SITE_ORIGIN: "https://example.test", SITE_ORIGINS: "https://example.test https://vicinity.city" }),
     [301, "https://vicinity.city/x?y=1", "public, max-age=3600"], "the review's case: not a 301 to the configured origin");
   assert.deepEqual(await go("https://vicinitycity.net/x", { SITE_ORIGIN: "https://example.test", SITE_ORIGINS: "https://example.test https://vicinity.city", HOST_REDIRECT: "on", DEPLOYMENT_ENV: "test" }),
@@ -684,7 +687,10 @@ const SERVER_LEFT = Object.freeze({
   // mail.js 18 since main 46c5825 (S06): today's three e-mails take their links from the served origin, today's address named once (MAIL_ORIGIN)
   today: { "brand.js": 3, "coinart.js": 1, "coinmeta.js": 2, "lpadmin.js": 1, "lpkit.js": 1, "mail.js": 18, "sol/lpadmin-ix.js": 1, "solana.js": 2 },
   legacy: { "coin.js": 1, "me.js": 1, "official.js": 30, "policy.js": 1, "portfolio.js": 2, "swap.js": 2 },
-  record: { "masterpolicy.js": 25 }, // 25 since main ec1e838 (#100): the owner's domains decision names vicinity.city in the policy statement
+  // 25 since main ec1e838 (#100): the owner's domains decision names vicinity.city in the policy statement; 28 since stage S55: the amendment
+  // owner-decision-2026-10-25-golive quotes the owner's go ("Vicinity still active") and the on-chain partner record it accepts going dark
+  // (name "Vicinity", the vicinity.city logo address). Records of the policy document, never shown on a page
+  record: { "masterpolicy.js": 28 },
 });
 const LEGACY_FILES = new Set(["coin.js", "me.js", "official.js", "portfolio.js", "swap.js"]);
 const TODAY_FILES = new Set(["brand.js", "coinart.js", "coinmeta.js", "lpadmin.js", "lpkit.js", "mail.js", "sol/lpadmin-ix.js", "solana.js"]);
