@@ -223,10 +223,13 @@ const legacyUnderV5 = (env, mint) => mainTokenV5(env) && (isLegacyMint(mint) || 
 const LEGACY_SWAP = "$VICINITY is a legacy token now: no swap or purchase is offered for it here. Your tokens stay yours, and you can still send them from your wallet.";
 
 /**
- * A swap platform-fee setting other than 0 (src/cluster.js swapFeeRefusal; Citycoin.dev master v5, stage S39): /quote and /tx answer
- * 503 swap_unavailable with the reason, before the attempt counters, any chain read or any Jupiter call, so no fee can reach a request
- * or a transaction. Logged once per server (Worker isolate) and reason, never with the setting's value. Every other route, the swap
- * config included, answers as before; with the settings unset or "0" (production) nothing here runs.
+ * A swap platform-fee setting other than 0 (src/cluster.js swapFeeRefusal; Citycoin.dev master v5, stage S39): the Jupiter path of /quote
+ * and /tx answers 503 swap_unavailable with the reason, so no fee can reach a Jupiter request or a transaction. It is asked in prepare()
+ * below, after the input, the legacy-token and the curve checks and before the mainnet decimals and any Jupiter call: a bad body still
+ * answers 400, a legacy token 409, and a city coin on its Meteora curve is still handed to /api/launchpad/trade (that trade never
+ * carried a Jupiter fee). The reason in the answer is deliberate: it is the only place an operator without the logs sees why swaps
+ * stopped (it names the kind of setting, never its value). Logged once per server (Worker isolate) and reason, never with the value.
+ * Every other route, the swap config included, answers as before; with the settings unset or "0" (production) nothing here runs.
  */
 const feeRefusalsLogged = new Set();
 function feeRefused(env) {
@@ -258,6 +261,8 @@ async function prepare(request, env, fetchImpl, now, { takerRequired }) {
       }
     }
   }
+  const refused = feeRefused(env); // the Jupiter path only (stage S39; review finding SF-5): never a fee in a Jupiter request
+  if (refused) return { error: refused };
   let inDec, outDec;
   try { [inDec, outDec] = await Promise.all([mintDecimals(env, input.inputMint, fetchImpl, now), mintDecimals(env, input.outputMint, fetchImpl, now)]); }
   catch (e) { console.error("mint decimals failed", codeOf(e)); return { error: json({ ok: false, error: "rpc_unavailable" }, 503, noStore) }; }
@@ -271,8 +276,6 @@ const curveAnswer = (c) => json({ ok: true, source: "curve", ...c, useRoute: "/a
 
 /** POST /api/swap/quote (the route has checked the switch, the method and the Origin). */
 export async function handleSwapQuote(request, env, fetchImpl = fetch, now = Date.now()) {
-  const refused = feeRefused(env);
-  if (refused) return refused;
   const slow = await publicLimit(env, request, "swap_quote");
   if (slow) return slow;
   const p = await prepare(request, env, fetchImpl, now, { takerRequired: false });
@@ -326,8 +329,6 @@ async function verifiedTables(env, build, fetchImpl, now) {
 
 /** POST /api/swap/tx: the unsigned Jupiter transaction for `taker`, checked, simulated, with our compute budget. */
 export async function handleSwapTx(request, env, fetchImpl = fetch, now = Date.now()) {
-  const refused = feeRefused(env);
-  if (refused) return refused;
   const kind = buildKind(request, "swap_tx"); // a Buy tap, or the panel's own build before the tap (?auto=1): counted apart
   const slow = await publicLimit(env, request, kind);
   if (slow) return slow;

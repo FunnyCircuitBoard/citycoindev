@@ -34,7 +34,7 @@ can trade this pair right now." Nothing is built and nothing can be signed for s
 | `JUPITER_API_KEY` (Secret) | a key from portal.jup.ag (the Developer plan, 10 requests per second, is the one for a launch day) | builds (`/swap/v2/build`) on the plan's own allowance. Without it previews are keyless estimates and the Worker still builds on Jupiter's **anonymous** allowance (api.jup.ag answered a keyless build on 9 Oct 2026), which can end any day without notice: the key is required for a launch, not optional |
 | `JUPITER_RPS` | the plan's requests per second (`10`) | the per-server token bucket: more than this per second becomes estimates, never errors |
 | `JUPITER_API_BASE` | unset (= `https://api.jup.ag`); `JUPITER_LITE_BASE` unset (= `https://lite-api.jup.ag`) | |
-| `SWAP_PLATFORM_FEE_BPS`, `SWAP_FEE_ACCOUNT` | unset = no platform fee (the page says "takes no fee") | nothing: the fee is pinned to 0 (Citycoin.dev master v5, stage S39); any value but unset, blank or `0`, and any fee account, stops the swaps (`swap_unavailable`) |
+| `SWAP_PLATFORM_FEE_BPS`, `SWAP_FEE_ACCOUNT` | unset = no platform fee (the page says "takes no fee") | nothing: the fee is pinned to 0 (Citycoin.dev master v5, stage S39); any value but unset, blank or `0`, and any fee account, stops the Jupiter swaps (`swap_unavailable`; a city coin on its curve still trades) |
 | `SOLANA_RPC_URL` (Secret) | the provider's mainnet URL (Helius or similar) | every chain read, the simulations, the relay's `sendTransaction`, the status polls |
 | `SOLANA_RPC_URL_BACKUP` (Secret, recommended) | a mainnet URL from a **different provider** (QuickNode, Alchemy, Triton, Syndica ...) whose plan allows `getProgramAccounts` on the SPL Token program; never the public RPC | asked only when `SOLANA_RPC_URL` refuses or fails (401/402/403/429/5xx, timeout, "max usage reached"); first for 60 s after the provider as a whole failed (key or credits refused, unreachable or too slow, 5xx, or three passing failures within 10 s). Never used if it is not a mainnet node (the Worker asks its genesis hash first). A signed transaction goes to it at most once, as the same bytes; a node's verdict (preflight failure) is never re-sent. Unset = one provider, as before. Added after the 10 Oct 2026 outage (src/rpcpool.js) |
 | `RPC_TIMEOUT_MS` | `8000` | |
@@ -219,7 +219,7 @@ Recorded on 10 October 2026, after the city-coin rows were added (same shell):
   caps it at 0.01 SOL; the panel's fee line says "priority ≤ X SOL" with the quote and the exact "priority X SOL" once the
   transaction is built), and once per new token account of theirs 2,039,280 lamports of rent (returned when they close the
   account; the panel's "Account rent" row says so when the wallet has no account for the token yet). Vicinity takes no fee:
-  the swap platform fee is pinned to 0 (Citycoin.dev master v5, stage S39), and a fee setting stops the swaps instead.
+  the swap platform fee is pinned to 0 (Citycoin.dev master v5, stage S39), and a fee setting stops the Jupiter swaps instead.
   Jupiter's Developer plan price ($25 per month, 10 requests per second) is the owner's figure from portal.jup.ag, not
   verified here.
 * Curve trades: the config's trading fee (125 bps on the live config today; the site reads it from the config, src/fees.js and

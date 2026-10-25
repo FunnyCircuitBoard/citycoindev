@@ -9,14 +9,20 @@
  *     only in the taker's own account of the output mint, the amount in / quoted out / slippage equal the JSON, the minimum it
  *     enforces on chain is the JSON's otherAmountThreshold, the platform fee is 0 (pinned: Citycoin.dev master v5, stage S39,
  *     src/cluster.js swapFeeRefusal; the swap's optional fee account may only be the taker's own output account) and there is no
- *     positive-slippage cut;
+ *     positive-slippage cut; its event authority and program sit in their places, and in the shared-accounts layout its program
+ *     authority is the one Jupiter derives for the swap's id, holding the input and the output in that authority's own accounts;
+ *   * the route (the swap's accounts past those fixed places: pools, vaults, their programs) is Jupiter's choice and cannot be
+ *     checked pool by pool here. What bounds it is the minimum output above, which Jupiter's program enforces on chain: whatever
+ *     the route does, the taker's output account gains at least otherAmountThreshold or the transaction fails. What the Worker can
+ *     tell is the taker's own accounts: the route may not name the taker's account of a watched mint (SOL's WSOL account, USDC,
+ *     USDT, the legacy $VICINITY) that the route does not trade (review finding SEC-1 of stage S39);
  *   * every setup, cleanup and other instruction is allow-listed by program, opcode and accounts: create-idempotent of the
  *     taker's own associated account of a mint on the route; a System transfer of at most the amount from the taker to the
  *     taker's WSOL account, only when paying with SOL; sync-native and close of the taker's WSOL account back to the taker.
  * A new discriminator or layout from Jupiter is refused (fail closed), never guessed at. Every refusal is an Error with a short
  * `code` for the log; the body never reaches a log or an answer.
  */
-import { ADDRESSES, PROGRAM_IDS, ata } from "./sol/pda.js";
+import { ADDRESSES, PROGRAM_IDS, ata, findProgramAddress } from "./sol/pda.js";
 import { fromBase64, hex, readU16, readU64 } from "./sol/bytes.js";
 import { base58Encode } from "./solana.js";
 import { maxCuPrice, setComputeUnitLimit, setComputeUnitPrice } from "./sol/ix.js";
@@ -24,6 +30,13 @@ import { maxCuPrice, setComputeUnitLimit, setComputeUnitPrice } from "./sol/ix.j
 export const JUPITER_PROGRAM = PROGRAM_IDS.jupiter;
 export const JUPITER_SWAP_DISCRIMINATORS = Object.freeze({ route_v2: "bb64facc31c4af14", shared_accounts_route_v2: "d19853937cfed8e9" });
 const TOKEN_PROGRAMS = [PROGRAM_IDS.token, PROGRAM_IDS.token2022];
+/** Mints whose taker account a route may name only when the route trades that mint: SOL (the WSOL account), USDC, USDT (src/swap.js KNOWN)
+ *  and the legacy $VICINITY (docs/citycoin-master/policy.json legacy_tokens). */
+export const WATCHED_MINTS = Object.freeze([ADDRESSES.wsol, "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", "2aVkhRfAEm44tMhFo8oamWvumGGvweFqnUwukRMBkray"]);
+const utf8 = new TextEncoder();
+/** Jupiter's event authority (Anchor's "__event_authority" PDA) and the program authority of a shared-accounts swap id ("authority", id). */
+export const jupiterEventAuthority = async () => (await findProgramAddress([utf8.encode("__event_authority")], PROGRAM_IDS.jupiter))[0];
+export const jupiterProgramAuthority = async (id) => (await findProgramAddress([utf8.encode("authority"), Uint8Array.of(id)], PROGRAM_IDS.jupiter))[0];
 const refuse = (code) => { const e = new Error("jupiter_refused:" + code); e.code = code; e.refused = true; return e; };
 const isAddr = (s) => typeof s === "string" && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s);
 const u64str = (s) => typeof s === "string" && /^\d{1,20}$/.test(s);
@@ -67,13 +80,16 @@ export function decodeJupiterSwap(ix) {
     // it may only be the taker's own destination: no fee is accepted, stage S39), event_authority, program
     const optional = acc(7);
     return { kind: "route_v2", authority: acc(0), source: acc(1), destinations: optional === JUPITER_PROGRAM ? [acc(2)] : [acc(2), optional], optional: optional === JUPITER_PROGRAM ? null : optional,
-      sourceMint: acc(3), destinationMint: acc(4), sourceTokenProgram: acc(5), destinationTokenProgram: acc(6), ...args(8) };
+      sourceMint: acc(3), destinationMint: acc(4), sourceTokenProgram: acc(5), destinationTokenProgram: acc(6), eventAuthority: acc(8), programAccount: acc(9),
+      route: ix.accounts.slice(10).map((a) => a && a.pubkey), ...args(8) };
   }
   if (disc === JUPITER_SWAP_DISCRIMINATORS.shared_accounts_route_v2) {
     // program_authority, user_transfer_authority, source, program_source, program_destination, destination, source_mint,
     // destination_mint, source_token_program, destination_token_program, event_authority, program; data: id u8 first
+    if (d.length < 9) throw refuse("swap_data_short");
     return { kind: "shared_accounts_route_v2", authority: acc(1), source: acc(2), destinations: [acc(5)],
-      sourceMint: acc(6), destinationMint: acc(7), sourceTokenProgram: acc(8), destinationTokenProgram: acc(9), ...args(9) };
+      sourceMint: acc(6), destinationMint: acc(7), sourceTokenProgram: acc(8), destinationTokenProgram: acc(9), eventAuthority: acc(10), programAccount: acc(11),
+      id: d[8], programAuthority: acc(0), programSource: acc(3), programDestination: acc(4), route: ix.accounts.slice(12).map((a) => a && a.pubkey), ...args(9) };
   }
   throw refuse("unknown_swap_" + disc.slice(0, 8));
 }
@@ -122,11 +138,25 @@ export async function checkJupiterBuild(build, { taker, inputMint, outputMint, i
   if (sw.minOut !== threshold) throw refuse("swap_min_out");
   if (sw.platformFeeBps !== 0) throw refuse("platform_fee");
   if (sw.positiveSlippageBps !== 0) throw refuse("positive_slippage");
+  // the accounts Jupiter derives itself, in their places (SEC-1): its event authority and program; in the shared-accounts layout the
+  // program authority of the swap's id and that authority's own accounts of the input and the output mint (recorded answers agree)
+  if (sw.eventAuthority !== await jupiterEventAuthority()) throw refuse("event_authority");
+  if (sw.programAccount !== JUPITER_PROGRAM) throw refuse("swap_program_account");
+  if (sw.kind === "shared_accounts_route_v2") {
+    const authority = await jupiterProgramAuthority(sw.id);
+    if (sw.programAuthority !== authority) throw refuse("program_authority");
+    if (sw.programSource !== await ata(authority, inputMint, sw.sourceTokenProgram)) throw refuse("program_source");
+    if (sw.programDestination !== await ata(authority, outputMint, sw.destinationTokenProgram)) throw refuse("program_destination");
+  }
 
   // every helper, by opcode and accounts
   const wsolAta = await ata(taker, ADDRESSES.wsol);
   const routeMints = new Set([inputMint, outputMint]);
   for (const r of build.routePlan) { const s = r && r.swapInfo; if (!s || !isAddr(s.inputMint) || !isAddr(s.outputMint)) throw refuse("route_plan"); routeMints.add(s.inputMint); routeMints.add(s.outputMint); }
+  // the route may not name the taker's account of a watched mint it does not trade (SEC-1; either token program)
+  const offRoute = new Set();
+  for (const m of WATCHED_MINTS) if (!routeMints.has(m)) for (const tp of TOKEN_PROGRAMS) offRoute.add(await ata(taker, m, tp));
+  if (sw.route.some((k) => offRoute.has(k))) throw refuse("route_taker_account");
   for (const i of helpers) {
     const d = fromBase64(i.data), a = (k) => i.accounts[k] && i.accounts[k].pubkey;
     if (i.programId === PROGRAM_IDS.ata) {

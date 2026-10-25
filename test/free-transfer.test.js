@@ -2,11 +2,16 @@
 // adds no charge; network/rent are separate"; master section 29, "Zero launch/send/receive platform fees": "Builders contain no flat/percentage
 // platform payment, hidden surcharge or transfer tax", and "Decode launch and transfer transactions to prove zero platform collection").
 //   * The swap platform fee is pinned to 0 (src/cluster.js swapFeeRefusal). SWAP_PLATFORM_FEE_BPS unset, blank or "0" and SWAP_FEE_ACCOUNT unset
-//     or blank are today's no fee, answer for answer; any other value makes /api/swap/quote and /api/swap/tx refuse with a named reason before
-//     any work (logged once per server and reason), and every other route answers as before.
+//     or blank are today's no fee, answer for answer; any other value makes the Jupiter path of /api/swap/quote and /api/swap/tx refuse with a
+//     named reason before any chain read or Jupiter call (logged once per server and reason). A bad body, a legacy token and a city coin on its
+//     curve answer as before (review finding SF-5), and every other route answers as before.
 //   * A swap build decoded: the versioned message, its account keys (the lookup table's included) and every instruction. No platform fee in the
-//     swap's data, no fee account anywhere, and nothing pays anyone but the taker's own accounts and the route Jupiter lists in the swap.
-//     Jupiter answers that add a fee (in the swap's optional slot, its data, or a transfer beside it) are refused before anything is simulated.
+//     swap's data, no fee account anywhere, and outside the swap nothing is written but the taker's own accounts. The swap's route (its pools
+//     and vaults, past the fixed places) is Jupiter's choice: the Worker does not check it pool by pool, and Jupiter's program bounds it on
+//     chain by the minimum output (otherAmountThreshold). What the Worker does check there: the derived accounts in their places and no taker
+//     account of a watched mint the route does not trade (review finding SEC-1). Jupiter answers that add a fee (in the swap's optional slot,
+//     its data, a transfer beside it, a Token-2022 transfer with fee, or the shared-accounts layout's data) are refused before anything is
+//     simulated.
 //   * The Send summary's fee line names the product from src/brand.js: "No Vicinity fee." with BRAND unset, byte for byte.
 // Against the fake Jupiter and fake RPC of test/helpers/jupfake.js (the recorded answers of 9 Oct 2026 rewritten for the asking wallet).
 import { test } from "node:test";
@@ -90,7 +95,7 @@ test("S39: the swap fee settings: unset, blank and \"0\" are no fee; any other v
   }
 });
 
-test("S39: with a fee setting, /api/swap/quote and /api/swap/tx refuse before any work (no counter, no chain read, no Jupiter call), logged once per server and reason; every other route answers as with no setting", async () => {
+test("S39: with a fee setting, the Jupiter path of /api/swap/quote and /api/swap/tx refuses before any chain read or Jupiter call (only the attempt counters are written), logged once per server and reason; every other route answers as with no setting", async () => {
   useClock("2026-10-24T12:00:00Z"); // the balances answer says when it was read
   try { await refusedRoutes(); } finally { realClock(); }
 });
@@ -115,7 +120,13 @@ async function refusedRoutes() {
     assert.ok(!logs.join(" ").includes(FEE_WALLET) && !logs.join(" ").includes("0.5"));
     assert.deepEqual(w.W.jup.log, [], "Jupiter was never called");
     assert.deepEqual(w.W.rpc.log, [], "the chain was never read");
-    assert.deepEqual(await rows(w.env), before, "nothing was written, not even an attempt counter");
+    // the attempt counters are written, as for any attempt (the input and the curve are read before the fee is asked, review finding SF-5);
+    // nothing else is
+    const after = await rows(w.env);
+    // (the counters' own rows: auth_limits, the per-server salt in settings, and the schema bookkeeping any first request makes)
+    for (const [t, v] of Object.entries(after)) if (!["auth_limits", "schema_migrations", "settings"].includes(t)) assert.equal(v, before[t] ?? "[]", `${t}: nothing but the attempt counters`);
+    assert.deepEqual(JSON.parse(after.settings).map((r) => r.key), ["limit_salt"]);
+    assert.ok(/swap_quote/.test(after.auth_limits) && /swap_tx/.test(after.auth_limits), "the attempts were counted");
     // the other routes, the swap config included, answer exactly as with no setting (the fee there is 0 either way)
     for (const p of OTHER) {
       const r = await w.call(p);
@@ -251,7 +262,7 @@ test("S39: a swap build decoded (versioned message, account keys with the lookup
   for (const l of w.W.jup.log) assert.deepEqual([l.q.platformFeeBps, l.q.feeAccount], [undefined, undefined], l.path);
 });
 
-test("S39: a Jupiter answer that adds a platform fee is refused before anything is compiled or simulated: the fee in the swap's data and its optional slot, the fee account alone, the fee alone, a token or SOL transfer to a fee wallet", async () => {
+test("S39: a Jupiter answer that adds a platform fee is refused before anything is compiled or simulated: the fee in the swap's data and its optional slot, the fee account alone, the fee alone, a token, Token-2022 or SOL transfer to a fee wallet, a fee in the shared-accounts layout", async () => {
   const tampered = {
     "Jupiter answers a fee nobody asked for, to a fee account": { platformFeeBps: 50, feeAccount: FEE_WALLET },
     fee_bps_and_account: { hostile: "fee_bps_and_account" },
@@ -260,6 +271,8 @@ test("S39: a Jupiter answer that adds a platform fee is refused before anything 
     fee_token_transfer: { hostile: "fee_token_transfer" },
     fee_token_transfer_checked: { hostile: "fee_token_transfer_checked" },
     fee_sol_transfer: { hostile: "fee_sol_transfer" },
+    fee_token2022_transfer: { hostile: "fee_token2022_transfer" }, // review finding SEC-8
+    shared_fee: { hostile: "shared_fee" },
   };
   for (const [name, jupiter] of Object.entries(tampered)) {
     for (const body of [quoteBody(), quoteBody({ inputMint: REAL_VIC, outputMint: SOL, amount: "100" })]) {
@@ -287,6 +300,15 @@ test("S39: a Jupiter answer that adds a platform fee is refused before anything 
   assert.equal(await reason({ hostile: "fee_token_transfer" }), "token_opcode");
   assert.equal(await reason({ hostile: "fee_token_transfer_checked" }), "token_opcode");
   assert.equal(await reason({ hostile: "fee_sol_transfer" }), "sol_transfer_destination");
+  // review findings SEC-8 and SEC-1: a Token-2022 transfer with fee, the shared-accounts layout (clean, with a fee, with a stranger in its
+  // program authority or destination), the event authority swapped, the taker's USDT account in a route that never trades USDT
+  assert.equal(await reason({ hostile: "fee_token2022_transfer" }), "helper_program");
+  assert.equal(await reason({ hostile: "shared" }), "accepted");
+  assert.equal(await reason({ hostile: "shared_fee" }), "platform_fee");
+  assert.equal(await reason({ hostile: "shared_program_authority" }), "program_authority");
+  assert.equal(await reason({ hostile: "shared_program_destination" }), "program_destination");
+  assert.equal(await reason({ hostile: "event_authority" }), "event_authority");
+  assert.equal(await reason({ hostile: "route_taker_account" }), "route_taker_account");
   // and a caller that still passes the old fee options is refused, even with a clean answer
   const clean = await rewriteBuild(p);
   for (const opt of [{ platformFeeBps: 50 }, { feeAccount: FEE_WALLET }, { platformFeeBps: 50, feeAccount: FEE_WALLET }, { platformFeeBps: "0" }]) {

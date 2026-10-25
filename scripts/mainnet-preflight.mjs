@@ -204,8 +204,8 @@ export async function preflight(env, { fetchImpl = fetch, now = Date.now(), site
   // ---- Jupiter ----
   row(jc.keyed ? "PASS" : "WARN", "JUPITER_API_KEY", jc.keyed ? `set (${jc.key.length} characters, never printed): builds on the plan's own allowance` : "not set here: previews are keyless estimates and builds run on Jupiter's ANONYMOUS allowance, which may stop without notice (portal.jup.ag gives a key; required for a launch)");
   row(jc.keyed && jc.rps > 1 ? "PASS" : "WARN", "JUPITER_RPS", `${jc.rps} per second per server${jc.rps === 1 ? " (the default: set the plan's rate, e.g. 10, or most previews during a rush become estimates)" : jc.rps < 10 ? " (below 10: a launch-day rush will see estimates instead of builds)" : ""}`);
-  // the swap platform fee is pinned to 0 (Citycoin.dev master v5, stage S39; src/cluster.js swapFeeRefusal): any other setting stops the swaps
-  row(jc.feeRefusal ? "FAIL" : "PASS", "SWAP_PLATFORM_FEE_BPS / SWAP_FEE_ACCOUNT", jc.feeRefusal ? `refused (${jc.feeRefusal}): the swap platform fee is pinned to 0, and while this setting is there every swap quote and build answers swap_unavailable; delete it or set SWAP_PLATFORM_FEE_BPS to 0 and SWAP_FEE_ACCOUNT to nothing` : "no platform fee (pinned to 0)");
+  // the swap platform fee is pinned to 0 (Citycoin.dev master v5, stage S39; src/cluster.js swapFeeRefusal): any other setting stops the Jupiter swaps
+  row(jc.feeRefusal ? "FAIL" : "PASS", "SWAP_PLATFORM_FEE_BPS / SWAP_FEE_ACCOUNT", jc.feeRefusal ? `refused (${jc.feeRefusal}): the swap platform fee is pinned to 0, and while this setting is there every swap quote and build that would go to Jupiter answers swap_unavailable; delete it or set SWAP_PLATFORM_FEE_BPS to 0 and SWAP_FEE_ACCOUNT to nothing` : "no platform fee (pinned to 0)");
   if (isSolanaAddress(mint)) {
     try {
       const { res: q, body: d, ms } = await getJson(fetchImpl, `${jc.lite}/swap/v1/quote?inputMint=${SOL}&outputMint=${mint}&amount=10000000&slippageBps=100&swapMode=ExactIn`);

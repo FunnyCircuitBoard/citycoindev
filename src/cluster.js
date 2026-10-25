@@ -86,10 +86,12 @@ export function lpSetup(env = {}) {
 }
 
 /**
- * The swap platform fee is pinned to 0 (Citycoin.dev master v5, stage S39; master section 29, "Zero launch/send/receive platform fees":
- * "Builders contain no flat/percentage platform payment, hidden surcharge or transfer tax"). No code path asks Jupiter for a fee or
- * accepts a build that charges one (src/swap.js, src/jupswap.js). The two old settings are read only to be refused: wrangler.jsonc keeps
- * dashboard variables across deploys (keep_vars), and a fee setting the code quietly ignored would look live to whoever set it.
+ * The swap platform fee is pinned to 0 (Citycoin.dev master v5, stage S39). The master names no swap fee: section 29's zero-fee rule is
+ * about sends and receives, and the only line about outside venues is "External third-party pools may not collect the custom-program
+ * fee; do not add a transfer tax" (master-v5.txt:1667-1668). The pin follows B02's free-transfer intent, and the refusal below follows
+ * from keep_vars. No code path asks Jupiter for a fee or accepts a build that charges one (src/swap.js, src/jupswap.js). The two old
+ * settings are read only to be refused: wrangler.jsonc keeps dashboard variables across deploys (keep_vars), and a fee setting the code
+ * quietly ignored would look live to whoever set it.
  * Null (no refusal) when SWAP_PLATFORM_FEE_BPS is unset, blank or "0" and SWAP_FEE_ACCOUNT is unset or blank: production sets neither.
  * Otherwise the reason every swap quote and build is refused with (src/swap.js feeRefused):
  *   platform_fee_not_zero   SWAP_PLATFORM_FEE_BPS is a whole number above 0 ("50")

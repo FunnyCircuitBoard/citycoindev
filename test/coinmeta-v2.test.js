@@ -1,13 +1,15 @@
 // Canonical city-coin metadata v2 (src/coinmeta-v2.js; Citycoin.dev master v5, stage S22, advances M01): the description's exact
-// wording for SOL and non-SOL quotes, with and without a state or region; content v2 with ids, attribution and the normalization
-// version; canonical JSON and its SHA-256 per quote; the metadata JSON whose SHA-256 is the program's meta_hash; the brand constants
-// of new-program coins against the master policy and PR #83 (test/fixtures/citycoin-curve-pr83.json); golden vectors
+// wording for SOL and non-SOL quotes, with and without a state or region; content v2, one per city version and the same for every quote
+// (ids, attribution, list and normalization versions, the picture's source), its canonical JSON and SHA-256 (the schema's content_hash);
+// per quote the description and the metadata JSON whose SHA-256 is the program's meta_hash; the brand constants of new-program coins
+// against the master policy and PR #83 (test/fixtures/citycoin-curve-pr83.json); the Unicode 15.1 tables of cc-norm-1; golden vectors
 // (test/fixtures/coinmeta-v2-golden.json). And the stage's promise: nothing is wired, and no existing module's output changes
-// (test/fixtures/s22-legacy-outputs.json was recorded from edabab5).
+// (test/fixtures/s22-legacy-outputs.json was recorded from edabab5). The review's findings have their own file, test/s22-s39-review.test.js.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import * as V2 from "../src/coinmeta-v2.js";
 import { MASTER_POLICY } from "../src/masterpolicy.js";
 import { POLICY } from "../src/policy.js";
@@ -17,6 +19,7 @@ import * as DEFS from "../src/coindefaults.js";
 import * as READY from "../src/coinready.js";
 import * as ART from "../src/coinart.js";
 import * as STORE from "../src/coinart-store.js";
+import * as UNI from "../src/cc-unicode.js";
 
 const root = new URL("../", import.meta.url);
 const text = (p) => readFileSync(new URL(p, root), "utf8");
@@ -28,11 +31,13 @@ const LEGACY = json("test/fixtures/s22-legacy-outputs.json");
 const cities = json("public/data/cities.json");
 const tickers = json("public/data/tickers.json");
 const P = MASTER_POLICY.policy;
-const { MetadataError, renderDescription, contentV2, canonicalJson, normalizeText, checkCoinName, checkCoinSymbol, quoteOf, buildCoinMetadataV2, buildPerQuote, metadataJsonV2, QUOTES, CC_COIN_BRAND } = V2;
+const { MetadataError, renderDescription, contentV2, canonicalJson, normalizeText, checkCoinName, checkCoinSymbol, quoteOf, buildCoinMetadataV2, buildPerQuote, metadataJsonV2, renderQuote, perQuoteJson, contentFromJson, describeContent, QUOTES, CC_COIN_BRAND } = V2;
 const MINT = "CagvLF3JgZNBTUf6LrTg9ryFh7FsZbVoBaHVmoCnhBba"; // fake
 const ART_SHA = "a".repeat(64); // fake
+const LIST_SHA = sha(readFileSync(new URL("public/data/cities.json", root))); // the list version: the exact city list file's SHA-256
 const code = (fn) => { try { fn(); } catch (e) { assert.ok(e instanceof MetadataError, String(e)); return e.code; } return null; };
-const UTICA = { city: { id: "5142056", name: "Utica" }, region: { id: "US.NY", name: "New York" }, country: { id: "US", name: "United States" }, name: "Utica", symbol: "UTICA", artSha256: ART_SHA, mint: MINT };
+const rejects = async (p, want) => { try { await p(); } catch (e) { assert.ok(e instanceof MetadataError, String(e)); assert.equal(e.code, want); return; } assert.fail(`expected ${want}`); };
+const UTICA = { city: { id: "5142056", name: "Utica" }, region: { id: "US.NY", name: "New York" }, country: { id: "US", name: "United States" }, name: "Utica", symbol: "UTICA", listSha256: LIST_SHA, image: { sha256: ART_SHA, source: "template" }, mint: MINT };
 const BRAND_LINE = "Launched on Citycoin.dev (https://citycoin.dev) on Solana.";
 
 /* ------------------------------------------------------------------ the wording (M01: actual city, state or region, country and pair) */
@@ -59,7 +64,7 @@ test("the description, word for word: SOL and USDC, with a state, with no state 
 
 test("every one of the 8,030 registry cities, with each listed quote: its own city, state or region (or 'No state or region'), country and the selected pair, never the other quote", () => {
   const sentence = (s) => (/[.!?…]$/u.test(s) ? s : `${s}.`);
-  let n = 0, noRegion = 0, longNames = [];
+  let n = 0, noRegion = 0, longNames = [], unreviewed = [];
   for (const [cc, rows] of Object.entries(cities.byCountry)) for (const r of rows) {
     const t = tickers[String(r[0])];
     if (!t) continue;
@@ -77,28 +82,32 @@ test("every one of the 8,030 registry cities, with each listed quote: its own ci
       assert.doesNotMatch(d, q === "SOL" ? /USDC/ : /\/ SOL\b|\bSOL\b/, `${r[1]}: never the other quote`);
       n++;
     }
-    // the coin's own content: the registry name, or its short form where the name is over 32 bytes (src/coindefaults.js)
-    const base = { city: { id: String(r[0]), name: r[1] }, region: region === null ? null : { id: `${cc}.${r[2]}`, name: region }, country: { id: cc, name: country }, symbol: ticker, artSha256: ART_SHA, quote: "SOL" };
-    if (code(() => contentV2({ ...base, name: r[1] })) === "name_too_long") longNames.push(String(r[0]));
+    // the coin's own content: the registry name, or its short form where the name is over 32 bytes (src/coindefaults.js); a null region
+    // only where no state or region applies (the three places of REGION_UNREVIEWED wait for the owner's review of their region)
+    const base = { city: { id: String(r[0]), name: r[1] }, region: region === null ? null : { id: `${cc}.${r[2]}`, name: region }, country: { id: cc, name: country }, symbol: ticker, listSha256: LIST_SHA, image: { sha256: ART_SHA, source: "template" } };
+    const why = code(() => contentV2({ ...base, name: r[1] }));
+    if (why === "region_unreviewed") { unreviewed.push(String(r[0])); continue; }
+    if (why === "name_too_long") longNames.push(String(r[0]));
     else assert.equal(contentV2({ ...base, name: r[1] }).name, normalizeText(r[1]));
     if (DEFS.NAME_OVERRIDES[r[0]]) assert.equal(contentV2({ ...base, name: DEFS.NAME_OVERRIDES[r[0]] }).name, DEFS.NAME_OVERRIDES[r[0]]);
   }
   assert.equal(n, 2 * 8030);
-  assert.equal(noRegion, 29, "the list has no state or region for 29 registry places; each says so");
+  assert.equal(noRegion, 29, "the list has no state or region for 29 registry places; each description says so");
+  assert.deepEqual(unreviewed.sort(), Object.keys(V2.REGION_UNREVIEWED).sort(), "three of them have a region that applies: refused until the owner reviews it");
   assert.deepEqual(longNames.sort(), Object.keys(DEFS.NAME_OVERRIDES).sort(), "only the three long names are refused, and their short forms pass");
 });
 
-test("the region must be stated: null for none, never left out, never blank, never made up", () => {
+test("the region must be stated: null for none, never left out, never blank, never made up", async () => {
   assert.equal(code(() => renderDescription("Utica", undefined, "United States", "SOL", { symbol: "UTICA" })), "region_missing");
   assert.equal(code(() => renderDescription("Utica", "", "United States", "SOL", { symbol: "UTICA" })), "empty");
   assert.equal(code(() => renderDescription("Utica", " \n ", "United States", "SOL", { symbol: "UTICA" })), "empty");
   const { region, ...noRegion } = UTICA;
-  assert.equal(code(() => contentV2({ ...noRegion, quote: "SOL" })), "region_missing");
-  assert.equal(code(() => contentV2({ ...UTICA, region: { id: "CA.08", name: "Ontario" }, quote: "SOL" })), "bad_id", "a region of another country");
-  const c = contentV2({ ...UTICA, region: null, quote: "SOL" });
+  assert.equal(code(() => contentV2(noRegion)), "region_missing");
+  assert.equal(code(() => contentV2({ ...UTICA, region: { id: "CA.08", name: "Ontario" } })), "bad_id", "a region of another country");
+  const c = contentV2({ ...UTICA, region: null });
   assert.equal(c.region, null);
-  assert.match(c.description, / City: Utica\. No state or region\. Country: United States\. /);
-  assert.deepEqual(metadataJsonV2(c, { mint: MINT, contentHash: "b".repeat(64) }).attributes[3], { trait_type: "State or region", value: "No state or region" });
+  assert.match(describeContent(c, "SOL"), / City: Utica\. No state or region\. Country: United States\. /);
+  assert.deepEqual((await metadataJsonV2(c, { mint: MINT, quote: "SOL" })).attributes[3], { trait_type: "State or region", value: "No state or region" });
 });
 
 test("pair accuracy: a listed quote's symbol only with its own mint, never a legacy mint, never a look-alike; the approved text may not name a quote", () => {
@@ -125,33 +134,47 @@ test("pair accuracy: a listed quote's symbol only with its own mint, never a leg
 
 /* ------------------------------------------------------------------ content v2, canonical JSON and the hashes */
 
-test("golden vectors: one SOL and one USDC coin of the same city, no state or region, non-ASCII, NFD input, an approved text, and a fake coin at every limit", async () => {
+test("golden vectors: one content per city version rendered for SOL and USDC (one mint), an approved upload, no state or region, non-ASCII, NFD input, an approved text, and a fake coin at every limit", async () => {
   assert.equal(GOLDEN.vectors.length, 8);
+  assert.equal(GOLDEN.listSha256, LIST_SHA, "the list version of the real places is public/data/cities.json as it is");
   const byId = Object.fromEntries(GOLDEN.vectors.map((v) => [v.id, v]));
   for (const v of GOLDEN.vectors) {
-    const r = await buildCoinMetadataV2({ ...v.input, quote: v.quote });
-    assert.equal(r.content.description, v.description, v.id);
+    const r = await buildPerQuote(v.input, v.quotes.map((q) => q.quote));
     assert.equal(r.contentJson, v.contentJson, v.id);
     assert.equal(r.contentHash, v.contentHash, v.id);
-    assert.equal(r.metadataJson, v.metadataJson, v.id);
-    assert.equal(r.metaHash, v.metaHash, v.id);
-    assert.equal(r.uri, v.uri, v.id);
     // the hashes again with Node's own SHA-256 over the UTF-8 bytes (an implementation the module does not use)
     assert.equal(sha(Buffer.from(v.contentJson, "utf8")), v.contentHash);
-    assert.equal(sha(Buffer.from(v.metadataJson, "utf8")), v.metaHash);
-    assert.deepEqual(JSON.parse(v.metadataJson), JSON.parse(JSON.stringify(r.metadata)));
-    assert.equal(JSON.parse(v.metadataJson).content.hash, v.contentHash, "the JSON names its content version");
-    assert.equal(v.uri, `https://citycoin.dev/coin-meta/v1/${v.input.mint}.json`);
-    assert.equal(JSON.parse(v.metadataJson).image, `https://citycoin.dev/coin-meta/v1/art/${v.input.artSha256}.png`);
+    assert.equal(V2.contentJson(contentFromJson(v.contentJson)), v.contentJson, `${v.id}: the stored content reads back to the same bytes`);
+    assert.equal(r.perQuote.length, v.quotes.length);
+    for (const [i, q] of v.quotes.entries()) {
+      const p = r.perQuote[i];
+      assert.equal(p.description, q.description, v.id);
+      assert.equal(p.metadataJson, q.metadataJson, v.id);
+      assert.equal(p.metaHash, q.metaHash, v.id);
+      assert.equal(p.uri, q.uri, v.id);
+      assert.equal(sha(Buffer.from(q.metadataJson, "utf8")), q.metaHash);
+      const m = JSON.parse(q.metadataJson);
+      assert.deepEqual(m, JSON.parse(JSON.stringify(p.metadata)));
+      assert.equal(m.description, q.description);
+      assert.equal(m.content.hash, v.contentHash, "the JSON names its content version: the same for every quote");
+      assert.equal(q.uri, `https://citycoin.dev/coin-meta/v1/${v.input.mint}.json`);
+      assert.equal(m.image, `https://citycoin.dev/coin-meta/v1/art/${v.input.image.sha256}.png`);
+    }
   }
-  // the same version, two quotes: only the pair, the quote and the hashes differ
-  const s = JSON.parse(byId["utica-sol"].contentJson), u = JSON.parse(byId["utica-usdc"].contentJson);
-  assert.deepEqual({ ...s, description: null, quote: null }, { ...u, description: null, quote: null });
-  assert.equal(s.description.replace("/ SOL.", "/ USDC."), u.description);
-  assert.notEqual(byId["utica-sol"].metaHash, byId["utica-usdc"].metaHash);
+  // one version, two quotes: one content and one content hash; only the descriptions, the pair and the meta hashes differ; one mint
+  const u = byId.utica;
+  assert.deepEqual(u.quotes.map((q) => q.quote), ["SOL", "USDC"]);
+  assert.equal(u.quotes[0].description.replace("/ SOL.", "/ USDC."), u.quotes[1].description);
+  assert.notEqual(u.quotes[0].metaHash, u.quotes[1].metaHash);
+  assert.equal(new Set(u.quotes.map((q) => q.uri)).size, 1);
+  // the next version with an owner-approved upload: only the picture differs
+  const up = byId["utica-upload"], a = JSON.parse(u.contentJson), b = JSON.parse(up.contentJson);
+  assert.deepEqual({ ...a, image: null }, { ...b, image: null });
+  assert.deepEqual([a.image.source, a.image.template, b.image.source, b.image.template], ["template", "t2", "upload", undefined]);
+  assert.equal(up.input.mint, u.input.mint, "one city, one mint");
   // NFD and stray spaces in, NFC out: the same content as the composed input
-  const nfd = byId["sao-paulo-usdc-nfd"];
-  const composed = await buildCoinMetadataV2({ ...nfd.input, city: { id: "3448439", name: "São Paulo" }, region: { id: "BR.27", name: "São Paulo" }, country: { id: "BR", name: "Brazil" }, name: "São Paulo", quote: nfd.quote });
+  const nfd = byId["sao-paulo-nfd"];
+  const composed = await buildCoinMetadataV2({ ...nfd.input, city: { id: "3448439", name: "São Paulo" }, region: { id: "BR.27", name: "São Paulo" }, country: { id: "BR", name: "Brazil" }, name: "São Paulo", quote: nfd.quotes[0].quote });
   assert.equal(composed.contentHash, nfd.contentHash);
   assert.ok(nfd.input.city.name !== "São Paulo" && nfd.contentJson.includes('"name":"São Paulo"') && !nfd.contentJson.includes("̃"));
   // the limits: a 32-byte name, a 10-character ticker, the largest city id, a 200-character text, a 44-byte country
@@ -161,8 +184,8 @@ test("golden vectors: one SOL and one USDC coin of the same city, no state or re
   assert.equal(lc.city.id, ((1n << 64n) - 2n).toString());
   assert.equal(lc.text.length, 200);
   assert.equal(Buffer.byteLength(lc.country.name, "utf8"), 44);
-  assert.ok(lim.uri.length <= 200, "within Metaplex's 200-byte URI");
-  const one = (patch) => code(() => contentV2({ ...lim.input, ...patch, quote: lim.quote }));
+  assert.ok(lim.quotes[0].uri.length <= 200, "within Metaplex's 200-byte URI");
+  const one = (patch) => code(() => contentV2({ ...lim.input, ...patch }));
   assert.equal(one({ name: "Sainte-Anne-des-Plaines-de-Lévis" }), "name_too_long", "33 bytes");
   assert.equal(one({ symbol: "GROSSGERAUX" }), "bad_symbol", "11 characters");
   assert.equal(one({ text: `${lc.text.slice(0, -1)}xx` }), "too_long", "201 characters");
@@ -170,27 +193,29 @@ test("golden vectors: one SOL and one USDC coin of the same city, no state or re
   assert.equal(one({ region: { id: "GS.ABCDEFGHIJKLMNOPQRSTU", name: "X" } }), "bad_id", "a 21-character region code");
 });
 
-test("content v2: exactly these keys, the ids, the attribution and the normalization version, deeply frozen, and the same bytes whatever the input key order", async () => {
-  const c = contentV2({ ...UTICA, quote: "SOL" });
-  assert.deepEqual(Object.keys(c).sort(), ["attribution", "city", "country", "description", "descriptionTemplate", "image", "name", "norm", "quote", "region", "symbol", "text", "v"]);
+test("content v2: exactly these keys, the ids, the attribution, the list and normalization versions and the picture's source, no quote, deeply frozen, and the same bytes whatever the input key order", async () => {
+  const c = contentV2(UTICA);
+  assert.deepEqual(Object.keys(c).sort(), ["city", "country", "descriptionTemplate", "image", "list", "name", "norm", "region", "symbol", "text", "v"]);
   assert.equal(c.v, 2);
   assert.equal(c.norm, "cc-norm-1");
+  assert.equal(V2.NORMALIZATION_UNICODE, "15.1");
   assert.equal(c.descriptionTemplate, "cc-desc-1");
-  assert.equal(c.attribution, "GeoNames (geonames.org), CC BY 4.0");
+  assert.deepEqual(c.list, { attribution: "GeoNames (geonames.org), CC BY 4.0", sha256: LIST_SHA });
   assert.deepEqual(c.city, { id: "5142056", name: "Utica" });
   assert.deepEqual(c.region, { id: "US.NY", name: "New York" });
   assert.deepEqual(c.country, { id: "US", name: "United States" });
-  assert.deepEqual(c.quote, { mint: QUOTES.SOL.mint, symbol: "SOL" });
-  assert.deepEqual(c.image, { sha256: ART_SHA, template: "t2" });
-  assert.equal(c.text, null);
-  assert.ok(Object.isFrozen(c) && Object.isFrozen(c.city) && Object.isFrozen(c.region) && Object.isFrozen(c.image) && Object.isFrozen(c.quote));
-  assert.equal(contentV2({ ...UTICA, city: { name: "Utica", id: 5142056 }, quote: { mint: QUOTES.SOL.mint, symbol: "SOL" } }).city.id, "5142056", "a numeric id is written as text");
-  const reversed = Object.fromEntries(Object.entries({ ...UTICA, quote: "SOL" }).reverse());
+  assert.deepEqual(c.image, { sha256: ART_SHA, source: "template", template: "t2" });
+  assert.equal(c.text, "The city coin of Utica.", "the default lead is stored as the text (descriptive_text is NOT NULL)");
+  assert.equal(V2.contentJson(contentV2({ ...UTICA, text: "The city coin of Utica." })), V2.contentJson(c), "the default's own words are the default");
+  assert.ok(Object.isFrozen(c) && Object.isFrozen(c.city) && Object.isFrozen(c.region) && Object.isFrozen(c.image) && Object.isFrozen(c.list));
+  assert.equal(contentV2({ ...UTICA, city: { name: "Utica", id: 5142056 } }).city.id, "5142056", "a numeric id is written as text");
+  for (const quote of ["SOL", "USDC", { symbol: "CCTEST", mint: MINT }]) assert.equal(V2.contentJson(contentV2({ ...UTICA, quote })), V2.contentJson(c), "a quote never enters the content");
+  const reversed = Object.fromEntries(Object.entries(UTICA).reverse());
   assert.equal(V2.contentJson(contentV2(reversed)), V2.contentJson(c));
   assert.equal(await V2.contentHash(c), sha(V2.contentJson(c)));
-  assert.match(V2.contentJson(c), /^\{"attribution":"GeoNames \(geonames\.org\), CC BY 4\.0","city":\{"id":"5142056","name":"Utica"\},"country":/);
+  assert.match(V2.contentJson(c), /^\{"city":\{"id":"5142056","name":"Utica"\},"country":\{"id":"US","name":"United States"\},"descriptionTemplate":"cc-desc-1","image":/);
   // refusals
-  const bad = (patch, want) => assert.equal(code(() => contentV2({ ...UTICA, quote: "SOL", ...patch })), want, JSON.stringify(patch));
+  const bad = (patch, want) => assert.equal(code(() => contentV2({ ...UTICA, ...patch })), want, JSON.stringify(patch));
   bad({ city: { id: "0", name: "Utica" } }, "bad_id");
   bad({ city: { id: "05142056", name: "Utica" } }, "bad_id");
   bad({ city: { id: 1.5, name: "Utica" } }, "bad_id");
@@ -203,9 +228,15 @@ test("content v2: exactly these keys, the ids, the attribution and the normaliza
   bad({ name: "Uti\u0007ca" }, "control_character");
   bad({ name: "Utica\uD800" }, "not_well_formed");
   bad({ symbol: "utica" }, "bad_symbol");
-  bad({ artSha256: "A".repeat(64) }, "bad_sha256");
-  bad({ quote: "BONK" }, "unknown_quote");
+  bad({ image: { sha256: "A".repeat(64), source: "template" } }, "bad_sha256");
+  bad({ image: undefined }, "missing");
+  bad({ image: { sha256: ART_SHA } }, "bad_image_source");
+  bad({ image: { sha256: ART_SHA, source: "template", template: "t1" } }, "bad_image_source");
+  bad({ image: { sha256: ART_SHA, source: "upload", template: "t2" } }, "bad_image_source");
+  bad({ listSha256: undefined }, "bad_sha256");
+  bad({ listSha256: "x" }, "bad_sha256");
   bad({ attribution: "" }, "empty");
+  bad({ text: "Trade it against SOL" }, "text_names_quote");
 });
 
 test("canonical JSON: keys sorted by UTF-16 code units at every level, no whitespace, UTF-8 text, and refusals instead of silent drops", () => {
@@ -243,6 +274,34 @@ test("normalization cc-norm-1: NFC, ASCII whitespace runs to one space, nothing 
     assert.ok(!/^ | $|  |[\t\n\r\v\f]/.test(n), JSON.stringify(n));
   }
   assert.ok(ok > 500);
+});
+
+test("cc-norm-1's Unicode 15.1 tables (src/cc-unicode.js): 149,813 assigned code points (Unicode 15.1's published total), all known to this runtime; the marks and the letters and digits of 15.1; what a newer Unicode added is refused", () => {
+  const count = (t) => t.reduce((n, [a, b]) => n + b - a + 1, 0);
+  assert.equal(UNI.UNICODE_VERSION, "15.1");
+  assert.deepEqual([count(UNI.ASSIGNED), count(UNI.MARK), count(UNI.LETTER_NUMBER)], [149813, 2450, 138557]);
+  for (const t of [UNI.ASSIGNED, UNI.MARK, UNI.LETTER_NUMBER]) for (let i = 1; i < t.length; i++) assert.ok(t[i][0] > t[i - 1][1] + 1, "sorted, disjoint ranges");
+  const assigned = /^(?![\p{Cc}\p{Cs}\p{Co}])\p{Assigned}$/u, mark = /^\p{M}$/u, ln = /^[\p{L}\p{N}]$/u;
+  let notHere = 0, markDiff = 0, lnDiff = 0;
+  for (const [a, b] of UNI.ASSIGNED) for (let c = a; c <= b; c++) {
+    const ch = String.fromCodePoint(c);
+    if (!assigned.test(ch)) notHere++;
+    if (mark.test(ch) !== UNI.inTable(UNI.MARK, c)) markDiff++;
+    if (ln.test(ch) !== UNI.inTable(UNI.LETTER_NUMBER, c)) lnDiff++;
+  }
+  assert.deepEqual([notHere, markDiff, lnDiff], [0, 0, 0], `this runtime (Unicode ${process.versions.unicode}) agrees on every 15.1 code point`);
+  for (const t of [UNI.MARK, UNI.LETTER_NUMBER]) for (const [a, b] of t) for (let c = a; c <= b; c++) assert.ok(UNI.inTable(UNI.ASSIGNED, c));
+  // the code points whose NFC order Unicode 16.0 changed (they are new in 16.0): refused, so no text's bytes depend on the runtime
+  for (const c of [0x113ce, 0x113cf, 0x113d0, 0x1612f, 0x1e5ef]) {
+    assert.equal(UNI.inTable(UNI.ASSIGNED, c), false);
+    assert.equal(code(() => normalizeText(`x\u0301${String.fromCodePoint(c)}`)), "unassigned_character", c.toString(16));
+  }
+  // on a Unicode 15.1 runtime the generator writes the committed file again, byte for byte
+  if (process.versions.unicode === "15.1") {
+    const out = new URL("../.cache/cc-unicode-check.js", import.meta.url).pathname;
+    execFileSync(process.execPath, [new URL("../scripts/cc-unicode-table.mjs", import.meta.url).pathname, out]);
+    assert.equal(readFileSync(out, "utf8"), text("src/cc-unicode.js"));
+  }
 });
 
 /* ------------------------------------------------------------------ the program's rules (PR #83) and the master's values */
@@ -303,28 +362,59 @@ test("brand constants of new-program coins: the master policy's product name and
   assert.equal(P.metadata.region_not_applicable, "render_explicitly_never_fabricate");
 });
 
-test("per quote: one content, one JSON and one hash for each allowed quote; a quote twice, no quote, the coin as its own quote or a quote's mint as the coin are refused", async () => {
+test("per quote: one content and one content hash for the city version, one description, JSON and meta hash for each allowed quote; per_quote_json keyed by quote config; a quote twice, no quote, the coin as its own quote or a quote's mint as the coin are refused", async () => {
   const all = await buildPerQuote(UTICA, ["SOL", "USDC", { symbol: "CCTEST", mint: "9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin" }]);
-  assert.equal(all.length, 3);
-  assert.equal(new Set(all.map((r) => r.contentHash)).size, 3);
-  assert.equal(new Set(all.map((r) => r.metaHash)).size, 3);
-  assert.equal(new Set(all.map((r) => r.uri)).size, 1, "one coin, one URI: the launch binds the quote's JSON by its hash");
-  assert.deepEqual(all.map((r) => r.content.quote.symbol), ["SOL", "USDC", "CCTEST"]);
-  for (const r of all) assert.ok(r.metadataJson.includes(`"value":"$UTICA / ${r.content.quote.symbol}"`));
+  assert.equal(all.perQuote.length, 3);
+  assert.equal(all.contentHash, sha(all.contentJson));
+  assert.equal(all.contentHash, (await buildCoinMetadataV2({ ...UTICA, quote: "USDC" })).contentHash, "the content hash does not depend on the quote");
+  assert.equal(new Set(all.perQuote.map((r) => r.metaHash)).size, 3);
+  assert.equal(new Set(all.perQuote.map((r) => r.uri)).size, 1, "one coin, one URI: the launch binds the quote's JSON by its hash");
+  assert.deepEqual(all.perQuote.map((r) => r.quote.symbol), ["SOL", "USDC", "CCTEST"]);
+  for (const r of all.perQuote) {
+    assert.ok(r.metadataJson.includes(`"value":"$UTICA / ${r.quote.symbol}"`));
+    assert.ok(r.description.includes(`Pair: $UTICA / ${r.quote.symbol}. `));
+    assert.equal(JSON.parse(r.metadataJson).content.hash, all.contentHash);
+  }
+  // per_quote_json: {quote_config_id: {description, metadata_json_sha256}} (the policy's SOL config is 0; a FAKE id for USDC here)
+  assert.equal(P.quote_configs.sol.config_id, 0);
+  const keyed = await buildPerQuote(UTICA, [{ ...QUOTES.SOL, configId: 0 }, { ...QUOTES.USDC, configId: 7 }]);
+  const pq = JSON.parse(perQuoteJson(keyed.perQuote));
+  assert.deepEqual(Object.keys(pq), ["0", "7"]);
+  assert.deepEqual(pq["0"], { description: keyed.perQuote[0].description, metadata_json_sha256: keyed.perQuote[0].metaHash });
+  assert.equal(perQuoteJson(keyed.perQuote), canonicalJson(pq));
+  assert.equal(keyed.perQuote[0].metaHash, all.perQuote[0].metaHash, "the config id never enters the metadata JSON");
+  assert.equal(code(() => perQuoteJson(all.perQuote)), "no_config_id");
+  assert.equal(code(() => perQuoteJson([])), "no_quotes");
+  assert.equal(code(() => perQuoteJson([{ ...keyed.perQuote[0] }])), "not_rendered", "only renderQuote's own results");
+  const other = await buildPerQuote({ ...UTICA, text: "Another version" }, [{ ...QUOTES.USDC, configId: 7 }]);
+  assert.equal(code(() => perQuoteJson([keyed.perQuote[0], other.perQuote[0]])), "not_rendered", "all of one content");
+  assert.equal(code(() => perQuoteJson([keyed.perQuote[0], keyed.perQuote[0]])), "duplicate_config_id");
+  assert.equal(code(() => quoteOf({ ...QUOTES.SOL, configId: -1 })), "bad_config_id");
+  assert.equal(code(() => quoteOf({ ...QUOTES.SOL, configId: 1.5 })), "bad_config_id");
   assert.equal(code(() => { throw new MetadataError("x", "y"); }), "x");
-  const rejects = async (p, want) => { try { await p(); } catch (e) { assert.equal(e.code, want); return; } assert.fail(`expected ${want}`); };
   await rejects(() => buildPerQuote(UTICA, ["SOL", { symbol: "SOL", mint: QUOTES.SOL.mint }]), "duplicate_quote");
   await rejects(() => buildPerQuote(UTICA, []), "no_quotes");
   await rejects(() => buildCoinMetadataV2({ ...UTICA, quote: { symbol: "CCTEST", mint: MINT } }), "own_quote");
   await rejects(() => buildCoinMetadataV2({ ...UTICA, mint: QUOTES.USDC.mint, quote: "SOL" }), "bad_mint");
   await rejects(() => buildCoinMetadataV2({ ...UTICA, mint: "not a mint", quote: "SOL" }), "bad_mint");
-  assert.equal(code(() => metadataJsonV2({ v: 1 }, { mint: MINT, contentHash: ART_SHA })), "not_content_v2");
-  assert.equal(code(() => metadataJsonV2(contentV2({ ...UTICA, quote: "SOL" }), { mint: MINT, contentHash: "x" })), "bad_sha256");
+  await rejects(() => metadataJsonV2({ v: 1 }, { mint: MINT, quote: "SOL" }), "not_content_v2");
+  await rejects(() => renderQuote(JSON.parse(all.contentJson), "SOL", { mint: MINT }), "not_content_v2");
+  await rejects(() => buildCoinMetadataV2({ ...UTICA, quote: "USDC", text: "Paired with CCTEST" }).then(() => buildCoinMetadataV2({ ...UTICA, text: "Paired with CCTEST", quote: { symbol: "CCTEST", mint: "9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin" } })), "text_names_quote");
+  // a stored canonical_json reads back only as the exact bytes contentV2 writes
+  const back = contentFromJson(all.contentJson);
+  assert.equal(V2.contentJson(back), all.contentJson);
+  assert.equal((await renderQuote(back, "SOL", { mint: MINT })).metaHash, all.perQuote[0].metaHash);
+  assert.equal(code(() => contentFromJson(all.contentJson.replace('"v":2', '"v":2 '))), "not_canonical");
+  assert.equal(code(() => contentFromJson(all.contentJson.replace('"cc-desc-1"', '"cc-desc-2"'))), "not_canonical", "another template is another version");
+  assert.equal(code(() => contentFromJson(all.contentJson.replace('"template":"t2"', '"template":"t1"'))), "bad_image_source");
+  assert.equal(code(() => contentFromJson(all.contentJson.replace("The city coin of Utica.", "Trade it for SOL"))), "text_names_quote", "a stored text is checked again");
+  assert.equal(code(() => contentFromJson("{")), "not_json");
+  assert.equal(code(() => contentFromJson("[]")), "not_content_v2");
 });
 
 /* ------------------------------------------------------------------ the stage's promise: not wired, and no existing output changes */
 
-test("not wired: no Worker path reaches src/coinmeta-v2.js or src/coinart-t2.js, no page or script names them, and they read no setting, clock, network or database", () => {
+test("not wired: no Worker path reaches src/coinmeta-v2.js, src/coinart-t2.js or src/cc-unicode.js, no page or script names them, and they read no setting, clock, network or database", () => {
   const seen = new Set();
   const walk = (rel) => {
     if (seen.has(rel)) return;
@@ -335,18 +425,19 @@ test("not wired: no Worker path reaches src/coinmeta-v2.js or src/coinart-t2.js,
   };
   walk("src/index.js");
   assert.ok(seen.has("src/coinmeta.js") && seen.has("src/coinart.js") && seen.has("src/jobs.js") && seen.size > 60, `the walk found the Worker (${seen.size} modules)`);
-  assert.ok(!seen.has("src/coinmeta-v2.js") && !seen.has("src/coinart-t2.js"));
+  assert.ok(!seen.has("src/coinmeta-v2.js") && !seen.has("src/coinart-t2.js") && !seen.has("src/cc-unicode.js"));
   const files = [];
   const list = (dir) => { for (const n of readdirSync(new URL(dir, root))) { const rel = `${dir}${n}`; if (n === "node_modules" || n.startsWith(".")) continue; if (statSync(new URL(rel, root)).isDirectory()) list(`${rel}/`); else if (/\.(m?js|html|jsonc?)$/.test(n)) files.push(rel); } };
   for (const dir of ["src/", "public/", "scripts/"]) list(dir);
   files.push("wrangler.jsonc");
-  const naming = files.filter((f) => /coinmeta-v2|coinart-t2/.test(text(f)));
-  assert.deepEqual(naming.sort(), ["src/coinart-t2.js", "src/coinmeta-v2.js"]);
-  for (const f of ["src/coinmeta-v2.js", "src/coinart-t2.js"]) {
+  // the table generator and the table it wrote name the module in their comments only (the generator is an owner-side script, never run by the site)
+  const naming = files.filter((f) => /coinmeta-v2|coinart-t2|cc-unicode/.test(text(f)));
+  assert.deepEqual(naming.sort(), ["scripts/cc-unicode-table.mjs", "src/cc-unicode.js", "src/coinart-t2.js", "src/coinmeta-v2.js"]);
+  for (const f of ["src/coinmeta-v2.js", "src/coinart-t2.js", "src/cc-unicode.js"]) {
     const src = text(f).replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, "");
     assert.doesNotMatch(src, /\bfetch\(|\benv\b|\.DB\b|Date\.now|new Date|Math\.random|console\.|import\(/, f);
     assert.deepEqual([...src.matchAll(/^import [^;]* from "([^"]+)";$/gm)].map((m) => m[1]).sort(),
-      f === "src/coinmeta-v2.js" ? ["./coinart-t2.js", "./coinart.js", "./text.js"] : ["./coinart-metrics.js", "./coinart.js"], f);
+      { "src/coinmeta-v2.js": ["./cc-unicode.js", "./coinart-t2.js", "./coinart.js", "./text.js"], "src/coinart-t2.js": ["./coinart-metrics.js", "./coinart.js"], "src/cc-unicode.js": [] }[f], f);
   }
 });
 
