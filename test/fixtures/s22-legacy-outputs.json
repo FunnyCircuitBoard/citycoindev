@@ -1,0 +1,426 @@
+{
+ "coinmeta": {
+  "VICINITY_BRAND": {
+   "name": "Vicinity",
+   "site": "https://vicinity.city",
+   "logo": "https://vicinity.city/brand/vicinity-512.png",
+   "network": "Solana",
+   "metadataPrefix": "https://vicinity.city/coin-meta/"
+  },
+  "MAX_NAME_BYTES": 32,
+  "MAX_SYMBOL_BYTES": 10,
+  "metadataUriFor": "https://vicinity.city/coin-meta/7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU.json",
+  "coinImageUrl": "https://vicinity.city/coin-meta/7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU.png",
+  "coinPageUrl": "https://vicinity.city/coin?mint=7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
+  "checkName": [
+   null,
+   "name must be 1 to 32 bytes (UTF-8)",
+   "name must be 1 to 32 bytes (UTF-8)",
+   "name must not contain control characters",
+   null
+  ],
+  "checkSymbol": [
+   null,
+   "symbol must be 1 to 10 characters of A-Z and 0-9",
+   "symbol must be 1 to 10 characters of A-Z and 0-9",
+   "symbol must be 1 to 10 characters of A-Z and 0-9"
+  ],
+  "json": [
+   {
+    "name": "Utica",
+    "symbol": "UTICA",
+    "description": "The city coin of Utica. Launched on Vicinity (https://vicinity.city) on Solana.",
+    "image": "https://vicinity.city/coin-meta/7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU.png",
+    "external_url": "https://vicinity.city/coin?mint=7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
+    "createdOn": "https://vicinity.city",
+    "launchpad": "Vicinity",
+    "launchpadLogo": "https://vicinity.city/brand/vicinity-512.png",
+    "network": "Solana",
+    "city": {
+     "id": 5142056,
+     "name": "Utica",
+     "country": "US",
+     "ticker": "UTICA"
+    },
+    "showName": true,
+    "attributes": [
+     {
+      "trait_type": "Launchpad",
+      "value": "Vicinity"
+     },
+     {
+      "trait_type": "Network",
+      "value": "Solana"
+     },
+     {
+      "trait_type": "City",
+      "value": "Utica"
+     }
+    ],
+    "website": "https://vicinity.city/coin?mint=7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU"
+   },
+   {
+    "name": "Herāt",
+    "symbol": "HERAT",
+    "description": "The old city of the west. Launched on Vicinity (https://vicinity.city) on Solana.",
+    "image": "https://vicinity.city/coin-meta/7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU.png",
+    "external_url": "https://vicinity.city/coin?mint=7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
+    "createdOn": "https://vicinity.city",
+    "launchpad": "Vicinity",
+    "launchpadLogo": "https://vicinity.city/brand/vicinity-512.png",
+    "network": "Solana",
+    "city": {
+     "id": 1140026,
+     "name": "Herāt",
+     "country": "AF",
+     "region": "Herat",
+     "countryName": "Afghanistan",
+     "ticker": "HERAT"
+    },
+    "showName": true,
+    "attributes": [
+     {
+      "trait_type": "Launchpad",
+      "value": "Vicinity"
+     },
+     {
+      "trait_type": "Network",
+      "value": "Solana"
+     },
+     {
+      "trait_type": "City",
+      "value": "Herāt"
+     }
+    ],
+    "website": "https://vicinity.city/coin?mint=7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
+    "twitter": "https://x.com/example",
+    "telegram": "https://t.me/example"
+   },
+   {
+    "name": "Gibraltar",
+    "symbol": "GIBRALTAR",
+    "description": "The city coin of Gibraltar. Launched on Vicinity (https://vicinity.city) on Solana.",
+    "image": "https://vicinity.city/coin-meta/art/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.png",
+    "external_url": "https://vicinity.city/coin?mint=7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
+    "createdOn": "https://vicinity.city",
+    "launchpad": "Vicinity",
+    "launchpadLogo": "https://vicinity.city/brand/vicinity-512.png",
+    "network": "Solana",
+    "city": {
+     "id": 2411585,
+     "name": "Gibraltar",
+     "country": "GI",
+     "ticker": "GIBRALTAR"
+    },
+    "showName": true,
+    "attributes": [
+     {
+      "trait_type": "Launchpad",
+      "value": "Vicinity"
+     },
+     {
+      "trait_type": "Network",
+      "value": "Solana"
+     },
+     {
+      "trait_type": "City",
+      "value": "Gibraltar"
+     }
+    ],
+    "website": "https://vicinity.city/coin?mint=7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU"
+   }
+  ],
+  "versionJson": {
+   "name": "Utica",
+   "symbol": "UTICA",
+   "description": "The city coin of Utica, New York, United States. Launched on Vicinity (https://vicinity.city) on Solana.",
+   "image": "https://vicinity.city/coin-meta/art/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.png",
+   "external_url": "https://vicinity.city/coin?mint=7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
+   "createdOn": "https://vicinity.city",
+   "launchpad": "Vicinity",
+   "launchpadLogo": "https://vicinity.city/brand/vicinity-512.png",
+   "network": "Solana",
+   "city": {
+    "id": 5142056,
+    "name": "Utica",
+    "country": "US",
+    "region": "New York",
+    "countryName": "United States",
+    "ticker": "UTICA"
+   },
+   "showName": true,
+   "attributes": [
+    {
+     "trait_type": "Launchpad",
+     "value": "Vicinity"
+    },
+    {
+     "trait_type": "Network",
+     "value": "Solana"
+    },
+    {
+     "trait_type": "City",
+     "value": "Utica"
+    }
+   ],
+   "website": "https://vicinity.city/coin?mint=7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU"
+  }
+ },
+ "coindefaults": {
+  "NAME_OVERRIDES": {
+   "2917788": "Greifswald",
+   "3518407": "San Martín Texmelucan",
+   "3526357": "Juchitán de Zaragoza"
+  },
+  "DEFAULT_PAIR": "SOL",
+  "SOURCE": "Vicinity city list",
+  "DEFAULT_GATES": {
+   "list_unavailable": "The city list couldn't be read just now. Try again in a minute.",
+   "no_ticker": "This city isn't in the Vicinity city list yet, so it has no registered ticker. Tell us and we'll add it.",
+   "not_in_list": "This city isn't in the Vicinity city list yet, so it has no ready-made coin. Tell us and we'll add it.",
+   "bad_name": "This city's name can't be written on the blockchain as it is. Tell us and we'll fix it in the city list."
+  },
+  "defaultDescription": [
+   "The city coin of Utica, New York, United States.",
+   "The city coin of Gibraltar.",
+   "The city coin of São Paulo, Brazil.",
+   "The city coin of Bogotá, Bogota D.C., Colombia."
+  ]
+ },
+ "coinready": {
+  "PREVIEW_LABEL": "Preview, not launched",
+  "canonicalContent": [
+   "{\"v\":1,\"city\":{\"id\":\"5142056\",\"name\":\"Utica\",\"region\":\"New York\",\"country\":\"US\",\"countryName\":\"United States\"},\"name\":\"Utica\",\"symbol\":\"UTICA\",\"description\":\"The city coin of Utica, New York, United States.\",\"image\":{\"sha256\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"template\":\"t1\"},\"pair\":\"SOL\"}",
+   "{\"v\":1,\"city\":{\"id\":\"2411585\",\"name\":\"Gibraltar\",\"region\":null,\"country\":\"GI\",\"countryName\":\"Gibraltar\"},\"name\":\"Gibraltar\",\"symbol\":\"GIBRALTAR\",\"description\":\"The city coin of Gibraltar.\",\"image\":{\"sha256\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"template\":\"t1\"},\"pair\":\"SOL\"}",
+   "{\"v\":1,\"city\":{\"id\":\"1140026\",\"name\":\"Herāt\",\"region\":\"Herat\",\"country\":\"AF\",\"countryName\":\"Afghanistan\"},\"name\":\"Herāt\",\"symbol\":\"HERAT\",\"description\":\"The city coin of Herāt, Herat, Afghanistan.\",\"image\":{\"sha256\":\"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"template\":\"t1\"},\"pair\":\"SOL\"}"
+  ],
+  "contentHashes": [
+   "580ea7ad0cb23a90a3dffd33477e502307604a30fc27a92215cbc4cc570ebaf4",
+   "fb8e4f6094906560c2ebefd1b923595ecbcedf3fd3fc65056275e0660b1852a8",
+   "7d81bb1d677ff04cb5220ca91622e1e2b04edc1dbae1373cd44a178911e32570"
+  ],
+  "versionLabel": "580ea7ad"
+ },
+ "coinart": {
+  "TEMPLATES": {
+   "t1": {
+    "version": "t1",
+    "base": "vector",
+    "fonts": {
+     "bold": "b640c8d301313064c5e8b3328769160c403d385edfaf09288537dfce11c4d92b",
+     "medium": "6dcc1460c1b324410c787292f2ce6948f0f64ff9cfe1856c341e37641dba70ba"
+    },
+    "resvg": "2.6.2",
+    "ticker": {
+     "start": 114.28571428571429,
+     "maxWidth": 330,
+     "min": 40,
+     "track": 0.01,
+     "centerY": 264,
+     "twoLineMax": 84,
+     "twoLineCenterY": 250
+    },
+    "city": {
+     "start": 30,
+     "track": 0.22,
+     "centerY": 339,
+     "band": 340,
+     "rule": 64,
+     "ruleMin": 18,
+     "gap": 12,
+     "min": 18,
+     "twoLineMax": 24,
+     "twoLineWidth": 300,
+     "twoLineCenterY": 338,
+     "lineHeight": 1.15,
+     "floor": 14
+    },
+    "arc": {
+     "r": 158,
+     "size": 19,
+     "spacing": 6,
+     "text": "VICINITY CITY"
+    }
+   }
+  },
+  "TEMPLATE_VERSION": "t1",
+  "FONT_SHA256": {
+   "bold": "b640c8d301313064c5e8b3328769160c403d385edfaf09288537dfce11c4d92b",
+   "medium": "6dcc1460c1b324410c787292f2ce6948f0f64ff9cfe1856c341e37641dba70ba"
+  },
+  "RESVG_VERSION": "2.6.2",
+  "ART_SIZE": 512,
+  "artText": [
+   "HERĀT",
+   "DAUGAVPILS",
+   "SÃO PAULO",
+   "STRASSE",
+   ""
+  ]
+ },
+ "coinartStore": {
+  "artPath": "/coin-meta/art/ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff.png",
+  "artUrl": "https://vicinity.city/coin-meta/art/ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff.png",
+  "READY_MIGRATION": {
+   "id": "2026-10-18-coin-ready",
+   "tables": [
+    "CREATE TABLE IF NOT EXISTS coin_art (\n  sha256           TEXT PRIMARY KEY,\n  svg_sha256       TEXT NOT NULL,\n  template_version TEXT NOT NULL,\n  type             TEXT NOT NULL,\n  bytes            BLOB NOT NULL,\n  created_at       TEXT NOT NULL\n)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS coin_art_svg ON coin_art (svg_sha256, template_version)",
+    "CREATE TABLE IF NOT EXISTS coin_versions (\n  id               INTEGER PRIMARY KEY AUTOINCREMENT,\n  city_id          TEXT NOT NULL,\n  origin           TEXT NOT NULL,\n  content_json     TEXT NOT NULL,\n  content_hash     TEXT NOT NULL,\n  name             TEXT NOT NULL,\n  symbol           TEXT NOT NULL,\n  description      TEXT NOT NULL,\n  art_sha256       TEXT NOT NULL,\n  template_version TEXT NOT NULL,\n  created_by       INTEGER,\n  created_at       TEXT NOT NULL,\n  UNIQUE (city_id, content_hash)\n)",
+    "CREATE TABLE IF NOT EXISTS coin_ready (\n  city_id      TEXT PRIMARY KEY,\n  version_id   INTEGER NOT NULL,\n  content_hash TEXT NOT NULL,\n  symbol       TEXT NOT NULL UNIQUE,\n  design_at    TEXT NOT NULL,\n  seat_id      INTEGER NOT NULL,\n  user_id      INTEGER NOT NULL,\n  chosen_at    TEXT NOT NULL,\n  mint         TEXT UNIQUE,\n  bound_at     TEXT,\n  approved_hash TEXT\n)",
+    "CREATE TABLE IF NOT EXISTS coin_legacy_designs (\n  id          INTEGER PRIMARY KEY AUTOINCREMENT,\n  city_id     TEXT NOT NULL,\n  design_json TEXT NOT NULL,\n  copied_at   TEXT NOT NULL,\n  copied_by   INTEGER\n)"
+   ]
+  },
+  "APPROVED_MIGRATION": {
+   "id": "2026-10-18-coin-ready-approved",
+   "column": "ALTER TABLE coin_ready ADD COLUMN approved_hash TEXT"
+  }
+ },
+ "text": {
+  "FORMAT_CHARS": [
+   [
+    173,
+    173
+   ],
+   [
+    847,
+    847
+   ],
+   [
+    1536,
+    1541
+   ],
+   [
+    1564,
+    1564
+   ],
+   [
+    1757,
+    1757
+   ],
+   [
+    1807,
+    1807
+   ],
+   [
+    2192,
+    2193
+   ],
+   [
+    2274,
+    2274
+   ],
+   [
+    4447,
+    4448
+   ],
+   [
+    6068,
+    6069
+   ],
+   [
+    6155,
+    6159
+   ],
+   [
+    8203,
+    8207
+   ],
+   [
+    8234,
+    8238
+   ],
+   [
+    8288,
+    8303
+   ],
+   [
+    12644,
+    12644
+   ],
+   [
+    65024,
+    65039
+   ],
+   [
+    65279,
+    65279
+   ],
+   [
+    65440,
+    65440
+   ],
+   [
+    65520,
+    65531
+   ],
+   [
+    69821,
+    69821
+   ],
+   [
+    69837,
+    69837
+   ],
+   [
+    78896,
+    78911
+   ],
+   [
+    113824,
+    113827
+   ],
+   [
+    119155,
+    119162
+   ],
+   [
+    917504,
+    921599
+   ]
+  ],
+  "BLANK_CHARS": [
+   [
+    160,
+    160
+   ],
+   [
+    5760,
+    5760
+   ],
+   [
+    8192,
+    8202
+   ],
+   [
+    8232,
+    8233
+   ],
+   [
+    8239,
+    8239
+   ],
+   [
+    8287,
+    8287
+   ],
+   [
+    10240,
+    10240
+   ],
+   [
+    12288,
+    12288
+   ],
+   [
+    119129,
+    119129
+   ]
+  ]
+ },
+ "t1Registry": {
+  "coins": 8033,
+  "digest": "75e4c1a82f638842ef76d8884095d2daa5ea5c18c13340e1d746cd6be00cc4e0"
+ },
+ "recordedAt": "edabab5 (main, live), by a scratch script run on an export of that tree (git archive edabab5)"
+}

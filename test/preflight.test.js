@@ -107,6 +107,25 @@ test("preflight: devnet settings: every chain row passes, the devnet keys warn (
   assert.equal(rows.at, "2026-10-09T12:00:00.000Z");
 });
 
+test("preflight: the swap platform fee is pinned to 0 (stage S39): unset or \"0\" PASS; any other value, or a fee account, FAILs with the reason; the build asks Jupiter for no fee either way", async () => {
+  for (const extra of [{}, { SWAP_PLATFORM_FEE_BPS: "0" }]) {
+    const { W, fetchImpl, now } = world();
+    const r = by(await preflight({ ...DEVNET_ENV, ...extra }, { fetchImpl, now }), "SWAP_PLATFORM_FEE_BPS / SWAP_FEE_ACCOUNT");
+    assert.deepEqual([r.level, r.detail], ["PASS", "no platform fee (pinned to 0)"], JSON.stringify(extra));
+    assert.ok(W.jup.log.some((l) => l.path === "/swap/v2/build"));
+  }
+  for (const [extra, reason] of [[{ SWAP_PLATFORM_FEE_BPS: "50", SWAP_FEE_ACCOUNT: ADDRESSES.feeRecipient }, "platform_fee_not_zero"], [{ SWAP_PLATFORM_FEE_BPS: "abc" }, "platform_fee_malformed"], [{ SWAP_FEE_ACCOUNT: ADDRESSES.feeRecipient }, "fee_account_set"]]) {
+    const { W, fetchImpl, now } = world();
+    const rows = await preflight({ ...DEVNET_ENV, ...extra }, { fetchImpl, now });
+    const r = by(rows, "SWAP_PLATFORM_FEE_BPS / SWAP_FEE_ACCOUNT");
+    assert.equal(r.level, "FAIL");
+    assert.match(r.detail, new RegExp(`^refused \\(${reason}\\): the swap platform fee is pinned to 0, and while this setting is there every swap quote and build that would go to Jupiter answers swap_unavailable`));
+    const build = W.jup.log.find((l) => l.path === "/swap/v2/build");
+    assert.deepEqual([build.q.platformFeeBps, build.q.feeAccount], [undefined, undefined], "the preflight's own build asks for no fee");
+    assert.equal(by(rows, "Jupiter build SOL → $VICINITY").level, "PASS");
+  }
+});
+
 test("preflight: the expected multisig keys: PASS when the chain agrees, FAIL naming the holder when it does not", async () => {
   const { fetchImpl, now } = world();
   const ok = await preflight(DEVNET_ENV, { fetchImpl, now, expectUpgradeAuthority: DEPLOYER, expectAdmin: DEPLOYER });

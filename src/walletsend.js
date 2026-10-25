@@ -44,6 +44,7 @@ import { fromBase64, readU64, toBase64 } from "./sol/bytes.js";
 import { formatAmount, parseAmount } from "./sol/input.js";
 import { issueTicket, simulate, simulationError } from "./relay.js";
 import { mintsFor } from "./portfolio.js";
+import { LEGACY_BRAND, brandOf } from "./brand.js";
 import { OFFICIAL } from "./official.js";
 import { mainTokenV5 } from "./v5policy.js";
 import { launchpadCluster, lpSetup } from "./cluster.js";
@@ -178,10 +179,11 @@ export const cuPriceOf = (env) => (/^\d{1,12}$/.test(String((env && env.LAUNCHPA
  *   chain          { sender, to, mint, senderAta, toAta }: accountOf() of each (the first DATA_SLICE bytes are enough), null when the account does not exist
  *   addresses      { senderAta, toAta } for a token (the associated token accounts)
  *   cuPrice        micro-lamports per compute unit (BigInt; capped so the priority fee stays under src/sol/ix.js MAX_PRIORITY_FEE_LAMPORTS)
+ *   brand          the label set whose productName the fee line names (src/brand.js brandOf; today's labels by default)
  * Returns { ok: true, instructions, amountRaw, cuLimit, cuPrice, fee, rent, remaining, remainingSol, summary } or
  * { ok: false, error, status, message, ... } with the plain words the page shows.
  */
-export async function planSend({ sender, to, asset, amount = null, all = false, chain, addresses = {}, cuPrice = DEFAULT_CU_PRICE }) {
+export async function planSend({ sender, to, asset, amount = null, all = false, chain, addresses = {}, cuPrice = DEFAULT_CU_PRICE, brand = LEGACY_BRAND }) {
   const isSol = asset.id === SOL;
   const decimals = isSol ? 9 : asset.decimals;
   const label = asset.label || (isSol ? "SOL" : asset.symbol || "tokens");
@@ -201,7 +203,7 @@ export async function planSend({ sender, to, asset, amount = null, all = false, 
   const price = BigInt(cuPrice) > cap ? cap : BigInt(cuPrice);
   const fee = NETWORK_FEE_LAMPORTS + priorityFeeLamports(price, cuLimit);
   const budget = [setComputeUnitLimit(cuLimit), ...(price > 0n ? [setComputeUnitPrice(price)] : [])];
-  const feeLine = `No Vicinity fee. Network fee about ${solText(fee)} SOL.`;
+  const feeLine = `No ${brand.productName} fee. Network fee about ${solText(fee)} SOL.`; // the product's name follows BRAND (stage S39): today's "No Vicinity fee."
   const freshLine = chain.to ? [] : [FRESH_LINE]; // no account at this address: said where the person decides
   const base = { asset: { id: asset.id, mint: isSol ? null : asset.mint, label, symbol: asset.symbol || label, name: asset.name || label, decimals }, to, notice: NOTICE };
   if (isSol) {
@@ -319,7 +321,7 @@ export async function handleSendBuild(request, env, fetchImpl = fetch, now = Dat
     if (!m) return json({ ok: false, error: "unsupported_asset", reason: chain.mint ? (chain.mint.owner === TOKEN_2022 ? "token2022" : "not_a_mint") : "no_mint", message: "This token cannot be sent from here." }, 400, noStore);
     asset = { ...asset, decimals: m.decimals };
   }
-  const plan = await planSend({ sender: u.wallet, to, asset, amount: body.amount, all, chain, addresses, cuPrice: cuPriceOf(env) });
+  const plan = await planSend({ sender: u.wallet, to, asset, amount: body.amount, all, chain, addresses, cuPrice: cuPriceOf(env), brand: brandOf(env) });
   if (!plan.ok) { const { status, ...rest } = plan; return json(rest, status, noStore); }
   const tx = wrapUnsigned(compileLegacy({ payer: u.wallet, instructions: plan.instructions, blockhash: blockhash.blockhash }));
   if (tx.length > MAX_TX_BYTES) return json({ ok: false, error: "tx_too_large", bytes: tx.length }, 400, noStore);

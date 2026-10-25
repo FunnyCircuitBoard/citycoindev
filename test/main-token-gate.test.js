@@ -241,6 +241,18 @@ test("SWON-5, SEC-6: while the switch counts, the swap refuses $VICINITY both wa
   assert.deepEqual(found, [OTHER_TOKEN], "the legacy token is not offered");
 });
 
+test("S39 review SF-5: a swap fee setting does not replace the legacy token's answer (409 legacy_token both ways); a pair for Jupiter gets the fee refusal", async () => {
+  const env = W.newWorld({ ...FULL, SWAP_PLATFORM_FEE_BPS: "50" });
+  pagesBuiltWithSwitch(); _resetSwap();
+  const body = (inputMint, outputMint, taker) => ({ method: "POST", body: JSON.stringify({ inputMint, outputMint, amount: "0.1", ...(taker ? { taker } : {}) }) });
+  for (const [path, b] of [["/api/swap/quote", body(SOL, LEGACY)], ["/api/swap/quote", body(LEGACY, SOL)], ["/api/swap/tx", body(SOL, LEGACY, "Hdr1111111111111111111111111111111111111111")]]) {
+    const r = await call(env, path, b);
+    assert.deepEqual([r.status, JSON.parse(r.body).error], [409, "legacy_token"], `${path} ${b.body}`);
+  }
+  const other = await call(env, "/api/swap/quote", body(SOL, OTHER_TOKEN));
+  assert.deepEqual([other.status, JSON.parse(other.body).reason], [503, "platform_fee_not_zero"]);
+});
+
 /* ---------------------------------------------------------------- SEC-1: the snapshot reads one token */
 
 test("SEC-1: the Founding Supporters snapshot reads the $VICINITY series only, whatever the switch says", async () => {

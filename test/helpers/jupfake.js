@@ -7,7 +7,7 @@
 //                         (a host, e.g. "lite-api.jup.ag" or "api.jup.ag", gets its own mode; setMode(null, host) gives it back the shared one)
 //   fakeRpc(opts)      -> { fetch, log, accounts, sim, send, statuses }            simulateTransaction / sendTransaction / statuses are programmable
 //   rewriteBuild(...)  the rewrite itself, exported for the harness
-import { ata, ADDRESSES, PROGRAM_IDS } from "../../src/sol/pda.js";
+import { ata, ADDRESSES, PROGRAM_IDS, findProgramAddress } from "../../src/sol/pda.js";
 import { fromBase64, toBase64, u64le, u16le, concat } from "../../src/sol/bytes.js";
 import { base58Encode } from "../../src/solana.js";
 import { decodeHeader } from "../../src/sol/message.js";
@@ -76,11 +76,26 @@ export async function rewriteBuild({ taker, inputMint, outputMint, amountRaw, sl
     blockhashWithMetadata: { blockhash: randomBlockhash(), lastValidBlockHeight },
     transactionVersion: 0,
   };
-  if (hostile) corrupt(build, hostile, { taker, outAta, wsolAta, inRaw });
+  if (hostile) await corrupt(build, hostile, { taker, outAta, wsolAta, inRaw });
   return build;
 }
-/** Deliberate corruptions, named by the validator code they must produce. */
-function corrupt(b, code, { taker, outAta, wsolAta, inRaw }) {
+/**
+ * The same swap in Jupiter's shared_accounts_route_v2 layout (as the recorded answers in solana/sdk/launchpad/fixtures/ have it): the
+ * program authority of swap id `id`, the taker, the taker's input account, that authority's own accounts of the two mints, the taker's
+ * output account, the mints, the token programs, the event authority, the program; data: the discriminator, the id, then route_v2's.
+ */
+async function toShared(b, taker, id = 3) {
+  const sw = b.swapInstruction, A = sw.accounts;
+  const authority = (await findProgramAddress([new TextEncoder().encode("authority"), Uint8Array.of(id)], PROGRAM_IDS.jupiter))[0];
+  const sTp = A[5].pubkey, dTp = A[6].pubkey;
+  const acc = (pubkey, isSigner, isWritable) => ({ pubkey, isSigner, isWritable });
+  sw.accounts = [acc(authority, false, false), acc(taker, true, false), acc(A[1].pubkey, false, true), acc(await ata(authority, b.inputMint, sTp), false, true), acc(await ata(authority, b.outputMint, dTp), false, true),
+    acc(A[2].pubkey, false, true), acc(A[3].pubkey, false, false), acc(A[4].pubkey, false, false), acc(sTp, false, false), acc(dTp, false, false), acc(A[8].pubkey, false, false), acc(A[9].pubkey, false, false), ...A.slice(10)];
+  const d = fromBase64(sw.data);
+  sw.data = toBase64(concat([Uint8Array.from([0xd1, 0x98, 0x53, 0x93, 0x7c, 0xfe, 0xd8, 0xe9]), Uint8Array.of(id), d.subarray(8)]));
+}
+/** Deliberate corruptions, named by the validator code they must produce ("shared" is the clean shared-accounts layout, accepted). */
+async function corrupt(b, code, { taker, outAta, wsolAta, inRaw }) {
   const other = "GjJyeC1r2RgkuoCWMyPYkCWSGSGLcz266EaAkLA27AhL"; // a stranger
   switch (code) {
     case "foreign_signer": b.setupInstructions[0].accounts[0] = { pubkey: other, isSigner: true, isWritable: true }; break;
@@ -105,6 +120,23 @@ function corrupt(b, code, { taker, outAta, wsolAta, inRaw }) {
     case "alt_mismatch": b.addressesByLookupTableAddress = { [ALT_KEY]: [other, ...buildUsdc.addressesByLookupTableAddress[ALT_KEY].slice(1)] }; break;
     case "alt_missing": b.addressesByLookupTableAddress = { [other]: [taker] }; break;
     case "compute_budget_program": b.computeBudgetInstructions.push(apiIx(other, [], Uint8Array.of(3))); break;
+    // a platform fee slipped in (stage S39: the Worker asks for none and accepts none): the fee account in the swap's optional slot, with
+    // or without a fee in its data; a token transfer (plain or checked) or a SOL transfer from the taker to a fee wallet beside the swap
+    case "fee_account": b.swapInstruction.accounts[7] = { pubkey: other, isSigner: false, isWritable: true }; break;
+    case "fee_bps_and_account": { const d = fromBase64(b.swapInstruction.data); d.set(u16le(50), 26); b.swapInstruction.data = toBase64(d); b.swapInstruction.accounts[7] = { pubkey: other, isSigner: false, isWritable: true }; break; }
+    case "fee_token_transfer": b.otherInstructions.push(apiIx(PROGRAM_IDS.token, [[b.swapInstruction.accounts[2].pubkey, false, true], [other, false, true], [taker, true, false]], concat([Uint8Array.of(3), u64le(1000n)]))); break;
+    case "fee_token_transfer_checked": b.otherInstructions.push(apiIx(PROGRAM_IDS.token, [[b.swapInstruction.accounts[2].pubkey, false, true], [b.outputMint, false, false], [other, false, true], [taker, true, false]], concat([Uint8Array.of(12), u64le(1000n), Uint8Array.of(6)]))); break;
+    case "fee_sol_transfer": b.otherInstructions.push(apiIx(PROGRAM_IDS.system, [[taker, true, true], [other, false, true]], concat([Uint8Array.of(2, 0, 0, 0), u64le(1000n)]))); break;
+    // stage S39 review (SEC-8): a Token-2022 TransferCheckedWithFee (extension 26, instruction 1) from the taker's output account to a fee
+    // wallet's account; the shared-accounts layout clean, with a platform fee, or with a stranger as its program authority or destination;
+    // (SEC-1) the event authority swapped, and the taker's account of a watched mint the route does not trade (USDT) in the route
+    case "fee_token2022_transfer": b.otherInstructions.push(apiIx(PROGRAM_IDS.token2022, [[b.swapInstruction.accounts[2].pubkey, false, true], [b.outputMint, false, false], [await ata(other, b.outputMint, PROGRAM_IDS.token2022), false, true], [taker, true, false]], concat([Uint8Array.of(26, 1), u64le(1000n), Uint8Array.of(6), u64le(10n)]))); break;
+    case "shared": await toShared(b, taker); break;
+    case "shared_fee": { const d = fromBase64(b.swapInstruction.data); d.set(u16le(50), 26); b.swapInstruction.data = toBase64(d); await toShared(b, taker); break; }
+    case "shared_program_authority": await toShared(b, taker); b.swapInstruction.accounts[0].pubkey = other; break;
+    case "shared_program_destination": await toShared(b, taker); b.swapInstruction.accounts[4].pubkey = other; break;
+    case "event_authority": b.swapInstruction.accounts[8].pubkey = other; break;
+    case "route_taker_account": b.swapInstruction.accounts.push({ pubkey: await ata(taker, USDT), isSigner: false, isWritable: true }); break;
     default: throw new Error("unknown hostile " + code);
   }
   void outAta; void wsolAta;

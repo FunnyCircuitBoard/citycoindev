@@ -203,6 +203,24 @@ test("lptrade: /api/swap/quote hands a curve coin over to these routes, refuses 
   assert.deepEqual([cfg.data.launchpad.enabled, cfg.data.launchpad.cluster, cfg.data.launchpad.programId], [true, "devnet", PROGRAM_IDS.launchpadDevnet]);
 });
 
+test("lptrade, S39 review SF-5: with a swap fee setting, /api/swap/quote and /api/swap/tx still hand a curve coin over (that trade never carried a Jupiter fee); a pair for Jupiter is refused", async () => {
+  const { W, call } = await tradeWorld({ SWAP: "on", SWAP_PLATFORM_FEE_BPS: "50" });
+  const q = await call("/api/swap/quote", { inputMint: SOL, outputMint: DEMOV, amount: "0.005", slippageBps: 100 });
+  assert.deepEqual([q.status, q.data.source, q.data.useRoute, q.data.side, q.data.mint], [200, "curve", "/api/launchpad/trade", "buy", DEMOV], JSON.stringify(q.data));
+  const s = await call("/api/swap/quote", { inputMint: DEMOV, outputMint: SOL, amount: "100", slippageBps: 100 });
+  assert.deepEqual([s.status, s.data.source, s.data.side], [200, "curve", "sell"]);
+  const t = await call("/api/swap/tx", { inputMint: SOL, outputMint: DEMOV, amount: "0.005", slippageBps: 100, taker: TRADER });
+  assert.deepEqual([t.status, t.data.source, t.data.useRoute], [200, "curve", "/api/launchpad/trade"]);
+  const u = await call("/api/swap/quote", { inputMint: USDC, outputMint: DEMOV, amount: "5", slippageBps: 100 });
+  assert.deepEqual([u.status, u.data.error], [409, "curve_quote_only"], "the curve's own refusal, not the fee's");
+  const j = await call("/api/swap/quote", { inputMint: SOL, outputMint: USDC, amount: "0.1", slippageBps: 100 });
+  assert.deepEqual([j.status, j.data.error, j.data.reason], [503, "swap_unavailable", "platform_fee_not_zero"]);
+  assert.ok(!W.jup.log.some((l) => /^\/swap\//.test(l.path)), "Jupiter was never asked for a swap");
+  // and the curve's own routes answer as without the setting
+  const cq = await call("/api/launchpad/trade/quote", buy());
+  assert.equal(cq.status, 200, JSON.stringify(cq.data));
+});
+
 test("lptrade: a DEVNET curve coin is no mainnet mint, and /api/swap/quote still hands it over (devnet rehearsal: the curve is asked before the mainnet decimals)", async () => {
   const { W, env } = await tradeWorld({ SWAP: "on" });
   // the site's mainnet RPC (SOLANA_RPC_URL) has never heard of the devnet coin, like the real mainnet; the launchpad's devnet RPC has
