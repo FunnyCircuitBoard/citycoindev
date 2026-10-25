@@ -7,7 +7,9 @@
 // (test/fixtures/s22-legacy-outputs.json was recorded from edabab5). The review's findings have their own file, test/s22-s39-review.test.js.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import * as V2 from "../src/coinmeta-v2.js";
@@ -298,9 +300,14 @@ test("cc-norm-1's Unicode 15.1 tables (src/cc-unicode.js): 149,813 assigned code
   }
   // on a Unicode 15.1 runtime the generator writes the committed file again, byte for byte
   if (process.versions.unicode === "15.1") {
-    const out = new URL("../.cache/cc-unicode-check.js", import.meta.url).pathname;
-    execFileSync(process.execPath, [new URL("../scripts/cc-unicode-table.mjs", import.meta.url).pathname, out]);
-    assert.equal(readFileSync(out, "utf8"), text("src/cc-unicode.js"));
+    const dir = mkdtempSync(join(tmpdir(), "cc-unicode-"));
+    try {
+      const out = join(dir, "cc-unicode-check.js");
+      execFileSync(process.execPath, [new URL("../scripts/cc-unicode-table.mjs", import.meta.url).pathname, out]);
+      assert.equal(readFileSync(out, "utf8"), text("src/cc-unicode.js"));
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   }
 });
 
