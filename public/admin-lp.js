@@ -6,6 +6,11 @@
 // a wallet that only signs, signs and the site's relay sends), then this page records the result. Only textContent here: nothing from the server is ever HTML.
 (() => {
   "use strict";
+  // The product's names in this file's words (the label migration, area b). A page built for a label set other than today's carries the
+  // set on <html> (data-brand, data-brand-name, data-brand-domain: scripts/pages/build.mjs writes them from src/brand.js); brand`…` puts
+  // those names in a text's own words, never in a value put into it. A page without them (today's pages) gets every text exactly as written.
+  const BRAND = (() => { try { const r = document.documentElement, at = (k) => (r && typeof r.getAttribute === "function" ? r.getAttribute(k) : null); return at("data-brand") && at("data-brand-name") && at("data-brand-domain") ? Object.freeze({ key: at("data-brand"), name: at("data-brand-name"), domain: at("data-brand-domain") }) : null; } catch { return null; } })();
+  const brand = (s, ...v) => s.reduce((out, part, i) => out + (BRAND ? part.replace(/vicinity\.city/g, () => BRAND.domain).replace(/Vicinity/g, () => BRAND.name) : part) + (i < v.length ? String(v[i]) : ""), "");
   const PENDING = "vicinity_lp_pending"; // a transaction that landed but was not recorded yet (per browser; retried on the next visit)
   const SAY_STATUS = { signing: "Waiting for your wallet…", sending: "Sending…", confirming: "Sent. Waiting for the network to confirm…", done: "Confirmed on the blockchain.",
     // the send's outcome is not known yet (lp-sign.js: the relay's unclear: true, or no answer from the site): watched, never sent twice
@@ -29,6 +34,9 @@
     b.addEventListener("click", async () => { if (b.disabled) return; b.disabled = true; try { await onClick(b); } finally { if (b.isConnected) b.disabled = false; } });
     return b;
   }
+  // the picture wallets show for a coin without an approved one (/coin-meta/<mint>.png answers the site's badge image): today it is named
+  // after the product; under another label set it is "the default badge", which stays true whatever that image shows
+  const WALLET_BADGE = BRAND ? "the default badge" : "the Vicinity badge";
   const addr = (a) => el("span", "mono lp-addr", a || "—");
   const fact = (dl, label, value) => { dl.append(el("dt", null, label)); const dd = el("dd"); if (value && typeof value === "object") dd.append(value); else dd.textContent = value == null ? "—" : String(value); dl.append(dd); };
   const section = (title, intro) => { const s = el("section", "lp-section"); s.append(el("h3", null, title)); if (intro) s.append(el("p", "muted small", intro)); return s; };
@@ -113,7 +121,7 @@
    */
   function describe(x) {
     const wrap = el("span", "lp-desc");
-    const tag = el("span", `tag ${x.descriptionBy === "founder" ? "tag--warn" : "tag--ok"} lp-desc__by`, x.descriptionBy === "founder" ? "The founder's own words" : "Vicinity's sentence");
+    const tag = el("span", `tag ${x.descriptionBy === "founder" ? "tag--warn" : "tag--ok"} lp-desc__by`, x.descriptionBy === "founder" ? "The founder's own words" : brand`Vicinity's sentence`);
     wrap.append(tag, el("q", "lp-desc__text", x.description || ""));
     return wrap;
   }
@@ -135,7 +143,7 @@
       fact(dl, "Ticker", `$${f.symbol}`);
       fact(dl, "Founder wallet (only it can launch)", addr(f.founder));
       if (c.ready) {
-        fact(dl, "Picture (the coin's metadata, for ever)", `Vicinity design ${c.ready.template || "t1"}, version ${c.ready.version}`);
+        fact(dl, "Picture (the coin's metadata, for ever)", brand`Vicinity design ${c.ready.template || "t1"}, version ${c.ready.version}`);
         if (c.ready.description != null) fact(dl, "Description (the coin's metadata, for ever)", describe(c.ready));
       }
       fact(dl, "Can launch until", `${new Date(f.expiresAt).toLocaleString()} (${f.expiresAt.slice(0, 16).replace("T", " ")} UTC)`);
@@ -260,7 +268,7 @@
 
   /* ---------------------------------------------------------------- cities */
   // the public log's and the founder's words when a waiting Raydium LaunchLab contract is rejected (src/coins.js LEGACY_REJECTED)
-  const LEGACY_REJECTED = "City coins launch on the Vicinity launchpad now; a contract from the old Raydium LaunchLab path is not recorded.";
+  const LEGACY_REJECTED = brand`City coins launch on the Vicinity launchpad now; a contract from the old Raydium LaunchLab path is not recorded.`;
   /**
    * "Reject the old contract": a contract sent for this city through the old Raydium LaunchLab path still waits (c.legacyContract), so
    * nothing is approved or launched for it. Rejecting it settles the city (src/coins.js settleLegacyContract): nothing on chain, no
@@ -297,11 +305,11 @@
       if (c.ready) {
         // the ready-made coin (COIN_V2_READY): this exact picture and version go into the coin's metadata for ever once it launches
         // (src/coinart-store.js binds only the version an approval was built from), so the owner sees them before approving
-        fact(dl, "Picture (wallets show it, for ever)", `Vicinity design ${c.ready.template || "t1"}, version ${c.ready.version}: this exact picture goes into the coin metadata for ever`);
+        fact(dl, "Picture (wallets show it, for ever)", brand`Vicinity design ${c.ready.template || "t1"}, version ${c.ready.version}: this exact picture goes into the coin metadata for ever`);
         const fig = el("figure", "lp-ready-art");
         const img = el("img");
         img.setAttribute("src", c.ready.art); img.setAttribute("width", "160"); img.setAttribute("height", "160");
-        img.alt = `$${c.symbol || c.ticker || ""} coin picture: Vicinity design ${c.ready.template || "t1"}, version ${c.ready.version}`;
+        img.alt = brand`$${c.symbol || c.ticker || ""} coin picture: Vicinity design ${c.ready.template || "t1"}, version ${c.ready.version}`;
         fig.append(img);
         card.append(dl, fig);
       } else {
@@ -309,8 +317,8 @@
         // The badge lines speak of the chain's image URL (/coin-meta/<mint>.png, what wallets show); the site shows the city's initials.
         fact(dl, "Picture", c.approved && c.logoStatus !== "approved" ? `An approved picture shows; a newer one ${c.logoStatus === "rejected" ? "was not approved" : "waits for a check (Moderation › Pictures)"}`
           : c.logoStatus === "approved" ? "Approved (on the coin page; you can still take it down later)"
-            : c.logoStatus === "rejected" ? "Not approved: wallets show the Vicinity badge until the founder sends another"
-              : c.logo ? "Waiting for a check (Moderation › Pictures): wallets show the Vicinity badge until it is approved" : "None: the Vicinity badge is used");
+            : c.logoStatus === "rejected" ? `Not approved: wallets show ${WALLET_BADGE} until the founder sends another`
+              : c.logo ? `Waiting for a check (Moderation › Pictures): wallets show ${WALLET_BADGE} until it is approved` : `None: ${WALLET_BADGE} is used`);
         card.append(dl);
       }
       for (const wmsg of c.warnings || []) card.append(el("p", "lp-warn", wmsg));
@@ -445,7 +453,7 @@
     await setupSection(setup, st);
     const cities = section("Cities", closedNow() ? LAUNCH_CLOSED : "A founder can launch only after you approve their city on chain. The name and ticker are fixed at approval.");
     const coins = section("Launched coins", "These buttons do what a keeper would do. Anyone may pay for them; nobody can move the city's money anywhere else.");
-    const platform = section("Platform fees", "Vicinity's share of every trade and launch waits on Meteora until the dev wallet collects it.");
+    const platform = section("Platform fees", brand`Vicinity's share of every trade and launch waits on Meteora until the dev wallet collects it.`);
     const pause = section("Launches", "Pausing stops new launches only. Trading and fees go on.");
     pauseSection(pause, st);
     top.append(setup, cities, coins, platform, pause);

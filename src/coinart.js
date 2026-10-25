@@ -11,9 +11,13 @@
  *                                                font lacks drawn without its accent (Ḑ → D); a mark left on its own is dropped.
  *
  * TEMPLATE VERSIONS ARE IMMUTABLE. A version fixes the geometry, the colours, the fonts (FONT_SHA256), the width table and the
- * renderer (resvg-wasm 2.6.2). Anything that would change one pixel of a coin is a NEW version ("t2"), never an edit of an existing
+ * renderer (resvg-wasm 2.6.2). Anything that would change one pixel of a coin is a NEW version id, never an edit of an existing
  * one: the picture of a coin that launched with "t1" is stored by the hash of its bytes (src/coinready.js coin_art) and named by it
  * (/coin-meta/art/<sha256>.png), and test/coinart.test.js pins the SVG and PNG hashes of t1 so an edit fails the build.
+ * An id names ONE picture for good, across the whole site: the id is stored with every picture (coin_art.template_version) and in every
+ * coin version's content (image.template), so it is never reused for another picture, here or elsewhere. Stage S22's "t2" (the new
+ * program's coin art, Civic Atlas colours and emblem; its own module, not wired) is such an id, and S22 keeps "t3" for its next
+ * version, so this file never defines either (test/coinart.test.js checks its ids against S22's).
  *
  * Two kinds of base, so the owner's painted coin can become a later version without touching t1:
  *   base: "vector"   t1: the rings, the field and the pin drawn as shapes (the owner's picture of the template, redrawn).
@@ -49,17 +53,34 @@ const COLORS = Object.freeze({
  * before any t1 coin was stored or launched. The text-fitting numbers live in the version, so a later version can move or resize the
  * text without moving t1's.
  */
+const T1 = Object.freeze({
+  version: "t1", base: "vector", fonts: FONT_SHA256, resvg: RESVG_VERSION,
+  ticker: Object.freeze({ start: 80 / 0.7, maxWidth: 330, min: 40, track: 0.01, centerY: 264, twoLineMax: 84, twoLineCenterY: 250 }),
+  city: Object.freeze({ start: 30, track: 0.22, centerY: 339, band: 340, rule: 64, ruleMin: 18, gap: 12, min: 18,
+    twoLineMax: 24, twoLineWidth: 300, twoLineCenterY: 338, lineHeight: 1.15, floor: 14 }),
+  arc: Object.freeze({ r: 158, size: 19, spacing: 6, text: "VICINITY CITY" }),
+});
+/**
+ * `t1c` (label migration, stage S48: the Citycoin.dev label set, BRAND=citycoin) is t1 with one change, the words on the bottom arc: the
+ * product's name in capitals ("CITYCOIN.DEV") instead of "VICINITY CITY". Every other number, colour, font and the renderer are t1's,
+ * so the ticker and the city sit exactly where t1 puts them (test/coinart.test.js pins its SVG and PNG hashes too). Its id is t1's
+ * number with the letter "c" for that one change (the id format: "t", a number, and a letter for a variant of that number's version):
+ * it is a picture of its own, so it cannot be "t2", which stage S22 gave to a different picture, and a letter keeps it out of the
+ * numbered versions for good. The owner's painted coin, when it comes, is a later version again.
+ */
 export const TEMPLATES = Object.freeze({
-  t1: Object.freeze({
-    version: "t1", base: "vector", fonts: FONT_SHA256, resvg: RESVG_VERSION,
-    ticker: Object.freeze({ start: 80 / 0.7, maxWidth: 330, min: 40, track: 0.01, centerY: 264, twoLineMax: 84, twoLineCenterY: 250 }),
-    city: Object.freeze({ start: 30, track: 0.22, centerY: 339, band: 340, rule: 64, ruleMin: 18, gap: 12, min: 18,
-      twoLineMax: 24, twoLineWidth: 300, twoLineCenterY: 338, lineHeight: 1.15, floor: 14 }),
-    arc: Object.freeze({ r: 158, size: 19, spacing: 6, text: "VICINITY CITY" }),
-  }),
+  t1: T1,
+  t1c: Object.freeze({ ...T1, version: "t1c", arc: Object.freeze({ ...T1.arc, text: "CITYCOIN.DEV" }) }),
 });
 /** The version new coins are made with. Changing it changes the defaults of coins not launched yet, never a launched coin. */
 export const TEMPLATE_VERSION = "t1";
+/** The version new coins are made with under each label set (src/brand.js keys): t1 for today's, t1c for Citycoin.dev. */
+export const BRAND_TEMPLATES = Object.freeze({ "": TEMPLATE_VERSION, citycoin: "t1c" });
+/** The template version for a label set (a src/brand.js set, or src/brandwords.js words' `brand`): today's t1 for anything else. */
+export const templateFor = (brand) => {
+  const key = brand && typeof brand.key === "string" ? brand.key : "";
+  return Object.hasOwn(BRAND_TEMPLATES, key) ? BRAND_TEMPLATES[key] : TEMPLATE_VERSION;
+};
 
 const n2 = (x) => Number(x).toFixed(2);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);

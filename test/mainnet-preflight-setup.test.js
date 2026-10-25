@@ -173,6 +173,11 @@ test("setup preflight: right after the website setup (before PR-2) every row pas
   assert.match(by(rows, "setup speed table").detail, new RegExp(`^${TABLE} holds the price curve and its allow-list entry \\(${c.tableAddrs.length} addresses; authority ${DEV}\\)$`));
   assert.match(by(rows, "speed table for city coins").detail, new RegExp(`^holds all ${c.tableAddrs.length} addresses`));
   assert.match(by(rows, "setup fee accounts").detail, /^SOL \w+; \$VICINITY \w+$/);
+  // the admin console names the legacy fee account "legacyToken" under BRAND=citycoin (src/lpadmin.js referralAccountsOf; review finding
+  // CRAWL-4): the preflight reads it the same
+  const { vicinity: legacyAcct, ...otherAccounts } = c.summary.referralAccounts;
+  const renamed = await run(PR1_ENV, world(c.accounts), { setup: { ...c.summary, referralAccounts: { ...otherAccounts, legacyToken: legacyAcct } }, site: SITE });
+  assert.deepEqual([by(renamed, "setup fee accounts").level, by(renamed, "setup fee accounts").detail], [by(rows, "setup fee accounts").level, by(rows, "setup fee accounts").detail]);
   assert.equal(by(rows, "setup signatures").detail, "all 8 setup transactions landed and succeeded");
   assert.match(by(rows, "city coins gate").detail, /^on \(mainnet\): the owner's City coins tab/);
   // the live site is on (PR-1 deployed) but has no price curve yet: a WARN that names the difference, never a FAIL

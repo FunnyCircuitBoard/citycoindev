@@ -75,7 +75,7 @@ import { FLAG_VALUES, MASTER_POLICY, nextSelectionBoundary, validatePolicy } fro
 import { hostRedirectOn, legacyLaunchValue, legacyLinkOn, legacySeatsValue, mainTokenV5On, publicV5On, walletOnlyOn } from "./flags.js";
 import { deploymentAccepted, mainMint, officialLinks } from "./maintoken.js";
 import { DEFAULT_SITE_ORIGIN, DEFAULT_SITE_ORIGINS, normalizeOrigin, siteConfig } from "./site-config.js";
-import { brandOf } from "./brand.js";
+import { _brandBuiltForTests, brandOf } from "./brand.js";
 import { PAGES_BUILT } from "./pages-built.js";
 
 const P = MASTER_POLICY.policy;
@@ -209,10 +209,14 @@ export function publicV5(env) {
 
 /* ---------------------------------------------------------------- MAIN_TOKEN_V5 as the Worker applies it */
 
-let pagesBuilt = PAGES_BUILT;
+let pagesBuiltBase = PAGES_BUILT, pagesBuilt = PAGES_BUILT;
 /** Tests only: stand in for a page build made with the switch ({ mainTokenV5: true, brand }), with every page sent through the Worker
- *  ({ pagesReachWorker: true }) or with the legacy seats frozen ({ legacySeats: "frozen" }), or null for the committed src/pages-built.js. */
-export const _pagesBuiltForTests = (p) => { pagesBuilt = p ? Object.freeze({ ...PAGES_BUILT, ...p }) : PAGES_BUILT; };
+ *  ({ pagesReachWorker: true }) or with the legacy seats frozen ({ legacySeats: "frozen" }), or null for the committed src/pages-built.js
+ *  (or the record _pagesBuiltBaseForTests put in its place). */
+export const _pagesBuiltForTests = (p) => { pagesBuilt = p ? Object.freeze({ ...pagesBuiltBase, ...p }) : pagesBuiltBase; _brandBuiltForTests(pagesBuilt === PAGES_BUILT ? null : pagesBuilt); };
+/** Tests only: the record that stands for the committed one (test/helpers/today-build.mjs: today's build, whatever build is committed), or
+ *  null for the committed src/pages-built.js itself. */
+export const _pagesBuiltBaseForTests = (base) => { pagesBuiltBase = base ? Object.freeze({ ...base }) : PAGES_BUILT; _pagesBuiltForTests(null); };
 
 /**
  * Why MAIN_TOKEN_V5 does not count in this environment: [] when every precondition holds, else the reasons (codes only, never a value).
@@ -233,7 +237,7 @@ export function mainTokenRefusals(env) {
   try {
     const out = [];
     if (pagesBuilt.mainTokenV5 !== true) out.push("MAIN_TOKEN_V5_PAGES_NOT_BUILT");
-    const b = brandOf(env);
+    const b = brandOf(env, pagesBuilt); // fail closed against this build record (src/brand.js), so a test stand-in counts too
     if (b.problem || b.value !== pagesBuilt.brand) out.push("MAIN_TOKEN_V5_BRAND_MISMATCH");
     if (!deploymentAccepted(env)) out.push("MAIN_TOKEN_V5_CONFIG_REFUSED");
     if (!policyConfig(env).ok) out.push("MAIN_TOKEN_V5_POLICY_REFUSED");

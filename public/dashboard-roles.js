@@ -6,6 +6,14 @@
 //   { sensitive, refresh, locateFor, errText, countryName }
 (() => {
   "use strict";
+  // The product's names in this file's words (the label migration, area b). A page built for a label set other than today's carries the
+  // set on <html> (data-brand, data-brand-name, data-brand-domain: scripts/pages/build.mjs writes them from src/brand.js); brand`…` puts
+  // those names in a text's own words, never in a value put into it. A page without them (today's pages) gets every text exactly as written.
+  const BRAND = (() => { try { const r = document.documentElement, at = (k) => (r && typeof r.getAttribute === "function" ? r.getAttribute(k) : null); return at("data-brand") && at("data-brand-name") && at("data-brand-domain") ? Object.freeze({ key: at("data-brand"), name: at("data-brand-name"), domain: at("data-brand-domain") }) : null; } catch { return null; } })();
+  const brand = (s, ...v) => s.reduce((out, part, i) => out + (BRAND ? part.replace(/vicinity\.city/g, () => BRAND.domain).replace(/Vicinity/g, () => BRAND.name) : part) + (i < v.length ? String(v[i]) : ""), "");
+  // the holdings' token: "$VICINITY" on today's pages; a page built for another label set names its own (the legacy one is shown nowhere there,
+  // and its own token may not be live yet: then /api/me says launched false, and nothing here offers to buy it)
+  const UNIT = BRAND ? `${BRAND.name} tokens` : "$VICINITY";
   const { $, el, fmt, api, toast, copy } = window.V;
   const date = (iso) => new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
   const when = (iso) => new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
@@ -15,7 +23,8 @@
   // the tabbed dashboard (DASHBOARD_V2=on): window.VDash exists only then; the flag-off page keeps its emoji and its buttons as they were
   const tabbed = () => Boolean(window.VDash);
   // the legacy seats frozen (LEGACY_SEATS=frozen: /api/me says legacySeats "frozen", stage S16): see frozenProfile below. Without the key: as before
-  const frozenSeats = (d) => Boolean(d && d.legacySeats === "frozen");
+  // (a page built for another label set is always built with the legacy seats frozen (scripts/pages/build.mjs pageBrandPrerequisites))
+  const frozenSeats = (d) => Boolean(BRAND) || Boolean(d && d.legacySeats === "frozen");
   // the legacy launch path closed (LEGACY_LAUNCH=off: /api/me says legacyLaunch "off", stage S23): no coin is designed, chosen or launched there
   // any more, so the card offers no jump to the coin and its lead promises none (review finding S23-OFF-1). Without the key: as before
   const launchShut = (d) => Boolean(d && d.legacyLaunch === "off");
@@ -99,7 +108,7 @@
     const p = { icon: "🌱", ico: ["pin", ""], title: `Member of ${city}`, lead: "", tag: null, meters: [], tools: [], notes: [], weight, danger: null };
     // the tabbed dashboard: walking away from a seat is not one of the everyday tools, it sits in the Founder tab's "Danger zone"
     const resign = (seat) => { if (tabbed()) p.danger = resignButton(seat); else p.tools.push(resignButton(seat)); };
-    const invite = tool("Invite locals · copy link", () => copy(`I'm repping ${city} on Vicinity. One city, one coin, chosen by locals: join us → ${location.origin}/connect`, "Invite copied. Send it to your locals!"));
+    const invite = tool("Invite locals · copy link", () => copy(brand`I'm repping ${city} on Vicinity. One city, one coin, chosen by locals: join us → ${location.origin}/connect`, "Invite copied. Send it to your locals!"));
 
     if (seat && seat.status === "steward") {
       const q = c && c.seat && c.seat.quorum;
@@ -110,8 +119,8 @@
       p.meters.push(meter("Probation", pct(Date.now() - start, Date.parse(seat.probationUntil) - start), `${daysLeft(seat.probationUntil)} days to go`));
       if (q) p.meters.push(meter("Verified local holders (early confirmation)", pct(q.have, q.need), `${q.have} of ${q.need}`));
       // a seat keeps the bar it was claimed under, even if the ladder has moved since
-      p.meters.push(meter(`Your holding vs your bar (${fmt(seat.threshold)})`, pct(d.holding.amount, seat.threshold), `${fmt(d.holding.amount)} $VICINITY`, d.holding.amount >= seat.threshold ? "ok" : "bad"));
-      if (seat.graceUntil) p.notes.push(`⚠️ You're below ${fmt(seat.threshold)} $VICINITY. Top up before ${when(seat.graceUntil)} or the seat is released. Moderation pauses while you're short.`);
+      p.meters.push(meter(`Your holding vs your bar (${fmt(seat.threshold)})`, pct(d.holding.amount, seat.threshold), `${fmt(d.holding.amount)} ${UNIT}`, d.holding.amount >= seat.threshold ? "ok" : "bad"));
+      if (seat.graceUntil) p.notes.push(`⚠️ You're below ${fmt(seat.threshold)} ${UNIT}. Top up before ${when(seat.graceUntil)} or the seat is released. Moderation pauses while you're short.`);
       p.tools.push(...(launchShut(d) ? [] : [jump("Design the city's coin", "#coin")]), jump("Moderator tools", "#mod"), invite); resign(seat);
     } else if (seat && seat.status === "provisional") {
       p.icon = "👑"; p.ico = ["crown", "gold"]; p.title = `Chosen founder of ${seat.city}`;
@@ -121,18 +130,20 @@
     } else if (seat && seat.status === "grace") {
       p.icon = "⚠️"; p.ico = ["info", ""]; p.title = `${seat.city}: your seat is in grace`;
       p.tag = { text: `Until ${when(seat.graceUntil)}`, cls: "tag--warn" };
-      p.lead = `You dropped below ${fmt(seat.threshold)} $VICINITY, so moderation is paused. Hold it again before ${when(seat.graceUntil)} or the seat reopens.`;
-      p.meters.push(meter(`Your holding vs your bar (${fmt(seat.threshold)})`, pct(d.holding.amount, seat.threshold), `${fmt(d.holding.amount)} $VICINITY`, "bad"));
-      p.tools.push(jump("Buy & swap", "#trade", "btn btn--primary btn--sm")); resign(seat);
+      p.lead = `You dropped below ${fmt(seat.threshold)} ${UNIT}, so moderation is paused. Hold it again before ${when(seat.graceUntil)} or the seat reopens.`;
+      p.meters.push(meter(`Your holding vs your bar (${fmt(seat.threshold)})`, pct(d.holding.amount, seat.threshold), `${fmt(d.holding.amount)} ${UNIT}`, "bad"));
+      // (no Buy & swap on a page built for another label set: that card is not shown there)
+      if (!BRAND) p.tools.push(jump("Buy & swap", "#trade", "btn btn--primary btn--sm"));
+      resign(seat);
     } else if (seat && seat.status === "active") {
       p.icon = "👑"; p.ico = ["crown", "gold"]; p.title = `City Founder of ${seat.city}`;
       p.tag = { text: "Active", cls: "tag--ok" };
       // with the ready-made coin on (COIN_V2_READY), the founder chooses the coin Vicinity made from the city list, never designs one
       const ready = d.coinV2Ready === true;
       const shut = launchShut(d);
-      p.lead = shut ? `You moderate ${seat.city} and your vote counts ×${weight}. ${LAUNCH_SHUT} Keep ${fmt(seat.threshold)} $VICINITY: below it, moderation pauses at once.`
-        : `You moderate ${seat.city}, ${ready ? "choose and launch its coin (made by Vicinity from the city list)" : "design its coin"} and your vote counts ×${weight}. Keep ${fmt(seat.threshold)} $VICINITY: below it, moderation pauses at once.`;
-      p.meters.push(meter(`Your holding vs your bar (${fmt(seat.threshold)})`, pct(d.holding.amount, seat.threshold), `${fmt(d.holding.amount)} $VICINITY`, d.holding.amount >= seat.threshold ? "ok" : "bad"));
+      p.lead = shut ? `You moderate ${seat.city} and your vote counts ×${weight}. ${LAUNCH_SHUT} Keep ${fmt(seat.threshold)} ${UNIT}: below it, moderation pauses at once.`
+        : `You moderate ${seat.city}, ${ready ? brand`choose and launch its coin (made by Vicinity from the city list)` : "design its coin"} and your vote counts ×${weight}. Keep ${fmt(seat.threshold)} ${UNIT}: below it, moderation pauses at once.`;
+      p.meters.push(meter(`Your holding vs your bar (${fmt(seat.threshold)})`, pct(d.holding.amount, seat.threshold), `${fmt(d.holding.amount)} ${UNIT}`, d.holding.amount >= seat.threshold ? "ok" : "bad"));
       p.tools.push(...(shut ? [] : [ready ? jump("Your city coin", "#coin-ready") : jump("Design the city's coin", "#coin")]), jump("Moderator tools", "#mod"), invite); resign(seat);
     } else if (d.level === "holder") {
       p.icon = "🏅"; p.ico = ["medal", "ok"]; p.title = `Holder in ${city}`;
@@ -144,9 +155,16 @@
     } else if (!d.user.wallet) {
       // onboarding v3: the account exists, the wallet is linked later (from the dashboard's link card, or here)
       p.tag = { text: "You are in", cls: "tag--ok" };
-      p.lead = `Member of ${city}. You are in. Link a wallet to see your $VICINITY, your rank and your road to founding ${city}.`;
+      p.lead = BRAND ? `Member of ${city}. You are in. You can link a Solana wallet whenever you like.` : `Member of ${city}. You are in. Link a wallet to see your $VICINITY, your rank and your road to founding ${city}.`;
       // (the tabbed dashboard's first card is the wallet card with its one Connect wallet button: no second one here)
       if (!tabbed()) p.tools.push(link("Link my wallet", "/connect?mode=link", "btn btn--primary btn--sm"));
+      p.tools.push(invite);
+    } else if (BRAND) {
+      // a page built for another label set: no Early member claim (that badge is history, and /api/me says who has it), no Buy (the token's
+      // pages are not there), and the plain words when its own token is not live yet
+      p.tag = { text: d.launched ? "Not holding yet" : "You are in", cls: d.launched ? "tag--warn" : "tag--ok" };
+      p.lead = d.launched ? `You're signed in and local, but this wallet holds no ${UNIT} yet. Holding any amount unlocks posting, voting and your rank.`
+        : `Member of ${city}, with your wallet linked. The ${BRAND.name} token is not live yet.`;
       p.tools.push(invite);
     } else {
       p.tag = { text: d.launched ? "Not holding yet" : "Early member", cls: d.launched ? "tag--warn" : "tag--ok" };
@@ -165,7 +183,7 @@
     }
     if (d.level === "admin") {
       p.icon = "⚙️"; p.ico = ["shield", "gold"]; p.title = "Admin";
-      p.tag = { text: "Runs Vicinity within the published rules", cls: "tag--gold" };
+      p.tag = { text: brand`Runs Vicinity within the published rules`, cls: "tag--gold" };
       p.lead = "Everything that needs a decision is in the moderator tools. Launch settings, team wallets and snapshots live in the admin console.";
       p.tools = [link("Admin console", "/admin", "btn btn--primary btn--sm"), jump("Moderator tools", "#mod"), link("Public log", "/api/audit"), link("The rules", "/rules"), ...p.tools.filter((t) => t.tagName === "BUTTON" && /Resign|Invite/.test(t.textContent))];
     }
@@ -189,7 +207,7 @@
     const home = d.user.home, city = home ? home.name : "your city", cc = d.national ? d.national.country : "";
     const seat = d.founder && d.founder.seat, weight = d.roles.weight;
     const p = { icon: "🌱", ico: ["pin", ""], title: `Member of ${city}`, lead: "", tag: null, meters: [], tools: [], notes: [], weight, danger: null };
-    const invite = tool("Invite locals · copy link", () => copy(`I'm repping ${city} on Vicinity. One city, one coin: join us → ${location.origin}/connect`, "Invite copied. Send it to your locals!"));
+    const invite = tool("Invite locals · copy link", () => copy(brand`I'm repping ${city} on Vicinity. One city, one coin: join us → ${location.origin}/connect`, "Invite copied. Send it to your locals!"));
     const ON_RECORD = "Founder seats, squads and elections are closed for changes.";
     if (seat) {
       const ready = d.coinV2Ready === true, live = seat.status === "active" || seat.status === "steward";
@@ -198,7 +216,7 @@
       p.tag = { text: "On record", cls: "tag--gold" };
       const shut = launchShut(d);
       p.lead = live && shut ? `Your founder seat for ${seat.city} is on record. Your vote counts ×${weight}. ${LAUNCH_SHUT} ${ON_RECORD}`
-        : live ? `Your founder seat for ${seat.city} is on record. You ${ready ? "choose and launch its coin (made by Vicinity from the city list)" : "design its coin"} and your vote counts ×${weight}. ${ON_RECORD}`
+        : live ? `Your founder seat for ${seat.city} is on record. You ${ready ? brand`choose and launch its coin (made by Vicinity from the city list)` : "design its coin"} and your vote counts ×${weight}. ${ON_RECORD}`
         : `Your founder seat for ${seat.city} is on record as it was. ${ON_RECORD}`;
       if (live && !shut) p.tools.push(ready ? jump("Your city coin", "#coin-ready") : jump("Design the city's coin", "#coin"));
       p.tools.push(invite);
@@ -208,8 +226,15 @@
       p.tools.push(jump("Post to your city", "#feed"), invite);
     } else if (!d.user.wallet) {
       p.tag = { text: "You are in", cls: "tag--ok" };
-      p.lead = `Member of ${city}. You are in. Link a wallet to see your $VICINITY and your rank.`;
+      p.lead = BRAND ? `Member of ${city}. You are in. You can link a Solana wallet whenever you like.` : `Member of ${city}. You are in. Link a wallet to see your $VICINITY and your rank.`;
       if (!tabbed()) p.tools.push(link("Link my wallet", "/connect?mode=link", "btn btn--primary btn--sm"));
+      p.tools.push(invite);
+    } else if (BRAND) {
+      // a page built for another label set (always built with the legacy seats frozen): no Early member claim, no Buy, and the plain words
+      // when its own token is not live yet, as in profile() above
+      p.tag = { text: d.launched ? "Not holding yet" : "You are in", cls: d.launched ? "tag--warn" : "tag--ok" };
+      p.lead = d.launched ? `You're signed in and local, but this wallet holds no ${UNIT} yet. Holding any amount unlocks posting, voting and your rank.`
+        : `Member of ${city}, with your wallet linked. The ${BRAND.name} token is not live yet.`;
       p.tools.push(invite);
     } else {
       p.tag = { text: d.launched ? "Not holding yet" : "Early member", cls: d.launched ? "tag--warn" : "tag--ok" };
@@ -227,7 +252,7 @@
     }
     if (d.level === "admin") {
       p.icon = "⚙️"; p.ico = ["shield", "gold"]; p.title = "Admin";
-      p.tag = { text: "Runs Vicinity within the published rules", cls: "tag--gold" };
+      p.tag = { text: brand`Runs Vicinity within the published rules`, cls: "tag--gold" };
       p.lead = "Everything that needs a decision is in the moderator tools. Launch settings, team wallets and snapshots live in the admin console.";
       p.tools = [link("Admin console", "/admin", "btn btn--primary btn--sm"), jump("Moderator tools", "#mod"), link("Public log", "/api/audit"), link("The rules", "/rules"), ...p.tools.filter((t) => t.tagName === "BUTTON" && /Invite/.test(t.textContent))];
     }
@@ -305,7 +330,7 @@
     below_threshold: "The squad's pooled holdings are below the bar.", squad_full: "That squad is full.", already_member: "You're already in this squad.",
     squad_exists: "Your city already has a squad forming: join it.", city_taken: "This city already has a founder or steward.",
     window_closing: "This city's window has ended and is being decided. Try again in a few minutes.",
-    not_local: "Only verified locals of this city can join.", not_in_city: "You're not inside the city right now.", not_launched: "Squads open when $VICINITY launches.",
+    not_local: "Only verified locals of this city can join.", not_in_city: "You're not inside the city right now.", not_launched: BRAND ? `Squads are closed while the ${BRAND.name} token is not live.` : "Squads open when $VICINITY launches.",
     has_seat: "Someone in the squad already holds a seat.", not_member: "You're not in this squad.",
     needs_checkin: "Check in once from inside your city first (proof you're really here).", account_too_new: "Your account has to be 7+ days old.",
     home_too_new: "Your home community has to be set 7+ days first.", banned: "You can't do this while banned.", sign_in: "Your session ended. Please sign in again.",

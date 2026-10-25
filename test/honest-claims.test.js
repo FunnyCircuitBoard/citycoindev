@@ -10,9 +10,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { sourceAs } from "../scripts/pages/build.mjs";
 import { POLICY } from "../src/policy.js";
 
-const read = (p) => readFileSync(new URL("../" + p, import.meta.url), "utf8").replace(/\r\n/g, "\n");
+// a page source as today's build reads it (BRAND unset: its brand blocks and {{label}} fills resolved; scripts/pages/build.mjs sourceAs)
+const read = (p) => { const t = readFileSync(new URL("../" + p, import.meta.url), "utf8").replace(/\r\n/g, "\n"); return p.startsWith("scripts/pages/src/") ? sourceAs(p, t) : t; };
 /** The words people read: a no-break space is a space, and a phrase split by markup still reads as one. */
 const readable = (s) => [s.replace(/&nbsp;| /g, " "), s.replace(/<[^>]+>/g, "").replace(/&nbsp;| /g, " ")];
 

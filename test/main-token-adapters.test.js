@@ -220,7 +220,7 @@ test("everything written into markup is escaped, and an address that is not a pl
 
 test("the page build refuses MAIN_TOKEN_V5=on before the brand rollout (S48): the pages still name $VICINITY as the token", () => {
   assert.throws(() => pageSocials({ ...ON, MAIN_TOKEN_MINT: FAKE_MINT, OFFICIAL_X_URL: FAKE_X }), /MAIN_TOKEN_V5=on in wrangler\.jsonc.*S48/);
-  assert.throws(() => pageSocials({ ...ON, MAIN_TOKEN_MINT: FAKE_MINT, MAIN_TOKEN_V5: "ON", BRAND: "citycoin" }), /S48/, "BRAND=citycoin has no label set yet either");
+  assert.throws(() => pageSocials({ ...ON, MAIN_TOKEN_MINT: FAKE_MINT, MAIN_TOKEN_V5: "ON", BRAND: "citycoin" }), /S48/, "BRAND=citycoin: the token page and the client scripts do not show the configured main token yet");
   // and, first, it never builds pages for a switch the Worker would refuse
   for (const env of [RAW_ON, { ...ON }, { ...ON, MAIN_TOKEN_MINT: LEGACY }, { ...RAW_ON, MAIN_TOKEN_MINT: FAKE_MINT }, { ...ON, MAIN_TOKEN_MINT: FAKE_MINT, OFFICIAL_X_URL: LEGACY_X_URL }])
     assert.throws(() => pageSocials(env), /configuration the Worker refuses/, JSON.stringify(env));

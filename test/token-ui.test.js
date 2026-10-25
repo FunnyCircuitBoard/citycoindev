@@ -8,13 +8,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { sourceAs } from "../scripts/pages/build.mjs";
 import vm from "node:vm";
 import { createHash } from "node:crypto";
 import { MINT } from "./helpers/world.js";
 
 const read = (f) => readFileSync(new URL(`../public/${f}`, import.meta.url), "utf8").replace(/\r\n/g, "\n");
 const HERO_SHA256 = "3c8c73451c47ae0efa3f8fb0d73b1ebbb88a40862fdfe1a47ffc166ab315bea1";
-const html = read("token.html"), src = readFileSync(new URL("../scripts/pages/src/token.html", import.meta.url), "utf8"), css = read("style.css"), js = read("token.js");
+const html = read("token.html"), src = sourceAs("token.html", readFileSync(new URL("../scripts/pages/src/token.html", import.meta.url), "utf8")), css = read("style.css"), js = read("token.js");
 
 /* ---------------- the page ---------------- */
 

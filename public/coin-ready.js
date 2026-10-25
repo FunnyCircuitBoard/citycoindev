@@ -13,9 +13,14 @@
 // textContent (never markup from text); the picture is an <img> of the server's own /coin-meta/art/<sha>.png.
 (() => {
   "use strict";
+  // The product's names in this file's words (the label migration, area b). A page built for a label set other than today's carries the
+  // set on <html> (data-brand, data-brand-name, data-brand-domain: scripts/pages/build.mjs writes them from src/brand.js); brand`…` puts
+  // those names in a text's own words, never in a value put into it. A page without them (today's pages) gets every text exactly as written.
+  const BRAND = (() => { try { const r = document.documentElement, at = (k) => (r && typeof r.getAttribute === "function" ? r.getAttribute(k) : null); return at("data-brand") && at("data-brand-name") && at("data-brand-domain") ? Object.freeze({ key: at("data-brand"), name: at("data-brand-name"), domain: at("data-brand-domain") }) : null; } catch { return null; } })();
+  const brand = (s, ...v) => s.reduce((out, part, i) => out + (BRAND ? part.replace(/vicinity\.city/g, () => BRAND.domain).replace(/Vicinity/g, () => BRAND.name) : part) + (i < v.length ? String(v[i]) : ""), "");
   const { $ } = window.V;
   const ERR = {
-    coin_changed: "Your coin changed since this page loaded (the city list or the Vicinity design was updated). Check it again, then use it.",
+    coin_changed: brand`Your coin changed since this page loaded (the city list or the Vicinity design was updated). Check it again, then use it.`,
     reprove: "Confirm it's you with your wallet, then try again.",
     slow_down: "Too many tries. Wait a little, then try again.",
     sign_in: "Sign in again, then try again.",
@@ -30,7 +35,7 @@
   const text = (sel, t) => { const n = $(sel); if (n) n.textContent = t == null ? "" : String(t); return n; };
   const show = (sel, on) => { const n = $(sel); if (n) n.hidden = !on; return n; };
   const place = (c) => [c.name, c.region, c.countryName].filter(Boolean).join(" · ");
-  const altOf = (ticker) => `$${ticker} coin: the Vicinity city coin design`;
+  const altOf = (ticker) => brand`$${ticker} coin: the Vicinity city coin design`;
   const errorText = (r, fallback) => (r && (ERR[r.error] || r.message)) || fallback;
   const told = (r) => { if (ctx && typeof ctx.onState === "function") ctx.onState(r); };
 
@@ -79,15 +84,15 @@
     else if (gate) state = ["Not available now", "tag--warn"];
     else if (r.inUse) {
       state = ["Your coin", "tag--ok"];
-      note = "This is your coin's design now. Next, Vicinity's owner approves it on the blockchain; then you launch it from your Founder tab.";
+      note = brand`This is your coin's design now. Next, Vicinity's owner approves it on the blockchain; then you launch it from your Founder tab.`;
     }
-    else if (chosen && chosen.current && !chosen.mine) note = "A former founder of this city chose this coin. Use it to make it yours: Vicinity's owner approves only the current founder's choice.";
-    else if (chosen && chosen.current) note = "Vicinity's design or the city list changed since you chose your coin. This is the new version: use it to keep your coin up to date.";
+    else if (chosen && chosen.current && !chosen.mine) note = brand`A former founder of this city chose this coin. Use it to make it yours: Vicinity's owner approves only the current founder's choice.`;
+    else if (chosen && chosen.current) note = brand`Vicinity's design or the city list changed since you chose your coin. This is the new version: use it to keep your coin up to date.`;
     else if (chosen && chosen.mine) note = "Your coin's design was changed since you chose it. Use this coin to choose it again.";
     // a design row kept aside: "your earlier design" only when this founder's own account saved it (earlier); a former founder's is said as
     // that (earlierOther), never as theirs
-    else if (r.earlier) note = "Your earlier coin design is kept, but it is not launched: city coins are made by Vicinity now. Use this coin to choose yours.";
-    else if (r.earlierOther) note = "A former founder's coin design is kept, but it is not launched: city coins are made by Vicinity now. Use this coin to choose yours.";
+    else if (r.earlier) note = brand`Your earlier coin design is kept, but it is not launched: city coins are made by Vicinity now. Use this coin to choose yours.`;
+    else if (r.earlierOther) note = brand`A former founder's coin design is kept, but it is not launched: city coins are made by Vicinity now. Use this coin to choose yours.`;
     st.textContent = state[0]; st.className = `tag ${state[1]}`;
     text("#cr-note", note);
     const usable = Boolean(coin && coin.contentHash && !gate && !r.inUse && !(chosen && chosen.launched));
@@ -110,7 +115,7 @@
     // and Vicinity's coin is named while the preview stands in
     if (!p) { box.hidden = true; coinCard.classList.remove("has-preview"); if (kick && kick.dataset.base) kick.textContent = kick.dataset.base; return; }
     box.hidden = false; coinCard.classList.add("has-preview");
-    if (kick) kick.textContent = "City coin · made by Vicinity";
+    if (kick) kick.textContent = brand`City coin · made by Vicinity`;
     const img = $("#coin-preview-art");
     if (p.art) { if (img.getAttribute("src") !== p.art) img.setAttribute("src", p.art); img.alt = altOf(p.ticker); img.hidden = false; }
     else { img.hidden = true; img.removeAttribute("src"); }
@@ -122,8 +127,8 @@
         : p.chosen && mine ? "This is the coin you chose. Nothing has launched yet."
           : p.chosen ? "A former founder of this city chose this coin: use it in your Founder tab to make it yours. Nothing has launched yet."
             : `This is what $${p.ticker} will look like. You choose it in your Founder tab; nothing has launched yet.`)
-      : p.chosen ? `This is the coin chosen for ${p.name}: made by Vicinity from the city list. Nothing has launched yet.`
-        : `This is what $${p.ticker} will look like once ${p.name}'s founder launches it. Made by Vicinity from the city list; nothing has launched yet.`);
+      : p.chosen ? brand`This is the coin chosen for ${p.name}: made by Vicinity from the city list. Nothing has launched yet.`
+        : brand`This is what $${p.ticker} will look like once ${p.name}'s founder launches it. Made by Vicinity from the city list; nothing has launched yet.`);
     const st = $("#coin-status");
     if (st) { st.textContent = "Not launched"; st.className = "tag tag--warn"; }
     text("#coin-note", "");

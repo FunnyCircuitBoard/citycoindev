@@ -28,6 +28,11 @@
 //   LPLaunch.pure                              the helpers test/lp-launch-ui.test.js runs in node
 (() => {
   "use strict";
+  // The product's names in this file's words (the label migration, area b). A page built for a label set other than today's carries the
+  // set on <html> (data-brand, data-brand-name, data-brand-domain: scripts/pages/build.mjs writes them from src/brand.js); brand`…` puts
+  // those names in a text's own words, never in a value put into it. A page without them (today's pages) gets every text exactly as written.
+  const BRAND = (() => { try { const r = document.documentElement, at = (k) => (r && typeof r.getAttribute === "function" ? r.getAttribute(k) : null); return at("data-brand") && at("data-brand-name") && at("data-brand-domain") ? Object.freeze({ key: at("data-brand"), name: at("data-brand-name"), domain: at("data-brand-domain") }) : null; } catch { return null; } })();
+  const brand = (s, ...v) => s.reduce((out, part, i) => out + (BRAND ? part.replace(/vicinity\.city/g, () => BRAND.domain).replace(/Vicinity/g, () => BRAND.name) : part) + (i < v.length ? String(v[i]) : ""), "");
   const MAX_FIRST_BUY = 10_000_000_000n; // lamports (src/lplaunch.js MAX_FIRST_BUY_LAMPORTS)
   const FIRST_BUY_SLIPPAGE_BPS = 50;
 
@@ -67,7 +72,7 @@
    * (founderFees.sharePct), halved between the founder and the holder pot by our program (not a field of the settings, so both are
    * named); "up to 0.25% …" once the coin trades in its pool (shareUpTo: other liquidity takes part of it); without a figure, none.
    */
-  const shareNote = (f) => (f && typeof f.sharePct === "string" && f.sharePct ? `${f.shareUpTo === true ? "up to " : ""}${f.sharePct} of every trade, from your coin's price-curve settings and Vicinity's program` : "your share of every trade");
+  const shareNote = (f) => (f && typeof f.sharePct === "string" && f.sharePct ? brand`${f.shareUpTo === true ? "up to " : ""}${f.sharePct} of every trade, from your coin's price-curve settings and Vicinity's program` : "your share of every trade");
   /** "EZVH…1kSP": an address shortened for the eye. */
   const short = (a) => (typeof a === "string" && a.length > 12 ? `${a.slice(0, 4)}…${a.slice(-4)}` : String(a || ""));
   /**
@@ -263,14 +268,14 @@
       : `On record: the owner's approval on the blockchain for ${ticker}${until ? ` ran out on ${until}` : " ran out"}.`;
   }
   /** The one step left before an approval while the ready-made coin is on (COIN_V2_READY): the studio is closed then. */
-  const READY_STEP = "Choose your city coin above (Use this coin); then Vicinity's owner approves it on the blockchain.";
+  const READY_STEP = brand`Choose your city coin above (Use this coin); then Vicinity's owner approves it on the blockchain.`;
   /** What the card says for a status answer: { state, tag: [text, class], lines: [...], canLaunch }. `ready`: COIN_V2_READY is on. */
   function view(st, design = null, { ready = false } = {}) {
     const s = st && st.ok ? st.state : "error";
     const ticker = st && st.coin && st.coin.symbol ? `$${st.coin.symbol}` : st && st.ticker ? `$${st.ticker}` : "your coin";
     switch (s) {
       case "ready": return { state: s, tag: ["Approved", "tag--gold"], canLaunch: true, lines: [`An admin approved ${ticker}. Launch it whenever you are ready: one signature in your wallet.`] };
-      case "launched": return { state: s, tag: ["● Live", "tag--ok"], canLaunch: false, lines: [`${ticker} is live on the Vicinity launchpad.`] };
+      case "launched": return { state: s, tag: ["● Live", "tag--ok"], canLaunch: false, lines: [brand`${ticker} is live on the Vicinity launchpad.`] };
       case "expired": return { state: s, tag: ["Approval expired", "tag--warn"], canLaunch: false, lines: [st.message || "Your approval expired. Ask an admin to approve your coin again."] };
       case "paused": return { state: s, tag: ["Paused", "tag--warn"], canLaunch: false, lines: [st.message || "Launches are paused for now. Your approval stays; try again later."] };
       // the legacy launch path closed (LEGACY_LAUNCH=off, stage S23): a neutral line, no launch control (a launched coin keeps its own card); an
@@ -539,11 +544,11 @@
         expected: st.wallet, cluster: p.cluster, ephemeral: 1, approve: `Approve the launch in your wallet`,
         build: (keys) => V.api("/api/lp/launch/tx", { cityId: st.cityId, cluster: p.cluster, mint: keys[0], firstBuyLamports: buy.lamports, slippageBps: FIRST_BUY_SLIPPAGE_BPS }),
         onDone: async () => {
-          flow.append(el("p", "lp-status", "Your coin is live. Recording it on vicinity.city…"));
+          flow.append(el("p", "lp-status", brand`Your coin is live. Recording it on vicinity.city…`));
           const rec = await record(st.cityId);
           if (V.toast) V.toast(`${ticker} is live`);
           await again();
-          if (!rec || !rec.ok) body.append(el("p", "small muted", "vicinity.city records it by itself within 30 minutes."));
+          if (!rec || !rec.ok) body.append(el("p", "small muted", brand`vicinity.city records it by itself within 30 minutes.`));
         },
       });
       if (!r) go.hidden = false;

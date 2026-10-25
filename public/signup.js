@@ -8,6 +8,11 @@
 // here touches the DOM until start() is called.
 (() => {
   "use strict";
+  // The product's names in this file's words (the label migration, area b). A page built for a label set other than today's carries the
+  // set on <html> (data-brand, data-brand-name, data-brand-domain: scripts/pages/build.mjs writes them from src/brand.js); brand`…` puts
+  // those names in a text's own words, never in a value put into it. A page without them (today's pages) gets every text exactly as written.
+  const BRAND = (() => { try { const r = document.documentElement, at = (k) => (r && typeof r.getAttribute === "function" ? r.getAttribute(k) : null); return at("data-brand") && at("data-brand-name") && at("data-brand-domain") ? Object.freeze({ key: at("data-brand"), name: at("data-brand-name"), domain: at("data-brand-domain") }) : null; } catch { return null; } })();
+  const brand = (s, ...v) => s.reduce((out, part, i) => out + (BRAND ? part.replace(/vicinity\.city/g, () => BRAND.domain).replace(/Vicinity/g, () => BRAND.name) : part) + (i < v.length ? String(v[i]) : ""), "");
 
   /* ================= pure helpers: no DOM (test/signup-ui.test.js runs them in node) ================= */
   const STEPS = ["location", "account"];
@@ -67,21 +72,21 @@
     return qr ? `${lead} here. Instead, scan the code below with your phone and approve there, then come back here: this page finishes the link by itself.` : `${lead}. Approve there instead, then come back here: this page finishes the link by itself.`;
   }
   /** The "Open app" screen's lead on a phone: what happens in the wallet app `name` (owner decision F4: the person stays there, signed in). */
-  const carryLead = (name) => `${name} opens Vicinity and asks to connect this wallet to your account. Check the number, connect, and sign the free message. Then you stay in ${name}, logged in.`;
+  const carryLead = (name) => brand`${name} opens Vicinity and asks to connect this wallet to your account. Check the number, connect, and sign the free message. Then you stay in ${name}, logged in.`;
   /** The small print under "Open <app>": a relay code also has to be OPENED within 2 minutes, but the page renews it by itself, so the words don't say so. */
   const carrySmall = (relay) => (relay ? "This link works once, only on this phone. Never send it to anyone." : "This link works once, for 10 minutes, only on this phone. Never send it to anyone.");
   /** The link page's lead on a phone (the wallet apps as rows). */
-  const linkLead = () => "Tap your wallet app. It opens Vicinity there: check the number, then sign once. You stay in the app, logged in.";
+  const linkLead = () => brand`Tap your wallet app. It opens Vicinity there: check the number, then sign once. You stay in the app, logged in.`;
   /**
    * Back in Safari and the wallet app never opened the link (a universal link that fell back to the web, an app not installed). `browser`:
    * "iphone" (Safari: app links can be switched off per site with a long press), "chrome" (Chrome on Android: app links work there, so
    * it is the app), anything else (Firefox and others on Android ship with "open links in apps" off: Chrome does it).
    */
   const carryHint = (name, browser) => (browser === "iphone" || browser === true
-    ? `${name} didn't open Vicinity? Press and hold “Open ${name}”, then choose “Open in ${name}”. No ${name} yet? Get it first.`
+    ? brand`${name} didn't open Vicinity? Press and hold “Open ${name}”, then choose “Open in ${name}”. No ${name} yet? Get it first.`
     : browser === "chrome"
-      ? `${name} didn't open Vicinity? Make sure ${name} is installed, then tap “Open ${name}” again. Or tap “Didn't work?” below.`
-      : `${name} didn't open Vicinity? Make sure ${name} is installed, or open this page in Chrome and try again.`);
+      ? brand`${name} didn't open Vicinity? Make sure ${name} is installed, then tap “Open ${name}” again. Or tap “Didn't work?” below.`
+      : brand`${name} didn't open Vicinity? Make sure ${name} is installed, or open this page in Chrome and try again.`);
   /**
    * The link was opened, but the server could not let it in there (carry/status "refused"). An ordinary link: the wallet app is on another
    * connection (Wi-Fi in one app and mobile data in the other), and the pairing, which works on any connection, becomes the button. A relay
@@ -111,7 +116,7 @@
   function noAccountCopy(inApp, name, returning = false) {
     const many = !returning ? "" : name ? ` More than one wallet in ${name}? Switch to the one you linked, then try again.` : " More than one wallet in your app? Switch to the one you linked, then try again.";
     return inApp
-      ? { title: "No account for this wallet yet", body: `Vicinity accounts start with Google or e-mail. Create yours in Safari or Chrome (it takes a minute), then connect this wallet from your dashboard, one tap.${many}`, primary: "copy",
+      ? { title: "No account for this wallet yet", body: brand`Vicinity accounts start with Google or e-mail. Create yours in Safari or Chrome (it takes a minute), then connect this wallet from your dashboard, one tap.${many}`, primary: "copy",
         login: "Log in with the wallet on your account, or with your e-mail and password." }
       : { title: "No account for this wallet yet", body: "Made your account with Google or e-mail? Log in that way, then connect this wallet from your dashboard. New here? Create one with Google in a minute.", primary: "create",
         login: "Log in with Google or your e-mail, then connect this wallet." };
@@ -129,7 +134,7 @@
     return { h: "Wallet linked.", sub: `${w} Taking you to your dashboard…`, go: "Open my dashboard", auto: true };
   }
   /** What the page says when "New here" with an e-mail that already has an account signs the person in instead (the typed password is thrown away). */
-  const SAME_EMAIL = "That e-mail already has a Vicinity account, so we logged you in. The password you just typed was not saved: to set a new one, use “Forgot or never set a password?” on the Log in tab. Taking you to your dashboard…";
+  const SAME_EMAIL = brand`That e-mail already has a Vicinity account, so we logged you in. The password you just typed was not saved: to set a new one, use “Forgot or never set a password?” on the Log in tab. Taking you to your dashboard…`;
   /** Only ever follow the server (or a "with" link's next=) to our own dashboard: one of its tabs at most (/dashboard#profile). */
   const safeNext = (next) => (next === "/dashboard?welcome=1" || next === "/dashboard?linked=1" || /^\/dashboard#[a-z][a-z0-9-]{0,24}$/.test(String(next)) ? next : "/dashboard");
   /** Same loose shape check as the server (the code that arrives is the real proof). */
@@ -168,9 +173,9 @@
     wrong_wallet: "That is not the wallet on your account. Use the one you linked, or unlink it first from your Profile tab.",
     // no_account names the login that found nobody (errText): a Google account, an e-mail, and a bare no_account (the fallback, in a
     // wallet's words: a wallet's own sign-in shows its screen, noAccountCopy). Each says what to do, for a member and for someone new.
-    no_account: "No Vicinity account uses this wallet yet. Made yours with Google or e-mail? Log in that way, then link this wallet from your dashboard. New here? Accounts start with Google or e-mail.",
-    "no_account:google": "No Vicinity account uses this Google account. Have one? Log in with your e-mail or wallet, then add Google in your Profile. A Gmail saved as contact e-mail can't log you in. New here? Tap New here.",
-    "no_account:email": "No Vicinity account logs in with this e-mail. Made yours with Google or a wallet? Log in that way instead. A contact e-mail saved in a Profile can't log you in. New here? Tap New here.",
+    no_account: brand`No Vicinity account uses this wallet yet. Made yours with Google or e-mail? Log in that way, then link this wallet from your dashboard. New here? Accounts start with Google or e-mail.`,
+    "no_account:google": brand`No Vicinity account uses this Google account. Have one? Log in with your e-mail or wallet, then add Google in your Profile. A Gmail saved as contact e-mail can't log you in. New here? Tap New here.`,
+    "no_account:email": brand`No Vicinity account logs in with this e-mail. Made yours with Google or a wallet? Log in that way instead. A contact e-mail saved in a Profile can't log you in. New here? Tap New here.`,
     use_link: "That signature was for a sign-in, so nothing was linked. To add this wallet to your account, use Connect wallet on your dashboard.",
     // the sign-up itself
     no_signup: "Your sign-up was open too long, so we cleared it. Please start again.",
@@ -199,9 +204,9 @@
     code_wrong: "That code doesn't match. Please check it and try again.",
     code_expired: "That code expired. Send a new one.",
     email_mismatch: "That code was sent to a different e-mail. Tap “Use a different e-mail” to start that part again.",
-    social_taken: "That login already has a Vicinity account. Log in with it instead, or choose another login.",
-    wallet_taken: "This wallet already belongs to another Vicinity account. Choose a different wallet, or log in to that account with it.",
-    "wallet_taken:app": "This wallet already has a Vicinity account. Pick another wallet in your app, or sign in to that account with it.",
+    social_taken: brand`That login already has a Vicinity account. Log in with it instead, or choose another login.`,
+    wallet_taken: brand`This wallet already belongs to another Vicinity account. Choose a different wallet, or log in to that account with it.`,
+    "wallet_taken:app": brand`This wallet already has a Vicinity account. Pick another wallet in your app, or sign in to that account with it.`,
     // finishing
     account_required: "Your login isn't confirmed yet. Please finish the account step.",
     changed_retry: "Something changed while we were creating your account. Please try again.",
@@ -218,7 +223,7 @@
     login_failed: "The sign-in didn't go through. Please try again.",
     login_expired: "That sign-in took too long or was opened in another tab. Please try again.",
     // the page itself
-    offline: "Couldn't reach Vicinity. Check your connection and try again.",
+    offline: brand`Couldn't reach Vicinity. Check your connection and try again.`,
     generic: "Something went wrong. Please try again.",
   };
   /**
@@ -479,13 +484,15 @@
       if (S.mode === "link" || S.mode === "linkin") {
         text(".connect__intro .kicker", "Almost done");
         accent.textContent = "One signature."; title.replaceChildren("Connect your wallet.", el("br"), accent);
-        text(".connect__intro .lead", "One free signature proves the wallet is yours. Nothing is paid or moved. Then your dashboard shows how much $VICINITY you hold and your rank.");
+        // (a page built for another label set promises no holding or rank: its token is not live yet, and the legacy one is shown nowhere)
+        text(".connect__intro .lead", BRAND ? "One free signature proves the wallet is yours. Nothing is paid or moved. Then your dashboard opens with the wallet linked."
+          : "One free signature proves the wallet is yours. Nothing is paid or moved. Then your dashboard shows how much $VICINITY you hold and your rank.");
       } else if (S.tab === "login") {
         text(".connect__intro .kicker", "Welcome back");
         accent.textContent = "Your city's waiting."; title.replaceChildren("Log in.", el("br"), accent);
         text(".connect__intro .lead", "Google, e-mail or your wallet.");
       } else {
-        text(".connect__intro .kicker", "Join Vicinity");
+        text(".connect__intro .kicker", brand`Join Vicinity`);
         accent.textContent = "Your account."; title.replaceChildren("Your city.", el("br"), accent);
         text(".connect__intro .lead", "Share your location once (it is never stored), then sign in. Link a wallet later, from your dashboard.");
       }
@@ -851,7 +858,7 @@
       if (d.linked) return linkDone(d.wallet, false, (WA.remembered() || {}).id);
       if (String(d.next || "").startsWith("/dashboard")) {
         // ("Open Phantom" from Safari's "confirm it's you": the page the person was on, /dashboard#profile, came along as next=)
-        return signedIn(S.mode === "link" ? "Your wallet is on your account. Taking you to your dashboard…" : "This wallet already has a Vicinity account, so we logged you in. Taking you to your dashboard…", d.next === "/dashboard" && S.next ? S.next : d.next);
+        return signedIn(S.mode === "link" ? "Your wallet is on your account. Taking you to your dashboard…" : brand`This wallet already has a Vicinity account, so we logged you in. Taking you to your dashboard…`, d.next === "/dashboard" && S.next ? S.next : d.next);
       }
       return location.reload(); // an answer this page does not know (the switch went back to the old sign-up while this page was open)
     }
@@ -1122,7 +1129,7 @@
     function drawOffer() {
       const i = S.offer.info, c = i.community, o = i.owner || {};
       show("carry-in");
-      text("#carry-in-h", `Link this wallet to ${o.name || "•••"}'s Vicinity account?`);
+      text("#carry-in-h", brand`Link this wallet to ${o.name || "•••"}'s Vicinity account?`);
       text("#carry-in-avatar", o.initial || "•");
       text("#carry-in-handle", `@${o.handle || "•••"}`);
       text("#carry-in-city", c ? `📍 ${c.name}, ${c.country}` : "");
@@ -1132,7 +1139,7 @@
       hide("#carry-in-here", !i.here); text("#carry-in-here", i.here ? `This app is logged in to ${i.here}'s account. Linking logs it out here.` : "");
       text("#carry-in-yes", i.here ? `Yes, log out ${i.here} and link` : "Yes, link my wallet");
       hide("#carry-in-yes", false); hide("#carry-in-wallets"); hide("#carry-in-tap"); hide("#carry-in-signin");
-      announce(`Link this wallet to ${o.name || "someone"}'s Vicinity account? Check number ${i.pin}. Only continue if you started this yourself, on this phone.`);
+      announce(brand`Link this wallet to ${o.name || "someone"}'s Vicinity account? Check number ${i.pin}. Only continue if you started this yourself, on this phone.`);
       S.first = false; focusHeading("carryIn"); // the question is why the person is here: bring it on screen at once (the intro sits above it)
     }
     /**
@@ -1194,9 +1201,9 @@
           ...(o.opener ? { opener: o.opener } : {}), ...(k ? { app: k.id } : {}) });
         if (r._handled) return;
         if (!r.ok) {
-          if (r.error === "already_signed_in") return text("#carry-in-error", "This app is logged in to another Vicinity account. Open the link again from Safari or Chrome: it offers to log it out here.");
+          if (r.error === "already_signed_in") return text("#carry-in-error", brand`This app is logged in to another Vicinity account. Open the link again from Safari or Chrome: it offers to log it out here.`);
           if (r.error === "wallet_taken") { // this wallet signs in to its own account: one tap away
-            text("#carry-in-error", `This wallet already has a Vicinity account. Pick another wallet in ${k ? k.name : "your app"}, or sign in to that account with it.`);
+            text("#carry-in-error", brand`This wallet already has a Vicinity account. Pick another wallet in ${k ? k.name : "your app"}, or sign in to that account with it.`);
             if (k) { text("#carry-in-signin", `Sign in with ${k.name}`); $("#carry-in-signin").dataset.app = k.id; hide("#carry-in-signin", false); }
             return;
           }
@@ -1267,7 +1274,7 @@
     }
     function showFinishStuck(plan) {
       show("su-finish");
-      text("#su-fin-title", plan.actions && plan.actions.includes("ident") ? "That login already has a Vicinity account" : "We couldn't finish yet"); hide("#su-fin-sub");
+      text("#su-fin-title", plan.actions && plan.actions.includes("ident") ? brand`That login already has a Vicinity account` : "We couldn't finish yet"); hide("#su-fin-sub");
       text("#su-fin-error", plan.text); announce(plan.text);
       hide("#su-fin-actions", false);
       const acts = plan.actions || ["retry"];

@@ -26,7 +26,8 @@ import { json, readJson } from "./http.js";
 import { mintInfo, rpc } from "./chain.js";
 import { isSolanaAddress } from "./solana.js";
 import { Source, codeOf, retryAfterMs } from "./sources.js";
-import { activeMint, tokenMint } from "./official.js";
+import { activeMint, legacyHidden, tokenMint } from "./official.js";
+import { brandWords } from "./brandwords.js";
 import { mainTokenV5 } from "./v5policy.js";
 import { MAIN_TOKEN_LABEL, isLegacyMint } from "./maintoken.js";
 import { PAIRS, launchedCoins } from "./coins.js";
@@ -217,10 +218,13 @@ const fail = (e) => {
 /**
  * A legacy token under MAIN_TOKEN_V5 ($VICINITY: the policy's legacy mints and the VICINITY_MINT setting): no swap is offered for it, in
  * either direction (owner amendment 01 sections 2 and 7; holders keep their tokens and may still send their own, src/walletsend.js).
- * With the switch off nothing is legacy and every pair Jupiter routes is offered, as before.
+ * Under a label set other than today's (src/official.js legacyHidden) the same, with or without the switch: the legacy token is shown
+ * nowhere, and its refusal does not name it. With the switch off and today's label set nothing is legacy and every pair Jupiter routes is
+ * offered, as before.
  */
-const legacyUnderV5 = (env, mint) => mainTokenV5(env) && (isLegacyMint(mint) || (Boolean(activeMint(env)) && mint === activeMint(env)));
+const legacyUnderV5 = (env, mint) => (mainTokenV5(env) || legacyHidden(env)) && (isLegacyMint(mint) || (Boolean(activeMint(env)) && mint === activeMint(env)));
 const LEGACY_SWAP = "$VICINITY is a legacy token now: no swap or purchase is offered for it here. Your tokens stay yours, and you can still send them from your wallet.";
+const legacySwapMessage = (bw) => (bw.on ? "No swap or purchase is offered for this token here. Your tokens stay yours, and you can still send them from your wallet." : LEGACY_SWAP);
 
 /**
  * A swap platform-fee setting other than 0 (src/cluster.js swapFeeRefusal; Citycoin.dev master v5, stage S39): the Jupiter path of /quote
@@ -245,7 +249,7 @@ async function prepare(request, env, fetchImpl, now, { takerRequired }) {
   const input = readSwapInput(body, { takerRequired });
   if (input.error) return { error: json({ ok: false, error: input.error }, input.status, noStore) };
   for (const mint of [input.outputMint, input.inputMint]) {
-    if (legacyUnderV5(env, mint)) return { error: json({ ok: false, error: "legacy_token", mint, message: LEGACY_SWAP }, 409, noStore) };
+    if (legacyUnderV5(env, mint)) return { error: json({ ok: false, error: "legacy_token", mint, message: legacySwapMessage(brandWords(env)) }, 409, noStore) };
   }
   // a city coin on its Meteora curve: the launchpad routes build that trade (Jupiter cannot route it yet). Asked BEFORE the
   // decimals below, which are read on mainnet: a devnet test coin (LAUNCHPAD_CLUSTER=devnet) is not a mainnet mint at all, and
@@ -426,7 +430,8 @@ async function mainTokenEntry(env, mint, fetchImpl, now) {
 /* ---------------------------------------------------------------- config and token search */
 /** GET /api/swap/config (public; edge-cached 60 s by the route). Booleans only about secrets. */
 export async function handleSwapConfig(env, fetchImpl = fetch, now = Date.now()) {
-  const jc = jupiterConfig(env), lp = launchpadCluster(env), vic = mainTokenV5(env) ? null : activeMint(env);
+  // $VICINITY in the list for today's label set only (src/official.js legacyHidden)
+  const jc = jupiterConfig(env), lp = launchpadCluster(env), vic = mainTokenV5(env) || legacyHidden(env) ? null : activeMint(env);
   const tokens = [{ mint: SOL, ...KNOWN[SOL] }, { mint: USDC, ...KNOWN[USDC] }, { mint: USDT, ...KNOWN[USDT] }];
   if (vic) tokens.push({ mint: vic, symbol: "VICINITY", name: "Vicinity", decimals: 6, kind: "vicinity", stage: "jupiter" });
   // MAIN_TOKEN_V5 on: the configured main token instead (only with a route), and no $VICINITY entry at all (no swap is offered for it)
@@ -475,7 +480,8 @@ export async function handleSwapTokens(request, env, fetchImpl = fetch, now = Da
   });
   const rows = r.values.get(q.toLowerCase());
   if (rows === undefined) return json({ ok: false, error: r.error === "jupiter_busy" ? "jupiter_busy" : "jupiter_unavailable" }, 503);
-  // MAIN_TOKEN_V5 counting: a legacy token is never offered (the shared search cache keeps Jupiter's own answer; only this view drops it)
-  const tokens = mainTokenV5(env) ? rows.filter((t) => !legacyUnderV5(env, t.mint)) : rows;
+  // MAIN_TOKEN_V5 counting, or a label set other than today's: a legacy token is never offered (the shared search cache keeps Jupiter's own
+  // answer; only this view drops it)
+  const tokens = mainTokenV5(env) || legacyHidden(env) ? rows.filter((t) => !legacyUnderV5(env, t.mint)) : rows;
   return json({ ok: true, q, tokens, poweredBy: "Jupiter" }, 200, { "Cache-Control": "public, max-age=300" });
 }

@@ -36,7 +36,7 @@ import { json, readJson, sameSite } from "./http.js";
 import { access } from "./access.js";
 import { DAY, HOUR, iso } from "./policy.js";
 import { activeBan, liveSeatOfCity, liveSeatOfUser, powersOf } from "./roles.js";
-import { FROZEN_BELOW_AMOUNT, holdsFounderAmount, legacySeatsFrozen, stillFounder } from "./seats.js";
+import { frozenRefusal, holdsFounderAmount, stillFounder } from "./seats.js";
 import { check, limitKey } from "./limits.js";
 import { ensureLimitsSchema, ensureLogoSchema, ensureSchema } from "./store.js";
 import { publicLimit } from "./guards.js";
@@ -47,7 +47,8 @@ import { lpRpc } from "./lpkit.js";
 import { launchpad as launchpadPdas } from "./sol/pda.js";
 import { tickerOf, tickersAvailable } from "./tickers.js";
 import { DEFAULT_PAIR, SOURCE, coinDefaults } from "./coindefaults.js";
-import { TEMPLATE_VERSION, coinSvg, sha256Hex } from "./coinart.js";
+import { TEMPLATE_VERSION, coinSvg, sha256Hex, templateFor } from "./coinart.js";
+import { SAME, brandWords } from "./brandwords.js";
 import { approvedBasis, approvedDescription, approvedRequest, artBySvg, artPath, chosenOf, cityDescription, ensureReadySchema, storeArtStatement } from "./coinart-store.js";
 import { coinV2ReadyOn, coinV2ReviewOn } from "./flags.js";
 import { pendingRequest, reviewState } from "./coinreview.js";
@@ -118,22 +119,29 @@ export async function renderPng(svg) {
 // the city line is the coin's name (the registry name, or its shortened form: src/coindefaults.js NAME_OVERRIDES), never a name the
 // coin itself does not carry
 export const svgOf = (d, templateVersion = TEMPLATE_VERSION) => coinSvg({ ticker: d.ticker, city: d.name, templateVersion });
+/**
+ * The template version a city's ready-made coin is drawn with in this environment (src/coinart.js templateFor): t1 under today's label
+ * set, t1c under Citycoin.dev's (src/brand.js brandOf, fail closed: only with pages built for it), so no new coin carries the old name.
+ */
+export const templateOf = (env) => templateFor(brandWords(env).brand);
 /** The stored picture of a coin's defaults: { sha256 } or null. Reads only. */
 export async function storedArt(env, d) {
-  const svg = svgOf(d);
-  const row = await artBySvg(env.DB, await sha256Hex(svg), TEMPLATE_VERSION);
+  const tv = templateOf(env);
+  const svg = svgOf(d, tv);
+  const row = await artBySvg(env.DB, await sha256Hex(svg), tv);
   return row ? { sha256: row.sha256 } : null;
 }
 /** The picture of a coin's defaults, drawn and stored now if it never was (only from a POST of the switch; every read fresh). */
 export async function ensureArt(env, d, now) {
-  const svg = svgOf(d), svgSha = await sha256Hex(svg);
-  const known = await artBySvg(env.DB, svgSha, TEMPLATE_VERSION, { fresh: true });
+  const tv = templateOf(env);
+  const svg = svgOf(d, tv), svgSha = await sha256Hex(svg);
+  const known = await artBySvg(env.DB, svgSha, tv, { fresh: true });
   if (known) return { sha256: known.sha256 };
   const png = await renderPng(svg);
   const sha = await sha256Hex(png);
-  await storeArtStatement(env.DB, { sha256: sha, svgSha256: svgSha, templateVersion: TEMPLATE_VERSION, bytes: png, now }).run();
+  await storeArtStatement(env.DB, { sha256: sha, svgSha256: svgSha, templateVersion: tv, bytes: png, now }).run();
   // two servers drawing at once both write the same bytes under the same name; the (svg, version) row that won is the one served
-  const row = await artBySvg(env.DB, svgSha, TEMPLATE_VERSION, { fresh: true });
+  const row = await artBySvg(env.DB, svgSha, tv, { fresh: true });
   return { sha256: row ? row.sha256 : sha };
 }
 
@@ -188,41 +196,44 @@ async function staleChoice(env, r, symbol) {
 }
 /** A released choice's symbol: "~" and the city id. Never a ticker (A-Z0-9 only), one per city, so coin_ready's UNIQUE holds. */
 export const releasedSymbol = (cityId) => `~${cityId}`;
-const gate = (code) => ({ code, message: GATES[code] });
+/** A gate's answer; `bw`: the product's name in its words (src/brandwords.js; today's words by default). */
+const gate = (code, bw = SAME) => ({ code, message: bw.say(GATES[code]) });
 /** below_amount's words while the legacy seats are frozen (stage S16 review fix S16-R1): no grace period follows a low balance then. */
 const BELOW_FROZEN = "Your balance is below the founder amount. Hold it again to choose your coin.";
-const belowGate = (env) => (legacySeatsFrozen(env) ? { code: "below_amount", message: BELOW_FROZEN } : gate("below_amount"));
+// (founder_paused while no token is live under another label set: src/seats.js frozenRefusal, rebrand review finding RB-1)
+const belowGate = (env, bw = SAME) => { const r = frozenRefusal(env, bw.say(BELOW_FROZEN)); return r ? { code: r.error, message: r.message } : gate("below_amount", bw); };
 /**
  * Why the founder cannot use the coin now, or null. `live`: the founder-amount check already made (true / false / "error").
  * Reads only (the GET's and the POSTs' common part).
  */
 async function coinGate(env, { u, seat, d, live, cityId, fetchImpl, now, chain = true }) {
+  const bw = brandWords(env);
   // the legacy launch path closed (stage S23): nothing is chosen for its approval any more (the POSTs answer 410); a launched coin is still said
   // as launched, and the card shows the closed line instead of "Use this coin"
-  if (legacyLaunchClosed(env)) return (await coinState(env, cityId)).launched ? gate("launched") : gate("legacy_launch_closed");
-  if (!u.wallet) return gate("no_wallet");
-  if (u.wallet !== seat.wallet) return gate("wallet_mismatch");
+  if (legacyLaunchClosed(env)) return (await coinState(env, cityId)).launched ? gate("launched", bw) : gate("legacy_launch_closed", bw);
+  if (!u.wallet) return gate("no_wallet", bw);
+  if (u.wallet !== seat.wallet) return gate("wallet_mismatch", bw);
   // the grace period is named only when the seat is in it; a balance that is merely low (seen by a route that starts nothing) is said as that
-  if (seat.status === "grace") return gate("in_grace");
-  if (!LIVE.includes(seat.status)) return gate("not_founder");
-  if (live === "error") return gate("rpc_unavailable");
-  if (!live) return stewardInGrace(seat, now) ? gate("in_grace") : belowGate(env);
-  if ((await activeBan(env.DB, u.id, u.home_country, now)) || (await activeBan(env.DB, u.id, seat.country, now))) return gate("banned");
+  if (seat.status === "grace") return gate("in_grace", bw);
+  if (!LIVE.includes(seat.status)) return gate("not_founder", bw);
+  if (live === "error") return gate("rpc_unavailable", bw);
+  if (!live) return stewardInGrace(seat, now) ? gate("in_grace", bw) : belowGate(env, bw);
+  if ((await activeBan(env.DB, u.id, u.home_country, now)) || (await activeBan(env.DB, u.id, seat.country, now))) return gate("banned", bw);
   if (!d.ok) return { code: d.code, message: d.message };
   if (coinV2ReviewOn(env)) {
     const pend = await pendingRequest(env.DB, cityId);
     // (one code for both: the page knows a review waits; the words say which)
-    if (pend) return { code: "request_pending", message: pend.kind === "description" ? GATES.description_pending : GATES.request_pending };
+    if (pend) return { code: "request_pending", message: bw.say(pend.kind === "description" ? GATES.description_pending : GATES.request_pending) };
   }
   const st = await coinState(env, cityId);
-  if (st.launched) return gate("launched");
-  if (st.pending) return gate("legacy_contract");
+  if (st.launched) return gate("launched", bw);
+  if (st.pending) return gate("legacy_contract", bw);
   const taken = await symbolTaken(env, cityId, d.ticker, fetchImpl, { chain });
-  if (taken) return gate(taken === "unknown" ? "ticker_unchecked" : "symbol_taken");
+  if (taken) return gate(taken === "unknown" ? "ticker_unchecked" : "symbol_taken", bw);
   let frozen;
-  try { frozen = await designFrozen(env, cityId, fetchImpl, now); } catch { return gate("rpc_unavailable"); }
-  if (frozen === "launched") return gate("launched");
-  if (frozen === "held") return gate("held"); // the owner is building an approval from the chosen version (src/lpadmin.js approveTx)
+  try { frozen = await designFrozen(env, cityId, fetchImpl, now); } catch { return gate("rpc_unavailable", bw); }
+  if (frozen === "launched") return gate("launched", bw);
+  if (frozen === "held") return gate("held", bw); // the owner is building an approval from the chosen version (src/lpadmin.js approveTx)
   if (frozen) return approvedGate(env, { seat, cityId, fetchImpl });
   return null;
 }
@@ -233,20 +244,20 @@ async function coinGate(env, { u, seat, d, live, cityId, fetchImpl, now, chain =
  * approved_earlier, naming what is approved: that is what launches, not the coin on the card.
  */
 async function approvedGate(env, { seat, cityId, fetchImpl }) {
-  const s = lpSetup(env);
+  const s = lpSetup(env), bw = brandWords(env);
   let ap;
   try {
     const r = await lpRpc(env, "getAccountInfo", [await launchpadPdas(s.programId).approval(BigInt(cityId)), { encoding: "base64", commitment: "confirmed" }], fetchImpl);
     ap = decodeApproval(r && r.value, s.programId);
-  } catch { return gate("rpc_unavailable"); }
-  if (!ap) return gate("rpc_unavailable"); // seen a moment ago, unreadable now (used or revoked meanwhile): the next look says
-  if (ap.founder !== seat.wallet) return gate("approved_other");
+  } catch { return gate("rpc_unavailable", bw); }
+  if (!ap) return gate("rpc_unavailable", bw); // seen a moment ago, unreadable now (used or revoked meanwhile): the next look says
+  if (ap.founder !== seat.wallet) return gate("approved_other", bw);
   const c = await chosenOf(env.DB, cityId, { fresh: true });
-  if (c && c.current && c.approved_hash === c.content_hash && c.name === ap.name && c.symbol === ap.symbol) return gate("approved");
+  if (c && c.current && c.approved_hash === c.content_hash && c.name === ap.name && c.symbol === ap.symbol) return gate("approved", bw);
   // built from an earlier version of this very coin (only the review routes keep that hash: src/coinreview.js select)
-  if (c && c.current && c.approved_hash && c.name === ap.name && c.symbol === ap.symbol) return gate("approved_changed");
+  if (c && c.current && c.approved_hash && c.name === ap.name && c.symbol === ap.symbol) return gate("approved_changed", bw);
   return { code: "approved_earlier",
-    message: `Your city's coin is approved on the blockchain as “${ap.name}” ($${ap.symbol}), but not with the Vicinity coin shown here. It launches as approved, with the design it was approved with.` };
+    message: bw`Your city's coin is approved on the blockchain as “${ap.name}” ($${ap.symbol}), but not with the Vicinity coin shown here. It launches as approved, with the design it was approved with.` };
 }
 const liveCheck = async (env, seat, fetchImpl) => { try { return await holdsFounderAmount(env, seat, fetchImpl); } catch { return "error"; } };
 /** A steward's seat in its grace period (stewards stay stewards in grace, with a deadline ahead: src/seats.js enterGrace). */
@@ -328,16 +339,17 @@ async function reviewedName(env, cityId, c) {
  * publishes. The current defaults may have moved since (a renamed region, a new description), but neither changes an approved or
  * launched coin.
  */
-function versionCoin(c, d) {
+function versionCoin(c, d, bw = SAME) {
   const city = (c.content && c.content.city) || {};
   return {
     city: { id: String(city.id || c.city_id), name: city.name || null, region: city.region || null, regionCode: d && d.ok && d.city.id === String(city.id) ? d.city.regionCode || null : null,
       country: city.country || null, countryName: city.countryName || null },
-    coin: { ticker: c.symbol, name: c.name, description: c.description, pair: (c.content && c.content.pair) || DEFAULT_PAIR, templateVersion: c.template_version, source: SOURCE,
+    coin: { ticker: c.symbol, name: c.name, description: c.description, pair: (c.content && c.content.pair) || DEFAULT_PAIR, templateVersion: c.template_version, source: bw.say(SOURCE),
       art: artPath(c.art_sha256), contentHash: c.content_hash, version: versionLabel(c.content_hash) },
   };
 }
 async function founderView(env, { u, seat, cityId, fetchImpl, now, live, chain = true }) {
+  const bw = brandWords(env), tv = templateOf(env);
   const d = await coinDefaults(env, cityId, seat.country);
   const g = await coinGate(env, { u, seat, d, live, cityId, fetchImpl, now, chain });
   const c = await chosenOf(env.DB, cityId, { fresh: true });
@@ -357,16 +369,16 @@ async function founderView(env, { u, seat, cityId, fetchImpl, now, live, chain =
   // (whatever COIN_V2_REVIEW says now: switched off after use, the founder's chosen version is still what the owner approves and launches)
   const reviewed = c && c.content && c.current && c.seat_id === seat.id && c.origin && c.origin !== "default";
   if (c && c.content && ((c.current && g && ["approved", "held"].includes(g.code)) || c.mint || reviewed)) {
-    const v = versionCoin(c, d);
+    const v = versionCoin(c, d, bw);
     return { ok: true, mode: "founder", city: v.city, coin: v.coin, chosen, inUse: Boolean(chosen.current && chosen.mine), earlier, earlierOther, gate: g, preview };
   }
   if (!d.ok) return { ok: true, mode: "founder", city: { id: cityId, name: seat.city_name, country: seat.country }, coin: null, chosen, inUse: false, earlier, earlierOther, gate: g, preview };
   const art = await storedArt(env, d);
-  const contentHash = art ? await sha256Hex(canonicalContent({ city: d.city, name: d.name, symbol: d.ticker, description: d.description, artSha256: art.sha256, templateVersion: TEMPLATE_VERSION })) : null;
+  const contentHash = art ? await sha256Hex(canonicalContent({ city: d.city, name: d.name, symbol: d.ticker, description: d.description, artSha256: art.sha256, templateVersion: tv })) : null;
   return {
     ok: true, mode: "founder",
     city: { id: d.city.id, name: d.city.name, region: d.city.region, regionCode: d.city.regionCode, country: d.city.country, countryName: d.city.countryName },
-    coin: { ticker: d.ticker, name: d.name, description: d.description, pair: d.pair, templateVersion: TEMPLATE_VERSION, source: SOURCE,
+    coin: { ticker: d.ticker, name: d.name, description: d.description, pair: d.pair, templateVersion: tv, source: bw.say(SOURCE),
       art: art ? artPath(art.sha256) : null, contentHash, version: versionLabel(contentHash) },
     chosen, inUse: Boolean(chosen && chosen.current && chosen.mine && contentHash && chosen.contentHash === contentHash), earlier, earlierOther, gate: g, preview,
   };
@@ -395,7 +407,7 @@ async function previewView(env, cityId) {
   return { ok: true, mode: "preview", preview };
 }
 
-const fail = (error, status, extra = {}) => json({ ok: false, error, ...(GATES[error] ? { message: GATES[error] } : {}), ...extra }, status);
+const fail = (error, status, extra = {}, bw = SAME) => json({ ok: false, error, ...(GATES[error] ? { message: bw.say(GATES[error]) } : {}), ...extra }, status);
 async function accountLimit(env, kind, userId, now) {
   const spec = READY_LIMITS[kind];
   await ensureLimitsSchema(env.DB);
@@ -449,7 +461,7 @@ export async function handleReadyArt(request, env, fetchImpl = fetch, now = Date
   if (slow) return slow;
   const live = await liveCheck(env, seat, fetchImpl);
   if (live === "error") return fail("rpc_unavailable", 503);
-  if (!live) return legacySeatsFrozen(env) ? fail("below_amount", 403, { message: BELOW_FROZEN }) : fail("below_amount", 403); // looked at only: no grace period starts here
+  if (!live) { const r = frozenRefusal(env, BELOW_FROZEN); return r ? fail(r.error, 403, { message: r.message }) : fail("below_amount", 403); } // looked at only: no grace period starts here
   const d = await coinDefaults(env, w.cityId, seat.country);
   if (!d.ok) return json({ ok: false, error: d.code, message: d.message }, d.code === "list_unavailable" ? 503 : 409);
   await ensureReadySchema(env.DB);
@@ -479,16 +491,17 @@ export async function handleReadyUse(request, env, fetchImpl = fetch, now = Date
   // (while the legacy seats are frozen nothing is written and the answer is below_amount: stage S16 review fix S16-R1 / SEC-S16-1)
   let still;
   try { still = await stillFounder(env, seat, now, fetchImpl); } catch { return fail("rpc_unavailable", 503); }
-  if (!still) return legacySeatsFrozen(env) ? fail("below_amount", 403, { message: FROZEN_BELOW_AMOUNT }) : fail("in_grace", 403);
+  if (!still) { const r = frozenRefusal(env); return r ? fail(r.error, 403, { message: r.message }) : fail("in_grace", 403); }
   const d = await coinDefaults(env, cityId, seat.country);
   if (!d.ok) return json({ ok: false, error: d.code, message: d.message }, d.code === "list_unavailable" ? 503 : 409);
   const g = await coinGate(env, { u, seat, d, live: true, cityId, fetchImpl, now });
-  if (g) return fail(g.code, g.code === "rpc_unavailable" ? 503 : 409);
+  const bw = brandWords(env), tv = templateOf(env);
+  if (g) return fail(g.code, g.code === "rpc_unavailable" ? 503 : 409, {}, bw);
 
   await ensureLogoSchema(env.DB);
   await ensureReadySchema(env.DB);
   const art = await ensureArt(env, d, now);
-  const content = canonicalContent({ city: d.city, name: d.name, symbol: d.ticker, description: d.description, artSha256: art.sha256, templateVersion: TEMPLATE_VERSION });
+  const content = canonicalContent({ city: d.city, name: d.name, symbol: d.ticker, description: d.description, artSha256: art.sha256, templateVersion: tv });
   const hash = await sha256Hex(content);
   const view = () => founderAnswer(env, { u, seat, cityId, fetchImpl, now, live: true });
   // the founder confirms exactly what their page showed: a list or template change since then is a new version, shown first
@@ -500,8 +513,8 @@ export async function handleReadyUse(request, env, fetchImpl = fetch, now = Date
 
   const db = env.DB;
   const { stmts } = await choiceStatements(env, { cityId, seat, userId: u.id, before, now,
-    v: { content, hash, name: d.name, symbol: d.ticker, description: d.description, artSha: art.sha256, templateVersion: TEMPLATE_VERSION, origin: "default" },
-    log: { actorId: u.id, role: "founder", action: "coin_design", reason: "design", note: `${seat.city_name}: the Vicinity coin $${d.ticker} "${d.name}", version ${versionLabel(hash)}` } });
+    v: { content, hash, name: d.name, symbol: d.ticker, description: d.description, artSha: art.sha256, templateVersion: tv, origin: "default" },
+    log: { actorId: u.id, role: "founder", action: "coin_design", reason: "design", note: bw`${seat.city_name}: the Vicinity coin $${d.ticker} "${d.name}", version ${versionLabel(hash)}` } });
   try { await db.batch(stmts); }
   catch (e) {
     if (/UNIQUE/i.test(String((e && e.message) || e))) return fail("symbol_taken", 409);
@@ -511,7 +524,7 @@ export async function handleReadyUse(request, env, fetchImpl = fetch, now = Date
   if (!after || !after.current || after.content_hash !== hash || after.seat_id !== seat.id) {
     // nothing of ours stands: say why, as the gate would have
     const why = await notWritten(env, cityId, now);
-    return why === "coin_changed" ? json({ ...(await view()), ok: false, error: "coin_changed", message: "Your coin changed since this page loaded. Check it again, then use it." }, 409) : fail(why, 409);
+    return why === "coin_changed" ? json({ ...(await view()), ok: false, error: "coin_changed", message: "Your coin changed since this page loaded. Check it again, then use it." }, 409) : fail(why, 409, {}, bw);
   }
   return json({ ...(await view()), used: true });
 }

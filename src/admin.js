@@ -29,7 +29,7 @@ import { KINDS as FEEDBACK_KINDS, STATUSES as FEEDBACK_STATUSES } from "./feedba
 import { autoUsername, cleanText } from "./text.js";
 import { isSolanaAddress } from "./solana.js";
 import { POLICY, DAY, iso } from "./policy.js";
-import { withMint } from "./official.js";
+import { legacyHidden, withMint } from "./official.js";
 import { mainTokenStatus } from "./maintoken.js";
 import { mainTokenRefusals, mainTokenV5 } from "./v5policy.js";
 import { lpSetup } from "./cluster.js";
@@ -42,6 +42,7 @@ import { decideReview, listReviews, pendingReviews, reviewArt } from "./coinrevi
 import { attempt, notify, pictureReason } from "./notify.js";
 import { coinV2ReviewOn, notifyOn } from "./flags.js";
 import { seatsFrozen } from "./seats.js";
+import { brandWords } from "./brandwords.js";
 
 /**
  * The admin routes that write the legacy seat tables (Citycoin.dev master v5, stage S16; docs/citycoin-master/schema-and-api.md section 3.9): a
@@ -205,9 +206,12 @@ async function handleGrowth(ctx) {
   let total = before.results[0]?.n || 0;
   const members = joined.results.map((r) => ({ day: r.day, joined: r.n, total: (total += r.n) }));
   const top = countries.results.slice(0, 12), rest = countries.results.slice(12).reduce((s, r) => s + r.n, 0);
+  // the balance samples are the legacy token's until a main token counts: under a label set other than today's without it they are shown
+  // nowhere (src/official.js legacyHidden), so the holders chart is empty there
+  const legacyOnly = legacyHidden(ctx.env) && !mainTokenV5(ctx.env);
   return json({
     ok: true, asOf: iso(now), since: day0,
-    holders: holders.results.map((r) => ({ day: r.day, holders: r.holders, at: r.taken_at })),
+    holders: legacyOnly ? [] : holders.results.map((r) => ({ day: r.day, holders: r.holders, at: r.taken_at })),
     members,
     countries: [...top.map((r) => ({ country: r.country, members: r.n })), ...(rest ? [{ country: "other", members: rest }] : [])],
   });
@@ -536,7 +540,8 @@ async function handleConfig(ctx) {
       RESEND_API_KEY: Boolean(env.RESEND_API_KEY),
       EMAIL_FROM: Boolean(env.EMAIL_FROM),
       EMAIL_MAX_PER_HOUR: Boolean(env.EMAIL_MAX_PER_HOUR),
-      VICINITY_MINT: Boolean(env.VICINITY_MINT),
+      // the setting keeps its name (rebrand-inventory.md P04); the console names it by what it holds under another label set
+      [brandWords(env).on ? "Legacy token mint" : "VICINITY_MINT"]: Boolean(env.VICINITY_MINT),
       SOLANA_RPC_URL: Boolean(env.SOLANA_RPC_URL),
       SOLANA_RPC_URL_BACKUP: Boolean(env.SOLANA_RPC_URL_BACKUP),
       ADMIN_WALLETS: Boolean(env.ADMIN_WALLETS),

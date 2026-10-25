@@ -93,6 +93,6 @@ test("a Moderate deep link waits for /api/mod only until the person picks anothe
 test("FS1-3: the Founder card points DOWN to the city coin card: it sits above #coin-ready in the Founder tab, so it never says 'above'", () => {
   const founder = /founder: \[([^\]]*)\]/.exec(v2)[1].split(",").map((s) => s.trim().replace(/"/g, ""));
   assert.ok(founder.indexOf("#fcard") >= 0 && founder.indexOf("#fcard") < founder.indexOf("#coin-ready"), founder.join(" "));
-  assert.match(v2, /note\.textContent = "Choose your city coin below \(Use this coin\); then Vicinity's owner approves it on the blockchain\.";/);
+  assert.match(v2, /note\.textContent = brand`Choose your city coin below \(Use this coin\); then Vicinity's owner approves it on the blockchain\.`;/); // brand`…`: the product's name from the page (label migration)
   assert.doesNotMatch(v2, /Choose your city coin above/, "the Founder card is the only card of dashboard-v2.js that says where the coin card is");
 });

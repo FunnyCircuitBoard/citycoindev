@@ -66,6 +66,7 @@ import { _forgetProgramHashes, fingerprint, programHashes, programRefusal, progr
 import * as IX from "./sol/lpadmin-ix.js";
 import { LEGACY_LAUNCH_LINE, launchClosed, lpAdminWrite } from "./legacylaunch.js";
 import { legacyLaunchClosed } from "./v5policy.js";
+import { SAME, brandWords } from "./brandwords.js";
 
 const DEV = ADDRESSES.feeRecipient;
 const WSOL = ADDRESSES.wsol;
@@ -79,6 +80,12 @@ const TITLE = {
   start: "Start the launchpad", handoff: "Hand the programs to your Squads", config: "Create the Meteora price curve", allow: "Allow the price curve",
   referral: "Fee accounts", lookup: "Speed table", partner: "Name Vicinity on Meteora", summary: "Send this to the team",
 };
+/**
+ * The partner step under a label set other than today's (src/brandwords.js): the entry it writes is the one the code fixes (src/sol/lpadmin-ix.js
+ * VICINITY_PARTNER, a persistent value; the one on chain stays as it was written), so its words never say it carries the new name.
+ */
+const BRANDED_TITLE = Object.freeze({ partner: "Name the launchpad on Meteora" });
+const titleOf = (id, bw) => (bw.on && Object.hasOwn(BRANDED_TITLE, id) ? BRANDED_TITLE[id] : bw.say(TITLE[id]));
 const short = (a) => (typeof a === "string" && a.length > 12 ? `${a.slice(0, 4)}…${a.slice(-4)}` : String(a || ""));
 const sol = (lamports) => `${(Number(lamports) / 1e9).toLocaleString("en-US", { maximumFractionDigits: 9 })} SOL`;
 const err = (error, message, status = 409, extra = {}) => json({ ok: false, error, message, ...extra }, status, { "Cache-Control": "no-store" });
@@ -357,9 +364,15 @@ async function tableWant(st) {
 /**
  * Steps 1-7 from the chain: each { id, n, title, state: done | ready | blocked, reason (plain words), ... }. "ready" means the
  * session wallet can sign it now; "blocked" says why not. Order matters: 2 needs 1 (after the hand-over step 1 can never run), and
- * 3-7 come after 2 so the upgrade authority stays in the wallet for minutes only.
+ * 3-7 come after 2 so the upgrade authority stays in the wallet for minutes only. `bw`: the product's name in the titles and reasons
+ * (src/brandwords.js; today's words by default).
  */
-export async function setupSteps(st) {
+export async function setupSteps(st, bw = SAME) {
+  const out = await stepsOf(st, bw);
+  if (bw.on) for (const x of out) if (x) x.title = titleOf(x.id, bw);
+  return out;
+}
+async function stepsOf(st, bw) {
   const { s, wallet, programs: P } = st;
   const out = [];
   const deployed = (p, name) => (!p.exists ? `The ${name} program is not on Solana ${s.cluster} at ${p.id} yet. Deploy it from your Mac first.`
@@ -397,9 +410,9 @@ export async function setupSteps(st) {
   const c = st.config;
   let s3;
   // the figures in the sentence are the config's own (configFacts: decoded from its bytes, the fee through src/fees.js), never a literal
-  if (c && c.exists && c.diff && c.diff.length === 0) s3 = step("config", "done", `The price curve ${c.address} matches Vicinity's defaults (${c.facts && c.facts.tradeFee ? `${c.facts.target} target, ${c.facts.tradeFee} fee, ${c.facts.launchFee} launch fee, ` : ""}fees to ${short(DEV)}).`, { address: c.address });
+  if (c && c.exists && c.diff && c.diff.length === 0) s3 = step("config", "done", bw`The price curve ${c.address} matches Vicinity's defaults (${c.facts && c.facts.tradeFee ? `${c.facts.target} target, ${c.facts.tradeFee} fee, ${c.facts.launchFee} launch fee, ` : ""}fees to ${short(DEV)}).`, { address: c.address });
   else if (c && c.exists && c.source === "settings") s3 = step("config", "done", `The price curve ${c.address} comes from the settings. It differs from the mainnet defaults in: ${c.diff.join(", ")}.`, { address: c.address, note: true });
-  else if (c && c.exists) s3 = step("config", "blocked", `The price curve ${c.address} differs from Vicinity's defaults in: ${c.diff.join(", ")}. Tell the team; do not allow it.`, { address: c.address });
+  else if (c && c.exists) s3 = step("config", "blocked", bw`The price curve ${c.address} differs from Vicinity's defaults in: ${c.diff.join(", ")}. Tell the team; do not allow it.`, { address: c.address });
   else if (s2.state === "done" && curveRefusal(st.dbc)) s3 = step("config", "blocked", curveRefusal(st.dbc).message, { dbc: { sha256: st.dbc.sha256, pinned: st.dbc.pinned, slot: st.dbc.slot } });
   else s3 = after2("config", true, `Creates the Meteora price curve with a one-time key made in this browser (${rentWords(st.rent, LAYOUT.PoolConfig.size)}).${c && c.source === "recorded" ? ` The recorded curve ${c.address} is not on chain, so a new one is made.` : ""}`, { ephemeral: 1 });
   out.push(s3);
@@ -411,15 +424,17 @@ export async function setupSteps(st) {
   else if (!st.launchpad || st.launchpad.admin !== wallet) s4 = step("allow", "blocked", notYours("The launchpad admin", st.launchpad ? st.launchpad.admin : "not set", wallet));
   // a Meteora program that is not the tested build, or that could not be read clearly: no new allow-list entry
   else if (programRefusal(st.meteora)) s4 = step("allow", "blocked", programRefusal(st.meteora, "This step and approvals").message, { meteora: programSummary(st.meteora) });
-  else s4 = after2("allow", true, "Allows the price curve on the launchpad. The program checks every Vicinity rule again (fees to the dev wallet, locked liquidity, immutable names).");
+  else s4 = after2("allow", true, bw`Allows the price curve on the launchpad. The program checks every Vicinity rule again (fees to the dev wallet, locked liquidity, immutable names).`);
   out.push(s4);
 
-  // 5 referral (fee) accounts
+  // 5 referral (fee) accounts. Under a label set other than today's the legacy token's account is named by what it is, never by its old
+  // ticker (src/official.js legacyHidden): the account itself is the deployed launchpad's and stays as it is
   const missing = st.referral.filter((r) => !r.exists && r.account);
   const noMint = st.referral.find((r) => r.missingMint);
+  const sym = (r) => (bw.on && r.mint === st.vicinityMint ? "the legacy token" : r.symbol);
   let s5;
-  if (!missing.length) s5 = step("referral", "done", `The dev wallet's fee account${st.referral.length > 1 ? "s exist" : " exists"}: ${st.referral.filter((r) => r.account).map((r) => `${r.symbol} ${r.account}`).join("; ")}.${noMint ? " The $VICINITY contract could not be read, so its account is missing." : ""}${!st.vicinityMint && s.cluster === "mainnet" ? " ($VICINITY's contract is not set, so only the SOL account is needed.)" : ""}`);
-  else s5 = after2("referral", true, `Creates the dev wallet's fee account${missing.length > 1 ? "s" : ""} for ${missing.map((r) => r.symbol).join(" and ")} (every trade on the site pays its referral fee there; ${rentWords(st.rent, ...missing.map(() => TOKEN_ACCOUNT_BYTES))}, which anyone may pay).`, { missing: missing.map((r) => r.symbol) });
+  if (!missing.length) s5 = step("referral", "done", `The dev wallet's fee account${st.referral.length > 1 ? "s exist" : " exists"}: ${st.referral.filter((r) => r.account).map((r) => `${sym(r)} ${r.account}`).join("; ")}.${noMint ? (bw.on ? " The legacy token's contract could not be read, so its account is missing." : " The $VICINITY contract could not be read, so its account is missing.") : ""}${!st.vicinityMint && s.cluster === "mainnet" ? (bw.on ? " (No legacy token contract is set, so only the SOL account is needed.)" : " ($VICINITY's contract is not set, so only the SOL account is needed.)") : ""}`);
+  else s5 = after2("referral", true, `Creates the dev wallet's fee account${missing.length > 1 ? "s" : ""} for ${missing.map(sym).join(" and ")} (every trade on the site pays its referral fee there; ${rentWords(st.rent, ...missing.map(() => TOKEN_ACCOUNT_BYTES))}, which anyone may pay).`, { missing: missing.map(sym) });
   out.push(s5);
 
   // 6 lookup (speed) table
@@ -440,9 +455,9 @@ export async function setupSteps(st) {
 
   // 7 partner metadata (only the dev wallet can sign)
   let s7;
-  if (st.partner.exists) s7 = step("partner", "done", `Meteora names the dev wallet's configs "Vicinity" (${st.partner.address}).`);
+  if (st.partner.exists) s7 = step("partner", "done", bw.on ? `The dev wallet's partner entry is on Meteora (${st.partner.address}).` : `Meteora names the dev wallet's configs "Vicinity" (${st.partner.address}).`);
   else if (wallet !== DEV) s7 = step("partner", "blocked", `Only the dev wallet ${DEV} can sign this (it is Meteora's fee claimer for our price curve). Sign in to this page with it to do this step.`);
-  else s7 = after2("partner", true, "Gives Meteora and Jupiter Vicinity's name, website and logo for our price curve (a little rent, once).");
+  else s7 = after2("partner", true, bw.on ? "Gives Meteora and Jupiter the launchpad's partner entry (a name, a website and a logo) for our price curve (a little rent, once)." : "Gives Meteora and Jupiter Vicinity's name, website and logo for our price curve (a little rent, once).");
   out.push(s7);
   return out;
 }
@@ -520,7 +535,8 @@ async function buildStep(env, ctx, body, fetchImpl, now, route = null) {
   const st = await readState(env, s, wallet, fetchImpl, gated ? { now, fresh: true, route } : { now });
   const pr = id === "config" ? curveRefusal(st.dbc) : id === "allow" ? programRefusal(st.meteora, "This step and approvals") : null;
   if (pr) return err(pr.error, pr.message, pr.status, { step: id, which: pr.which });
-  const steps = await setupSteps(st);
+  const bw = brandWords(env);
+  const steps = await setupSteps(st, bw);
   const me = steps.find((x) => x.id === id);
   const labels = {};
   let instructions = [], extraSigners = [], watch = [];
@@ -560,7 +576,7 @@ async function buildStep(env, ctx, body, fetchImpl, now, route = null) {
       extraSigners = [k];
       record.params = { address: k };
       labels[k] = "the new price curve (a one-time key made in this browser)";
-      labels[DEV] = "Vicinity dev wallet (fee claimer and leftover receiver)";
+      labels[DEV] = bw`Vicinity dev wallet (fee claimer and leftover receiver)`;
     } else if (id === "allow") {
       instructions.push(await IX.addLaunchConfig({ programId: s.programId, admin: wallet, payer: wallet, dbcConfig: st.config.address }));
       labels[st.config.address] = "the price curve";
@@ -588,7 +604,7 @@ async function buildStep(env, ctx, body, fetchImpl, now, route = null) {
       if (!instructions.length) return err("tx_too_large", "Nothing fits in one transaction. Tell the team.", 409);
     } else if (id === "partner") {
       instructions.push(await IX.createPartnerMetadata({ payer: wallet, feeClaimer: wallet }));
-      labels[await IX.partnerMetadataAddress(wallet)] = "Vicinity's partner entry on Meteora (new)";
+      labels[await IX.partnerMetadataAddress(wallet)] = bw.on ? "the launchpad's partner entry on Meteora (new)" : "Vicinity's partner entry on Meteora (new)";
     }
   }
   const r = await buildTx(env, { payer: wallet, instructions, extraSigners, labels, watch }, fetchImpl, now);
@@ -616,7 +632,7 @@ async function confirmedTx(env, signature, wallet, fetchImpl) {
 }
 
 async function recordStep(env, ctx, body, fetchImpl, now, route = null) {
-  const s = lpSetup(env), wallet = ctx.wallet, db = env.DB;
+  const s = lpSetup(env), wallet = ctx.wallet, db = env.DB, bw = brandWords(env);
   const id = body.step, params = body.params && typeof body.params === "object" ? body.params : {};
   const PER_CITY = ["approve", "revoke", "initCity", "collect", "forward", "platform", "pause"];
   if (!STEPS.includes(id) && !PER_CITY.includes(id)) return err("bad_step", "Unknown step.", 400);
@@ -652,7 +668,7 @@ async function recordStep(env, ctx, body, fetchImpl, now, route = null) {
       if (!isSolanaAddress(a) || !tx.keys.has(a)) return err("wrong_transaction", "This transaction did not create that price curve.");
       const acc = (await readAccounts(env, [a], fetchImpl)).get(a) || null;
       const diff = acc ? configDiff(acc) : ["missing"];
-      if (diff.length) return err("config_differs", `The price curve ${a} ${acc ? `differs from Vicinity's defaults in: ${diff.join(", ")}` : "is not on chain yet"}. It was not recorded.`);
+      if (diff.length) return err("config_differs", `The price curve ${a} ${acc ? bw`differs from Vicinity's defaults in: ${diff.join(", ")}` : "is not on chain yet"}. It was not recorded.`);
       // the bytes say "version 0 or 1", not which build wrote them: the program that made it must be the one the team checked
       // (readState's `dbc`, read fresh above through src/programpins.js; sha256 null when it could not be read clearly)
       const fp = st.dbc;
@@ -710,6 +726,13 @@ async function recordStep(env, ctx, body, fetchImpl, now, route = null) {
 }
 
 /* ---------------------------------------------------------------- the summary for the team (PLAN C5) */
+/**
+ * The summary's fee accounts: the SOL one and the legacy token's, each null until it exists. Today's key for the second is "vicinity"; under a
+ * label set other than today's (`bw`, src/brandwords.js) it is "legacyToken", so the box the owner copies says no old name (review finding
+ * CRAWL-4). scripts/mainnet-preflight.mjs reads either key.
+ */
+export const referralAccountsOf = (referral, bw) => ({ wsol: referral[0].exists ? referral[0].account : null,
+  [bw.on ? "legacyToken" : "vicinity"]: referral[1] && referral[1].exists ? referral[1].account : null });
 async function summary(env, ctx, fetchImpl, now) {
   const s = lpSetup(env);
   const st = await readState(env, s, ctx.wallet, fetchImpl, { now });
@@ -721,7 +744,7 @@ async function summary(env, ctx, fetchImpl, now) {
     admin: st.launchpad ? st.launchpad.admin : null, registryAdmin: st.registry ? st.registry.admin : null,
     dbcConfig: st.config ? st.config.address : null, launchConfig: st.launchConfig && !st.launchConfig.missing ? st.launchConfig.address : null,
     lookupTable: st.lookup && st.lookup.exists ? st.lookup.address : null,
-    referralAccounts: { wsol: st.referral[0].exists ? st.referral[0].account : null, vicinity: st.referral[1] && st.referral[1].exists ? st.referral[1].account : null },
+    referralAccounts: referralAccountsOf(st.referral, brandWords(env)),
     partnerMetadata: st.partner.exists ? st.partner.address : null,
     signatures: {
       init: sig("start"), handoff: sig("handoff"), config: sig("config"), allow: sig("allow"), referral: sig("referral"), lookupCreate: sig("lookup"),
@@ -729,7 +752,7 @@ async function summary(env, ctx, fetchImpl, now) {
       partner: sig("partner"),
     },
   };
-  const steps = await setupSteps(st);
+  const steps = await setupSteps(st, brandWords(env));
   return json({ ok: true, summary: out, complete: steps.every((x) => x.state === "done"), steps: steps.map((x) => ({ id: x.id, state: x.state })) }, 200, { "Cache-Control": "no-store" });
 }
 
@@ -758,7 +781,7 @@ const symbolOk = (t) => typeof t === "string" && /^[A-Z0-9]{1,10}$/.test(t);
 
 /** Every city with a coin design: its founder, name, ticker, pair and what keeps it from being approved now. */
 export async function candidateList(env, ctx, fetchImpl, now) {
-  const s = lpSetup(env), db = env.DB;
+  const s = lpSetup(env), db = env.DB, bw = brandWords(env);
   await ensureLogoSchema(db);
   const rows = (await db.prepare(`SELECT cc.city_id, cc.city_name, cc.country, cc.name, cc.pitch, cc.media_id, cc.approved_media_id, cc.logo_status, cc.updated_at, cc.pair, cc.mint, cc.pending_mint, cc.seat_id,
       s.id AS live_seat, s.status AS seat_status, s.wallet AS seat_wallet, u.wallet AS user_wallet, u.handle
@@ -807,7 +830,7 @@ export async function candidateList(env, ctx, fetchImpl, now) {
     // a contract sent through the old Raydium LaunchLab path before the launchpad was set up (src/coins.js closes that path now):
     // the city may already have a coin there, and one city has one coin, so it is skipped until an admin rejects that contract
     if (r.pending_mint) reasons.push("A Raydium LaunchLab contract sent for this city through the old path is still waiting (the city may have that coin already, and one city has one coin). It can't be recorded any more: reject it with “Reject the old contract” on this card, then approve this city.");
-    if (r.pair !== "SOL") reasons.push(`The coin is paired with ${r.pair}; only SOL-paired coins can launch on the Vicinity curve for now. The founder must pick SOL.`);
+    if (r.pair !== "SOL") reasons.push(bw`The coin is paired with ${r.pair}; only SOL-paired coins can launch on the Vicinity curve for now. The founder must pick SOL.`);
     const np = nameProblem(r.name);
     if (np) reasons.push(np);
     if (!t) reasons.push("This city has no ticker in the list.");
@@ -830,7 +853,7 @@ export async function candidateList(env, ctx, fetchImpl, now) {
       // the description goes into the coin's metadata for ever: the owner reads it, and whose words they are (BATCH-1)
       else if (c && c.current && t && c.symbol === t.ticker && c.name === r.name) readyCoin = { version: c.content_hash.slice(0, 8), contentHash: c.content_hash, template: c.template_version, art: `/coin-meta/art/${c.art_sha256}.png`,
         description: c.description || "", descriptionBy: c.description === cityDescription(c.content && c.content.city) ? "vicinity" : "founder" };
-      else reasons.push(c && c.current ? "The founder's chosen Vicinity coin no longer matches the city list (its ticker or name changed). The founder must use the coin again." : "The founder has not chosen the Vicinity coin yet (\"Use this coin\" in their Founder tab).");
+      else reasons.push(bw.say(c && c.current ? "The founder's chosen Vicinity coin no longer matches the city list (its ticker or name changed). The founder must use the coin again." : "The founder has not chosen the Vicinity coin yet (\"Use this coin\" in their Founder tab)."));
     }
     return { reasons, readyCoin, chosen: c };
   };
@@ -1170,7 +1193,7 @@ async function platformTx(env, ctx, fetchImpl, now) {
 async function status(env, ctx, fetchImpl, now) {
   const s = lpSetup(env);
   const st = await readState(env, s, ctx.wallet, fetchImpl, { hashes: true, now });
-  const steps = await setupSteps(st);
+  const steps = await setupSteps(st, brandWords(env));
   const want = await tableWant(st);
   return json({
     ok: true, cluster: s.cluster, wallet: ctx.wallet, devWallet: DEV, isDevWallet: ctx.wallet === DEV,

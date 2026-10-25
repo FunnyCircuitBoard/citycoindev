@@ -31,6 +31,7 @@ import { readI64, readU32, readU64, toBase64 } from "./sol/bytes.js";
 import { ADDRESSES, PROGRAM_IDS } from "./sol/pda.js";
 import { maxCuPrice, priorityFeeLamports, setComputeUnitLimit, setComputeUnitPrice } from "./sol/ix.js";
 import { accountBytes, decodeLookupTable } from "./sol/dbc.js";
+import { brandWords } from "./brandwords.js";
 
 export { lpSetup };
 
@@ -62,8 +63,8 @@ export const PROGRAM_NAMES = Object.freeze({
 });
 /** program id -> plain name, with this site's own launchpad and rewards programs (only while the gate is on). */
 export function programNames(env) {
-  const s = lpSetup(env);
-  return { ...PROGRAM_NAMES, ...(s.on ? { [s.programId]: "Vicinity launchpad", [s.rewardsProgramId]: "Vicinity rewards" } : {}) };
+  const s = lpSetup(env), bw = brandWords(env); // our programs by the product's name (src/brandwords.js); their on-chain names never change
+  return { ...PROGRAM_NAMES, ...(s.on ? { [s.programId]: bw`Vicinity launchpad`, [s.rewardsProgramId]: bw`Vicinity rewards` } : {}) };
 }
 const SYSVARS = {
   SysvarRent111111111111111111111111111111111: "Rent sysvar",
@@ -85,6 +86,11 @@ export const ANCHOR_NAMES = Object.freeze({
     "withdraw_migration_fee", "claim_creator_trading_fee", "creator_withdraw_surplus"],
   damm: ["claim_position_fee", "swap", "swap2", "create_position", "add_liquidity", "remove_liquidity", "lock_position", "permanent_lock_position"],
 });
+/**
+ * Words for an instruction under a label set other than today's (src/brandwords.js): create_partner_metadata writes the partner entry the
+ * code fixes (src/sol/lpadmin-ix.js VICINITY_PARTNER, a persistent value), so it is never said to write the new name.
+ */
+const SAY_BRANDED = Object.freeze({ create_partner_metadata: "name the launchpad on Meteora" });
 /** What an instruction does, in plain words (the raw name is shown next to it). */
 const SAY = {
   init_launchpad: "start the launchpad", init_registry: "start the rewards registry", propose_admin: "propose a new admin", accept_admin: "accept the admin role",
@@ -147,8 +153,9 @@ const utcMinute = (isoString) => `${isoString.slice(0, 10)} ${isoString.slice(11
 
 /** { ix, say, detail, fields? } of one instruction ({ programAddress, data }) under the site's programs. */
 export async function nameInstruction(env, ix) {
+  const branded = brandWords(env).on;
   const s = lpSetup(env), p = ix.programAddress, d = ix.data || new Uint8Array(0);
-  const out = (name, detail = null, fields = null) => ({ ix: name, say: (name && SAY[name]) || (name ? name.replace(/_/g, " ") : "unknown instruction"), detail, ...(fields ? { fields } : {}) });
+  const out = (name, detail = null, fields = null) => ({ ix: name, say: (name && branded && Object.hasOwn(SAY_BRANDED, name) && SAY_BRANDED[name]) || (name && SAY[name]) || (name ? name.replace(/_/g, " ") : "unknown instruction"), detail, ...(fields ? { fields } : {}) });
   try {
     const key = p === s.programId ? "launchpad" : p === s.rewardsProgramId ? "rewards" : p === PROGRAM_IDS.dbc ? "dbc" : p === PROGRAM_IDS.damm ? "damm" : null;
     if (key) {
@@ -183,8 +190,8 @@ export async function nameInstruction(env, ix) {
 const ROLE = ["read-only", "writable", "signer", "writable signer"];
 /** The decoded instruction list a page shows before the wallet opens. */
 export async function summarize(env, instructions, labels = {}) {
-  const names = programNames(env);
-  const label = (a) => labels[a] || names[a] || SYSVARS[a] || (a === ADDRESSES.feeRecipient ? "Vicinity dev wallet (platform fees)" : a === ADDRESSES.wsol ? "Wrapped SOL" : null);
+  const names = programNames(env), bw = brandWords(env);
+  const label = (a) => labels[a] || names[a] || SYSVARS[a] || (a === ADDRESSES.feeRecipient ? bw`Vicinity dev wallet (platform fees)` : a === ADDRESSES.wsol ? "Wrapped SOL" : null);
   const out = [];
   for (const ix of instructions) {
     const n = await nameInstruction(env, ix);

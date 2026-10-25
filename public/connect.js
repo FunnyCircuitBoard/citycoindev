@@ -8,6 +8,11 @@
 // Needs site.js (window.V), wallets.js (window.VW) and vendor/qrcode.js (window.qrcode).
 (() => {
   "use strict";
+  // The product's names in this file's words (the label migration, area b). A page built for a label set other than today's carries the
+  // set on <html> (data-brand, data-brand-name, data-brand-domain: scripts/pages/build.mjs writes them from src/brand.js); brand`…` puts
+  // those names in a text's own words, never in a value put into it. A page without them (today's pages) gets every text exactly as written.
+  const BRAND = (() => { try { const r = document.documentElement, at = (k) => (r && typeof r.getAttribute === "function" ? r.getAttribute(k) : null); return at("data-brand") && at("data-brand-name") && at("data-brand-domain") ? Object.freeze({ key: at("data-brand"), name: at("data-brand-name"), domain: at("data-brand-domain") }) : null; } catch { return null; } })();
+  const brand = (s, ...v) => s.reduce((out, part, i) => out + (BRAND ? part.replace(/vicinity\.city/g, () => BRAND.domain).replace(/Vicinity/g, () => BRAND.name) : part) + (i < v.length ? String(v[i]) : ""), "");
   const { $, $$, el, api, toast, copy, short, isAddr, burst } = window.V;
   const W = window.VW;
   const params = new URLSearchParams(location.search);
@@ -31,7 +36,7 @@
   const ERR = {
     social_taken: "That Google account is already linked to a different wallet. Sign in with the wallet it's linked to, or use another account.",
     wallet_taken: "This wallet is already linked to another account. Sign in with that account instead.",
-    wallet_first: "That login isn't linked to a Vicinity account yet. New here? Connect your wallet below first, then link that login in step 2.",
+    wallet_first: brand`That login isn't linked to a Vicinity account yet. New here? Connect your wallet below first, then link that login in step 2.`,
     login_unavailable: "Log in with Google is being switched on. Please check back soon, or use e-mail or your wallet.",
     login_cancelled: "Sign-in was cancelled. Nothing changed.",
     login_failed: "The sign-in didn't go through. Please try again.",
@@ -146,7 +151,7 @@
     const more = $("#wallets-more");
     if (more) { more.hidden = !others.length; $("#wallets-rest").replaceChildren(...others.map((k) => knownTile(k, location.origin + "/connect", null))); }
     $("#wallets-known").classList.toggle("wallet-grid--apps", Boolean(W.isMobile && !list.length)); // a phone's only way on: full rows that say "Open app"
-    $("#more-label").textContent = W.isMobile && !list.length ? "Open Vicinity in your wallet app" : list.length ? "More wallets" : "Get a wallet";
+    $("#more-label").textContent = W.isMobile && !list.length ? brand`Open Vicinity in your wallet app` : list.length ? "More wallets" : "Get a wallet";
     // "Wallet on my phone" on the phone itself: no code to scan, its wallet apps open the approval (openPair)
     $("#alt-phone em").textContent = samePhone() ? "Approve in your wallet app, then finish here." : "Scan a code with your phone, sign there, continue here.";
     $("#more-wallets").open = list.length === 0;
@@ -257,7 +262,7 @@
       if (!d.ok && (wo || woApprove)) throw ours(challengeError(d));
       if (!d.ok && signup && signup.handles(d.error)) return d; // no account for this wallet, a wallet already linked...: the sign-up page says what to do
       // (pairing: "where you started" is a computer, or Safari / Chrome on this same phone)
-      if (!d.ok) throw ours(d.error === "expired" ? "That message expired. Please sign again." : d.error === "pair_expired" ? "That code expired. Go back to where you started and try again." : d.error === "pin_mismatch" ? "The check number doesn't match. Go back to where you started and try again." : d.error === "offline" ? "Couldn't reach Vicinity. Check your connection and try again." : "Sign-in failed. Please try again.");
+      if (!d.ok) throw ours(d.error === "expired" ? "That message expired. Please sign again." : d.error === "pair_expired" ? "That code expired. Go back to where you started and try again." : d.error === "pin_mismatch" ? "The check number doesn't match. Go back to where you started and try again." : d.error === "offline" ? brand`Couldn't reach Vicinity. Check your connection and try again.` : "Sign-in failed. Please try again.");
       return d;
     } finally { if (message === msg) message = null; }
   }
@@ -582,7 +587,7 @@
     $("#approve-pin").textContent = s.pin;
     if (wo) wo.approveShown(s); // wallet-only: what the phone is approving (a sign-in, or the registration a computer started)
     if (pairPurpose === "link" && !wo) { // (wallet-only: the legacy link window's words, public/wallet-only.js approveShown)
-      $("#approve-h").textContent = `Link this wallet to ${s.name || "•••"}'s Vicinity account?`;
+      $("#approve-h").textContent = brand`Link this wallet to ${s.name || "•••"}'s Vicinity account?`;
       $("#approve-owner").textContent = `@${s.handle || "•••"}`;
       $("#approve-city").textContent = s.community ? `${s.community.name}, ${s.community.country}` : ""; // the pin is drawn by pages-connect.css
       $("#approve-city").hidden = !s.community;
@@ -736,7 +741,7 @@
     else {
       show("pick"); renderPick();
       if (me.ok !== false) resumePair();
-      else if ((savedPair() || { until: 0 }).until >= Date.now()) setErr("Couldn't reach Vicinity to finish. Check your connection, then reload this page."); // /api/me failed: the pairing stays kept
+      else if ((savedPair() || { until: 0 }).until >= Date.now()) setErr(brand`Couldn't reach Vicinity to finish. Check your connection, then reload this page.`); // /api/me failed: the pairing stays kept
     }
     if (err && ERR[err]) setErr(ERR[err]);
   })();

@@ -11,12 +11,18 @@
 // the tab is visible and ease to a new value. A computer shows the first five items with a value; a phone swipes through all of them.
 (() => {
   "use strict";
+  // The product's names in this file's words (the label migration, area b). A page built for a label set other than today's carries the
+  // set on <html> (data-brand, data-brand-name, data-brand-domain: scripts/pages/build.mjs writes them from src/brand.js); brand`…` puts
+  // those names in a text's own words, never in a value put into it. A page without them (today's pages) gets every text exactly as written.
+  const BRAND = (() => { try { const r = document.documentElement, at = (k) => (r && typeof r.getAttribute === "function" ? r.getAttribute(k) : null); return at("data-brand") && at("data-brand-name") && at("data-brand-domain") ? Object.freeze({ key: at("data-brand"), name: at("data-brand-name"), domain: at("data-brand-domain") }) : null; } catch { return null; } })();
+  const brand = (s, ...v) => s.reduce((out, part, i) => out + (BRAND ? part.replace(/vicinity\.city/g, () => BRAND.domain).replace(/Vicinity/g, () => BRAND.name) : part) + (i < v.length ? String(v[i]) : ""), "");
   const { $, $$, api, reduced } = window.V;
 
   // Old one-page links still work: a section that moved opens where it lives now; one that is gone stays on this page without a dead
   // anchor in the address bar (#how is this page's "How it works"; #faq, #buy-faq and #why-launchlab are the FAQ's).
   const NYC = "/cities?city=5128581";
-  const OLD = { "#token": "/token", "#holders": "/token#holders", "#wallet": "/connect", "#cities": "/cities", "#launchpad": "/launchpad", "#check": "/token#check",
+  // (a page built for another label set has the link checker on /official: its /token is the plain "not live yet" page)
+  const OLD = { "#token": "/token", "#holders": "/token#holders", "#wallet": "/connect", "#cities": "/cities", "#launchpad": "/launchpad", "#check": BRAND ? "/official#check" : "/token#check",
     "#nyc": NYC, "#story": NYC, "#demo": NYC, "#roles": "/dashboard#roles", "#get": "/token#buy-slot" };
   const GONE = ["#why", "#why-now", "#for-cities", "#problem", "#roadmap"];
   /** true when the hash was an old link (it left for its new page, or was cleared); the page's own hashes are left alone */
@@ -62,6 +68,9 @@
   const MEMBERS_MIN = 100; // a small count makes the map look empty (d3): no members item below 100
   const STALE_MS = 3 * 60 * 1000; // a market answer older than this (its source kept failing since) shows the Delayed tag
 
+  // the market numbers' own token: "$VICINITY" on today's pages; a page built for another label set names its own token (the Worker sends
+  // no market numbers there while that token is not live, and never the legacy token's)
+  const TOKEN = BRAND ? `${BRAND.name} token` : "$VICINITY";
   /** Every item the bar can show, in its order, from the answers so far: { key, label, text, title, chg?, stale? } or null (left out). */
   function items(a) {
     const lp = a.lp && a.lp.ok ? a.lp : null, vic = lp && lp.vicinity, mk = (vic && vic.market) || {}, from = mk.sources || {};
@@ -73,17 +82,17 @@
     const at = lp ? a.lpAt : tok ? a.tokenAt : null, old = num(at) != null && Date.now() - at > STALE_MS;
     const stale = Boolean((lp && mk.stale) || old);
     const price = lp ? num(mk.priceUsd) : num(tok && tok.price);
-    if (price != null) out.push({ key: "price", label: "$VICINITY", text: money(price), chg: lp ? change(mk.priceChange24hPct) : null, stale,
-      title: said(`$VICINITY price ${fullMoney(price)}`, lp ? from.price : "Jupiter") + (stale ? " · last good copy" : "") });
+    if (price != null) out.push({ key: "price", label: TOKEN, text: money(price), chg: lp ? change(mk.priceChange24hPct) : null, stale,
+      title: said(`${TOKEN} price ${fullMoney(price)}`, lp ? from.price : "Jupiter") + (stale ? " · last good copy" : "") });
     const mcap = lp ? num(mk.marketCapUsd) : num(tok && tok.marketCap);
-    if (mcap != null) out.push({ key: "mcap", label: "Market cap", sr: "$VICINITY ", text: money(mcap), title: said(`$VICINITY market cap ${fullMoney(mcap)}`, lp ? from.marketCap : "Jupiter price × supply") });
+    if (mcap != null) out.push({ key: "mcap", label: "Market cap", sr: `${TOKEN} `, text: money(mcap), title: said(`${TOKEN} market cap ${fullMoney(mcap)}`, lp ? from.marketCap : "Jupiter price × supply") });
     const vol = lp ? num(mk.volume24hUsd) : null;
-    if (vol != null) out.push({ key: "vol", label: "24h volume", sr: "$VICINITY ", text: money(vol), title: said(`$VICINITY 24 h volume ${fullMoney(vol)}`, from.volume24h) });
+    if (vol != null) out.push({ key: "vol", label: "24h volume", sr: `${TOKEN} `, text: money(vol), title: said(`${TOKEN} 24 h volume ${fullMoney(vol)}`, from.volume24h) });
     const holders = num(vic && vic.holders && vic.holders.count);
-    if (holders != null) out.push({ key: "holders", label: "Holders", sr: "$VICINITY ", text: plainFmt.format(holders), title: `${plainFmt.format(holders)} people hold $VICINITY · counted by vicinity.city (pools and team wallets excluded)` });
+    if (holders != null) out.push({ key: "holders", label: "Holders", sr: `${TOKEN} `, text: plainFmt.format(holders), title: `${plainFmt.format(holders)} people hold ${BRAND ? `the ${TOKEN}` : TOKEN}${brand` · counted by vicinity.city (pools and team wallets excluded)`}` });
     // "live" is a coin with a recorded contract: it may not have traded yet, so the title says live, not "trade"
     const live = lp && Array.isArray(lp.coins) ? lp.coins.filter((c) => c && c.status === "live").length : null;
-    if (live) out.push({ key: "coins", label: "City coins live", text: plainFmt.format(live), title: `${plainFmt.format(live)} city ${live === 1 ? "coin" : "coins"} live on the Vicinity Launchpad` });
+    if (live) out.push({ key: "coins", label: "City coins live", text: plainFmt.format(live), title: brand`${plainFmt.format(live)} city ${live === 1 ? "coin" : "coins"} live on the Vicinity Launchpad` });
     const members = num(a.members && a.members.members);
     if (members != null && members >= MEMBERS_MIN) out.push({ key: "members", label: "Members", text: plainFmt.format(members), title: `${plainFmt.format(members)} verified members` });
     const st = a.stats || {};
@@ -111,7 +120,7 @@
       }
     } else if (market) named.push(link("Powered by Jupiter", "https://jup.ag"));
     const parts = [];
-    if (named.length) { const lead = document.createElement("span"); lead.textContent = "$VICINITY market data: "; parts.push([lead, ...named.flatMap((n, i) => (i ? [", ", n] : [n]))]); }
+    if (named.length) { const lead = document.createElement("span"); lead.textContent = `${TOKEN} market data: `; parts.push([lead, ...named.flatMap((n, i) => (i ? [", ", n] : [n]))]); }
     const all = document.createElement("a"); all.href = "/credits"; all.textContent = "All sources";
     parts.push([all]);
     return parts.flatMap((n, i) => (i ? [" · ", ...n] : n));

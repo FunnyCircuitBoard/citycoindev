@@ -9,6 +9,11 @@
 // repeating what was typed.
 (() => {
   "use strict";
+  // The product's names in this file's words (the label migration, area b). A page built for a label set other than today's carries the
+  // set on <html> (data-brand, data-brand-name, data-brand-domain: scripts/pages/build.mjs writes them from src/brand.js); brand`…` puts
+  // those names in a text's own words, never in a value put into it. A page without them (today's pages) gets every text exactly as written.
+  const BRAND = (() => { try { const r = document.documentElement, at = (k) => (r && typeof r.getAttribute === "function" ? r.getAttribute(k) : null); return at("data-brand") && at("data-brand-name") && at("data-brand-domain") ? Object.freeze({ key: at("data-brand"), name: at("data-brand-name"), domain: at("data-brand-domain") }) : null; } catch { return null; } })();
+  const brand = (s, ...v) => s.reduce((out, part, i) => out + (BRAND ? part.replace(/vicinity\.city/g, () => BRAND.domain).replace(/Vicinity/g, () => BRAND.name) : part) + (i < v.length ? String(v[i]) : ""), "");
 
   /* =====================================================================
      Pure helpers (test/coin-ui.test.js runs them in node)
@@ -111,7 +116,7 @@
   const mask = (w) => (isAddr(w) ? `${w.slice(0, 5)}*****${w.slice(-3)}` : str(w));
   /** The avatar's letters (the Launchpad's recipe): the city's initials, "V" for $VICINITY; never a cut ticker. */
   function initialsOf(c) {
-    if (c && c.kind === "vicinity") return "V";
+    if (c && c.kind === "vicinity") return BRAND ? BRAND.name.slice(0, 1).toUpperCase() : "V"; // the site's own token: its name's initial
     const words = str((c && c.city && c.city.name) || (c && c.name) || (c && c.ticker)).normalize("NFD").replace(/[\u0300-\u036f]/g, "").match(/[A-Za-z0-9]+/g) || [];
     if (!words.length) return "?";
     return (words.length > 1 ? words[0][0] + words[1][0] : words[0].slice(0, 2)).toUpperCase();
@@ -140,8 +145,8 @@
     out.push(tile("traders", "24h traders", count(m.traders24h), { src: num(m.traders24h) != null ? s.volume24h || null : null, missing: "Only Jupiter counts them, and it gave no count" }));
     if (num(m.priceNative) != null) out.push(tile("native", `Price in ${sym}`, shortZeros(price(m.priceNative, "SOL")), { title: price(m.priceNative, "SOL"), src: "On-chain curve (Solana)", sub: `${sym} per ${str(d && d.coin && d.coin.ticker) ? "$" + d.coin.ticker : "token"}` }));
     const nc = smp && num(smp.change24hNativePct);
-    if (smp && (nc != null || smp.since)) out.push(tile("change-native", `24h change in ${sym}`, nc == null ? null : chip(nc).text, { src: nc == null ? null : str(smp.source) || "vicinity.city samples", missing: smp.since ? "Needs 24 hours of readings in a row" : "Not recorded yet" }));
-    out.push(tile("holders", "Holders", h && num(h.count) != null ? count(h.count) : null, { title: h && num(h.count) != null ? `${intFmt.format(h.count)} wallets` : null, src: h ? str(h.source) || "Counted by vicinity.city" : null, sub: null, missing: "Not counted yet: vicinity.city counts every 10 minutes" }));
+    if (smp && (nc != null || smp.since)) out.push(tile("change-native", `24h change in ${sym}`, nc == null ? null : chip(nc).text, { src: nc == null ? null : str(smp.source) || brand`vicinity.city samples`, missing: smp.since ? "Needs 24 hours of readings in a row" : "Not recorded yet" }));
+    out.push(tile("holders", "Holders", h && num(h.count) != null ? count(h.count) : null, { title: h && num(h.count) != null ? `${intFmt.format(h.count)} wallets` : null, src: h ? str(h.source) || brand`Counted by vicinity.city` : null, sub: null, missing: brand`Not counted yet: vicinity.city counts every 10 minutes` }));
     out.push(tile("supply", "Supply", f && num(f.supply) != null ? intFmt.format(f.supply) : null, { src: f ? str(f.source) : null, sub: f && f.mintingDisabled ? "Fixed: no one can mint more" : null, missing: "The chain could not be read" }));
     const auth = (on, held) => (on ? "Disabled ✓" : held ? "Held by the launch program" : "Enabled ⚠");
     out.push(tile("mintauth", "Mint authority", f ? auth(f.mintingDisabled, f.mintHeldByProgram) : null, { src: f ? str(f.source) : null, missing: "The chain could not be read" }));
@@ -163,7 +168,7 @@
   /** The About text of a city coin. */
   function cityAbout(d) {
     const c = d.coin, city = c.city && c.city.name ? c.city.name : "its city", pair = c.pair && c.pair.symbol ? c.pair.symbol : "SOL";
-    return `${c.ticker ? "$" + c.ticker : "This coin"} is the one official coin of ${city}${c.city && c.city.country ? `, ${c.city.country}` : ""}: launched by its founder${onLaunchLab(d) ? " on Raydium LaunchLab" : onVicinity(d) ? " on the Vicinity launchpad" : ""}, paired with ${pair}, and recorded by Vicinity.`;
+    return brand`${c.ticker ? "$" + c.ticker : "This coin"} is the one official coin of ${city}${c.city && c.city.country ? `, ${c.city.country}` : ""}: launched by its founder${onLaunchLab(d) ? " on Raydium LaunchLab" : onVicinity(d) ? brand` on the Vicinity launchpad` : ""}, paired with ${pair}, and recorded by Vicinity.`;
   }
   /**
    * The bonding curve in words: { pct, of, text, graduated, full, venue } or null when the coin has no curve we know. A Vicinity
@@ -190,7 +195,7 @@
     const stage = c.stage === "graduated" || c.stage === "full" ? c.stage : "curve";
     const graduated = stage === "graduated", full = stage === "full";
     return {
-      graduated, full, lp: true, venue: "Vicinity launchpad", stage,
+      graduated, full, lp: true, venue: brand`Vicinity launchpad`, stage,
       value: stage === "curve" ? (pct == null ? 0 : Math.max(0, Math.min(100, pct))) : 100,
       pct: graduated ? "Graduated" : full ? "Full" : pct == null ? "—" : `${pct >= 10 ? pct.toFixed(1) : pct.toFixed(2)}%`,
       of: stage === "curve" && raised != null && target != null ? `${sol(raised)} of ${sol(target)} ${sym} raised` : full && target != null ? `${sol(target)} ${sym} raised` : "",
@@ -236,15 +241,15 @@
     const what = series.kind === "candles" ? `${INTERVAL_WORDS[iv] || ""} candles` : series.unit === "SOL" ? `${INTERVAL_WORDS[iv] || ""} candles as a line` : `a reading every ${EVERY_WORDS[iv] || "few minutes"}`;
     const parts = [], how = series.empty ? "" : `, ${what}`; // an empty range names no interval
     if (series.unit === "SOL") parts.push(`Price in SOL: Raydium LaunchLab (the curve's price after each trade)${how}`);
-    else if (series.unit === "MCAP") parts.push(`Market cap = price × ${num(supply) ? intFmt.format(supply) : "the supply"} (the supply is fixed: minting is disabled on the chain). Price: vicinity.city readings${how}`);
-    else parts.push(`Price in USD: read by vicinity.city (Jupiter's last trade, or the on-chain curve × SOL)${how}`);
+    else if (series.unit === "MCAP") parts.push(brand`Market cap = price × ${num(supply) ? intFmt.format(supply) : "the supply"} (the supply is fixed: minting is disabled on the chain). Price: vicinity.city readings${how}`);
+    else parts.push(brand`Price in USD: read by vicinity.city (Jupiter's last trade, or the on-chain curve × SOL)${how}`);
     if (series.unit !== "SOL" && chart && chart.line && chart.line.recordingSince) parts.push(`recorded since ${fmtDate(chart.line.recordingSince)}`);
     if (dom && dom.short) parts.push(`history in this range starts ${fmtDate(new Date(dom.x0 * 1000).toISOString())}`);
     parts.push(tzName ? `times in your time zone (${tzName})` : "times in your time zone");
     return parts.join(" · ");
   }
   /** The chart's legend: "vicinity.city readings: ▼ 3.16% over 24 hours" (USD and market cap), "Raydium LaunchLab: …" (SOL). */
-  const legendText = (series, change, span) => `${series && series.unit === "SOL" ? "Raydium LaunchLab" : "vicinity.city readings"}: ${change} over ${span}`;
+  const legendText = (series, change, span) => `${series && series.unit === "SOL" ? "Raydium LaunchLab" : brand`vicinity.city readings`}: ${change} over ${span}`;
   const fmtDate = (iso) => { const t = Date.parse(str(iso)); return Number.isFinite(t) ? new Date(t).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }) : ""; };
   /**
    * The Holders card's five: the biggest holders by size. /api/holders lists pools, the team lock and the team wallets first (the
@@ -406,9 +411,15 @@
   /* ----- the note card (not listed, switched off, not launched, unreachable) ----- */
   function note(kind) {
     const T = {
-      notfound: ["This coin isn't listed on Vicinity", "Only $VICINITY and the city coins recorded by Vicinity have a page here. Check the address, or find the coin on the Launchpad.", "/launchpad", "Back to the Launchpad", false],
-      disabled: ["Coin pages aren't switched on yet", "The live chart and the trades are coming. Meanwhile, the token page shows $VICINITY's contract, holders and links.", "/token", "Go to the token page", false],
-      prelaunch: ["$VICINITY isn't launched yet", "Its page opens here the moment the official contract is published. Anything called $VICINITY before that is fake.", "/token", "Go to the token page", false],
+      // (a page built for another label set names only the city coins: the legacy token is not that brand's, and its own is not live yet)
+      notfound: [brand`This coin isn't listed on Vicinity`, BRAND ? brand`Only the city coins recorded by Vicinity have a page here. Check the address, or find the coin on the Launchpad.`
+        : "Only $VICINITY and the city coins recorded by Vicinity have a page here. Check the address, or find the coin on the Launchpad.", "/launchpad", "Back to the Launchpad", false],
+      // (a page built for another label set sends nobody to the token page: its /token is the plain "not live yet" page)
+      disabled: ["Coin pages aren't switched on yet", BRAND ? "The live chart and the trades are coming." : "The live chart and the trades are coming. Meanwhile, the token page shows $VICINITY's contract, holders and links.",
+        BRAND ? "/launchpad" : "/token", BRAND ? "Back to the Launchpad" : "Go to the token page", false],
+      prelaunch: [BRAND ? `The ${BRAND.name} token is not live yet` : "$VICINITY isn't launched yet",
+        BRAND ? "Its page opens here once it is live. Anything presented as it before that is not ours." : "Its page opens here the moment the official contract is published. Anything called $VICINITY before that is fake.",
+        BRAND ? "/launchpad" : "/token", BRAND ? "Back to the Launchpad" : "Go to the token page", false],
       offline: ["You seem to be offline", "The live numbers couldn't load. They'll come back by themselves when you're online.", "/launchpad", "Back to the Launchpad", true],
       error: ["The live numbers didn't load", "The coin's data source didn't answer. Trying again in 30 seconds.", "/launchpad", "Back to the Launchpad", true],
     }[kind];
@@ -417,7 +428,7 @@
     show("#coin-note-retry", T[4]);
     show("#coin-note", true); show("#coin-main", false); show("#coin-lower", false); show("#coin-sources", false);
     root.removeAttribute("aria-busy");
-    document.title = `${T[0]} · Vicinity`;
+    document.title = brand`${T[0]} · Vicinity`;
   }
 
   /* ----- the header ----- */
@@ -425,7 +436,7 @@
     const c = d.coin, m = d.market || {};
     const ticker = str(c.ticker) ? `$${str(c.ticker)}` : str(c.name) || "city coin"; // a coin without a ticker goes by its name: nothing here makes one up
     $("#coin-ticker").textContent = ticker; $("#coin-ticker").classList.remove("skel", "skel--w140");
-    const place = c.kind === "vicinity" ? "Vicinity · Solana" : [c.city && c.city.name, c.city && c.city.country, "Solana"].filter(Boolean).join(" · ");
+    const place = c.kind === "vicinity" ? brand`Vicinity · Solana` : [c.city && c.city.name, c.city && c.city.country, "Solana"].filter(Boolean).join(" · ");
     $("#coin-name").textContent = c.kind === "vicinity" ? place : `${str(c.name)} · ${place}`;
     for (const id of ["#coin-disc", "#coin-mini-disc"]) {
       const disc = $(id); disc.dataset.color = ["gold", "rose", "ocean", "emerald", "violet", "ink"].includes(c.color) ? c.color : "gold";
@@ -446,7 +457,7 @@
     else if (cv && !cv.graduated) words.push(["tag--gold", `Bonding curve ${cv.pct}`]);
     else if (cv && cv.graduated) words.push(["tag--gold", cv.lp ? "✓ On the open market (Meteora)" : "✓ Graduated to Raydium"]);
     if (offi && offi.tokenContract === d.mint) words.push(["tag--ok", "✓ Official"]);
-    else if (c.kind === "city") words.push(["", "City coin · recorded by Vicinity"]);
+    else if (c.kind === "city") words.push(["", brand`City coin · recorded by Vicinity`]);
     const key = JSON.stringify([paused, words]);
     if (key !== pillsKey) { // redrawn only when something changed (the live dot keeps its rhythm)
       pillsKey = key;
@@ -483,7 +494,7 @@
     const start = window.VChart.pure.fmtWhen(Math.floor((pt.series.kind === "candles" ? pt.series.candles[0][0] : pt.series.points[0][0])), 86400);
     const chg = $("#coin-chg"); chg.textContent = `${c.text} since ${start}`; chg.className = `coin-chg ${c.cls}`;
     const when = window.VChart.pure.fmtWhen(pt.t, pt.series.interval);
-    const src = pt.series.unit === "SOL" ? "Raydium LaunchLab" : pt.src ? window.VChart.pure.SRC_WORDS[pt.src] : "vicinity.city reading";
+    const src = pt.series.unit === "SOL" ? "Raydium LaunchLab" : pt.src ? window.VChart.pure.SRC_WORDS[pt.src] : brand`vicinity.city reading`;
     $("#coin-price-sub").textContent = `${when} · ${src} · let go for the live price`;
     $("#coin-chart-live").textContent = `${when}: ${val}`;
   }
@@ -606,13 +617,13 @@
     show("#coin-ca-copy", true);
     const official = offi && offi.tokenContract === d.mint;
     show("#coin-ca-badge", official || d.coin.kind === "city");
-    $("#coin-ca-badge-text").textContent = official ? "Official" : "Recorded by Vicinity";
+    $("#coin-ca-badge-text").textContent = official ? "Official" : brand`Recorded by Vicinity`;
     $("#coin-ca-badge").classList.toggle("is-plain", !official);
     // a coin of the Vicinity launchpad is recorded by the site from the blockchain (src/lpcoins.js), after the owner's approval on chain:
     // no admin records it; an older coin's contract was recorded by an admin (the Raydium LaunchLab path)
     const tk = d.coin.ticker ? "$" + d.coin.ticker : "coin", city = d.coin.city && d.coin.city.name ? d.coin.city.name : "this city";
-    $("#coin-ca-note").textContent = official ? "This is the only official $VICINITY. Anything else using the name is fake."
-      : onVicinity(d) ? `The one ${tk} Vicinity recorded from the blockchain for ${city}, launched on the Vicinity launchpad after an on-chain approval. Check the address before you buy.`
+    $("#coin-ca-note").textContent = official ? (BRAND ? `This is the official ${BRAND.name} token. Anything else using the name is not ours.` : "This is the only official $VICINITY. Anything else using the name is fake.")
+      : onVicinity(d) ? brand`The one ${tk} Vicinity recorded from the blockchain for ${city}, launched on the Vicinity launchpad after an on-chain approval. Check the address before you buy.`
         : `The one ${tk} an admin recorded for ${city}. Check the address before you buy.`;
   }
   let copiedTimer = 0;
@@ -663,10 +674,11 @@
     put($("#coin-holders-n"), h && num(h.count) != null ? count(h.count) : "—");
     $("#coin-holders-word").textContent = h && h.count === 1 ? "holder" : "holders";
     const age = h && Date.parse(str(h.asOf));
-    $("#coin-holders-src").textContent = h ? `${str(h.source) || "Counted by vicinity.city"}${Number.isFinite(age) ? ` · counted ${ago((Date.now() - age) / 1000)}` : ""}` : "Not counted yet: vicinity.city counts every 10 minutes.";
+    $("#coin-holders-src").textContent = h ? `${str(h.source) || brand`Counted by vicinity.city`}${Number.isFinite(age) ? ` · counted ${ago((Date.now() - age) / 1000)}` : ""}` : brand`Not counted yet: vicinity.city counts every 10 minutes.`;
     const vic = d.coin.kind === "vicinity";
     const more = $("#coin-holders-more");
-    if (vic) { more.href = "/token#holders"; more.textContent = "See every holder on the token page →"; more.removeAttribute("target"); }
+    // (a page built for another label set links no token page: it is the plain "not live yet" page there; Solscan lists every holder)
+    if (vic && !BRAND) { more.href = "/token#holders"; more.textContent = "See every holder on the token page →"; more.removeAttribute("target"); }
     else { more.href = `https://solscan.io/token/${d.mint}#holders`; more.textContent = "Every holder on Solscan ↗"; more.target = "_blank"; more.rel = "noopener"; }
     if (!vic || Date.now() - holdersAt < 120000) return;
     holdersAt = Date.now();
@@ -698,17 +710,20 @@
       if (f && f.mintingDisabled && f.freezingDisabled) facts.push("mint and freeze authority disabled (checked on the chain)");
       const team = offi && Array.isArray(offi.teamWallets) && isAddr(offi.teamWallets[0]) ? ` (team wallet ${mask(offi.teamWallets[0])})` : "";
       const when = Date.parse(str(c.launchedAt));
+      // (a page built for another label set: the site's main token as the Worker names it, nothing of the legacy token's launch or team)
       // (the legacy seats frozen, /api/me legacySeats "frozen", stage S16: holding no longer founds a city, so the sentence stops at the map)
       const frozen = Boolean(window.V.me && window.V.me() && window.V.me().legacySeats === "frozen");
-      p.textContent = `$VICINITY is the key to the Vicinity map${frozen ? "." : ": hold it to found and back your city."} One official token${facts.length ? `, ${facts.join(", ")}` : ""}. Launched on Raydium LaunchLab${Number.isFinite(when) ? ` on ${new Date(when).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}` : ""} by the Vicinity team${team}.`;
+      p.textContent = BRAND ? `${str(c.name) || "The main token"} is the ${BRAND.name} token. One official token${facts.length ? `, ${facts.join(", ")}` : ""}.`
+        : `$VICINITY is the key to the Vicinity map${frozen ? "." : ": hold it to found and back your city."} One official token${facts.length ? `, ${facts.join(", ")}` : ""}. Launched on Raydium LaunchLab${Number.isFinite(when) ? ` on ${new Date(when).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}` : ""} by the Vicinity team${team}.`;
     } else p.textContent = cityAbout(d);
     const links = $("#coin-about-links"), out = [];
     const a = (text, href, ext) => { const x = el("a", "chip-link coin-about__link", text); x.href = href; if (ext) newTab(x); return x; };
     if (c.kind === "city" && c.city && /^[A-Za-z0-9_-]{1,40}$/.test(str(c.city.id))) out.push(a(`${c.city.name || "The city"} on the map`, `/cities?city=${encodeURIComponent(c.city.id)}`));
-    out.push(a("vicinity.city", "/"));
+    out.push(a(brand`vicinity.city`, "/"));
     const x = offi && Array.isArray(offi.socials) ? offi.socials.find((s) => /^@[A-Za-z0-9_]{1,15}$/.test(s)) : null;
     if (x) out.push(a(`X ${x}`, `https://x.com/${x.slice(1)}`, true));
-    out.push(a("Rules", "/rules"), a("Token & holders", "/token"));
+    // (no link to /token on a page built for another label set: it is the plain "not live yet" page there)
+    out.push(a("Rules", "/rules"), ...(BRAND ? [] : [a("Token & holders", "/token")]));
     links.replaceChildren(...out);
   }
   function paintSources(d) {
@@ -718,7 +733,7 @@
       const u = typeof x.url === "string" && /^https:\/\/(jup\.ag|raydium\.io|dexscreener\.com)(\/|$)/.test(x.url) && !/[\s"'<>]/.test(x.url) ? x.url : null;
       if (u) { const a = newTab(el("a", null, x.text)); a.href = u; parts.push(a); } else parts.push(el("span", null, x.text));
     }
-    parts.push(el("span", null, "Price history in USD: read by vicinity.city every 10 minutes"));
+    parts.push(el("span", null, brand`Price history in USD: read by vicinity.city every 10 minutes`));
     p.replaceChildren(...parts.flatMap((n, i) => (i ? [" · ", n] : [n])));
   }
 
@@ -927,7 +942,7 @@
     const d = data, ageS = ageSeconds(d.asOf, receivedAt, Date.now());
     show("#coin-note", false); show("#coin-main", true); show("#coin-lower", true); show("#coin-sources", true);
     root.removeAttribute("aria-busy");
-    document.title = `${str(d.coin.ticker) ? `$${str(d.coin.ticker)}` : str(d.coin.name) || "City coin"}: live price, chart and holders · Vicinity`;
+    document.title = brand`${str(d.coin.ticker) ? `$${str(d.coin.ticker)}` : str(d.coin.name) || "City coin"}: live price, chart and holders · Vicinity`;
     paintHead(d, ageS); paintTiles(d, ageS); paintCurve(d); paintLinks(d); paintTrades(d); paintAbout(d); paintFees(d); paintSoFar(d); paintSources(d);
     paintHolders(d);
   }

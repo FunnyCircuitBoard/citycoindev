@@ -8,10 +8,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { sourceAs } from "../scripts/pages/build.mjs";
 import vm from "node:vm";
 import { founderAmount, POLICY } from "../src/policy.js";
 
-const read = (p) => readFileSync(new URL("../" + p, import.meta.url), "utf8").replace(/\r\n/g, "\n");
+// a page source as today's build reads it (BRAND unset: its brand blocks and {{label}} fills resolved; scripts/pages/build.mjs sourceAs)
+const read = (p) => { const t = readFileSync(new URL("../" + p, import.meta.url), "utf8").replace(/\r\n/g, "\n"); return p.startsWith("scripts/pages/src/") ? sourceAs(p, t) : t; };
 const css = read("public/polish-dash.css"), js = read("public/dashboard.js"), site = read("public/site.js"); // the preview's rules live in the dashboard's own sheet (review PERF-1)
 const both = [["public", read("public/dashboard.html")], ["src", read("scripts/pages/src/dashboard.html")]];
 /** #dash-out's markup, from its opening tag to the section after it. */

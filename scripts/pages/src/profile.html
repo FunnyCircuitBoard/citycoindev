@@ -1,4 +1,4 @@
-<!--{"title": "Member profiles", "description": "Look up a Vicinity member: their community, what they hold, and who they follow.", "page": "profile", "scripts": ["profile"], "styles": ["pages-profile"], "noindex": true, "standalone": true}-->
+<!--{"title": "Member profiles", "description": "Look up a {{productName}} member: their community, what they hold, and who they follow.", "page": "profile", "scripts": ["profile"], "styles": ["pages-profile"], "noindex": true, "standalone": true}-->
     <section class="section section--tight prof" id="prof">
       <div class="wrap">
         <!-- signed out -->
@@ -57,7 +57,7 @@
                 <article class="pass prof-pass" id="pf-pass" aria-labelledby="pf-handle">
                   <span class="pass__shine" aria-hidden="true"></span>
                   <div class="pass__top">
-                    <span class="pass__brand"><span class="pass__mark" aria-hidden="true"></span>Vicinity Pass</span>
+                    <span class="pass__brand"><span class="pass__mark" aria-hidden="true"></span>{{productName}} Pass</span>
                     <span class="role-pill" id="pf-level">Member</span>
                   </div>
                   <div class="pass__who">
@@ -111,8 +111,8 @@
               </div>
 
               <div class="prof-col">
-                <section class="card prof-hold" aria-labelledby="pf-hold-h">
-                  <h2 class="prof-h" id="pf-hold-h">$VICINITY</h2>
+                <section class="card prof-hold<!--@if citycoin--> cc-off<!--@end-->" aria-labelledby="pf-hold-h">
+                  <h2 class="prof-h" id="pf-hold-h"><!--@if citycoin-->Main token<!--@else-->$VICINITY<!--@end--></h2>
                   <dl class="kv">
                     <div><dt>Holds</dt><dd id="pf-hold-amount">—</dd></div>
                     <div><dt>Rank</dt><dd id="pf-hold-rank">—</dd></div>
@@ -123,10 +123,10 @@
 
                 <section class="card portfolio-card" id="pf-portfolio" aria-labelledby="pf-pf-h">
                   <div class="portfolio-card__head">
-                    <div><p class="kicker">Portfolio · live values</p><h2 class="prof-h" id="pf-pf-h">Vicinity coins</h2></div>
+                    <div><p class="kicker">Portfolio · live values</p><h2 class="prof-h" id="pf-pf-h"><!--@if citycoin-->City coins<!--@else-->Vicinity coins<!--@end--></h2></div>
                     <div class="pf__meta"><span class="tiny muted" id="pp-updated"></span><button class="link-btn pf__refresh" type="button" id="pp-refresh">Refresh</button></div>
                   </div>
-                  <p class="small muted">Only $VICINITY and city coins are shown. Other tokens in a wallet never are.</p>
+                  <p class="small muted"><!--@if citycoin-->Only city coins are shown.<!--@else-->Only $VICINITY and city coins are shown.<!--@end--> Other tokens in a wallet never are.</p>
                   <div class="pf" id="pp-body"><p class="muted small">Loading…</p></div>
                   <p class="inline-err" id="pp-msg" role="alert" hidden></p>
                 </section>

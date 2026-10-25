@@ -15,6 +15,11 @@
 // Founding Supporter snapshot: status, and any wallet's amount + Merkle proof.
 (() => {
   "use strict";
+  // The product's names in this file's words (the label migration, area b). A page built for a label set other than today's carries the
+  // set on <html> (data-brand, data-brand-name, data-brand-domain: scripts/pages/build.mjs writes them from src/brand.js); brand`…` puts
+  // those names in a text's own words, never in a value put into it. A page without them (today's pages) gets every text exactly as written.
+  const BRAND = (() => { try { const r = document.documentElement, at = (k) => (r && typeof r.getAttribute === "function" ? r.getAttribute(k) : null); return at("data-brand") && at("data-brand-name") && at("data-brand-domain") ? Object.freeze({ key: at("data-brand"), name: at("data-brand-name"), domain: at("data-brand-domain") }) : null; } catch { return null; } })();
+  const brand = (s, ...v) => s.reduce((out, part, i) => out + (BRAND ? part.replace(/vicinity\.city/g, () => BRAND.domain).replace(/Vicinity/g, () => BRAND.name) : part) + (i < v.length ? String(v[i]) : ""), "");
   const { $, el, api, fmt, isAddr } = window.V;
   let snap = null;
   (async () => {
@@ -35,7 +40,8 @@
     const r = await api(`/api/snapshots/${snap.id}/proof?wallet=${encodeURIComponent(w)}`);
     if (!r.eligible) { out.replaceChildren(el("p", null, "This wallet isn't in the snapshot.")); return; }
     const proof = el("pre", "formula", JSON.stringify({ leaf: r.leaf, proof: r.proof, root: r.snapshot.merkleRoot }, null, 1));
-    out.replaceChildren(el("p", null, `✓ Founding Supporter: ${fmt(r.amount / 1e6)} $VICINITY counted${r.verified ? " · proof verified" : ""}.`), proof);
+    // (a page built for another label set names no legacy token: the amount is in tokens)
+    out.replaceChildren(el("p", null, `✓ Founding Supporter: ${fmt(r.amount / 1e6)} ${BRAND ? "tokens" : "$VICINITY"} counted${r.verified ? " · proof verified" : ""}.`), proof);
   });
 })();
 
@@ -48,6 +54,11 @@
 // their cell flashes once) and the whole card opens the coin's own page, /coin?mint=<mint> (public/coin.js).
 (() => {
   "use strict";
+  // The product's names in this file's words (the label migration, area b). A page built for a label set other than today's carries the
+  // set on <html> (data-brand, data-brand-name, data-brand-domain: scripts/pages/build.mjs writes them from src/brand.js); brand`…` puts
+  // those names in a text's own words, never in a value put into it. A page without them (today's pages) gets every text exactly as written.
+  const BRAND = (() => { try { const r = document.documentElement, at = (k) => (r && typeof r.getAttribute === "function" ? r.getAttribute(k) : null); return at("data-brand") && at("data-brand-name") && at("data-brand-domain") ? Object.freeze({ key: at("data-brand"), name: at("data-brand-name"), domain: at("data-brand-domain") }) : null; } catch { return null; } })();
+  const brand = (s, ...v) => s.reduce((out, part, i) => out + (BRAND ? part.replace(/vicinity\.city/g, () => BRAND.domain).replace(/Vicinity/g, () => BRAND.name) : part) + (i < v.length ? String(v[i]) : ""), "");
 
   /* =====================================================================
      Pure helpers: no page, no network (test/launchpad-ui.test.js runs them in node)
@@ -159,13 +170,15 @@
   /** A count: 45.3K on the card, 45,312 in full. */
   const count = (v) => { const n = num(v); return n == null ? null : n >= 1000 ? compactFmt.format(n) : plainFmt.format(n); };
   const fullCount = (v) => { const n = num(v); return n == null ? null : plainFmt.format(n); };
-  /** The community line and its title: "1 member · 1 holds $VICINITY", "3 members · 2 hold $VICINITY"; null without a member count. */
+  /** The community line and its title: "1 member · 1 holds $VICINITY", "3 members · 2 hold $VICINITY"; null without a member count. A page
+   *  built for another label set names its own token (the Worker sends no holder count there while that token is not live). */
+  const TOKEN = BRAND ? `the ${BRAND.name} token` : "$VICINITY";
   function communityText(mem) {
     const n = num(mem && mem.members), h = num(mem && mem.holders);
     if (n == null) return null;
     const members = (c) => `${c} ${n === 1 ? "member" : "members"}`;
-    const short = members(count(n)) + (h != null ? ` · ${count(h)} ${h === 1 ? "holds" : "hold"} $VICINITY` : "");
-    const full = members(fullCount(n)) + (h != null ? `, ${fullCount(h)} ${h === 1 ? "who holds" : "of them hold"} $VICINITY` : "");
+    const short = members(count(n)) + (h != null ? ` · ${count(h)} ${h === 1 ? "holds" : "hold"} ${TOKEN}` : "");
+    const full = members(fullCount(n)) + (h != null ? `, ${fullCount(h)} ${h === 1 ? "who holds" : "of them hold"} ${TOKEN}` : "");
     return { short, full };
   }
   /** A 24-hour change: +12.3% / -4.1% (always signed, one decimal). */
@@ -215,9 +228,9 @@
    */
   const notLiveWhy = (c, lp = lpOn, ready = readyOn) => (c && c.status === "waiting"
     ? (lp || ready ? "A contract from the old Raydium LaunchLab path is waiting; nothing launches until an admin settles it." : "Trades once an admin records the contract.")
-    : c && c.kind === "vicinity" ? "Trades once $VICINITY launches on Raydium LaunchLab."
-      : lp ? "Trades once an admin approves it on chain and the founder launches it on the Vicinity launchpad."
-        : ready ? "Trades once its founder launches it on the Vicinity launchpad." : "Trades once the founder launches it on Raydium LaunchLab.");
+    : c && c.kind === "vicinity" ? (BRAND ? "Not trading yet." : "Trades once $VICINITY launches on Raydium LaunchLab.")
+      : lp ? brand`Trades once an admin approves it on chain and the founder launches it on the Vicinity launchpad.`
+        : ready ? brand`Trades once its founder launches it on the Vicinity launchpad.` : "Trades once the founder launches it on Raydium LaunchLab.");
   /** The founder line: the handle, or the masked wallet (never a full address, even if the server slipped). */
   function founderText(f) {
     if (!f || (!f.handle && !f.wallet)) return "No founder yet";
@@ -225,7 +238,7 @@
     const role = f.status === "steward" ? "Seed Steward" : f.status === "provisional" ? "Founder (provisional)" : "Founder";
     return `${role} ✓ ${who}`;
   }
-  const pairText = (c) => (c && c.pair && c.pair.symbol ? `Pair: $${str(c.ticker)} / ${str(c.pair.symbol)}` : c && c.kind === "vicinity" ? "Pair: $VICINITY / SOL" : "Pair: chosen by the founder");
+  const pairText = (c) => (c && c.pair && c.pair.symbol ? `Pair: $${str(c.ticker)} / ${str(c.pair.symbol)}` : c && c.kind === "vicinity" ? (BRAND ? "Pair: SOL" : "Pair: $VICINITY / SOL") : "Pair: chosen by the founder");
 
   /* ----- links: the same templates as the dashboard and the token page; only these four sites, only for a real mint ----- */
   const HOSTS = { raydium: "https://raydium.io/", jupiter: "https://jup.ag/", dexscreener: "https://dexscreener.com/", solscan: "https://solscan.io/" };
@@ -248,7 +261,7 @@
   const COLORS = ["gold", "rose", "ocean", "emerald", "violet", "ink"];
   /** The avatar's letters: the city's initials ("SP" for São Paulo, "UT" for Utica), "V" for $VICINITY; never a cut ticker. */
   function initialsOf(c) {
-    if (c && c.kind === "vicinity") return "V";
+    if (c && c.kind === "vicinity") return BRAND ? BRAND.name.slice(0, 1).toUpperCase() : "V"; // the site's own token: its name's initial
     const words = str((c && c.city && c.city.name) || (c && c.name) || (c && c.ticker)).normalize("NFD").replace(/[\u0300-\u036f]/g, "").match(/[A-Za-z0-9]+/g) || [];
     if (!words.length) return "?";
     return (words.length > 1 ? words[0][0] + words[1][0] : words[0].slice(0, 2)).toUpperCase();
@@ -298,7 +311,8 @@
     if (/^Raydium/.test(t)) return "Raydium";
     if (/^DEX Screener/.test(t)) return "DEX Screener";
     if (/^Price × on-chain supply/.test(t)) return "Price × supply";
-    if (/^Counted by vicinity\.city/.test(t)) return "vicinity.city";
+    // the site's own count, in the Worker's words (src/ answers in today's name, or in the label set's once its texts follow BRAND)
+    if (/^Counted by vicinity\.city/.test(t) || (BRAND && t.startsWith(`Counted by ${BRAND.domain}`))) return brand`vicinity.city`;
     return t;
   }
   /**
@@ -314,7 +328,7 @@
     return [
       cell("mcap", "Market cap", num(m.marketCapUsd), money(m.marketCapUsd), fullMoney(m.marketCapUsd), src.marketCap, reason(why.marketCap) || "No source has it right now"),
       cell("vol", "24h volume", num(m.volume24hUsd), money(m.volume24hUsd), fullMoney(m.volume24hUsd), src.volume24h, reason(why.volume24h) || "No source has it right now"),
-      cell("holders", "Holders", h, count(h), fullCount(h), h != null ? "Counted by vicinity.city (pools and team wallets excluded)" : null, "Not counted yet: vicinity.city counts every 10 minutes"),
+      cell("holders", "Holders", h, count(h), fullCount(h), h != null ? brand`Counted by vicinity.city (pools and team wallets excluded)` : null, brand`Not counted yet: vicinity.city counts every 10 minutes`),
       cell("liq", curve ? "In the curve*" : "Liquidity", num(m.liquidityUsd), money(m.liquidityUsd), fullMoney(m.liquidityUsd), src.liquidity, reason(why.liquidity) || "No source has it right now",
         curve ? "On the bonding curve this is what the curve holds, not a trading pool" : null),
     ];
@@ -347,7 +361,7 @@
    *  launched there (server: market.launchpad); otherwise the pair alone, never a venue nobody confirmed. */
   function venueLine(c) {
     const m = (c && c.market) || {}, sym = str(c && c.pair && c.pair.symbol) || "SOL";
-    if (m.launchpad === "vicinity") return `Vicinity launchpad · ${sym} pair`;
+    if (m.launchpad === "vicinity") return brand`Vicinity launchpad · ${sym} pair`;
     return `${m.launchpad === "raydium-launchlab" || (m.curve && typeof m.curve === "object") ? "Raydium LaunchLab · " : ""}${sym} pair`;
   }
   /** Is it a card that trades (a price block, a curve, a sparkline) or one that waits? Cards of another shape are redrawn whole. */
@@ -559,7 +573,7 @@
     link.append(el("span", "lp-card__ticker", `$${str(c.ticker)}`), " ", el("span", "lp-card__name", str(c.name)));
     if (live) link.append(el("span", "sr-only", ": chart and details"));
     h3.append(link);
-    const place = c.kind === "vicinity" ? "The Vicinity token · every city" : [c.city && c.city.name, countryNames[c.city && c.city.country] || (c.city && c.city.country)].filter(Boolean).join(", ");
+    const place = c.kind === "vicinity" ? brand`The Vicinity token · every city` : [c.city && c.city.name, countryNames[c.city && c.city.country] || (c.city && c.city.country)].filter(Boolean).join(", ");
     id.append(h3, el("p", "small muted lp-card__place", place));
     const [stText, stCls] = statusLabel(c, { now, opensAt: opensAt() });
     const tag = field(el("span", `tag ${stCls} lp-card__status`), "status"); tag.dataset.status = str(c.status);
@@ -608,7 +622,7 @@
     } else li.append(sparkEl(c, featured));
 
     const meta = field(el("p", "tiny muted lp-card__meta"), "meta");
-    meta.append(el("span", null, pairText(c)), el("span", "lp-card__sep", " · "), el("span", "lp-card__founder", c.kind === "vicinity" ? "Launched by the Vicinity team" : founderText(c.founder)));
+    meta.append(el("span", null, pairText(c)), el("span", "lp-card__sep", " · "), el("span", "lp-card__founder", c.kind === "vicinity" ? (BRAND ? "The site's main token" : "Launched by the Vicinity team") : founderText(c.founder)));
     const ct = communityText(c.members || {});
     if (ct) { const com = el("span", "lp-card__community", ct.short); com.title = ct.full; meta.append(el("span", "lp-card__sep", " · "), com); }
     (live ? fold : li).append(meta);
@@ -757,7 +771,7 @@
     }
     const words = parts.flatMap((n, i) => (i ? [" · ", n] : [n]));
     // with the in-app swap on (SWAP=on) the Buy buttons trade here, so the sentence says so (public/swap.js holds the words); otherwise the old truth
-    const trade = swapOn && window.VSwap && window.VSwap.tradeSentence ? window.VSwap.tradeSentence : "You trade in your own wallet on Raydium or Jupiter; Vicinity never touches your funds.";
+    const trade = swapOn && window.VSwap && window.VSwap.tradeSentence ? window.VSwap.tradeSentence : brand`You trade in your own wallet on Raydium or Jupiter; Vicinity never touches your funds.`;
     p.replaceChildren(...words, `. Every card refreshes every 30 seconds and says how old its numbers are. ${trade}`);
   }
   function paintCountries() {

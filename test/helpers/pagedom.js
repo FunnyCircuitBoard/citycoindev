@@ -288,9 +288,9 @@ export function parse(doc, html) {
  * Runs public/site.js on the page, then lets its first requests (/api/me, /api/official, /api/health) answer. `calls` lists every
  * request the page made: { path, body }.
  */
-export async function openPage(file, { agreed = null, focus = null, me = { ok: true, signedIn: false } } = {}) {
+export async function openPage(file, { agreed = null, focus = null, me = { ok: true, signedIn: false }, html = null } = {}) {
   const doc = new Doc();
-  doc.append(...parse(doc, page(file)));
+  doc.append(...parse(doc, html ?? page(file))); // html: the page as another build wrote it (a label set other than today's)
   const storage = new Map(agreed ? [["vicinity_terms", agreed]] : []);
   const calls = [];
   const win = new Target();

@@ -27,6 +27,7 @@ import { _resetSwap } from "../src/swap.js";
 import { _resetLaunchpad } from "../src/launchpad.js";
 import { _resetCoin } from "../src/coin.js";
 import { PAGES_BUILT } from "../src/pages-built.js";
+import { committedIsToday } from "./helpers/today-build.mjs";
 import { PAGES_BUILT_FILE, pageSocials, pagesBuiltSource } from "../scripts/pages/build.mjs";
 
 const FAKE_MINT = "FakeMainTokenMint111111111111111111111111111";
@@ -148,9 +149,12 @@ test("pages not built for the switch: every value accepted, and the whole API, t
 test("the page build writes the marker the Worker reads, and refuses the switch while the client scripts still label the main token $VICINITY", () => {
   assert.equal(readFileSync(PAGES_BUILT_FILE, "utf8"), pagesBuiltSource(), "src/pages-built.js is the build's output for wrangler.jsonc");
   // pagesReachWorker (stage S03): wrangler.jsonc's run_worker_first is a list today, so the pages bypass the Worker (test/host-redirect.test.js)
-  assert.deepEqual({ ...PAGES_BUILT }, { mainTokenV5: false, brand: "", pagesReachWorker: false });
+  // (the committed record while the committed build is today's; a committed build of another switch is checked against its own wrangler.jsonc
+  // by test/build-parity.test.js, and the suite reads today's build in its place: test/helpers/today-build.mjs)
+  if (committedIsToday) assert.deepEqual({ ...PAGES_BUILT }, { mainTokenV5: false, brand: "", pagesReachWorker: false });
   const swapJs = readFileSync(new URL("../public/swap.js", import.meta.url), "utf8");
-  assert.match(swapJs, /t\.kind === "vicinity" \? "\$VICINITY"/, "the Buy panel still names the main token $VICINITY (label migration S48)");
+  assert.match(swapJs, /const mainLabel = \(t\) => \(BRAND \? \(t\.symbol \? [^\n]* : t\.name \|\| "Main token"\) : "\$VICINITY"\);/, "the Buy panel still names the main token $VICINITY on today's pages (label migration S48)");
+  assert.match(swapJs, /t\.kind === "vicinity" \? mainLabel\(t\)/);
   for (const BRAND of [...Object.keys(BRANDS), "citycoin"]) {
     assert.throws(() => pageSocials({ ...FULL, BRAND }), /MAIN_TOKEN_V5=on in wrangler\.jsonc/, `BRAND=${JSON.stringify(BRAND)}`);
     assert.throws(() => pagesBuiltSource({ ...FULL, BRAND }), /MAIN_TOKEN_V5=on in wrangler\.jsonc/);

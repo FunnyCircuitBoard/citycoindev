@@ -1,13 +1,17 @@
-<!--{"title": "How it works", "description": "Vicinity puts every real city on one map with real boundaries. One official coin per community, local leaders, local memes, check-ins and votes. Locals hold $VICINITY to found their city.", "page": "home", "scripts": ["home", "swap"], "styles": ["app-phone", "pages-home"]}-->
+<!--{"title": "How it works", "description": "Vicinity puts every real city on one map with real boundaries. One official coin per community, local leaders, local memes, check-ins and votes. Locals hold $VICINITY to found their city.", "page": "home", "scripts": ["home", "swap"], "styles": ["app-phone", "pages-home"], "brand": {"citycoin": {"description": "{{productName}} puts every real city on one map with real boundaries. One official coin per community, local leaders, local memes, check-ins and votes."}}}-->
     <!-- ============ HERO (design v4, the owner: "One city. One coin." centred at the top, no New York map, a Sign up beside the buy button).
          The headline, one line under it, the two buttons, then the live numbers (home.js fills the bar once, from /api/launchpad,
          /api/members and /data/stats.json; a number nobody answered for is left out). One glow, at the top; nothing loops. ============ -->
     <section class="hero4" id="hero">
       <div class="wrap hero4__inner">
         <h1 class="hero4__title"><span class="text-ink">One city.</span> <span class="accent">One coin.</span></h1>
-        <p class="lead hero4__lead">Every real city can get one official coin, run by the people who live there. Locals hold $VICINITY to found their&nbsp;city.</p>
+        <p class="lead hero4__lead">Every real city can get one official coin, run by the people who live there.<!--@if !citycoin--> Locals hold $VICINITY to found their&nbsp;city.<!--@end--></p>
         <div class="hero4__cta" data-fb-avoid>
+<!--@if citycoin-->
+          <a class="btn btn--primary btn--lg has-ring" href="/cities">Find your city <span aria-hidden="true">→</span></a>
+<!--@else-->
           <a class="btn btn--primary btn--lg has-ring" href="/token#buy-slot">Get $VICINITY <span aria-hidden="true">→</span></a>
+<!--@end-->
           <a class="btn btn--glass btn--lg hero4__second" href="/connect" data-hero-second><span class="hero4__as-guest">Sign up</span><span class="hero4__as-member">My dashboard</span></a>
         </div>
         <div class="tk" data-fb-avoid>
@@ -45,7 +49,7 @@
             <span class="how4__n" aria-hidden="true">02</span>
             <span class="ico how4__ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v9M9.5 9.5h3.75a1.75 1.75 0 0 1 0 3.5h-2.5a1.75 1.75 0 0 0 0 3.5h3.75"/></svg></span>
             <h3>Hold to&nbsp;found</h3>
-            <p>Hold your city's founder amount of $VICINITY, set by its size, through random balance checks for seven days.</p>
+            <p>Hold your city's founder amount<!--@if !citycoin--> of $VICINITY<!--@end-->, set by its size, through random balance checks for seven days.</p>
             <a class="how4__link" href="/rules#founders">How founding works <span aria-hidden="true">→</span></a>
           </li>
           <li class="card card--link how4__card">
@@ -65,19 +69,21 @@
         <div class="card card--link teaser4__card">
           <div class="teaser4__copy">
             <p class="teaser4__tag"><span class="tag tag--gold">In development</span></p>
-            <h2>Vicinity, in your&nbsp;pocket.</h2>
-            <p class="teaser4__line">Coming: send and receive city coins and $VICINITY from your phone.</p>
+            <h2>{{productName}}, in your&nbsp;pocket.</h2>
+            <p class="teaser4__line">Coming: send and receive city coins<!--@if !citycoin--> and $VICINITY<!--@end--> from your phone.</p>
             <a class="teaser4__link" href="/app">See the preview <span aria-hidden="true">→</span></a>
           </div>
           <div class="teaser4__stage" aria-hidden="true">
             <div class="phone4 teaser4__phone">
               <div class="phone4__screen">
                 <span class="phone4__notch"></span>
-                <div class="pm-head"><span class="pm-title">Wallet</span><span class="pm-ava">V</span></div>
+                <div class="pm-head"><span class="pm-title">Wallet</span><span class="pm-ava"><!--@if citycoin-->C<!--@else-->V<!--@end--></span></div>
                 <div class="pm-balance"><span class="pm-label">Balance</span><span class="skel pm-skel pm-skel--lg"></span></div>
                 <div class="pm-actions"><span class="pm-btn pm-btn--primary"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg>Send</span><span class="pm-btn"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 7 7 17M15 17H7V9"/></svg>Receive</span></div>
                 <div class="pm-list">
+<!--@if !citycoin-->
                   <div class="pm-row"><span class="pm-coin pm-coin--vic">V</span><span class="pm-row__name"><b>$VICINITY</b><small>Vicinity</small></span><span class="skel pm-skel"></span></div>
+<!--@end-->
                   <div class="pm-row"><span class="pm-coin pm-coin--city"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg></span><span class="pm-row__name"><b>Your city coin</b><small>One per city</small></span><span class="skel pm-skel"></span></div>
                 </div>
               </div>
@@ -97,7 +103,12 @@
           <button type="button" role="tab" id="tab-faq-safety" aria-selected="false" aria-controls="faq-safety" tabindex="-1">Safety</button>
         </div>
         <div class="tabpanel" id="faq-basics" role="tabpanel" aria-labelledby="tab-faq-basics">
+<!--@if citycoin-->
+          <details><summary>What is {{productName}}?</summary><p>A map of every real city, where each community gets one official coin, local leaders and its own feed for memes, check-ins, discussions and weekly votes. The {{productName}} Launchpad lets each city launch its coin.</p></details>
+<!--@else-->
           <details><summary>What is Vicinity?</summary><p>A map of every real city, where each community gets one official coin, local leaders and its own feed for memes, check-ins, discussions and weekly votes. $VICINITY is the token locals hold to found their city — it launched on October 3 on Raydium LaunchLab. The Vicinity Launchpad then lets each city launch its coin.</p></details>
+<!--@end-->
+<!--@if !citycoin-->
           <details id="buy-faq"><summary>How do I buy $VICINITY?</summary><p>Get a Solana wallet, add SOL, then use the one official Buy button on the <a href="/token">Token page</a>. Buy nowhere else: look-alikes are scams.</p></details>
           <details id="why-launchlab"><summary>Why did $VICINITY launch on Raydium LaunchLab and not on the Vicinity Launchpad?</summary>
             <p><strong>Trust.</strong> LaunchLab is Raydium's own launchpad on Solana: no presale or private sale, and everyone buys on the same public curve. Minting and freezing are already switched off for good: the full supply was created with the token and nobody can add to it. When the curve fills, the coin moves into a Raydium pool and the pool's liquidity is burned or locked permanently. Launching our own token on our own brand-new launchpad would mean asking you to trust code we wrote and control. We'd be the player and the referee.</p>
@@ -105,6 +116,7 @@
             <p><strong>Room to grow.</strong> LaunchLab lets projects run their own launchpads on the same Raydium infrastructure. Starting $VICINITY there keeps it on the rails the Vicinity Launchpad can build on.</p>
             <p><strong>Focus.</strong> The Launchpad is built for city coins: one official coin per city, verified locals, founders and managers. $VICINITY is the key to that map, not a city coin, so it stays where it launched.</p>
           </details>
+<!--@end-->
           <details><summary>How do I get my dashboard?</summary><p>Share your location once (it finds your community and is never saved) and sign in with Google or an e-mail address: you're in. Connect a Solana wallet from your dashboard whenever you like: you sign one free message, it isn't a transaction, and your rank and badges switch on. One account per wallet and per login.</p></details>
           <details><summary>I use FOMO (or another app wallet). How do I connect?</summary><p>If the app can't connect to websites, choose "App wallet (FOMO…)" when you connect. We'll show a tiny, exact amount of SOL to send <em>to yourself</em>. It costs only the network fee, and since only the wallet's owner can send from it, it proves the wallet is yours. You can also open this site inside a wallet app's browser, or scan a code with a wallet app on your phone.</p></details>
         </div>
@@ -116,9 +128,13 @@
           <details><summary>What if I don't live inside any city?</summary><p>Then you pick one of the three nearest communities to join. You can also ask for your town to become its own community; your Country Manager approves it.</p></details>
         </div>
         <div class="tabpanel" id="faq-safety" role="tabpanel" aria-labelledby="tab-faq-safety" hidden>
+<!--@if citycoin-->
+          <details><summary>Which contract address is real?</summary><p>The {{productName}} token is not live yet, so there is no official contract address yet. Contract addresses can't be posted in {{productName}} feeds, so a fake can't spread there.</p></details>
+<!--@else-->
           <details><summary>Is this a rug pull?</summary><p>No. There's no presale, minting and freezing are already switched off for good, and every team wallet is listed: the <a href="/token">Token page</a> shows the proof live from the blockchain. Until its curve fills, $VICINITY trades on LaunchLab's bonding curve; when it fills, LaunchLab burns or locks the new pool's liquidity.</p></details>
           <details><summary>Which contract address is real?</summary><p>Only the one on the <a href="/token">Token page</a>. Paste any address into the <a href="/token#check">checker</a> to confirm. Contract addresses can't be posted in Vicinity feeds, so a fake can't spread there.</p></details>
-          <details><summary>What do you store about me?</summary><p>Your wallet address. With Google sign-in, only your Google account id and first name. With e-mail sign-in, the e-mail address itself (it is your account id) and a hash of the 6-digit code, which expires in 10 minutes. A made-up username, which is the only name feeds show, never your wallet. The name of your home community. Optionally a contact e-mail and a phone number: you can remove them any time, and the phone number is not verified and not used for anything yet. Never your location: it's used once to find your community, then thrown away. We never keep a password anyone could read: if an e-mail account has one, only a salted hash of it is stored. <span data-profiles-only hidden>Member profiles: other signed-in members can open your profile and see your username, home community, bio, wallet address, member-since date, badges and your $VICINITY and city-coin balances. They never see your real name, how you signed in, your e-mail or phone, or your location. You can block anyone, and there is no messaging.</span></p></details>
+<!--@end-->
+          <details><summary>What do you store about me?</summary><p>Your wallet address. With Google sign-in, only your Google account id and first name. With e-mail sign-in, the e-mail address itself (it is your account id) and a hash of the 6-digit code, which expires in 10 minutes. A made-up username, which is the only name feeds show, never your wallet. The name of your home community. Optionally a contact e-mail and a phone number: you can remove them any time, and the phone number is not verified and not used for anything yet. Never your location: it's used once to find your community, then thrown away. We never keep a password anyone could read: if an e-mail account has one, only a salted hash of it is stored. <span data-profiles-only hidden>Member profiles: other signed-in members can open your profile and see your username, home community, bio, wallet address, member-since date, badges and your <!--@if !citycoin-->$VICINITY and <!--@end-->city-coin balances. They never see your real name, how you signed in, your e-mail or phone, or your location. You can block anyone, and there is no messaging.</span></p></details>
           <details><summary>Can someone fake their location?</summary><p>We make it hard: GPS must be inside the real boundary, and the internet connection must be in the same country and nearby. VPNs, proxies, cloud servers and Tor are refused. Country Managers can flag anything suspicious.</p></details>
         </div>
       </div></div>

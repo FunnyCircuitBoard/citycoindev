@@ -5,6 +5,20 @@
    list of another network than mainnet is not shown: its links would open mainnet pages. */
 (() => {
   const { $, $$, el, api, copy } = window.V;
+  // the link checker (GET /api/check), on the pages that carry it here: a page built for another label set, whose /token is the plain
+  // "not live yet" page (review finding F9). Today's page has no #checker, so nothing below runs there.
+  const checker = $("#checker");
+  if (checker) checker.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const result = $("#check-result");
+    const d = await api(`/api/check?q=${encodeURIComponent($("#check-input").value.trim())}`);
+    if (!d || !d.verdict) { result.className = "check-result check-result--unknown"; result.textContent = "Couldn't reach the checker. Please try again."; result.hidden = false; return; }
+    const icon = { official: "✓", not_official: "✕", warning: "!", unknown: "?", empty: "?" }[d.verdict] || "?";
+    const title = { official: "Official", not_official: "Not official", warning: "Be careful" }[d.verdict] || "Hmm";
+    const body = el("div"); body.append(el("strong", null, title), el("p", null, d.message));
+    result.className = `check-result check-result--${d.verdict}`;
+    result.replaceChildren(el("span", "check-result__icon", icon), body); result.hidden = false;
+  });
   const wire = (b) => { b.hidden = false; b.addEventListener("click", () => copy(b.dataset.copy, "Address copied")); };
   $$("[data-copy]").forEach(wire);
 

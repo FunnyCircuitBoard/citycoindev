@@ -1,4 +1,20 @@
-<!--{"title": "$VICINITY token & holders", "description": "Live $VICINITY token facts straight from the Solana blockchain, every holder ranked, and a checker to see where any wallet stands.", "page": "token", "scripts": ["wallets", "swap", "token"], "styles": ["swap", "pages-token"]}-->
+<!--{"title": "$VICINITY token & holders", "description": "Live $VICINITY token facts straight from the Solana blockchain, every holder ranked, and a checker to see where any wallet stands.", "page": "token", "scripts": ["wallets", "swap", "token"], "styles": ["swap", "pages-token"], "brand": {"citycoin": {"title": "Token", "description": "The {{productName}} token is not live yet.", "scripts": [], "styles": ["pages-404"]}}}-->
+<!--@if citycoin-->
+    <section class="section notfound-sec" id="token">
+      <div class="wrap notfound">
+        <div class="empty notfound__box">
+          <span class="ico notfound__ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/></svg></span>
+          <p class="kicker notfound__kicker">Token</p>
+          <h1 class="notfound__title">The {{productName}} token is not live yet.</h1>
+          <p class="notfound__text">There is no official token address, price or Buy button yet.</p>
+          <div class="notfound__cta">
+            <a class="btn btn--primary" href="/launchpad">Launchpad</a>
+            <a class="btn btn--glass" href="/cities">Live map</a>
+          </div>
+        </div>
+      </div>
+    </section>
+<!--@else-->
     <!-- ============ TOKEN ============ -->
     <section class="page-hero" id="token">
       <div class="wrap token-hero">
@@ -188,3 +204,4 @@
         <details><summary>What is the founder amount?</summary><p>How much $VICINITY you need to hold to found your city: 100K to 1M by city size, held for 7 days. The rank check shows whether a wallet holds enough, or how much it still needs to reach the smallest amount.</p></details>
       </div></div>
     </section>
+<!--@end-->

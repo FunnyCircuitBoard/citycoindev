@@ -1,6 +1,11 @@
 // Rules page: fills in every number from the live rules (/api/policy), so the page can't drift from the code.
 (() => {
   "use strict";
+  // The product's names in this file's words (the label migration, area b). A page built for a label set other than today's carries the
+  // set on <html> (data-brand, data-brand-name, data-brand-domain: scripts/pages/build.mjs writes them from src/brand.js); brand`…` puts
+  // those names in a text's own words, never in a value put into it. A page without them (today's pages) gets every text exactly as written.
+  const BRAND = (() => { try { const r = document.documentElement, at = (k) => (r && typeof r.getAttribute === "function" ? r.getAttribute(k) : null); return at("data-brand") && at("data-brand-name") && at("data-brand-domain") ? Object.freeze({ key: at("data-brand"), name: at("data-brand-name"), domain: at("data-brand-domain") }) : null; } catch { return null; } })();
+  const brand = (s, ...v) => s.reduce((out, part, i) => out + (BRAND ? part.replace(/vicinity\.city/g, () => BRAND.domain).replace(/Vicinity/g, () => BRAND.name) : part) + (i < v.length ? String(v[i]) : ""), "");
   const { $, $$, el, api, fmt, ago } = window.V;
   // each rule is a fold: open on a computer, closed on a phone (one card at a time); a link to a rule (/rules#founders) opens its fold.
   // The Terms page (/terms) loads this file for the same folds on its sections (and nothing else: the rules' numbers are below)
@@ -43,11 +48,12 @@
     const formula = $("#founder-formula"); // (guarded: the page built with the legacy seats frozen has no founder formula, stage S16)
     if (formula) formula.textContent = `score = ${w.endorsement * 100}% × endorsement share + ${w.contribution * 100}% × contribution + ${w.stake * 100}% × holdings
 holdings count from the amount up to ${f.stakeCap}× the amount (more counts the same)
-ties: lowest sha256("vicinity-seat|window|wallet")`;
+${BRAND ? "ties: lowest sha256(seat prefix|window|wallet)" : 'ties: lowest sha256("vicinity-seat|window|wallet")'}`;
     $("#never-list").replaceChildren(...p.never.map((t) => el("li", null, t)));
     $("#cutoff").textContent = d.snapshotCutoff ? new Date(d.snapshotCutoff).toUTCString() : "not scheduled yet";
     const h = d.balanceHistory || {};
-    $("#health-text").textContent = !d.launched ? "Balance checks start the moment $VICINITY launches."
+    // (a page built for another label set names no legacy token: its own token is not live yet, so nothing is checked)
+    $("#health-text").textContent = !d.launched ? (BRAND ? `The ${BRAND.name} token is not live yet, so no balances are checked.` : "Balance checks start the moment $VICINITY launches.")
       : h.lastSample ? `Balance checks running: last check ${ago(h.lastSample.taken_at)} (slot ${h.lastSample.slot ?? "—"}, ${fmt(h.lastSample.holders)} holding wallets, pools and team wallets included), ${h.samplesLast24h} in the last 24 hours.`
       : "Balance checks haven't recorded anything yet.";
   })();

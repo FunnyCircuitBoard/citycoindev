@@ -173,8 +173,8 @@ test("the pages that show a rank say 'team wallet' where a team wallet has none,
   assert.equal((prof.match(/h && h\.team \? "Team wallet" : "—"/g) || []).length, 2, "a profile's Rank, drawn and refreshed");
   // 13 Oct 2026: the team lock (labelled "Team lock (Jupiter Lock)") says "Lock", not "Pool" (test/team-lock.test.js)
   assert.ok(coin.includes('x.rank ? `#${x.rank}` : /^Team wallet/.test(str(x.label)) ? "Team" : /^Team lock/.test(str(x.label)) ? "Lock" : "Pool"'), "the coin page's top five");
-  assert.ok(lp.includes('"Counted by vicinity.city (pools and team wallets excluded)"'));
-  assert.ok(dash.includes('else if (h.team) t.textContent = `${fmt(h.amount)} $VICINITY · team wallet, not ranked`;'), "the first visit's 'Your position among all holders'");
+  assert.ok(lp.includes("brand`Counted by vicinity.city (pools and team wallets excluded)`"));
+  assert.ok(dash.includes('else if (h.team) t.textContent = `${fmt(h.amount)} ${UNIT} · team wallet, not ranked`;') && dash.includes('const UNIT = BRAND ? `${BRAND.name} tokens` : "$VICINITY"'), "the first visit's 'Your position among all holders'");
   // the rules page's count is every holding wallet (the balance sample's list.length): it says so, and is not read as people
   assert.ok(read("rules.js").includes("${fmt(h.lastSample.holders)} holding wallets, pools and team wallets included)"));
   const { badgesFor } = await import("../src/me.js");

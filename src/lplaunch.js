@@ -39,7 +39,7 @@ import { coinV2ReadyOn } from "./flags.js";
 import { launchHold, reviewPause } from "./coinreview.js";
 import { buildTx, checkCluster, checkGenesis, checkedRoute, readAccounts, respond } from "./lpkit.js";
 import { liveSeatOfUser } from "./roles.js";
-import { FROZEN_BELOW_AMOUNT, legacySeatsFrozen, stillFounder } from "./seats.js";
+import { frozenRefusal, legacySeatsFrozen, stillFounder } from "./seats.js";
 import { iso } from "./policy.js";
 import { keyLimit, publicLimit, walletLimit } from "./guards.js";
 import { displayTicker } from "./tickers.js";
@@ -57,6 +57,7 @@ import { harvestCurveFees } from "./sol/lpadmin-ix.js";
 import * as IX from "./sol/lplaunch-ix.js";
 import { LEGACY_LAUNCH_LINE, launchClosed } from "./legacylaunch.js";
 import { legacyLaunchClosed } from "./v5policy.js";
+import { SAME, brandWords } from "./brandwords.js";
 
 const WSOL = ADDRESSES.wsol;
 /** The most SOL a founder's first buy may spend (raw lamports): 10 SOL. */
@@ -109,7 +110,8 @@ async function founderOf(env, u, cityId, now, fetchImpl) {
   if (frozen && u.wallet !== seat.wallet) return { error: err("wallet_mismatch", "Your founder seat is held by another wallet. Sign in with that wallet to launch.", 403) };
   let ok;
   try { ok = await stillFounder(env, seat, now, fetchImpl); } catch (e) { console.error("founder check failed", codeOf(e)); return { error: err("rpc_unavailable", "Your balance could not be checked just now. Try again in a minute.", 503) }; }
-  if (!ok && frozen) return { error: err("below_amount", FROZEN_BELOW_AMOUNT, 403) };
+  const r = ok ? null : frozenRefusal(env); // (founder_paused while no token is live under another label set: src/seats.js)
+  if (r) return { error: err(r.error, r.message, 403) };
   if (!ok) return { error: err("in_grace", "Your balance is below the founder amount, so your seat went into its grace period. Hold the founder amount again, then launch.", 403) };
   return { seat };
 }
@@ -156,9 +158,9 @@ async function launchState(env, s, cityId, fetchImpl) {
 /**
  * The fee split of a config in plain numbers (percent of every trade), from the schedule src/fees.js reads out of the config: Meteora's
  * protocol fee, Vicinity's share, the city's share halved between holders and founder; the pool fee after graduation. null without a
- * config: no figure is ever said that was not read from the chain.
+ * config: no figure is ever said that was not read from the chain. `bw`: the product's name in the words (src/brandwords.js).
  */
-export function feeSplit(config) {
+export function feeSplit(config, bw = SAME) {
   const S = feeSchedule(config);
   if (!S) return null;
   const c = S.curve, t = c.text, pct = (bps) => bps / 100;
@@ -167,8 +169,8 @@ export function feeSplit(config) {
     totalText: t.total, // the schedule's own text ("about …" where the config's fee is not a whole tenth of a basis point): what the launch card names
     // the same clauses as the Fees sections (src/fees.js): the Meteora protocol fee with its source, the pool's split with the
     // later-liquidity note; `halves` says the founder / holder-pot halving is our program's rule (the card writes it after its source)
-    words: `Every buy and sell on the price curve pays ${t.total}: ${meteoraWords(S)}, Vicinity ${t.vicinity}, the city's holder pot ${t.holders}, and you, the founder, ${t.founder}. After your coin graduates, its pool fee is ${S.pool.text.total}, ${poolSplitWords(S, "you, the founder,")}.`,
-    halves: halvesWords("you"),
+    words: bw`Every buy and sell on the price curve pays ${t.total}: ${meteoraWords(S, {}, bw)}, Vicinity ${t.vicinity}, the city's holder pot ${t.holders}, and you, the founder, ${t.founder}. After your coin graduates, its pool fee is ${S.pool.text.total}, ${poolSplitWords(S, "you, the founder,", bw)}.`,
+    halves: halvesWords("you", bw),
   };
 }
 /** What a launch costs the founder, before the simulation says it exactly: the curve's launch fee (when known) and the rent. */
@@ -275,7 +277,7 @@ async function launchStatus(request, env, fetchImpl, now) {
   const nowS = Math.floor(now / 1000);
   const out = {
     ok: true, cluster: s.cluster, chain: s.chain, cityId: String(cityId), city: { id: String(cityId), name: f.seat.city_name, country: f.seat.country },
-    wallet: who.wallet, ticker: t ? t.ticker : null, fees: feeSplit(st.config),
+    wallet: who.wallet, ticker: t ? t.ticker : null, fees: feeSplit(st.config, brandWords(env)),
     cost: launchCost(st.config),
     firstBuy: { maxLamports: MAX_FIRST_BUY_LAMPORTS.toString(), allowed: Boolean(s.lookupTable), reason: s.lookupTable ? null : "A first buy in the same transaction needs the site's speed table, which is not set yet. Launch first, then buy on your coin's page." },
   };
@@ -321,7 +323,7 @@ async function launchStatus(request, env, fetchImpl, now) {
 
 /* ---------------------------------------------------------------- POST /api/lp/launch/tx */
 async function launchTx(request, env, fetchImpl, now) {
-  const s = lpSetup(env);
+  const s = lpSetup(env), bw = brandWords(env);
   const who = await caller(request, env, now, { write: true });
   if (who.error) return who.error;
   const body = await readJson(request, 2048);
@@ -390,8 +392,8 @@ async function launchTx(request, env, fetchImpl, now) {
     [mint]: `${ap.symbol}'s address (new: a one-time key made in your browser)`, [accts.coin]: `${f.seat.city_name}'s coin record (new)`, [accts.approval]: "your approval (closed: its rent goes back to the admin who paid it)",
     [ap.rentPayer]: ap.rentPayer === who.wallet ? "your wallet (gets the approval's rent back)" : "the admin who paid the approval's rent (gets it back)",
     [accts.pool]: "the coin's price curve on Meteora (new)", [accts.holdersPot]: "the holders' pot (new)", [accts.founderVault]: "your founder fee vault (new)", [accts.metadata]: "the coin's name and symbol (Metaplex, new)",
-    [ap.dbcConfig]: "the Vicinity price curve settings", [ADDRESSES.feeRecipient]: "Vicinity dev wallet",
-    [accts.launchpad]: "the Vicinity launchpad's settings", [accts.launchConfig]: "the price curve's place on the launchpad's allow-list",
+    [ap.dbcConfig]: bw`the Vicinity price curve settings`, [ADDRESSES.feeRecipient]: bw`Vicinity dev wallet`,
+    [accts.launchpad]: bw`the Vicinity launchpad's settings`, [accts.launchConfig]: "the price curve's place on the launchpad's allow-list",
   };
   const r = await buildTx(env, { payer: who.wallet, instructions, extraSigners: [mint], lookupTable: s.lookupTable || null, watch: [who.wallet], labels }, fetchImpl, now);
   if (!r.ok && r.error === "tx_too_large" && buy > 0n) {
@@ -432,12 +434,12 @@ async function gradState(env, s, mint, fetchImpl) {
   const pct = config.migrationQuoteThreshold > 0n ? Math.min(100, Number((pool.quoteReserve * 10000n) / config.migrationQuoteThreshold) / 100) : null;
   return { coin, pool, config, stage, canMigrate, leftoverDue, progress: { raised: formatAmount(pool.quoteReserve, SOL_DECIMALS), target: formatAmount(config.migrationQuoteThreshold, SOL_DECIMALS), pct: stage === "curve" ? pct : 100 } };
 }
-const gradWords = (g) => (g.canMigrate ? "The curve is full. Anyone can move the coin to the open market now: a Meteora pool where it trades like any other token."
-  : g.leftoverDue ? "One step left: return the coins the curve never sold to Vicinity's dev wallet (the curve's settings name it). Anyone can do it for the network fee."
+const gradWords = (g, bw = SAME) => (g.canMigrate ? "The curve is full. Anyone can move the coin to the open market now: a Meteora pool where it trades like any other token."
+  : g.leftoverDue ? bw`One step left: return the coins the curve never sold to Vicinity's dev wallet (the curve's settings name it). Anyone can do it for the network fee.`
     : g.stage === "graduated" ? "This coin is on the open market already. Nothing left to do."
       : g.stage === "curve" ? "The curve is not full yet: the coin moves to the open market once its target is raised."
         : g.stage === "full" ? "The curve is full and Meteora is finishing the move. Check again in a minute."
-          : "This coin's curve could not be read as a Vicinity curve.");
+          : bw`This coin's curve could not be read as a Vicinity curve.`);
 
 /** GET /api/lp/graduate/status?mint=&cluster= (public: it only reads the chain; counted per connection). */
 async function graduateStatus(request, env, fetchImpl, now) {
@@ -452,8 +454,9 @@ async function graduateStatus(request, env, fetchImpl, now) {
   if (gen) return gen;
   let g;
   try { g = await gradState(env, s, mint, fetchImpl); } catch (e) { console.error("graduate status failed", codeOf(e)); return err("rpc_unavailable", "The blockchain could not be reached just now.", 503); }
-  if (!g) return err("not_found", "This coin is not on the Vicinity launchpad.", 404);
-  return json({ ok: true, cluster: s.cluster, mint, stage: g.stage, canMigrate: g.canMigrate, leftoverDue: g.leftoverDue, progress: g.progress || null, message: gradWords(g),
+  const bw = brandWords(env);
+  if (!g) return err("not_found", bw`This coin is not on the Vicinity launchpad.`, 404);
+  return json({ ok: true, cluster: s.cluster, mint, stage: g.stage, canMigrate: g.canMigrate, leftoverDue: g.leftoverDue, progress: g.progress || null, message: gradWords(g, bw),
     cost: { approxLamports: GRADUATE_COST_LAMPORTS, words: `About ${sol(GRADUATE_COST_LAMPORTS)} of rent, paid by the wallet that does it (you, if you press the button).` } }, 200, { "Cache-Control": "no-store" });
 }
 
@@ -481,11 +484,12 @@ async function graduateTx(request, env, fetchImpl, now) {
   if (gen) return gen;
   let g;
   try { g = await gradState(env, s, body.mint, fetchImpl); } catch (e) { console.error("graduate read failed", codeOf(e)); return err("rpc_unavailable", "The blockchain could not be reached just now. Nothing was built.", 503); }
-  if (!g) return err("not_found", "This coin is not on the Vicinity launchpad.", 404);
-  if (!g.pool) return err("not_a_curve", gradWords(g));
+  const bw = brandWords(env);
+  if (!g) return err("not_found", bw`This coin is not on the Vicinity launchpad.`, 404);
+  if (!g.pool) return err("not_a_curve", gradWords(g, bw));
   const c = g.coin;
   if (step === "migrate") {
-    if (!g.canMigrate) return err(g.stage === "graduated" ? "already_graduated" : "not_full", gradWords(g), 409, { stage: g.stage, leftoverDue: g.leftoverDue });
+    if (!g.canMigrate) return err(g.stage === "graduated" ? "already_graduated" : "not_full", gradWords(g, bw), 409, { stage: g.stage, leftoverDue: g.leftoverDue });
     const [nft1, nft2] = keys;
     const ix = await IX.migrateToDammV2({ payer: who.wallet, dbcPool: c.dbcPool, dbcConfig: c.dbcConfig, coinMint: c.mint, quoteMint: c.quoteMint, firstNftMint: nft1, secondNftMint: nft2 });
     const ma = await IX.migrationAccounts({ coinMint: c.mint, quoteMint: c.quoteMint, firstNftMint: nft1, secondNftMint: nft2 });
@@ -495,10 +499,10 @@ async function graduateTx(request, env, fetchImpl, now) {
     if (r.ok) Object.assign(r, { step: "migrate", mint: c.mint, cityId: String(c.cityId), pool: ma.pool, next: "leftover" });
     return respond(r);
   }
-  if (!g.leftoverDue) return err(g.stage === "graduated" ? "nothing_left" : "not_full", gradWords(g), 409, { stage: g.stage });
+  if (!g.leftoverDue) return err(g.stage === "graduated" ? "nothing_left" : "not_full", gradWords(g, bw), 409, { stage: g.stage });
   const ixs = await IX.leftoverInstructions({ payer: who.wallet, coin: c });
   const r = await buildTx(env, { payer: who.wallet, instructions: ixs, lookupTable: s.lookupTable || null, watch: [who.wallet],
-    labels: { [await ata(ADDRESSES.feeRecipient, c.mint)]: "Vicinity dev wallet's account for this coin (made if missing)", [c.dbcPool]: "the coin's price curve" } }, fetchImpl, now);
+    labels: { [await ata(ADDRESSES.feeRecipient, c.mint)]: bw`Vicinity dev wallet's account for this coin (made if missing)`, [c.dbcPool]: "the coin's price curve" } }, fetchImpl, now);
   if (r.ok) Object.assign(r, { step: "leftover", mint: c.mint, cityId: String(c.cityId) });
   return respond(r);
 }

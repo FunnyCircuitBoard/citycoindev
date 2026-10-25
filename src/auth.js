@@ -85,6 +85,7 @@ import { presented } from "./walletlink.js";
 import { bindOf, finishRegisterPairing, handoffRef, notReady, pairRef, readBind, signupRef, usableHandoff } from "./register-core.js";
 import { finishLegacyPairing, legacyChallenge, legacyPairRef, legacyPairStart } from "./legacy.js";
 import { legacyLink } from "./v5policy.js";
+import { statementNames } from "./brandwords.js";
 
 export { SESSION_COOKIE, SESSION_SECONDS };
 export const OAUTH_COOKIE = "vo";
@@ -584,7 +585,7 @@ export async function handleReprove(request, env, now = Date.now()) {
   const body = await readJson(request);
   if (!body) return json({ ok: false, error: "bad_json" }, 400);
   if (walletOnly(env)) return walletOnlyReprove(request, env, now, s, body); // a server challenge bound to this session (stage S10)
-  const r = await checkSigned(body, request, now, ["login"], badSigned, env.DB, servedHost(env, request).host);
+  const r = await checkSigned(body, request, now, ["login"], badSigned, env.DB, servedHost(env, request).host, { names: statementNames(env) });
   if (r.error) return r.error;
   if (r.parsed.pin || r.parsed.address !== s.user.wallet) return json({ ok: false, error: "wrong_wallet" }, 403);
   await env.DB.prepare("UPDATE sessions SET proven_at = ? WHERE id = ?").bind(iso(now), s.id).run();
@@ -616,7 +617,7 @@ export async function handleWalletLogin(request, env, now = Date.now()) {
   // sessions.host (src/hostbind.js) before the signed text is used up: a migration that fails answers 500 and leaves the signature usable
   if (served.bound) await ensureHostSchema(env.DB, "sessions");
   // a signed message works once, and only on the host it names (an allowlist entry while the host binding counts: src/hostbind.js)
-  const r = await checkSigned(body, request, now, v2On(env) ? ["login", "link"] : ["login"], badSigned, env.DB, served.host);
+  const r = await checkSigned(body, request, now, v2On(env) ? ["login", "link"] : ["login"], badSigned, env.DB, served.host, { names: statementNames(env) });
   if (r.error) return r.error;
   const wallet = r.parsed.address;
 
@@ -1201,7 +1202,8 @@ function sixDigits() {
 }
 
 async function sendCodeEmail(env, to, code, fetchImpl, mailer = {}, kind = "signin", origin = undefined) {
-  const { subject, text, html } = verificationEmail(code, kind, origin); // origin: where the code is entered (src/hostbind.js mailOrigin)
+  // origin: where the code is entered (src/hostbind.js mailOrigin); env: the product's own name (src/mail.js; today's e-mail while BRAND is unset)
+  const { subject, text, html } = verificationEmail(code, kind, origin, env);
   return sendMail(env, { to, subject, text, html }, { fetchImpl, smtpImpl: mailer.smtpImpl || null });
 }
 

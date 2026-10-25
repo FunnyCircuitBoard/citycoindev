@@ -6,6 +6,14 @@
 // hides what the server would refuse. Only textContent: nothing from the server is ever HTML.
 (() => {
   "use strict";
+  // The product's names in this file's words (the label migration, area b). A page built for a label set other than today's carries the
+  // set on <html> (data-brand, data-brand-name, data-brand-domain: scripts/pages/build.mjs writes them from src/brand.js); brand`…` puts
+  // those names in a text's own words, never in a value put into it. A page without them (today's pages) gets every text exactly as written.
+  const BRAND = (() => { try { const r = document.documentElement, at = (k) => (r && typeof r.getAttribute === "function" ? r.getAttribute(k) : null); return at("data-brand") && at("data-brand-name") && at("data-brand-domain") ? Object.freeze({ key: at("data-brand"), name: at("data-brand-name"), domain: at("data-brand-domain") }) : null; } catch { return null; } })();
+  const brand = (s, ...v) => s.reduce((out, part, i) => out + (BRAND ? part.replace(/vicinity\.city/g, () => BRAND.domain).replace(/Vicinity/g, () => BRAND.name) : part) + (i < v.length ? String(v[i]) : ""), "");
+  // the site's main token by name: "$VICINITY" on today's pages; a page built for another label set names its own (the legacy one is shown
+  // nowhere there: the Worker sends no legacy holders, price or chart for it)
+  const TOKEN = BRAND ? `${BRAND.name} token` : "$VICINITY";
   const { $, el, api, toast, short, ago } = window.V;
   const W = window.VW;
   const LVL = { moderator: 1, admin: 2, owner: 3 };
@@ -46,7 +54,8 @@
   const walletOnlyNow = () => { const m = window.V.me(); return m ? m.walletOnly === true : null; };
   // the legacy seats frozen (/api/me says legacySeats "frozen"; Citycoin.dev master v5 stage S16): the seat decision, objection decision, election
   // opening and test-lab seed answer 410, so their buttons give way to one line; the lists stay (history). Without the key: as before
-  const seatsFrozenNow = () => { const m = window.V.me(); return Boolean(m && m.legacySeats === "frozen"); };
+  // (a page built for another label set is always built with the legacy seats frozen (scripts/pages/build.mjs pageBrandPrerequisites))
+  const seatsFrozenNow = () => { const m = window.V.me(); return Boolean(BRAND) || Boolean(m && m.legacySeats === "frozen"); };
   const CLOSED = "Founder seats, squads and elections are closed for changes.";
   // the legacy launch path closed (/api/me says legacyLaunch "off"; Citycoin.dev master v5 stage S23): a coin review can no longer be approved
   // (410), so its card offers "Ask for changes" only, with one line saying why; the queue stays (history). Without the key: as before
@@ -512,7 +521,8 @@
     const kh = h2("Key numbers"); kh.id = "ov-kpis"; kh.classList.add("sr-only");
     const grid = el("div", "adm-metrics");
     const M = {
-      members: metric("Members"), holders: metric("$VICINITY holders"), price: metric("$VICINITY price"), volume: metric("24h volume"),
+      // (a page built for another label set names its own token: the legacy one is shown nowhere there, src/official.js legacyHidden)
+      members: metric("Members"), holders: metric(`${TOKEN} holders`), price: metric(`${TOKEN} price`), volume: metric("24h volume"),
       mcap: metric("Market cap"), coins: metric("City coins live"), elections: metric("Open elections"), sampler: metric("Balance samples, 24 h"),
     };
     grid.append(...Object.values(M).map((m) => m.root));
@@ -548,7 +558,7 @@
     p.append(wrap);
 
     // the numbers the server keeps itself
-    M.members.set(int(ov.users), { from: "Accounts on vicinity.city" });
+    M.members.set(int(ov.users), { from: brand`Accounts on vicinity.city` });
     M.coins.set(int(ov.launchedCityCoins), { from: "City coins with a recorded contract" });
     // (the legacy seats frozen, stage S16 review fix S16-R4: an open election is on record only, nobody can vote in it)
     M.elections.set(int(ov.openElections), { from: seatsFrozenNow() ? "Elections on record, closed for changes" : "Country votes open now" });
@@ -601,11 +611,12 @@
     if (!lp || !lp.ok) { for (const k of ["holders", "price", "volume", "mcap"]) M[k].none("Couldn't reach /api/launchpad"); return; }
     const v = lp.vicinity || {};
     const h = v.holders;
-    if (!v.mint) M.holders.none("No official contract yet");
+    const noContract = BRAND ? "Not live yet" : "No official contract yet";
+    if (!v.mint) M.holders.none(noContract);
     else if (h && h.count != null) M.holders.set(int(h.count), { from: `People only, pools and team wallets left out · counted ${ago(h.asOf)}` });
     else M.holders.none("Not counted yet: the scheduled job counts holders every 10 minutes");
     const m = v.market;
-    if (!v.mint || !m) { const why = v.mint ? "No market answer yet" : "No official contract yet"; for (const k of ["price", "volume", "mcap"]) M[k].none(why); return; }
+    if (!v.mint || !m) { const why = v.mint ? "No market answer yet" : noContract; for (const k of ["price", "volume", "mcap"]) M[k].none(why); return; }
     const from = (key) => `${m.sources && m.sources[key] ? m.sources[key] : "—"}${m.stale ? " · a delayed copy" : ""}`;
     const tag = m.stale ? { kind: "warn", text: "Delayed" } : null;
     if (m.priceUsd != null) {
@@ -638,7 +649,7 @@
       for (const k of ["holders", "members", "countries"]) holes[k].replaceChildren(el("p", "chart__empty", "Couldn't load /api/admin/growth."));
     } else {
       C.line(holes.holders, g.holders.map((r) => ({ t: dayMs(r.day), v: r.holders })), {
-        title: "Wallets holding $VICINITY", sub: "The last balance sample of each day; pools and team wallets included", height: 200, whole: true,
+        title: `Wallets holding ${BRAND ? `the ${TOKEN}` : TOKEN}`, sub: "The last balance sample of each day; pools and team wallets included", height: 200, whole: true,
         endLabel: (v) => `${int(v)} wallets`, fmt: (v) => `${int(v)} wallets`, head: ["Day", "Wallets"],
         empty: "No balance samples yet: the sampler records about once an hour.",
       });
@@ -670,16 +681,16 @@
     }
     const mint = o && o.launchpadV2 && o.tokenContract;
     if (!mint) {
-      C.line(holes.price, [], { title: "$VICINITY price, 30 days", height: 200, empty: o && !o.launchpadV2 ? "The Launchpad list is switched off on this site." : "No official contract yet." });
+      C.line(holes.price, [], { title: `${TOKEN} price, 30 days`, height: 200, empty: o && !o.launchpadV2 ? "The Launchpad list is switched off on this site." : BRAND ? "Not live yet." : "No official contract yet." });
       return;
     }
     const ch = await chartP;
     const line = ch && ch.ok && ch.line ? ch.line : null;
     const pts = line ? line.points.filter((x) => x[1] != null).map((x) => ({ t: x[0] * 1000, v: x[1] })) : [];
     let note = null; // Jupiter's line goes with Jupiter's numbers: only when the chart shows them
-    if (pts.length) { note = el("span"); note.append(`One point per ${line.interval}, sampled by vicinity.city from Jupiter's last-trade price · `, poweredByJupiter()); }
+    if (pts.length) { note = el("span"); note.append(brand`One point per ${line.interval}, sampled by vicinity.city from Jupiter's last-trade price · `, poweredByJupiter()); }
     C.line(holes.price, pts, {
-      title: "$VICINITY price, 30 days", sub: "US dollars", height: 200, zero: false, when: "time", fmt: usd, tick: usd, head: ["Time", "Price (USD)"], note,
+      title: `${TOKEN} price, 30 days`, sub: "US dollars", height: 200, zero: false, when: "time", fmt: usd, tick: usd, head: ["Time", "Price (USD)"], note,
       empty: (ch && ch.missing && ch.missing.line) || (ch && ch.ok ? "No price sample in the last 30 days." : "Couldn't load /api/coin/chart."),
     });
     await market.catch(() => null);
@@ -1003,7 +1014,7 @@
   function inUseSection(list) {
     const s = el("section", "card adm-coinrev__inuse");
     s.append(el("h3", "adm-h3", "Founders' own words and pictures in use"),
-      el("p", "small muted", "Each one here is public on its coin now (a reviewer approved it). Take it down if it breaks the rules: the coin falls back to Vicinity's own words or design, everywhere, and the founder is told."));
+      el("p", "small muted", brand`Each one here is public on its coin now (a reviewer approved it). Take it down if it breaks the rules: the coin falls back to Vicinity's own words or design, everywhere, and the founder is told.`));
     for (const x of list) {
       const row = el("article", "adm-coinrev__use");
       row.append(el("p", "small", `${x.city && x.city.name ? x.city.name : "—"}${x.city && x.city.country ? ` (${x.city.country})` : ""} · $${x.symbol} “${x.name}” · ${x.launched ? "launched" : "not launched yet"} · version ${x.version || "—"}`));
@@ -1026,10 +1037,10 @@
       const n = note.value.trim();
       if (n.length < 3) { toast("Say what is wrong in 3 to 300 characters (it goes into the staff log)."); note.focus(); return; }
       const ask = what === "art"
-        ? (x.launched ? "Take the founder's picture down? The coin's metadata and every page show the Vicinity design of the coin instead; the picture's address stops working. The founder is told."
-          : "Take the founder's picture down? Its address stops working, and the coin goes back to Vicinity's coin for the city on every page. The founder is told.")
-        : (x.ownName && !x.launched ? "Take the founder's coin name and words down? The coin goes back to Vicinity's coin for the city (name, ticker, picture and description) on every page. The founder is told."
-          : `Take the founder's description down? Every page${x.launched ? " and the coin's metadata" : ""} show Vicinity's own sentence instead. The founder is told.`);
+        ? (x.launched ? brand`Take the founder's picture down? The coin's metadata and every page show the Vicinity design of the coin instead; the picture's address stops working. The founder is told.`
+          : brand`Take the founder's picture down? Its address stops working, and the coin goes back to Vicinity's coin for the city on every page. The founder is told.`)
+        : (x.ownName && !x.launched ? brand`Take the founder's coin name and words down? The coin goes back to Vicinity's coin for the city (name, ticker, picture and description) on every page. The founder is told.`
+          : brand`Take the founder's description down? Every page${x.launched ? " and the coin's metadata" : ""} show Vicinity's own sentence instead. The founder is told.`);
       if (!sure(ask)) return;
       said(await post("/api/coins/takedown", { city: x.city && x.city.id, what, ...(sha ? { sha } : {}), reason: why.value, note: n }), what === "art" ? "Picture taken down" : "Taken down");
     };
@@ -1128,7 +1139,7 @@
     box.append(why, note, btn("Take the picture down", async () => {
       const n = note.value.trim();
       if (n.length < 3) { toast("Say what is wrong in 3 to 300 characters (it goes into the staff log)."); return; }
-      if (sure("Take this picture down? Its public address stops working; a coin that uses it goes back to Vicinity's coin for the city (a launched one shows the Vicinity design of its own ticker and name). The founder is told.")) {
+      if (sure(brand`Take this picture down? Its public address stops working; a coin that uses it goes back to Vicinity's coin for the city (a launched one shows the Vicinity design of its own ticker and name). The founder is told.`)) {
         said(await post("/api/coins/takedown", { city: x.city && x.city.id, what: "art", sha, reason: why.value, note: n }), "Picture taken down");
       }
     }));

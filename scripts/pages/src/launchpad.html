@@ -1,11 +1,15 @@
-<!--{"title": "Launchpad", "description": "Every city gets its own coin. Browse the live coins and buy in one tap, or create your city's coin.", "page": "launchpad", "scripts": ["wallets", "swap", "launchpad"], "styles": ["swap", "pages-launchpad"]}-->
+<!--{"title": "Launchpad", "description": "Every city gets its own coin. Browse the live coins and buy in one tap, or create your city's coin.", "page": "launchpad", "scripts": ["wallets", "swap", "launchpad"], "styles": ["swap", "pages-launchpad"], "brand": {"citycoin": {"description": "Every city gets its own coin. Browse the live coins and buy in one tap."}}}-->
     <!-- Design v4 (the owner, 12 Oct 2026: "keep only 'Every city gets its own coin.', get rid of the rest, directly show the live tokens, and
          add a button 'Create your city coin'"): the tagline and one button, then the coins. The button signs a visitor up (/connect); a member
          goes to the dashboard's Founder tab instead (launchpad.js, from site.js's /api/me answer). -->
     <section class="lp4-hero" id="launchpad">
       <div class="wrap lp4-hero__inner">
         <h1 class="page-title lp4-hero__title"><span class="lp4-hero__line">Every city gets</span> <span class="accent">its own coin.</span></h1>
+        <!--@if citycoin-->
+        <p class="lead lp4-hero__note">New city coins launch here once the {{productName}} token is live.</p>
+        <!--@else-->
         <a class="btn btn--primary btn--lg btn--cta-glow has-ring lp4-hero__cta" href="/connect" id="lp-create" data-create-coin>Create your city coin</a>
+        <!--@end-->
       </div>
     </section>
 
@@ -48,11 +52,11 @@
             </li>
           </ul>
         </div>
-        <p class="lp-trust">Powered by Jupiter · Vicinity never touches your funds.</p>
+        <p class="lp-trust">Powered by Jupiter · {{productName}} never touches your funds.</p>
         <details class="fold lp-sources">
-          <summary>Where the numbers come from <span class="fold__meta">Jupiter · the Solana chain · vicinity.city · every 30 s</span></summary>
-          <p class="tiny muted lp-about">Every coin here is a city's one official coin, launched by its City Founder<span data-launchlab-copy> and recorded by Vicinity</span><span data-lp-only hidden> on the Vicinity launchpad (a Meteora bonding curve)</span>. A coin that has launched shows its live price; the others are <span data-designed-copy>designed and waiting</span><span data-ready-copy hidden>chosen or designed, not launched yet</span>.</p>
-          <p class="tiny muted lp-honesty" id="lp-honesty">Every number says where it comes from: prices, market caps and 24 h volumes from Jupiter (Powered by Jupiter), each bonding curve read from the Solana chain, holders counted by vicinity.city. They refresh every 30 seconds. You trade in your own wallet on Raydium or Jupiter; Vicinity never touches your funds.</p>
+          <summary>Where the numbers come from <span class="fold__meta">Jupiter · the Solana chain · {{domain}} · every 30 s</span></summary>
+          <p class="tiny muted lp-about">Every coin here is a city's one official coin, launched by its City Founder<span data-launchlab-copy> and recorded by {{productName}}</span><span data-lp-only hidden> on the {{productName}} launchpad (a Meteora bonding curve)</span>. A coin that has launched shows its live price; the others are <span data-designed-copy>designed and waiting</span><span data-ready-copy hidden>chosen or designed, not launched yet</span>.</p>
+          <p class="tiny muted lp-honesty" id="lp-honesty">Every number says where it comes from: prices, market caps and 24 h volumes from Jupiter (Powered by Jupiter), each bonding curve read from the Solana chain, holders counted by {{domain}}. They refresh every 30 seconds. You trade in your own wallet on Raydium or Jupiter; {{productName}} never touches your funds.</p>
         </details>
       </div>
     </section>

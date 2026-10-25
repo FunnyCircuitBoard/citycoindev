@@ -100,7 +100,7 @@ import { base58Encode, buildMessage, isSolanaAddress, statementFor } from "./sol
 import { SECURITY_HEADERS, json } from "./http.js";
 import { readSigned } from "./signed.js";
 import { ensureSchema } from "./store.js";
-import { POLICY, founderAmount } from "./policy.js";
+import { LEGACY_NEVER, POLICY, founderAmount } from "./policy.js";
 import { ledgerStatus } from "./ledger.js";
 import { handleChallenge, handleEmailStart, handleEmailVerify, handleGoogleAdd, handleLogout, handleOAuthCallback, handleOAuthStart, handlePairFinish, handlePairStart, handlePairStatus,
   handlePairStatusPost, handleReprove, handleTransferCheck, handleTransferStart, handleWalletLogin } from "./auth.js";
@@ -146,6 +146,7 @@ import { EDGE_SECONDS as FEE_STATUS_SECONDS, handleFeeStatus } from "./feestatus
 import { handleCoinMeta } from "./coinmeta.js";
 import { BROWSER_SECONDS, EDGE_SECONDS, OFFICIAL_CSV_PATH, officialCacheKey, officialCoinsCsv, officialCoinsJson } from "./officialcoins.js";
 import { DEFAULT_SITE, isForwardHost, localDevAllowed, siteConfig } from "./site-config.js";
+import { brandWords, statementName, statementNames } from "./brandwords.js";
 import { checkDeploymentConfig } from "./maintoken.js";
 import { checkPolicyConfig, hostRedirect, masterPolicyAnswer, publicMaster, publicV5, walletOnly, walletOnlyHeld } from "./v5policy.js";
 import { hostAnswer, isLocal, wrongHost } from "./hostroute.js";
@@ -199,7 +200,7 @@ async function cached(key, seconds, produce, { edge = 0 } = {}) {
 export async function handleVerify(request, env = {}, now = Date.now(), fetchImpl = fetch) {
   // one-time: a replayed body is 409, not another RPC call; the message must name the host it is checked on (src/hostbind.js); while
   // WALLET_ONLY counts a message whose single use the database cannot confirm is refused (strict), otherwise accepted as today
-  const r = await readSigned(request, now, ["verify"], "verified", undefined, env.DB || null, servedHost(env, request).host, { strict: walletOnly(env) || walletOnlyHeld(env) });
+  const r = await readSigned(request, now, ["verify"], "verified", undefined, env.DB || null, servedHost(env, request).host, { strict: walletOnly(env) || walletOnlyHeld(env), names: statementNames(env) });
   if (r.error) return r.error;
   const address = r.parsed.address;
   console.log("wallet verified", address.slice(0, 4) + "…" + address.slice(-4));
@@ -457,7 +458,9 @@ export async function handleApi(request, env = {}, fetchImpl = fetch, ctx = null
     if (blocked) return blocked;
     const mint = url.searchParams.get("mint");
     if (mint !== null && !isSolanaAddress(mint)) return json({ ok: false, error: "bad_mint" }, 400);
-    return cached(`fees-${mint || "live"}`, 300, async () => (await publicLimit(env, request, "fees")) || handleFees(request, env, fetchImpl));
+    // the key names the label set's mode too (mainCacheTag: "" with today's, so today's key is unchanged): the fee words carry the product's
+    // name, and an answer kept at the edge before a label-set change is never served after it (go-live review finding GL-DEP-8)
+    return cached(`fees-${mint || "live"}${mainCacheTag(env)}`, 300, async () => (await publicLimit(env, request, "fees")) || handleFees(request, env, fetchImpl));
   }
   // one official city coin's fees so far (lpSetup), read from the chain (src/feestatus.js). With the settings missing it is simply not
   // there (before any method check); the public limiter counts a cache miss; a 404 or a 503 is never kept at the edge
@@ -481,8 +484,9 @@ export async function handleApi(request, env = {}, fetchImpl = fetch, ctx = null
     }
     const blocked = method === "HEAD" ? null : only("GET");
     if (blocked) return blocked;
-    // the key names the configs too (officialCacheKey): a config added to LAUNCHPAD_DBC_CONFIGS is a new list at once
-    return cached(officialCacheKey(s, csv), BROWSER_SECONDS,
+    // the key names the configs too (officialCacheKey): a config added to LAUNCHPAD_DBC_CONFIGS is a new list at once; and the label set's
+    // mode (mainCacheTag, "" with today's): the JSON's rule sentence carries the product's name (go-live review finding GL-DEP-8)
+    return cached(officialCacheKey(s, csv) + mainCacheTag(env), BROWSER_SECONDS,
       async () => (await publicLimit(env, request, "official_coins")) || (csv ? officialCoinsCsv(env, fetchImpl) : officialCoinsJson(env, fetchImpl)), { edge: EDGE_SECONDS });
   }
   // city coins on our own launchpad (lpSetup): with the settings missing they are simply not there (before any method check)
@@ -534,7 +538,10 @@ export async function handleApi(request, env = {}, fetchImpl = fetch, ctx = null
     case "/api/policy": {
       const blocked = only("GET");
       if (blocked) return blocked;
-      const out = { policy: POLICY, snapshotCutoff: snapshotCutoff(env), launched: Boolean(tokenMint(env)),
+      // the Rules page shows the never-list as it comes: in the product's own name (today's words while BRAND is unset), and under another
+      // label set without the legacy token's own line (it is shown nowhere then, src/official.js legacyHidden)
+      const bw = brandWords(env);
+      const out = { policy: bw.on ? { ...POLICY, never: POLICY.never.filter((t) => t !== LEGACY_NEVER).map((t) => bw.say(t)) } : POLICY, snapshotCutoff: snapshotCutoff(env), launched: Boolean(tokenMint(env)),
         balanceHistory: env.DB ? await ledgerStatus(env, Date.now()) : { running: false } };
       // the legacy seats frozen (stage S16, src/seats.js LEGACY_SEATS_STATUS): the seat, squad, steward and election rules of `policy` are history,
       // and the answer says so; otherwise no such key, exactly today's answer
@@ -612,15 +619,17 @@ export async function handleApi(request, env = {}, fetchImpl = fetch, ctx = null
       if ((walletOnly(env) || walletOnlyHeld(env)) && (action === "login" || action === "link")) return json({ error: "use_challenge" }, 400);
       let statement;
       const pin = q.get("pin") || undefined;
-      if (action === "verify") statement = statementFor("verify");
-      else if (action === "login" && (!pin || /^[0-9]{2}$/.test(pin))) statement = statementFor("login", { pin });
+      // the statement names the product (src/brandwords.js statementName: today's "Vicinity" while BRAND is unset)
+      const product = statementName(env);
+      if (action === "verify") statement = statementFor("verify", {}, product);
+      else if (action === "login" && (!pin || /^[0-9]{2}$/.test(pin))) statement = statementFor("login", { pin }, product);
       else if (action === "link" && (!pin || /^[0-9]{2}$/.test(pin))) {
         // the statement names the account the wallet is linked to: the signed-in person's own, or the owner of a live code / link pairing
         if (!env.DB) return json({ error: "unavailable" }, 503);
         const a = await linkAccountFor(request, env);
         if (a.response) return a.response;
         if (a.error) return json({ error: a.error }, a.status);
-        statement = statementFor("link", { handle: a.handle, pin });
+        statement = statementFor("link", { handle: a.handle, pin }, product);
       } else return json({ error: "bad_request" }, 400);
       const nonce = base58Encode(crypto.getRandomValues(new Uint8Array(16)));
       // the host the text names: the allowlist entry this request is served as (src/hostbind.js; today, the request's own host), the one
@@ -678,13 +687,13 @@ export async function handleApi(request, env = {}, fetchImpl = fetch, ctx = null
     }
     case "/api/coins/design":
       // COIN_V2_READY=on: every coin is the ready-made Vicinity coin ("Use this coin", src/coinready.js); the old studio stays closed
-      if (coinV2ReadyOn(env) && method === "POST") return json({ ok: false, error: "use_ready_coin", message: "Your city's coin is made from the Vicinity design now. Use the coin in your Founder tab." }, 409);
+      if (coinV2ReadyOn(env) && method === "POST") return json({ ok: false, error: "use_ready_coin", message: brandWords(env).say("Your city's coin is made from the Vicinity design now. Use the coin in your Founder tab.") }, 409);
       return only("POST") || handleDesign(request, env, fetchImpl);
     case "/api/coins/mint":
       // COIN_V2_READY=on: a city's one coin launches on the Vicinity launchpad only, so a founder can't send a Raydium LaunchLab
       // contract (nothing is read: no body, no founder check). An admin's decision on a contract sent before goes to handleDecideMint,
       // which refuses to RECORD one while the switch is on and lets a rejection (with a reason) through, so such a city can be settled
-      if (coinV2ReadyOn(env) && method === "POST") return json({ ok: false, error: "launchpad_only", message: "City coins launch on the Vicinity launchpad now, so a Raydium LaunchLab contract can't be added here. Nothing was changed." }, 409);
+      if (coinV2ReadyOn(env) && method === "POST") return json({ ok: false, error: "launchpad_only", message: brandWords(env).say("City coins launch on the Vicinity launchpad now, so a Raydium LaunchLab contract can't be added here. Nothing was changed.") }, 409);
       return only("POST") || handleProposeMint(request, env, fetchImpl);
     case "/api/coins/mint/decide":
       return only("POST") || handleDecideMint(request, env, fetchImpl);

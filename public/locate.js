@@ -4,6 +4,11 @@
 // request, so it never reaches a server log, the history or a Referer (review finding SEC-6). A ?code= link is read as always.
 (() => {
   "use strict";
+  // The product's names in this file's words (the label migration, area b). A page built for a label set other than today's carries the
+  // set on <html> (data-brand, data-brand-name, data-brand-domain: scripts/pages/build.mjs writes them from src/brand.js); brand`…` puts
+  // those names in a text's own words, never in a value put into it. A page without them (today's pages) gets every text exactly as written.
+  const BRAND = (() => { try { const r = document.documentElement, at = (k) => (r && typeof r.getAttribute === "function" ? r.getAttribute(k) : null); return at("data-brand") && at("data-brand-name") && at("data-brand-domain") ? Object.freeze({ key: at("data-brand"), name: at("data-brand-name"), domain: at("data-brand-domain") }) : null; } catch { return null; } })();
+  const brand = (s, ...v) => s.reduce((out, part, i) => out + (BRAND ? part.replace(/vicinity\.city/g, () => BRAND.domain).replace(/Vicinity/g, () => BRAND.name) : part) + (i < v.length ? String(v[i]) : ""), "");
   const { $, $$, api, getLocation } = window.V;
   const fromHash = new URLSearchParams(String(location.hash || "").slice(1)).get("code");
   if (fromHash) { try { history.replaceState(null, "", location.pathname + location.search); } catch {} }
@@ -45,7 +50,7 @@
   /** A new account's location check can be started from a computer too, so don't say "wallet app" there. */
   function signupWording() {
     const ask = $("#l-purpose").parentElement, strong = $("#l-purpose");
-    ask.replaceChildren("You started this on Vicinity to ", strong, ". Share your location here, then go back to the page where you started: it continues by itself.");
+    ask.replaceChildren(brand`You started this on Vicinity to `, strong, ". Share your location here, then go back to the page where you started: it continues by itself.");
     $(".cstate[data-state=done] p").textContent = "Go back to the page where you started. It picks this up in a few seconds. You can close this page.";
     // the page's own bullet about the network is written for a wallet app on this phone: say the same thing the error would
     const net = Array.from($$(".safety li")).find((li) => /same phone as your wallet app/.test(li.textContent));

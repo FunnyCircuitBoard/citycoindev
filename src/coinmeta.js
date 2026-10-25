@@ -29,6 +29,7 @@ import { LAYOUT } from "./sol/layout.js";
 import { publicLimit } from "./guards.js";
 import { chainMetadata, findCoin, knownMissing, rememberMissing } from "./lpcoins.js";
 import { artBound, artBytes, artUrl, bindVersion, boundArtOf, versionForCoin } from "./coinart-store.js";
+import { brandWords, onLegacyHost, siteOrigin } from "./brandwords.js";
 
 /* ---------------------------------------------------------------- the JSON (a port of metadata.mts, kept byte-for-byte in parity) */
 export const VICINITY_BRAND = Object.freeze({
@@ -42,7 +43,37 @@ export const MAX_NAME_BYTES = 32;
 export const MAX_SYMBOL_BYTES = 10;
 export const metadataUriFor = (mint) => `${VICINITY_BRAND.metadataPrefix}${mint}.json`;
 export const coinImageUrl = (mint) => `${VICINITY_BRAND.metadataPrefix}${mint}.png`;
-export const coinPageUrl = (mint) => `${VICINITY_BRAND.site}/coin?mint=${mint}`;
+export const coinPageUrl = (mint, brand = VICINITY_BRAND) => `${brand.site}/coin?mint=${mint}`;
+/**
+ * The launchpad brand a NEW coin's JSON names (the label migration, stage S48): the frozen legacy brand above under today's label set; under
+ * another (src/brandwords.js), the product's name, the serving origin (SITE_ORIGIN) for its links and the label set's badge
+ * (/brand/icon-512.png). The metadata URI prefix and the picture URLs never change (they are compiled into the deployed program). A coin
+ * whose JSON was first built under the legacy brand keeps it whenever its JSON is built again (metaBrandFor).
+ * While the site is served from a legacy host under another label set (SITE_ORIGIN unset, or naming vicinity.city: src/site-config.js
+ * LEGACY_HOSTS) the brand has no site and no badge address (`provisional`): the JSON names no host at all, because wallets, explorers and
+ * Jupiter keep what they read and the stored JSON is served for good (review finding CRAWL-1). Such a JSON is rebuilt once, from the
+ * recorded name and symbol, the first time it is read after SITE_ORIGIN names the new host (metadata below).
+ */
+export function metaBrand(env) {
+  const bw = brandWords(env);
+  if (!bw.on) return VICINITY_BRAND;
+  if (onLegacyHost(env)) {
+    return Object.freeze({ name: bw.brand.productName, site: null, logo: null, network: VICINITY_BRAND.network, metadataPrefix: VICINITY_BRAND.metadataPrefix, provisional: true });
+  }
+  const site = siteOrigin(env);
+  return Object.freeze({ name: bw.brand.productName, site, logo: `${site}/brand/icon-512.png`, network: VICINITY_BRAND.network, metadataPrefix: VICINITY_BRAND.metadataPrefix });
+}
+/** A stored JSON built under another label set while the site was served from a legacy host (metaBrand's `provisional`): no host links. */
+export function provisionalJson(metaJson) {
+  try { const j = JSON.parse(metaJson); return Boolean(j) && j.launchpad !== VICINITY_BRAND.name && !Object.hasOwn(j, "createdOn"); } catch { return false; }
+}
+/** The brand of a recorded coin's JSON: the legacy brand when its stored JSON names it (a coin launched before the label set changed), else metaBrand. */
+export function metaBrandFor(env, row) {
+  if (row && row.meta_json) {
+    try { if (JSON.parse(row.meta_json).launchpad === VICINITY_BRAND.name) return VICINITY_BRAND; } catch { /* unreadable: the label set's */ }
+  }
+  return metaBrand(env);
+}
 const utf8Len = (s) => new TextEncoder().encode(s).length;
 // eslint-disable-next-line no-control-regex
 const CONTROL = /[\u0000-\u001f\u007f-\u009f]/;
@@ -53,8 +84,11 @@ export function checkName(name) {
 }
 export const checkSymbol = (symbol) => (/^[A-Z0-9]{1,10}$/.test(symbol) ? null : `symbol must be 1 to ${MAX_SYMBOL_BYTES} characters of A-Z and 0-9`);
 const PITCH_BAD = /https?:|www\.|[1-9A-HJ-NP-Za-km-z]{32,44}/;
-/** The JSON served at /coin-meta/<mint>.json: the same object coinMetadataJson in solana/sdk/launchpad/metadata.mts builds. */
-export function coinMetadataJson(i) {
+/**
+ * The JSON served at /coin-meta/<mint>.json: the same object coinMetadataJson in solana/sdk/launchpad/metadata.mts builds (with the legacy
+ * brand, the default). `brand`: metaBrand's; under another label set the description names the product, never a host.
+ */
+export function coinMetadataJson(i, brand = VICINITY_BRAND) {
   const nameErr = checkName(i.name), symErr = checkSymbol(i.symbol);
   if (nameErr) throw new Error(nameErr);
   if (symErr) throw new Error(symErr);
@@ -65,22 +99,22 @@ export function coinMetadataJson(i) {
   const out = {
     name: i.name,
     symbol: i.symbol,
-    description: `${lead}Launched on Vicinity (${VICINITY_BRAND.site}) on Solana.`,
+    description: brand === VICINITY_BRAND ? `${lead}Launched on Vicinity (${VICINITY_BRAND.site}) on Solana.` : `${lead}Launched on ${brand.name} on Solana.`,
     image: i.image ?? coinImageUrl(i.mint),
-    external_url: coinPageUrl(i.mint),
-    createdOn: VICINITY_BRAND.site,
-    launchpad: VICINITY_BRAND.name,
-    launchpadLogo: VICINITY_BRAND.logo,
-    network: VICINITY_BRAND.network,
+    // (a provisional brand, metaBrand: no host links until SITE_ORIGIN names the new host)
+    ...(brand.site ? { external_url: coinPageUrl(i.mint, brand), createdOn: brand.site } : {}),
+    launchpad: brand.name,
+    ...(brand.logo ? { launchpadLogo: brand.logo } : {}),
+    network: brand.network,
     city: { id: cityId, name: i.city.name, ...(i.city.country ? { country: i.city.country } : {}), ...(i.city.region ? { region: i.city.region } : {}),
       ...(i.city.countryName ? { countryName: i.city.countryName } : {}), ticker: i.city.ticker },
     showName: true,
     attributes: [
-      { trait_type: "Launchpad", value: VICINITY_BRAND.name },
-      { trait_type: "Network", value: VICINITY_BRAND.network },
+      { trait_type: "Launchpad", value: brand.name },
+      { trait_type: "Network", value: brand.network },
       { trait_type: "City", value: i.city.name },
     ],
-    website: coinPageUrl(i.mint),
+    ...(brand.site ? { website: coinPageUrl(i.mint, brand) } : {}),
   };
   if (i.twitter) out.twitter = i.twitter;
   if (i.telegram) out.telegram = i.telegram;
@@ -90,10 +124,10 @@ export function coinMetadataJson(i) {
  * The JSON of a coin launched with a ready-made version `v` (src/coinart-store.js versionForCoin: its description, picture and city), with
  * the chain's name and symbol (`md`). Pure: src/cointakedown.js builds the JSON a takedown leaves with it, in the same batch.
  */
-export function versionJson(row, md, v) {
+export function versionJson(row, md, v, brand = VICINITY_BRAND) {
   const c = (v.content && v.content.city) || {};
   return coinMetadataJson({ mint: row.mint, name: md.name, symbol: md.symbol, pitch: v.description, image: artUrl(v.art_sha256),
-    city: { id: row.city_id, name: c.name, country: c.country, region: c.region || undefined, countryName: c.countryName || undefined, ticker: md.symbol } });
+    city: { id: row.city_id, name: c.name, country: c.country, region: c.region || undefined, countryName: c.countryName || undefined, ticker: md.symbol } }, brand);
 }
 /**
  * The JSON of a recorded coin (`row`: lp_coins) from its on-chain metadata (`md`: { name, symbol }) and its city's design row:
@@ -102,16 +136,17 @@ export function versionJson(row, md, v) {
  */
 export async function metaJsonFor(env, row, md) {
   await ensureSchema(env.DB);
+  const brand = metaBrandFor(env, row);
   // a coin launched with a ready-made version (src/coinready.js, COIN_V2_READY): its picture and every word from that version, built
   // here and never from a request, whatever the switches say now (src/coinart-store.js versionForCoin: only the version BOUND to this
   // mint when its launch was recorded with the switch on and the owner's approval built from it, with the chain's name and symbol and
   // its picture intact; anything else gets the JSON below)
   const v = await versionForCoin(env, { cityId: String(row.city_id), mint: row.mint, name: md.name, symbol: md.symbol });
-  if (v) return versionJson(row, md, v);
+  if (v) return versionJson(row, md, v, brand);
   const city = await env.DB.prepare("SELECT city_name, country, pitch FROM city_coins WHERE city_id = ?").bind(String(row.city_id)).first();
   const pitch = city && city.pitch && !PITCH_BAD.test(city.pitch) ? city.pitch : undefined;
   return coinMetadataJson({ mint: row.mint, name: md.name, symbol: md.symbol, pitch,
-    city: { id: row.city_id, name: city ? city.city_name : md.name, ...(city && city.country ? { country: city.country } : {}), ticker: md.symbol } });
+    city: { id: row.city_id, name: city ? city.city_name : md.name, ...(city && city.country ? { country: city.country } : {}), ticker: md.symbol } }, brand);
 }
 
 /* ---------------------------------------------------------------- the route */
@@ -144,7 +179,19 @@ export async function handleCoinMeta(request, env, fetchImpl = fetch, now = Date
 }
 
 async function metadata(request, env, row, fetchImpl, now) {
-  if (row.meta_json) return jsonAnswer(request, row.meta_json, 200, 3600);
+  if (row.meta_json) {
+    // today's label set serves every stored JSON exactly as before, whatever fields it holds (a stored JSON without "launchpad" and
+    // "createdOn" read as provisional here and got 5 minutes in caches: final check parity sweep); only another label set looks further
+    if (!brandWords(env).on || !provisionalJson(row.meta_json)) return jsonAnswer(request, row.meta_json, 200, 3600);
+    // built while the site was served from a legacy host under another label set (no host links): rebuilt once, from the recorded name and
+    // symbol, when SITE_ORIGIN names the new host; until then served as it is, for 5 minutes at a time (review finding CRAWL-1)
+    const b = metaBrand(env);
+    if (b.provisional || b === VICINITY_BRAND || !row.name || !row.symbol) return jsonAnswer(request, row.meta_json, 200, 300);
+    let meta;
+    try { meta = JSON.stringify(await metaJsonFor(env, row, { name: row.name, symbol: row.symbol })); } catch (e) { console.error("coin-meta JSON not rebuilt", codeOf(e)); return jsonAnswer(request, row.meta_json, 200, 300); }
+    await env.DB.prepare("UPDATE lp_coins SET meta_json = ?, meta_at = ? WHERE mint = ? AND meta_json = ?").bind(meta, iso(now), row.mint, row.meta_json).run();
+    return jsonAnswer(request, meta, 200, 3600);
+  }
   // recorded, but the JSON is not built yet (the metadata could not be read at that moment): only with the settings on, from the chain
   const s = lpSetup(env);
   if (!s.on || row.cluster !== s.cluster || row.program_id !== s.programId) return notFound(request);
@@ -166,7 +213,7 @@ async function metadata(request, env, row, fetchImpl, now) {
   // the chain's name and symbol too, where the launch record could not read them (src/lpcoins.js stores them only then): the
   // "ticker already launched" checks read lp_coins.symbol (src/coinready.js, src/lpadmin.js, src/lplaunch.js)
   await env.DB.prepare("UPDATE lp_coins SET meta_json = ?, meta_at = ?, name = COALESCE(name, ?), symbol = COALESCE(symbol, ?) WHERE mint = ?").bind(meta, iso(now), md.name, md.symbol, row.mint).run();
-  return jsonAnswer(request, meta, 200, 3600);
+  return jsonAnswer(request, meta, 200, provisionalJson(meta) ? 300 : 3600);
 }
 
 /** The APPROVED picture (src/logos.js), only while its bytes still hash to the coin's logo_hash; else the badge (no picture, waiting, taken down). */
@@ -184,7 +231,8 @@ async function image(request, env, row) {
       return answer(request, toBytes(logo.bytes), 200, { "Content-Type": logo.type, "Cache-Control": `public, max-age=${PICTURE_MAX_AGE}`, "Content-Security-Policy": "default-src 'none'; sandbox", "Content-Disposition": "inline" });
     }
   } catch (e) { console.error("coin-meta logo read failed", codeOf(e)); }
-  return new Response(null, { status: 302, headers: { ...base, Location: "/brand/vicinity-512.png", "Cache-Control": "public, max-age=300" } });
+  // no picture of its own: the badge of the label set (/brand/vicinity-512.png itself stays, unchanged, for whatever names it)
+  return new Response(null, { status: 302, headers: { ...base, Location: brandWords(env).on ? "/brand/icon-512.png" : "/brand/vicinity-512.png", "Cache-Control": "public, max-age=300" } });
 }
 
 /**

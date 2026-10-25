@@ -8,6 +8,9 @@ import { legacyLaunchClosed, mainTokenV5 } from "./v5policy.js";
 import { launchpadCluster, launchpadTradingOn, lpSetup, swapOn } from "./cluster.js";
 import { ADDRESSES } from "./sol/pda.js";
 import { LEGACY_TOKENS, LEGACY_X_URL, MAIN_TOKEN_LABEL, isLegacyMint, mainMint, officialLinks } from "./maintoken.js";
+import { brandWords } from "./brandwords.js";
+import { brandOf } from "./brand.js";
+import { CUTOVER_HOSTS, LEGACY_HOSTS, siteConfig } from "./site-config.js";
 
 // The $VICINITY mint address. Paste it here the moment the token launches (one line change).
 export const VICINITY_MINT = null;
@@ -140,10 +143,14 @@ function socialLink(url) {
   return { network: onHost[0].network, profile, account: Boolean(first) };
 }
 
-/** Decide whether something a visitor pasted is an official Vicinity place (the list as it is now: see withMint). */
+/** Decide whether something a visitor pasted is an official Vicinity place (the list as it is now: see withMint). Under MAIN_TOKEN_V5, and
+ *  under a label set other than today's (legacyHidden), checkOfficialV5 answers: below, today's answers for today's label set only. */
 export function checkOfficial(input, isSolanaAddress, env) {
-  if (mainTokenV5(env)) return checkOfficialV5(input, isSolanaAddress, env);
+  if (mainTokenV5(env) || legacyHidden(env)) return checkOfficialV5(input, isSolanaAddress, env);
   const OFFICIAL = withMint(env);
+  // the product's name in the answers that name the site itself (src/brandwords.js); the token's and the social accounts' answers are
+  // the main-token stage's (rebrand area d)
+  const bw = brandWords(env);
   const raw = clean(input);
   if (!raw) return { verdict: "empty", message: "Paste a link, address or @handle to check it." };
 
@@ -153,7 +160,7 @@ export function checkOfficial(input, isSolanaAddress, env) {
       return { verdict: "official", kind: "contract", message: "This is the official $VICINITY contract address." };
     if (OFFICIAL.teamWallets.includes(raw)) {
       const name = teamWalletName(raw);
-      return { verdict: "official", kind: "wallet", message: `This is a published Vicinity team wallet${name ? ` (${name.what})` : ""}.` };
+      return { verdict: "official", kind: "wallet", message: bw`This is a published Vicinity team wallet${name ? ` (${name.what})` : ""}.` };
     }
     const lock = (OFFICIAL.teamLocks || []).find((l) => l.address === raw);
     if (lock) return { verdict: "official", kind: "lock", message: lockMessage(lock) };
@@ -187,7 +194,7 @@ export function checkOfficial(input, isSolanaAddress, env) {
     if (url.protocol === "http:" && OFFICIAL.websites.includes(host))
       return { verdict: "warning", kind: "website", message: "Right site, but the link uses http. Use the https version." };
     if (OFFICIAL.websites.includes(host))
-      return { verdict: "official", kind: "website", message: "This is the official Vicinity website." };
+      return { verdict: "official", kind: "website", message: bw`This is the official Vicinity website.` };
     // the team lock's own page (the token page's "See the lock"): exact host and path, the address in it case and all
     const lockPage = (OFFICIAL.teamLocks || []).find((l) => { const u = new URL(l.url); return host === u.hostname && url.pathname.replace(/\/+$/, "") === u.pathname; });
     if (lockPage && url.protocol === "http:") return { verdict: "warning", kind: "lock", message: "Right lock page, but the link uses http. Use the https version." };
@@ -204,7 +211,7 @@ export function checkOfficial(input, isSolanaAddress, env) {
       };
     }
     if (host === "github.com" && OFFICIAL.github.some((g) => hostPath === g || hostPath.startsWith(g + "/")))
-      return { verdict: "official", kind: "github", message: "This is the official Vicinity code repository." };
+      return { verdict: "official", kind: "github", message: bw`This is the official Vicinity code repository.` };
     const market = OFFICIAL.tokenContract ? marketLink(raw, isSolanaAddress) : null;
     if (market) {
       const mint = OFFICIAL.tokenContract;
@@ -218,7 +225,7 @@ export function checkOfficial(input, isSolanaAddress, env) {
     return {
       verdict: "not_official", kind: "website",
       message: lookalike
-        ? "Careful: this looks like a copy of our name, but it is NOT an official Vicinity site. Don't connect your wallet there."
+        ? bw`Careful: this looks like a copy of our name, but it is NOT an official Vicinity site. Don't connect your wallet there.`
         : "This link is not on our official list.",
     };
   }
@@ -272,6 +279,27 @@ export function officialAddresses(env = {}, mainToken = mainTokenV5(env)) {
   return groups;
 }
 
+/** The legacy token's own /official groups (its mint, and the team's lock and wallets, published for that token): a label set with a look leaves
+ *  them out (scripts/pages/build.mjs brandAddressGroups). */
+export const LEGACY_ADDRESS_GROUPS = Object.freeze(["vicinity", "team", "legacy"]);
+/**
+ * An /official note in the words of a label set with a look: no crate name (the deployed programs' names are permanent: rebrand-inventory.md,
+ * plan item 4), no pointer to the Team group it leaves out, the product's name the label set's. The page build writes /official with it
+ * (brandAddressGroups) and the link checker answers with it (currentAddressRow), so the two never say different things.
+ */
+export const brandAddressNote = (n, brand) => (n == null ? n : n.replace(/^vicinity_[a-z_]+\.\s*/, "").replace(/\s*It is also the team's public wallet, listed under Team\./, "")
+  .replace(/\bVicinity's\b/g, `${brand.productName}'s`).trim() || null);
+/** The row /official lists for `address` under a label set with a look (the programs, their upgrade authority, the fee wallet, the price-curve
+ *  settings: never a legacy group), with its note in that label set's words; null when it lists none. */
+function currentAddressRow(env, address, brand) {
+  for (const g of officialAddresses(env, mainTokenV5(env))) {
+    if (LEGACY_ADDRESS_GROUPS.includes(g.id)) continue;
+    const r = g.rows.find((x) => x.address === address);
+    if (r) return { ...r, note: brandAddressNote(r.note, brand) };
+  }
+  return null;
+}
+
 /** The live mint: the Cloudflare setting VICINITY_MINT wins over the line above (so launch needs no code change). */
 export const activeMint = (env) => (env && env.VICINITY_MINT) || VICINITY_MINT;
 
@@ -285,15 +313,32 @@ export const activeMint = (env) => (env && env.VICINITY_MINT) || VICINITY_MINT;
  * launched" and is never the legacy mint under the switch).
  * VICINITY_MINT keeps its name and stays the legacy $VICINITY mint: the early-member flags (src/signup-finish.js, src/auth.js) keep
  * reading it through activeMint, because "early" means "joined before $VICINITY launched on 3 Oct 2026", a fact of history.
+ * Under a label set other than today's without the switch (legacyHidden below) it is null: no token is live, and the legacy one is shown
+ * nowhere.
  */
-export const tokenMint = (env) => (mainTokenV5(env) ? mainMint(env) : activeMint(env));
+export const tokenMint = (env) => (mainTokenV5(env) ? mainMint(env) : legacyHidden(env) ? null : activeMint(env));
 
 /**
- * The part of an edge-cache key that names the main token's mode: "" while MAIN_TOKEN_V5 does not count (so every key is exactly
- * today's), and "-v5-<mint>" while it does, so an answer cached for one token is never served as the other's after the switch flips
- * (src/index.js, src/cointakedown.js).
+ * The legacy token ($VICINITY) is shown nowhere (owner directive of 24 Oct 2026: "there should be no existence of vicinity. only
+ * citycoin."; the label migration, area d): true while the Worker speaks a label set other than today's (src/brand.js brandOf, which
+ * counts BRAND only while the deployed pages were built with it, so a BRAND set only in the Cloudflare dashboard changes nothing). Then no
+ * answer names $VICINITY or carries its mint, price, holders, team wallets or lock:
+ *   - without the configured main token (MAIN_TOKEN_V5 not counting) there is no token at all: tokenMint is null, which is the site's
+ *     "not launched" state (no holdings, ranks, founder claims, balance samples or Buy for a token that is not live), and the official
+ *     list (withoutLegacy), the link checker (checkOfficialV5), the coin page, the portfolio, the swap and Send leave the legacy mint out;
+ *   - with it (MAIN_TOKEN_V5 counting, the S02A main-token path), the configured main token as S02A shows it, without its legacy entries.
+ * With today's label set (BRAND unset) false: every answer exactly as before. Holders keep their tokens: nothing is moved or swapped, and
+ * the early-member flags keep reading VICINITY_MINT (history: joined before $VICINITY launched).
  */
-export const mainCacheTag = (env) => (mainTokenV5(env) ? `-v5-${tokenMint(env) || "pre"}` : "");
+export const legacyHidden = (env) => brandOf(env).key !== "";
+
+/**
+ * The part of an edge-cache key that names the main token's mode: "" while MAIN_TOKEN_V5 does not count and the legacy token is shown (so
+ * every key is exactly today's), "-v5-<mint>" while the switch counts and "-nolegacy" while the legacy token is hidden without it
+ * (legacyHidden), so an answer cached for one mode is never served in another after a switch or a label set changes (src/index.js,
+ * src/cointakedown.js).
+ */
+export const mainCacheTag = (env) => (mainTokenV5(env) ? `-v5-${tokenMint(env) || "pre"}` : legacyHidden(env) ? "-nolegacy" : "");
 
 /** The published team wallets and team locks, as facts of a token's holder list: { wallets, locks }. */
 export const TEAM = Object.freeze({ wallets: OFFICIAL.teamWallets, locks: OFFICIAL.teamLocks });
@@ -309,20 +354,40 @@ export const teamFor = (env, mint) => (mint != null && mainTokenV5(env) && mint 
 /** The former official X account (policy.official_links.legacy) as a social profile: refused as official, answered as legacy. */
 const LEGACY_HANDLE = (/^https:\/\/x\.com\/([A-Za-z0-9_]{1,15})$/.exec(LEGACY_X_URL) || [])[1] || null;
 const LEGACY_SOCIAL = LEGACY_HANDLE ? Object.freeze({ network: "X", handle: `@${LEGACY_HANDLE}`, hosts: ["x.com", "twitter.com"] }) : null;
+const NO_PROFILES = Object.freeze([]);
 /**
- * The official social accounts as profiles ({ network, handle, hosts, url? }): while MAIN_TOKEN_V5 does not count, SOCIAL_PROFILES above,
- * as before; while it counts, only what OFFICIAL_X_URL and OFFICIAL_TELEGRAM_URL hold after the policy's shape check (src/maintoken.js
- * officialLinks), so an unset or refused link is simply not there and the legacy account is never one of them. The page footers
- * (scripts/pages/build.mjs and the Worker's response-time rewrite, src/footer-social.js) and the link checker read this one list. `on`:
- * the page build passes its own decision (the switch in wrangler.jsonc, once the build accepts it), because the pages it is writing are
- * what makes the switch count at run time.
+ * The official websites the public list names under a label set other than today's (review finding CRAWL-3): the hosts this Worker is
+ * configured to serve (src/site-config.js SITE_ORIGINS) other than the legacy ones, so none while the site is served from vicinity.city with
+ * SITE_ORIGIN unset. The link checker's own verdict still knows the legacy names (checkOfficialV5: "Right site").
  */
-export function socialProfiles(env, on = mainTokenV5(env)) {
-  if (!on) return SOCIAL_PROFILES;
+const brandWebsites = (env) => siteConfig(env).hosts.filter((h) => !LEGACY_HOSTS.includes(h));
+/** Every website name of ours, each with and without www. (the published list, the legacy hosts and the cutover's own): the link checker
+ *  under a label set other than today's says "an address of ours" for one this Worker does not serve (checkOfficialV5). */
+const OUR_SITE_NAMES = Object.freeze([...new Set([...OFFICIAL.websites, ...LEGACY_HOSTS, ...CUTOVER_HOSTS].flatMap((h) => { const apex = h.replace(/^www\./, ""); return [apex, `www.${apex}`]; }))]);
+/**
+ * The official social accounts the configuration names: what OFFICIAL_X_URL and OFFICIAL_TELEGRAM_URL hold after the policy's shape check
+ * (src/maintoken.js officialLinks; amendment 01: owner-supplied and verified before they are configured, empty means not shown), as
+ * profiles ({ network, handle, hosts, url }). An unset or refused link is simply not there, and the former X account is refused, so it is
+ * never one of them. The page build reads this for a label set other than today's (scripts/pages/build.mjs pageSocials).
+ */
+export function configuredSocialProfiles(env) {
   const l = officialLinks(env), out = [];
   if (l.xUrl) out.push(Object.freeze({ network: "X", handle: `@${l.xUrl.slice("https://x.com/".length)}`, hosts: ["x.com", "twitter.com"], url: l.xUrl }));
   if (l.telegramUrl) out.push(Object.freeze({ network: "Telegram", handle: `@${l.telegramUrl.slice("https://t.me/".length)}`, hosts: ["t.me", "telegram.me"], url: l.telegramUrl }));
   return Object.freeze(out);
+}
+/**
+ * The official social accounts as profiles ({ network, handle, hosts, url? }): while MAIN_TOKEN_V5 does not count, SOCIAL_PROFILES above,
+ * as before; while it counts, only the configured accounts (configuredSocialProfiles), so the legacy account is never one of them. Under a
+ * label set other than today's (legacyHidden) without the switch: none. The former X account is today's brand's (amendment 01 refuses it
+ * as the new official link), and a configured account is shown only once the switch counts, the day its verification is re-run (amendment
+ * 01 sections 4.3 and 4.4: OFFICIAL_X_URL is configured with an incomplete record, and "before any switch shows it" a person checks the
+ * account and a second person signs off). The page footers (scripts/pages/build.mjs and the Worker's response-time
+ * rewrite, src/footer-social.js) and the link checker read this one list. `on`: the page build passes its own decision (the switch in
+ * wrangler.jsonc, once the build accepts it), because the pages it is writing are what makes the switch count at run time.
+ */
+export function socialProfiles(env, on = mainTokenV5(env)) {
+  return on ? configuredSocialProfiles(env) : legacyHidden(env) ? NO_PROFILES : SOCIAL_PROFILES;
 }
 
 /**
@@ -337,11 +402,13 @@ export function legacyTokens() {
   }));
 }
 
-/** The official list under MAIN_TOKEN_V5: the main token from configuration, $VICINITY under legacyTokens, the configured links only. */
+/** The official list under MAIN_TOKEN_V5: the main token from configuration, $VICINITY under legacyTokens, the configured links only.
+ *  Under a label set other than today's (legacyHidden) the legacy token's entries are left out: it is shown nowhere. */
 function withMainToken(env) {
-  const main = mainMint(env), links = officialLinks(env);
+  const main = mainMint(env), links = officialLinks(env), bw = brandWords(env);
   return {
     ...OFFICIAL,
+    ...(bw.on ? { websites: brandWebsites(env) } : {}),
     socials: [...new Set(socialProfiles(env).map((p) => p.handle))],
     tokenContract: main,
     // the published team wallets and the Jupiter Lock describe $VICINITY holdings: they live under legacyTokens, never as the new token's
@@ -350,11 +417,36 @@ function withMainToken(env) {
     tokens: [
       // shape-checked and configured, not verified by this code: "Configured", never "Live" on the strength of a shape check
       { network: "Solana", name: MAIN_TOKEN_LABEL, symbol: "", contract: main, platform: null, status: main ? "Configured" : "Not published yet" },
-      { network: "Solana", name: "Vicinity, legacy token", symbol: "VICINITY", contract: null, platform: "Raydium LaunchLab", status: "Legacy (history only)", legacy: true },
-      OFFICIAL.tokens[1],
+      ...(bw.on ? [] : [{ network: "Solana", name: "Vicinity, legacy token", symbol: "VICINITY", contract: null, platform: "Raydium LaunchLab", status: "Legacy (history only)", legacy: true }]),
+      cityCoinsEntry(bw),
     ],
-    legacyTokens: legacyTokens(),
+    legacyTokens: bw.on ? [] : legacyTokens(),
     officialLinks: { x: links.xUrl, telegram: links.telegramUrl },
+  };
+}
+
+/** The official list's city-coin entry, on the label set's launchpad (today's entry exactly for today's label set). */
+const cityCoinsEntry = (bw) => (bw.on ? { ...OFFICIAL.tokens[1], platform: bw.say(OFFICIAL.tokens[1].platform) } : OFFICIAL.tokens[1]);
+
+/**
+ * The official list under a label set other than today's without the configured main token (legacyHidden, MAIN_TOKEN_V5 not counting):
+ * its own token is not live yet (no contract, "Not live yet"), the legacy token is not on it, no team wallet or lock (they were published for
+ * $VICINITY), no social account (the former X account is refused, and a configured one is shown only with the switch: socialProfiles), the
+ * websites this Worker serves other than the legacy names (brandWebsites), and the city coins on the label set's launchpad.
+ */
+function withoutLegacy(env) {
+  const bw = brandWords(env);
+  return {
+    ...OFFICIAL,
+    websites: brandWebsites(env),
+    socials: [],
+    tokenContract: null,
+    teamWallets: [],
+    teamLocks: [],
+    tokens: [
+      { network: "Solana", name: `${bw.brand.productName} token`, symbol: "", contract: null, platform: null, status: "Not live yet" },
+      cityCoinsEntry(bw),
+    ],
   };
 }
 
@@ -381,37 +473,71 @@ function mainTokenAddressGroups(env, feeIsTeamWallet) {
 
 const LEGACY_CONTRACT = "This is the legacy $VICINITY contract (history only). It is not the main token: no swap or purchase is offered for it, and holders keep their tokens.";
 const legacyLockMessage = (lock) => `This is the Vicinity team lock on ${lock.platform} for the legacy $VICINITY token. The team locked ${lock.amount.toLocaleString("en-US")} $VICINITY here: nothing unlocks before ${longDate(lock.cliff)}, and nobody can cancel it or change who receives it.`;
+// the same facts under a label set other than today's (legacyHidden): the legacy token is "an earlier token of ours", never by its name
+const ourLockMessage = (lock) => `This is the team lock on ${lock.platform} for an earlier token of ours (history only). The team locked ${lock.amount.toLocaleString("en-US")} tokens here: nothing unlocks before ${longDate(lock.cliff)}, and nobody can cancel it or change who receives it.`;
 const accountsText = (list) => list.map((p) => p.handle).join(" and ");
+/**
+ * The accounts the configuration names (configuredSocialProfiles: OFFICIAL_X_URL, OFFICIAL_TELEGRAM_URL) that are not on the official list
+ * yet (`socials`): shown nowhere until the main-token switch counts, the day their verification is finished (amendment 01 sections 4.3 and
+ * 4.4; OFFICIAL_X_URL = https://x.com/CityCoinDev is configured since main ec1e838 with an incomplete record).
+ */
+const unverifiedProfiles = (env, socials) => configuredSocialProfiles(env).filter((c) => !socials.some((p) => p.network === c.network && p.handle.toLowerCase() === c.handle.toLowerCase()));
+/**
+ * The checker's answer for such an account under a label set other than today's (final check finding 3 of the rebrand stage): neither
+ * "official" (its verification is not finished) nor "not official" (the team named it), a plain warning that says so. A choice the owner
+ * can revisit (implementation report section 11, "Rebrand stage"); with today's label set this answer never exists.
+ */
+const unverifiedAnswer = (p, P) => ({ verdict: "warning", kind: "social", unverified: true,
+  message: `The ${P} team named this ${p.network} account (${p.handle}), but its verification is not finished yet, so this checker cannot confirm it yet. Never share your recovery phrase or private key with any account.` });
 
-/** The link checker under MAIN_TOKEN_V5 (checkOfficial above keeps today's answers with it off). Plain text answers, never markup. */
+/**
+ * The link checker under MAIN_TOKEN_V5, and under a label set other than today's (legacyHidden) with or without it (checkOfficial above
+ * keeps today's answers otherwise). Plain text answers, never markup. The main token is tokenMint (the configured mint while the switch
+ * counts; none under a label set other than today's without it). With today's label set every answer is S02A's; under another label set
+ * the product's name is the label set's and the legacy token, its team wallets and lock and the former X account are answered as ours
+ * and legacy without their old name, and an account the configuration names whose verification is not finished gets unverifiedAnswer.
+ */
 function checkOfficialV5(input, isSolanaAddress, env) {
-  const main = mainMint(env), socials = socialProfiles(env);
+  const main = tokenMint(env), socials = socialProfiles(env), bw = brandWords(env), P = bw.brand.productName;
+  const unverified = bw.on ? unverifiedProfiles(env, socials) : [];
   const raw = clean(input);
   if (!raw) return { verdict: "empty", message: "Paste a link, address or @handle to check it." };
   const legacyMint = (a) => isLegacyMint(a) || (Boolean(activeMint(env)) && a === activeMint(env));
 
   if (isSolanaAddress(raw)) {
     if (main && raw === main) return { verdict: "official", kind: "contract", message: "This is the official main token contract address." };
-    if (legacyMint(raw)) return { verdict: "warning", kind: "contract", legacy: true, message: LEGACY_CONTRACT };
+    if (legacyMint(raw)) return { verdict: "warning", kind: "contract", legacy: true,
+      message: bw.on ? `This is the contract of an earlier token of ours (history only). It is not the ${P} token: no swap or purchase is offered for it here, and holders keep their tokens.` : LEGACY_CONTRACT };
+    // under a label set other than today's, an address /official lists as current is answered with that role, in the page's words, before any
+    // legacy answer (rebrand review finding RB-2: the fee wallet is also a team wallet published for the earlier token, but it is the fee wallet)
+    const row = bw.on ? currentAddressRow(env, raw, bw.brand) : null;
+    if (row) return { verdict: "official", kind: row.kind === "token" ? "contract" : "address", current: true,
+      message: `This is an official ${P} address: ${row.label}.${row.note ? ` ${row.note.replace(/, linked here,/, "")}` : ""}` };
     if (OFFICIAL.teamWallets.includes(raw)) {
-      const name = teamWalletName(raw);
-      return { verdict: "official", kind: "wallet", message: `This is a published Vicinity team wallet${name ? ` (${name.what})` : ""}, listed for the legacy $VICINITY token.` };
+      const name = teamWalletName(raw), named = name ? ` (${name.what})` : "";
+      return { verdict: "official", kind: "wallet", message: bw.on ? `This is a published team wallet${named}, listed for an earlier token of ours (history only).`
+        : `This is a published Vicinity team wallet${named}, listed for the legacy $VICINITY token.` };
     }
     const lock = OFFICIAL.teamLocks.find((l) => l.address === raw);
-    if (lock) return { verdict: "official", kind: "lock", legacy: true, message: legacyLockMessage(lock) };
+    if (lock) return { verdict: "official", kind: "lock", legacy: true, message: bw.on ? ourLockMessage(lock) : legacyLockMessage(lock) };
     return {
       verdict: "not_official", kind: "address",
       message: main ? "This address is NOT the official main token contract or a team wallet."
-        : "The main token's contract is not published here yet, so no address is the official main token. Any token presented as it right now is not ours.",
+        : bw.on ? `The ${P} token is not live yet, so no address is its official contract. Any token presented as it right now is not ours.`
+          : "The main token's contract is not published here yet, so no address is the official main token. Any token presented as it right now is not ours.",
     };
   }
 
   if (/^@[A-Za-z0-9_.]{1,40}$/.test(raw)) {
     const lower = raw.toLowerCase();
-    if (socials.some((p) => p.handle.toLowerCase() === lower)) return { verdict: "official", kind: "social", message: "This is an official Vicinity account." };
-    const current = socials.length ? ` Vicinity's official account${socials.length > 1 ? "s are" : " is"} ${accountsText(socials)}.` : "";
-    if (LEGACY_SOCIAL && LEGACY_SOCIAL.handle.toLowerCase() === lower) return { verdict: "warning", kind: "social", legacy: true, message: `This is the former Vicinity account (legacy), not the current official account.${current}` };
-    return { verdict: "not_official", kind: "social", message: socials.length ? `This account is not us.${current}` : "Vicinity lists no official social accounts right now, so this account is not us." };
+    if (socials.some((p) => p.handle.toLowerCase() === lower)) return { verdict: "official", kind: "social", message: bw`This is an official Vicinity account.` };
+    const named = unverified.find((p) => p.handle.toLowerCase() === lower);
+    if (named) return unverifiedAnswer(named, P);
+    const current = socials.length ? bw` Vicinity's official account${socials.length > 1 ? "s are" : " is"} ${accountsText(socials)}.` : "";
+    if (LEGACY_SOCIAL && LEGACY_SOCIAL.handle.toLowerCase() === lower) return { verdict: "warning", kind: "social", legacy: true,
+      message: bw.on ? `This is a former account of ours (legacy), not a current official account.${current}` : `This is the former Vicinity account (legacy), not the current official account.${current}` };
+    return { verdict: "not_official", kind: "social", message: socials.length ? `This account is not us.${current}`
+      : bw.on ? `This account is not on the official list: ${P} lists no official social accounts right now.` : bw`Vicinity lists no official social accounts right now, so this account is not us.` };
   }
 
   let url;
@@ -419,24 +545,46 @@ function checkOfficialV5(input, isSolanaAddress, env) {
   if (url && url.hostname.includes(".")) {
     const host = url.hostname.toLowerCase().replace(/^www\./, "");
     const hostPath = (host + url.pathname.toLowerCase()).replace(/\/+$/, "");
-    if (url.protocol === "http:" && OFFICIAL.websites.includes(host)) return { verdict: "warning", kind: "website", message: "Right site, but the link uses http. Use the https version." };
-    if (OFFICIAL.websites.includes(host)) return { verdict: "official", kind: "website", message: "This is the official Vicinity website." };
+    if (bw.on) {
+      // under a label set other than today's, "official" only for a host this Worker serves in place (src/site-config.js SITE_ORIGINS), exactly
+      // as written: www. is a host of its own (go-live review finding GL-8: www.citycoin.dev and vicinitycity.net are not attached, and
+      // vicinitycity.com serves nothing). Every other name of ours is said as it is, never "official"; the vicinity.city names stay official only
+      // while SITE_ORIGINS lists them (stage S55 removes them)
+      const name = url.hostname.toLowerCase(), served = siteConfig(env).hosts;
+      if (served.includes(name)) return url.protocol === "http:" ? { verdict: "warning", kind: "website", message: "Right site, but the link uses http. Use the https version." }
+        : { verdict: "official", kind: "website", message: bw`This is the official Vicinity website.` };
+      // the label set's own planned address (src/site-config.js CUTOVER_HOSTS) while this Worker does not serve it yet (review finding F9)
+      if (CUTOVER_HOSTS.includes(name) && !served.includes(CUTOVER_HOSTS[0])) return { verdict: "warning", kind: "website", message: `This is the address planned for ${P}. It does not serve the site yet, so nothing there is official until it does.` };
+      if (OUR_SITE_NAMES.includes(name)) return { verdict: "warning", kind: "website", ours: true, message: `This is an address of ours, but it does not serve the ${P} site, so nothing there is official.` };
+    } else {
+      if (url.protocol === "http:" && OFFICIAL.websites.includes(host)) return { verdict: "warning", kind: "website", message: "Right site, but the link uses http. Use the https version." };
+      if (OFFICIAL.websites.includes(host)) return { verdict: "official", kind: "website", message: bw`This is the official Vicinity website.` };
+    }
     const lockPage = OFFICIAL.teamLocks.find((l) => { const u = new URL(l.url); return host === u.hostname && url.pathname.replace(/\/+$/, "") === u.pathname; });
     if (lockPage && url.protocol === "http:") return { verdict: "warning", kind: "lock", message: "Right lock page, but the link uses http. Use the https version." };
-    if (lockPage) return { verdict: "official", kind: "lock", legacy: true, message: legacyLockMessage(lockPage) };
+    if (lockPage) return { verdict: "official", kind: "lock", legacy: true, message: bw.on ? ourLockMessage(lockPage) : legacyLockMessage(lockPage) };
+    // a link to an account the configuration names that is not verified yet (only its own profile link: any other link answers as before)
+    const named = unverified.length ? socialLinkOf(url, unverified) : null;
+    if (named && named.profile) return unverifiedAnswer(named.profile, P);
     const social = socialLinkOf(url, [...socials, ...(LEGACY_SOCIAL ? [LEGACY_SOCIAL] : [])]);
     if (social) {
       const ours = socials.filter((p) => p.network === social.network);
-      const current = ours.length ? `Vicinity's official ${social.network}: ${accountsText(ours)}.` : `Vicinity lists no official ${social.network} account right now.`;
-      if (social.profile && social.profile !== LEGACY_SOCIAL) return { verdict: "official", kind: "social", message: `This is Vicinity's official account on ${social.profile.network}.` };
-      if (social.profile) return { verdict: "warning", kind: "social", legacy: true, message: `This is the former Vicinity account on ${social.network} (legacy), not the current official account. ${current}` };
-      return { verdict: "not_official", kind: "social", message: social.account ? `This ${social.network} account is not us. ${current}` : `That link doesn't open an account. ${current}` };
+      const current = ours.length ? bw`Vicinity's official ${social.network}: ${accountsText(ours)}.` : bw`Vicinity lists no official ${social.network} account right now.`;
+      if (social.profile && social.profile !== LEGACY_SOCIAL) return { verdict: "official", kind: "social", message: bw`This is Vicinity's official account on ${social.profile.network}.` };
+      if (social.profile) return { verdict: "warning", kind: "social", legacy: true,
+        message: bw.on ? `This is a former account of ours on ${social.network} (legacy), not a current official account. ${current}` : `This is the former Vicinity account on ${social.network} (legacy), not the current official account. ${current}` };
+      // (under a label set other than today's with no account listed: "not on the official list", never "not us" for an account of ours
+      // that is configured but not verified yet; review finding F9)
+      return { verdict: "not_official", kind: "social", message: !social.account ? `That link doesn't open an account. ${current}`
+        : bw.on && !ours.length ? `This ${social.network} account is not on the official list. ${current}` : `This ${social.network} account is not us. ${current}` };
     }
     if (host === "github.com" && OFFICIAL.github.some((g) => hostPath === g || hostPath.startsWith(g + "/")))
-      return { verdict: "official", kind: "github", message: "This is the official Vicinity code repository." };
+      return { verdict: "official", kind: "github", message: bw`This is the official Vicinity code repository.` };
     const market = marketLink(raw, isSolanaAddress);
     if (market && market.addresses.length && market.addresses.every(legacyMint))
-      return { verdict: "warning", kind: "market", legacy: true, message: `This ${market.name} link is for the legacy $VICINITY token (history only), not the main token. No swap or purchase is offered for it here.` };
+      return { verdict: "warning", kind: "market", legacy: true,
+        message: bw.on ? `This ${market.name} link is for an earlier token of ours (history only), not the ${P} token. No swap or purchase is offered for it here.`
+          : `This ${market.name} link is for the legacy $VICINITY token (history only), not the main token. No swap or purchase is offered for it here.` };
     if (market && main) {
       if (!market.addresses.length)
         return { verdict: "warning", kind: "market", message: `This is the real ${market.name} (${market.host}). Before you buy, check that the token there has the official main token contract: ${main}.` };
@@ -447,9 +595,9 @@ function checkOfficialV5(input, isSolanaAddress, env) {
     const lookalike = /v[i1l]c[i1l]n[i1l]ty/i.test(host);
     return {
       verdict: "not_official", kind: "website",
-      message: lookalike
-        ? "Careful: this looks like a copy of our name, but it is NOT an official Vicinity site. Don't connect your wallet there."
-        : "This link is not on our official list.",
+      message: !lookalike ? "This link is not on our official list."
+        : bw.on ? `Careful: this looks like a copy of a name of ours, but it is NOT an official ${P} site. Don't connect your wallet there.`
+          : `Careful: this looks like a copy of our name, but it is NOT an official Vicinity site. Don't connect your wallet there.`,
     };
   }
   return { verdict: "unknown", message: "That doesn't look like a link, Solana address or @handle." };
@@ -472,6 +620,7 @@ function socialLinkOf(url, profiles) {
  */
 export function withMint(env) {
   if (mainTokenV5(env)) return withMainToken(env);
+  if (legacyHidden(env)) return withoutLegacy(env);
   const mint = activeMint(env);
   if (!mint) return OFFICIAL;
   return {

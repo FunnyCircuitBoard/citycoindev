@@ -3,6 +3,13 @@
 // Needs site.js (window.V). The dashboard loads this file ONLY when /api/me says profilesFlag is true; /profile loads it as its script.
 (() => {
   "use strict";
+  // The product's names in this file's words (the label migration, area b). A page built for a label set other than today's carries the
+  // set on <html> (data-brand, data-brand-name, data-brand-domain: scripts/pages/build.mjs writes them from src/brand.js); brand`…` puts
+  // those names in a text's own words, never in a value put into it. A page without them (today's pages) gets every text exactly as written.
+  const BRAND = (() => { try { const r = document.documentElement, at = (k) => (r && typeof r.getAttribute === "function" ? r.getAttribute(k) : null); return at("data-brand") && at("data-brand-name") && at("data-brand-domain") ? Object.freeze({ key: at("data-brand"), name: at("data-brand-name"), domain: at("data-brand-domain") }) : null; } catch { return null; } })();
+  const brand = (s, ...v) => s.reduce((out, part, i) => out + (BRAND ? part.replace(/vicinity\.city/g, () => BRAND.domain).replace(/Vicinity/g, () => BRAND.name) : part) + (i < v.length ? String(v[i]) : ""), "");
+  // a holding's unit: "$VICINITY" on today's pages; a page built for another label set names its own token (the legacy one is shown nowhere)
+  const UNIT = BRAND ? `${BRAND.name} tokens` : "$VICINITY";
 
   /* =====================================================================
      Pure helpers: no page, no network (test/profiles-ui.test.js runs them in node)
@@ -152,7 +159,7 @@
   /** Every code the profile routes can answer with, as one plain sentence (the page picks the place with `ctx`). */
   const ERR = {
     generic: "Something went wrong. Please try again.",
-    offline: "Can't reach Vicinity right now. Check your connection and try again.",
+    offline: brand`Can't reach Vicinity right now. Check your connection and try again.`,
     not_enabled: "Member profiles aren't open yet.",
     login_required: "Please log in to see member profiles.",
     sign_in: "Your session ended. Please log in again.",
@@ -221,9 +228,12 @@
     const items = sortItems(p.items);
     if (!items.length) {
       const e = el("div", "pf__empty");
-      e.append(el("strong", null, !launched ? "Your portfolio starts at launch." : who === "you" ? "No Vicinity coins yet." : "No Vicinity coins held."),
-        el("span", "muted small", !launched
-          ? "$VICINITY and the city coins appear here as soon as they exist and you hold some. Anything else in a wallet is never shown."
+      // (a page built for another label set: its city coins can be live before its own token, so the words never wait for a launch, and they
+      // name no legacy token)
+      e.append(el("strong", null, !launched && !BRAND ? "Your portfolio starts at launch." : who === "you" ? brand`No Vicinity coins yet.` : brand`No Vicinity coins held.`),
+        el("span", "muted small", BRAND ? (who === "you" ? brand`When you hold a Vicinity coin, it appears here with its live value. Other tokens in your wallet are never shown.`
+          : brand`Only Vicinity coins are shown on a profile. Other tokens in a wallet never are.`)
+          : !launched ? "$VICINITY and the city coins appear here as soon as they exist and you hold some. Anything else in a wallet is never shown."
           : who === "you" ? "When you hold $VICINITY or a city coin, it appears here with its live value. Other tokens in your wallet are never shown."
           : "Only $VICINITY and city coins are shown on a profile. Other tokens in a wallet never are."));
       host.append(e);
@@ -254,7 +264,7 @@
     // the table
     const legend = el("div", "pf__legend");
     const table = el("table", "pf-table");
-    const cap = el("caption", "sr-only", `${who === "you" ? "Your" : "Their"} $VICINITY and city coins: amount, value in US dollars and share of the total, biggest first.`);
+    const cap = el("caption", "sr-only", `${who === "you" ? "Your" : "Their"} ${BRAND ? brand`Vicinity coins` : "$VICINITY and city coins"}: amount, value in US dollars and share of the total, biggest first.`);
     const head = el("thead"), hr = el("tr");
     for (const [t, c] of [["Coin", "pf-c-coin"], ["Amount", "pf-c-amt"], ["Value", "pf-c-val"]]) { const th = el("th", c, t); th.scope = "col"; hr.append(th); }
     head.append(hr);
@@ -264,7 +274,7 @@
       const tr = el("tr"); if (key) tr.dataset.key = key;
       const c1 = el("th", "pf-c-coin"); c1.scope = "row";
       const sw = el("span", `pf-sw ${inChart && slot >= 0 ? `pf-s${slot}` : key === "other" ? "pf-sx" : "pf-sn"}`); sw.setAttribute("aria-hidden", "true");
-      const nm = el("span", "pf-coin"); nm.append(el("strong", null, symbolOf(it)), el("span", "pf-sub", it.city ? `${it.city.name}, ${countryName(it.city.country)}` : it.name || "Vicinity"));
+      const nm = el("span", "pf-coin"); nm.append(el("strong", null, symbolOf(it)), el("span", "pf-sub", it.city ? `${it.city.name}, ${countryName(it.city.country)}` : it.name || (BRAND ? BRAND.name : "Vicinity")));
       c1.append(sw, nm);
       const c2 = el("td", "pf-c-amt", fmtAmount(it.amount));
       const c3 = el("td", "pf-c-val");
@@ -553,7 +563,7 @@
       }
       cur = d.profile; show("#pf-view");
       paint(cur);
-      document.title = `${cur.handle} · Member profile · Vicinity`;
+      document.title = brand`${cur.handle} · Member profile · Vicinity`;
       return d;
     }
 
@@ -581,10 +591,12 @@
 
       // holdings
       const h = p.holding;
-      $("#pf-hold-amount").textContent = h ? `${fmt(h.amount)} $VICINITY` : "—";
+      $("#pf-hold-amount").textContent = h ? `${fmt(h.amount)} ${UNIT}` : "—";
       $("#pf-hold-rank").textContent = h && h.rank ? `#${fmt(h.rank)} of ${fmt(h.total)}` : h && h.team ? "Team wallet" : "—";
       $("#pf-hold-pct").textContent = h && h.rank ? `Top ${pctText(h.percentile)}%` : h && h.team ? "Not ranked" : "—";
-      $("#pf-hold-note").textContent = !linked ? (self ? "No wallet linked yet. Link one from your dashboard to show your $VICINITY here." : "No wallet linked yet.") : !h ? "No $VICINITY figures to show right now. They appear once $VICINITY is live." : h.amount > 0 ? "" : "Doesn't hold $VICINITY yet.";
+      $("#pf-hold-note").textContent = BRAND ? (!linked ? (self ? "No wallet linked yet. Link one from your dashboard to show your holdings here." : "No wallet linked yet.")
+        : !h ? `The ${BRAND.name} token is not live yet, so there are no figures to show.` : h.amount > 0 ? "" : `Doesn't hold the ${BRAND.name} token yet.`)
+        : !linked ? (self ? "No wallet linked yet. Link one from your dashboard to show your $VICINITY here." : "No wallet linked yet.") : !h ? "No $VICINITY figures to show right now. They appear once $VICINITY is live." : h.amount > 0 ? "" : "Doesn't hold $VICINITY yet.";
       $("#pf-hold-note").hidden = !$("#pf-hold-note").textContent;
 
       // who is this, to me
@@ -652,7 +664,7 @@
     }
     function paintLive(p) {
       const h = p.holding;
-      $("#pf-hold-amount").textContent = h ? `${fmt(h.amount)} $VICINITY` : "—";
+      $("#pf-hold-amount").textContent = h ? `${fmt(h.amount)} ${UNIT}` : "—";
       $("#pf-hold-rank").textContent = h && h.rank ? `#${fmt(h.rank)} of ${fmt(h.total)}` : h && h.team ? "Team wallet" : "—";
       $("#pf-hold-pct").textContent = h && h.rank ? `Top ${pctText(h.percentile)}%` : h && h.team ? "Not ranked" : "—";
       paintCounts();

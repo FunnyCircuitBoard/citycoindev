@@ -60,6 +60,7 @@
 import { BLANK_CHARS, FORMAT_CHARS, cleanText } from "./text.js";
 import * as WORDS from "./screen-words.js";
 import * as VOCAB from "./screen-vocab.js";
+import { SAME } from "./brandwords.js";
 
 export const DESCRIPTION_MIN = 10, DESCRIPTION_MAX = 200, DESCRIPTION_LINES = 3, DESCRIPTION_BYTES = 600;
 export const REASON_MIN = 10, REASON_MAX = 300;
@@ -95,8 +96,9 @@ export const MESSAGES = Object.freeze({
   sounds_like: "A word here sounds like a word that can't be used on a coin. If it's a name or a word of your city, that's fine: a person checks it first.",
   error: "We couldn't check your description just now. Nothing changed. Try again in a minute.",
 });
-/** One plain sentence for an issue, with the city's name filled in. */
-export const explain = (code, cityName = "your city") => (MESSAGES[code] || MESSAGES.error).replace("{City}", cityName || "your city");
+/** One plain sentence for an issue, with the city's name filled in. `bw`: the product's name in the sentence, before the city goes in
+ *  (src/brandwords.js; today's words by default). */
+export const explain = (code, cityName = "your city", bw = SAME) => bw.say(MESSAGES[code] || MESSAGES.error).replace("{City}", cityName || "your city");
 
 /* ---------------------------------------------------------------- the rules version (a SHA-256 of the lists, computed at load) */
 /** SHA-256 of a string, as hex (synchronous: the rules version is known the moment the module loads, in the Worker and in Node). */
@@ -1058,7 +1060,11 @@ function run(text, ctx, { rules, lists }) {
   }
   if (rules.has("staff")) {
     const staff = new Set(lists.STAFF_WORDS.flatMap(phraseWords));
-    const vic = [...toks, ...joins].filter((t) => skel(t.w) === skel("vicinity") || skel(t.w) === skel("vicinitys"));
+    // "Vicinity", and under a label set other than today's its own words too (ctx.brandNames, src/brandwords.js ownWords: "citycoin",
+    // "citycoindev"; go-live review finding GL-1). A deployment input, not a reviewed list, so RULES_VERSION stays the lists' hash: the rule
+    // only flags, and a person reads every founder description anyway (review, below)
+    const ours = ["vicinity", ...(ctx && Array.isArray(ctx.brandNames) ? ctx.brandNames.filter((n) => typeof n === "string" && n) : [])].flatMap((n) => [skel(n), skel(`${n}s`)]);
+    const vic = [...toks, ...joins].filter((t) => ours.includes(skel(t.w)));
     push(vic.filter((t) => near(toks, { start: t.s, end: t.e }, 3).some((w) => staff.has(w))).map((t) => ({ code: "staff", start: t.s, end: t.e })));
     push(tag("staff", matchList(lists.STAFF_ALONE, toks, [], own)));
   }
@@ -1085,7 +1091,7 @@ const verdict = (issues) => (issues.some((x) => x.severity === "block") ? "block
 /**
  * Screen `raw` as a `target` ("description", "name", "ticker", "reason"). `ctx`: { city: { name, region, countryName, country }, ticker,
  * otherCity?(name) => bool, rulesVersion? (the version the caller expects: another one is an error), lists? (tests: a stand-in for
- * src/screen-words.js) }. Never throws.
+ * src/screen-words.js), brandNames? (the label set's own words, src/brandwords.js ownWords: none under today's) }. Never throws.
  */
 export function screen(target, raw, ctx = {}) {
   let text = null, rulesVersion = RULES_VERSION;
@@ -1119,4 +1125,4 @@ export const screenName = (name, ctx) => screen("name", name, ctx);
 export const screenTicker = (symbol, ctx) => screen("ticker", symbol, ctx);
 export const screenReason = (text, ctx) => screen("reason", text, ctx);
 /** The issues in the founder's words: [{ code, start, end, message }], one sentence per code. */
-export const explained = (issues, cityName) => (issues || []).map((x) => ({ code: x.code, severity: x.severity, start: x.start, end: x.end, message: explain(x.code, cityName) }));
+export const explained = (issues, cityName, bw = SAME) => (issues || []).map((x) => ({ code: x.code, severity: x.severity, start: x.start, end: x.end, message: explain(x.code, cityName, bw) }));

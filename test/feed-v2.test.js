@@ -499,7 +499,7 @@ test("the pages: the Updates chip and the hint start hidden (the flag-off page i
   assert.match(dash, /<button type="button" role="tab" data-kind="update" aria-selected="false" data-feed-v2 hidden>Updates<\/button>/);
   assert.match(dash, /<p class="tiny muted" id="c-hint" hidden><\/p>/);
   assert.ok(read("scripts/pages/src/dashboard.html").includes('data-kind="update" aria-selected="false" data-feed-v2 hidden'), "the source the page is built from");
-  assert.ok(js.includes('const UPDATE_HINT = "Updates come from the city founder, the country manager or Vicinity."'));
+  assert.ok(js.includes("const UPDATE_HINT = brand`Updates come from the city founder, the country manager or Vicinity.`"));
   assert.ok(js.includes('confirm("Delete this post? It disappears for everyone.")'));
   assert.ok(js.includes("will see this. Post it?"));
   assert.match(js, /\$\$\("\.chips \[data-feed-v2\]"\)\.forEach\(\(b\) => \(b\.hidden = !feedV2\(\)\)\)/, "the chip shows only when /api/me says feedV2");

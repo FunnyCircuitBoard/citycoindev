@@ -51,6 +51,7 @@ import { boundArtOf, chosenOf, madeByOf } from "./coinart-store.js";
 import { choiceHolds } from "./coinready.js";
 import { v2Takedown } from "./cointakedown.js";
 import { launchClosed, logoRemovalOnly, peek } from "./legacylaunch.js";
+import { brandWords } from "./brandwords.js";
 
 const C = POLICY.coins;
 
@@ -264,7 +265,8 @@ async function removeOwnLogo(env, { u, seat, fetchImpl, now }) {
  */
 function launchLabClosed(env, what) {
   if (!lpSetup(env).on) return null;
-  return json({ ok: false, error: "launchpad_only", message: `City coins launch on the Vicinity launchpad now, so ${what}. Nothing was changed.` }, 409);
+  const bw = brandWords(env);
+  return json({ ok: false, error: "launchpad_only", message: bw`City coins launch on the Vicinity launchpad now, so ${what}. Nothing was changed.` }, 409);
 }
 /**
  * The public log's words (after the city's name) for a waiting Raydium LaunchLab contract rejected while the launchpad is set up. Fixed
@@ -280,7 +282,7 @@ export const LEGACY_REJECTED = "City coins launch on the Vicinity launchpad now;
  * → { ok: true, coin } or { ok: false, error, status }.
  */
 export async function settleLegacyContract(env, { cityId, mint = "", actorId, now = Date.now() }) {
-  const db = env.DB;
+  const db = env.DB, rejected = brandWords(env).say(LEGACY_REJECTED);
   if (!lpSetup(env).on) return { ok: false, error: "not_enabled", status: 404 };
   const coin = await coinOf(db, String(cityId || ""));
   if (!coin || !coin.pending_mint) return { ok: false, error: "not_found", status: 404 };
@@ -290,9 +292,9 @@ export async function settleLegacyContract(env, { cityId, mint = "", actorId, no
   const r = await db.prepare("UPDATE city_coins SET pending_mint = NULL, pending_at = NULL WHERE city_id = ? AND pending_mint = ?").bind(coin.city_id, coin.pending_mint).run();
   if (!r.meta.changes) return { ok: false, error: "not_found", status: 404 };
   await log(db, { actor: actorId, role: "admin", action: "coin_contract_rejected", user: coin.user_id, country: coin.country, place: coin.city_id, reason: "launch",
-    note: `${coin.city_name}: ${LEGACY_REJECTED}`, at: iso(now) });
+    note: `${coin.city_name}: ${rejected}`, at: iso(now) });
   // in-app notice (NOTIFY=on) to the founder who sent it: their card simply stops saying it waits, so they are told why, in the same words
-  await notify(env, { to: coin.user_id, kind: "founder", ref: coin.city_id, href: "/dashboard#founder", now, text: `${coin.city_name}: ${LEGACY_REJECTED}` });
+  await notify(env, { to: coin.user_id, kind: "founder", ref: coin.city_id, href: "/dashboard#founder", now, text: `${coin.city_name}: ${rejected}` });
   return { ok: true, coin: coinView(await coinOf(db, coin.city_id), { mine: true }) };
 }
 
@@ -358,7 +360,7 @@ export async function handleDecideMint(request, env, fetchImpl = fetch, now = Da
     if (!mint) return json({ ok: false, error: "mint_required" }, 400);
     // COIN_V2_READY=on (src/coinready.js): a city's one coin launches on the Vicinity launchpad, so a contract is never RECORDED as a
     // city's coin (it could become a second coin); a waiting one can still be rejected (below), which settles the city
-    if (coinV2ReadyOn(env)) return json({ ok: false, error: "launchpad_only", message: "City coins launch on the Vicinity launchpad now, so a waiting Raydium LaunchLab contract can only be rejected, not recorded. Nothing was changed." }, 409);
+    if (coinV2ReadyOn(env)) return json({ ok: false, error: "launchpad_only", message: brandWords(env).say("City coins launch on the Vicinity launchpad now, so a waiting Raydium LaunchLab contract can only be rejected, not recorded. Nothing was changed.") }, 409);
     let facts;
     try { facts = await mintInfo(env, mint, fetchImpl); }
     catch (e) { console.error("mint check failed", String(e)); return json({ ok: false, error: "chain_unavailable" }, 503); }
@@ -417,7 +419,7 @@ export async function handleTakedown(request, env, fetchImpl = fetch, now = Date
   // default sentence from the city list (src/coinmeta.js never reads the design row's text for it), so there is no founder's text to take
   // down and the public log would claim a removal that did not happen
   else if (body.what === "text" && (await boundArtOf(db, coin.mint))) {
-    return json({ ok: false, error: "system_text", message: "This coin's description is Vicinity's own sentence from the city list (it launched with the Vicinity design), not the founder's text, so there is nothing to take down. Nothing was changed." }, 409);
+    return json({ ok: false, error: "system_text", message: brandWords(env).say("This coin's description is Vicinity's own sentence from the city list (it launched with the Vicinity design), not the founder's text, so there is nothing to take down. Nothing was changed.") }, 409);
   }
   else if (body.what === "text" && coin.pitch && (await recordedOnLaunchpad(env, coin.mint))) {
     // a coin launched on the Vicinity launchpad: its name is on chain for ever, but its description lives in the /coin-meta JSON
@@ -455,12 +457,12 @@ export async function officialCityCoin(env, address) {
   }
   if (!row) return null;
   try { ticker = (await displayTicker(env, { cityId: row.city_id, mint: address }))?.ticker || null; } catch { ticker = null; } // the coin is official with or without its ticker
-  const where = `${row.city_name}${row.country ? `, ${row.country}` : ""}`;
+  const where = `${row.city_name}${row.country ? `, ${row.country}` : ""}`, bw = brandWords(env);
   return {
     verdict: "official", kind: "city_coin", city: row.city_id, cityName: row.city_name, country: row.country, ticker, name: row.name,
     message: ticker
-      ? `This is the official $${ticker}: the city coin of ${where}, recorded by Vicinity.`
-      : `This is the official city coin of ${where}, recorded by Vicinity.`,
+      ? bw`This is the official $${ticker}: the city coin of ${where}, recorded by Vicinity.`
+      : bw`This is the official city coin of ${where}, recorded by Vicinity.`,
   };
 }
 

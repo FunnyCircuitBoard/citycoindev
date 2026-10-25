@@ -17,6 +17,11 @@
 // test/coinchart.test.js.
 (() => {
   "use strict";
+  // The product's names in this file's words (the label migration, area b). A page built for a label set other than today's carries the
+  // set on <html> (data-brand, data-brand-name, data-brand-domain: scripts/pages/build.mjs writes them from src/brand.js); brand`…` puts
+  // those names in a text's own words, never in a value put into it. A page without them (today's pages) gets every text exactly as written.
+  const BRAND = (() => { try { const r = document.documentElement, at = (k) => (r && typeof r.getAttribute === "function" ? r.getAttribute(k) : null); return at("data-brand") && at("data-brand-name") && at("data-brand-domain") ? Object.freeze({ key: at("data-brand"), name: at("data-brand-name"), domain: at("data-brand-domain") }) : null; } catch { return null; } })();
+  const brand = (s, ...v) => s.reduce((out, part, i) => out + (BRAND ? part.replace(/vicinity\.city/g, () => BRAND.domain).replace(/Vicinity/g, () => BRAND.name) : part) + (i < v.length ? String(v[i]) : ""), "");
 
   /* =====================================================================
      Pure helpers
@@ -205,7 +210,7 @@
       .map((p) => [p[0], isNum(p[1]) && p[1] > 0 && isNum(mult) && mult > 0 ? p[1] * mult : null, typeof p[2] === "string" && SRC_WORDS[p[2]] ? p[2] : null])
       .sort((x, y) => x[0] - y[0]);
     const vals = points.filter((p) => p[1] != null);
-    const base = { kind: "line", unit: unit === "MCAP" ? "MCAP" : "USD", interval, candles: [], source: (l && typeof l.source === "string" && l.source) || "vicinity.city samples", gapWord: "no reading",
+    const base = { kind: "line", unit: unit === "MCAP" ? "MCAP" : "USD", interval, candles: [], source: (l && typeof l.source === "string" && l.source) || brand`vicinity.city samples`, gapWord: "no reading",
       recordingSince: l && typeof l.recordingSince === "string" ? l.recordingSince : null, note: null };
     if (unit === "MCAP" && !(supply > 0)) return { ...base, points: [], first: null, last: null, empty: "The supply is not known to be fixed, so no market cap is drawn" };
     if (!vals.length) return { ...base, points: [], first: null, last: null, empty: typeof missing.line === "string" ? missing.line : "No reading in this range" };

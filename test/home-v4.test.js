@@ -9,8 +9,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { settingsFor, sourceAs } from "../scripts/pages/build.mjs";
+import { BRANDS } from "../src/brand.js";
 
-const read = (p) => readFileSync(new URL("../" + p, import.meta.url), "utf8").replace(/\r\n/g, "\n");
+// a page source as today's build reads it (BRAND unset: its brand blocks and {{label}} fills resolved; scripts/pages/build.mjs sourceAs)
+const read = (p) => { const t = readFileSync(new URL("../" + p, import.meta.url), "utf8").replace(/\r\n/g, "\n"); return p.startsWith("scripts/pages/src/") ? sourceAs(p, t) : t; };
 const homeSrc = read("scripts/pages/src/index.html"), home = read("public/index.html"), js = read("public/home.js");
 const appSrc = read("scripts/pages/src/app.html"), app = read("public/app.html"), appJs = read("public/app.js");
 const homeCss = read("public/pages-home.css"), appCss = read("public/pages-app.css"), phoneCss = read("public/app-phone.css");
@@ -76,7 +79,8 @@ test("home ticker (R1): every number from an existing API, an item without a val
   assert.deepEqual([...js.matchAll(/(?:api|get)\("([^"]+)"\)/g)].map((m) => m[1]).sort(), ["/api/launchpad", "/api/members", "/api/token", "/data/stats.json"]);
   assert.match(js, /const lp = await api\("\/api\/launchpad"\);\n\s+if \(lp && lp\.ok\) \{ answers\.lp = lp; answers\.lpAt = Date\.now\(\); return; \}/);
   for (const [key, re] of [
-    ["price", /const price = lp \? num\(mk\.priceUsd\) : num\(tok && tok\.price\);\n\s+if \(price != null\) out\.push\(\{ key: "price", label: "\$VICINITY", text: money\(price\), chg: lp \? change\(mk\.priceChange24hPct\) : null, stale,/],
+    ["price", /const price = lp \? num\(mk\.priceUsd\) : num\(tok && tok\.price\);\n\s+if \(price != null\) out\.push\(\{ key: "price", label: TOKEN, text: money\(price\), chg: lp \? change\(mk\.priceChange24hPct\) : null, stale,/],
+    ["token", /const TOKEN = BRAND \? `\$\{BRAND\.name\} token` : "\$VICINITY";/],
     ["mcap", /const mcap = lp \? num\(mk\.marketCapUsd\) : num\(tok && tok\.marketCap\);\n\s+if \(mcap != null\)/],
     ["vol", /const vol = lp \? num\(mk\.volume24hUsd\) : null;\n\s+if \(vol != null\)/],
     ["holders", /const holders = num\(vic && vic\.holders && vic\.holders\.count\);\n\s+if \(holders != null\)/],
@@ -95,8 +99,9 @@ test("home ticker (R1): every number from an existing API, an item without a val
   assert.match(js, /const at = lp \? a\.lpAt : tok \? a\.tokenAt : null, old = num\(at\) != null && Date\.now\(\) - at > STALE_MS;\n\s+const stale = Boolean\(\(lp && mk\.stale\) \|\| old\);/);
   // the market numbers are $VICINITY's own, not the network's: their titles and screen-reader labels name it; "live" is a recorded
   // contract, not a trade
-  assert.match(js, /label: "Market cap", sr: "\$VICINITY ", text: money\(mcap\), title: said\(`\$VICINITY market cap /);
-  assert.match(js, /label: "24h volume", sr: "\$VICINITY ", text: money\(vol\), title: said\(`\$VICINITY 24 h volume /);
+  // (named through TOKEN: "$VICINITY" on today's pages, the label set's own token on a page built for another one, label migration area d)
+  assert.match(js, /label: "Market cap", sr: `\$\{TOKEN\} `, text: money\(mcap\), title: said\(`\$\{TOKEN\} market cap /);
+  assert.match(js, /label: "24h volume", sr: `\$\{TOKEN\} `, text: money\(vol\), title: said\(`\$\{TOKEN\} 24 h volume /);
   assert.match(js, /city \$\{live === 1 \? "coin" : "coins"\} live on the Vicinity Launchpad/);
   assert.doesNotMatch(js, /coins trade on the Vicinity Launchpad/);
   // drawn once (every source answered, or 2.5 s), never an item removed or added after that; a refresh only rewrites values
@@ -118,7 +123,7 @@ test("home ticker (R1): every number from an existing API, an item without a val
   assert.match(js, /\/\^https:\\\/\\\/\(jup\\\.ag\|raydium\\\.io\|dexscreener\\\.com\)\(\\\/\|\$\)\/\.test\(x\.url\)/);
   assert.match(js, /all\.href = "\/credits"; all\.textContent = "All sources";/);
   assert.match(js, /else if \(market\) named\.push\(link\("Powered by Jupiter", "https:\/\/jup\.ag"\)\);/, "the token page's Jupiter price says Powered by Jupiter too");
-  assert.match(js, /lead\.textContent = "\$VICINITY market data: ";/, "one short line that says whose market numbers these are");
+  assert.match(js, /lead\.textContent = `\$\{TOKEN\} market data: `;/, "one short line that says whose market numbers these are");
   assert.match(js, /const SHORT = \{ "Jupiter": "Powered by Jupiter",/, "Jupiter's attribution, once (it named Jupiter twice)");
   // no layout shift: a fixed bar height from the first paint (the cells arrive all at once), the sources line holds its room
   assert.match(homeCss, /\.tk__bar \{ list-style: none; margin: 0; padding: 0 8px; display: flex; align-items: center; height: 54px; \}/);
@@ -169,7 +174,9 @@ test("home: How it works (three cards, each one link), the app teaser (in develo
 test("home: old one-page links land where the thing lives now, never on a dead anchor", () => {
   assert.match(js, /const NYC = "\/cities\?city=5128581";/);
   assert.match(js, /"#nyc": NYC, "#story": NYC, "#demo": NYC, "#roles": "\/dashboard#roles", "#get": "\/token#buy-slot" \};/, "critique 21");
-  for (const [from, to] of [["#token", "/token"], ["#holders", "/token#holders"], ["#wallet", "/connect"], ["#cities", "/cities"], ["#launchpad", "/launchpad"], ["#check", "/token#check"]]) assert.ok(js.includes(`"${from}": "${to}"`), from);
+  for (const [from, to] of [["#token", "/token"], ["#holders", "/token#holders"], ["#wallet", "/connect"], ["#cities", "/cities"], ["#launchpad", "/launchpad"]]) assert.ok(js.includes(`"${from}": "${to}"`), from);
+  // the checker: on /token on today's pages; a page built for another label set has it on /official (its /token is the plain "not live" page)
+  assert.ok(js.includes(`"#check": BRAND ? "/official#check" : "/token#check"`), "#check");
   assert.match(js, /const GONE = \["#why", "#why-now", "#for-cities", "#problem", "#roadmap"\];/);
   assert.match(js, /if \(GONE\.includes\(location\.hash\)\) \{ history\.replaceState\(history\.state, "", location\.pathname \+ location\.search\); return true; \}/);
   assert.match(js, /if \(oldLink\(\) && location\.hash\) return;/, "a link that moved leaves before anything else runs");
@@ -178,7 +185,8 @@ test("home: old one-page links land where the thing lives now, never on a dead a
 });
 
 test("/app (prompt item 6): an early look at the app, labelled in development first, no number, no store, no date (R1)", () => {
-  assert.deepEqual(settings(appSrc), { title: "App preview", description: "The Vicinity mobile app is in development: an early look at sending and receiving city coins and $VICINITY on your phone.", page: "app", scripts: ["app"], styles: ["app-phone", "pages-app"] });
+  // today's settings (BRAND unset); the Citycoin.dev ones (its "brand" entry) are test/build-parity.test.js's
+  assert.deepEqual(settingsFor("app.html", settings(appSrc), BRANDS[""]), { title: "App preview", description: "The Vicinity mobile app is in development: an early look at sending and receiving city coins and $VICINITY on your phone.", page: "app", scripts: ["app"], styles: ["app-phone", "pages-app"] });
   for (const h of [appSrc, app]) {
     const main = mainOf(h);
     const tag = main.indexOf('<p class="app4-hero__tag"><span class="tag tag--gold">In development</span></p>'), h1 = main.indexOf("<h1");
