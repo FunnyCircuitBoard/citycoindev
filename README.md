@@ -2,9 +2,9 @@
 
 **One city. One coin. One community.** Every real city on one map, with real boundaries. Each community gets one official coin, local leaders, and its own feed of memes, check-ins, discussions and weekly votes. Locals hold $VICINITY to found their city; the Vicinity Launchpad opened October 10, 2026 at 10:10:10 AM New York time.
 
-Live: https://vicinity.city (vicinitycity.net and the www addresses forward there).
+Live: https://citycoin.dev, the site's one address since stage S55 (docs/citycoin-master/domain-cutover.md). vicinity.city, vicinitycity.com, vicinitycity.net and their www are no longer this site's and do not forward to it (the owner's decision of 24 Oct 2026).
 
-> **$VICINITY launched on October 3, 2026, on Raydium LaunchLab.** The one official contract address (Solana) is `2aVkhRfAEm44tMhFo8oamWvumGGvweFqnUwukRMBkray`, the same one as on https://vicinity.city/token. No presale, no airdrop. Any other token using the name is fake: use the site's "Is this link really Vicinity?" checker if in doubt.
+> **$VICINITY launched on October 3, 2026, on Raydium LaunchLab.** The one official contract address (Solana) is `2aVkhRfAEm44tMhFo8oamWvumGGvweFqnUwukRMBkray`, the one the site's token page showed until the Citycoin.dev go-live (it is now a legacy token, history only, shown nowhere on Citycoin.dev). No presale, no airdrop. Any other token using the name is fake: use the site's "Is this link really Vicinity?" checker if in doubt.
 
 ## What's on the site
 Separate pages, one shared menu (top menu on computers, bottom menu bar on phones), dark by default with a light theme on the header toggle (remembered on the device; the device's own setting is not followed), live buttons (glow and light passes, paused off screen) and a "Pause animations" switch in every footer:
@@ -65,7 +65,7 @@ Keys and passwords (`SOLANA_RPC_URL`, `GOOGLE_CLIENT_SECRET`, the mail keys) are
 | `SOLANA_RPC_URL` | A Helius (or similar) RPC URL. Needed for the full holder list, ranks and the balance history; without it only the top 20 show and nobody can qualify as founder. |
 | `VICINITY_MINT` | The official token address. Set in `wrangler.jsonc` → `vars` since the launch on 3 Oct 2026 (`2aVkhRfAEm44tMhFo8oamWvumGGvweFqnUwukRMBkray`); it wins over the line in `src/official.js`. |
 | `ADMIN_WALLETS` | Admin wallet address(es), comma-separated. Two admins let appeals of an admin's own decisions be judged by the other. |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google sign-in. Redirect URI: `https://vicinity.city/api/auth/google/callback` |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google sign-in, which answers 404 while `WALLET_ONLY` is on. Redirect URI on the served host: `https://citycoin.dev/api/auth/google/callback` |
 | `SNAPSHOT_CUTOFF` | The Founding Supporter cutoff, always 00:00 UTC, e.g. `2026-10-08T00:00:00Z`. Announce it first. |
 | `ATTEST_KEY` | Optional: the key that signs location attestations (otherwise one is made once and kept in the database). |
 | `JUPITER_API_BASE`, `JUPITER_API_KEY` | Optional: where prices come from and the key for it (`https://api.jup.ag` with a free key from portal.jup.ag). Unset = the keyless address Jupiter is retiring. See [docs/DEPLOY.md](docs/DEPLOY.md). |

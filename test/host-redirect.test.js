@@ -5,8 +5,9 @@
 // committed wrangler.jsonc does not have): 308 for ordinary public GET and HEAD on every other accepted host, 421 wrong_host for every
 // other method, wallet challenge, sign-in, hand-off, callback or webhook, the immutable legacy files and the read-only API in place on
 // every accepted host, unknown hosts refused. Since stage S06 the committed wrangler.jsonc attaches citycoin.dev and lists it in
-// SITE_ORIGINS beside vicinity.city (still canonical), with DEPLOYMENT_ENV production; HOST_REDIRECT stays unset. No request here leaves
-// this process.
+// SITE_ORIGINS, with DEPLOYMENT_ENV production; since stage S55 it lists and attaches citycoin.dev alone, so the legacy hosts are refused
+// like any unknown host, with the switch off and on (never redirected: the owner's decision of 24 Oct 2026). HOST_REDIRECT stays unset.
+// No request here leaves this process.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -185,17 +186,23 @@ test("a switch set on but refused says why, once per isolate, as codes only; uns
 /* ---------------------------------------------------------------- switch off: exactly today */
 
 /** The site settings HOST_REDIRECT unset is checked with, and the hosts each one refuses before any route (421 wrong_host naming the canonical
- *  origin, vicinity.city in all three, from the configuration):
- *   - as committed (stage S06): SITE_ORIGINS lists citycoin.dev and vicinity.city, DEPLOYMENT_ENV production, SITE_ORIGIN unset. The host
- *     binding counts (src/hostbind.js): every host outside the allowlist (SITE_ORIGINS plus the four legacy hosts) is refused, www.citycoin.dev
- *     (never listed: domain-cutover.md section 2) and, in production, the local development hosts among them;
+ *  origin of the configuration):
+ *   - as committed (stage S55): SITE_ORIGINS and SITE_ORIGIN https://citycoin.dev, DEPLOYMENT_ENV production. The host binding counts
+ *     (src/hostbind.js) and its allowlist is citycoin.dev alone: every other host is refused, the four legacy hosts (vicinity.city, any
+ *     letter case, and its three old names: no longer served, never forwarded) and www.citycoin.dev included, and in production the local
+ *     development hosts;
+ *   - stage S06 and the go-live (S55's rollback): SITE_ORIGINS lists citycoin.dev and vicinity.city. The binding counts; every host outside
+ *     the allowlist (SITE_ORIGINS plus the four legacy hosts, which count while vicinity.city is listed) is refused, www.citycoin.dev (never
+ *     listed: domain-cutover.md section 2) and, in production, the local development hosts among them;
  *   - the site settings taken out (the rollback of domain-cutover.md section 5; DEPLOYMENT_ENV stays): unbound, only the cutover's own two
  *     hosts are refused (section 1.3), every other host is served in place as before S04;
  *   - the settings main had before stage S06 (no site setting, no environment): the same answers as the rollback. */
 // (the origin a refused host is told: the canonical one of the configuration, https://citycoin.dev as committed since the go-live, and
 // today's https://vicinity.city with the site settings taken out)
+const TWO_HOSTS = "https://citycoin.dev https://vicinity.city";
 const UNSET_CONFIGS = [
-  ["as committed (stage S06 and the go-live)", {}, new Set(["www.citycoin.dev", ...UNKNOWN_HOSTS, "localhost"])],
+  ["as committed (stage S55)", {}, new Set([...ACCEPTED_HOSTS.filter((h) => h !== "citycoin.dev"), ...UNKNOWN_HOSTS, "VICINITY.CITY", "localhost"])],
+  ["stage S06 and the go-live (both hosts listed: the rollback of S55)", { SITE_ORIGINS: TWO_HOSTS }, new Set(["www.citycoin.dev", ...UNKNOWN_HOSTS, "localhost"])],
   ["site settings taken out (rollback)", { SITE_ORIGIN: undefined, SITE_ORIGINS: undefined }, new Set(CUTOVER_HOSTS)],
   ["before stage S06", { SITE_ORIGIN: undefined, SITE_ORIGINS: undefined, DEPLOYMENT_ENV: undefined }, new Set(CUTOVER_HOSTS)],
 ];
@@ -203,8 +210,8 @@ test("switch unset: every host, scheme, method and path class answers as today (
   assert.equal(VARS.HOST_REDIRECT, undefined);
   for (const [label, extra, refused] of UNSET_CONFIGS) {
     const env = world(extra), ref = world(extra), vic = world(extra);
-    const committed = label.startsWith("as committed");
-    assert.equal(hostBound(siteConfig(env)), label.startsWith("as committed"), `${label}: the binding counts only with the committed site settings`);
+    const bothHosts = label.startsWith("stage S06");
+    assert.equal(hostBound(siteConfig(env)), label.startsWith("as committed") || bothHosts, `${label}: the binding counts only with a site setting that lists citycoin.dev`);
     for (const host of [...ACCEPTED_HOSTS, ...UNKNOWN_HOSTS, "VICINITY.CITY", "localhost"]) {
       for (const proto of ["https", "http"]) {
         for (const method of ["GET", "HEAD", "POST", "OPTIONS"]) {
@@ -222,11 +229,11 @@ test("switch unset: every host, scheme, method and path class answers as today (
               // served in place: no answer of the entry (a redirect or a refusal), the route's own answer, as a second world gives it
               assert.ok(got.status !== 308 && got.status !== 421 && !(got.status === 301 && got.body === null), at);
               assert.deepEqual(got, await call(ref, url, method), at);
-              // as committed, citycoin.dev serves the same site as vicinity.city: every answer served in place there equals the same request on
-              // vicinity.city (in a third world given the same requests in the same order: citycoin.dev's come first), except the routes whose
-              // answer names the host it is served as (OWN_HOST_NAMED: the wallet challenge's text, the Google return address, the pairing
-              // link; domain-cutover.md section 1.2). S06 review, R8.
-              if (committed && host === "citycoin.dev" && proto === "https" && !OWN_HOST_NAMED.has(new URL(url).pathname))
+              // while both hosts are listed (S06, the go-live), citycoin.dev serves the same site as vicinity.city: every answer served in place
+              // there equals the same request on vicinity.city (in a third world given the same requests in the same order: citycoin.dev's come
+              // first), except the routes whose answer names the host it is served as (OWN_HOST_NAMED: the wallet challenge's text, the Google
+              // return address, the pairing link; domain-cutover.md section 1.2). S06 review, R8.
+              if (bothHosts && host === "citycoin.dev" && proto === "https" && !OWN_HOST_NAMED.has(new URL(url).pathname))
                 assert.deepEqual(got, await call(vic, `https://vicinity.city${path}`, method), `${at}: the same answer as vicinity.city's`);
             }
           }
@@ -234,10 +241,13 @@ test("switch unset: every host, scheme, method and path class answers as today (
       }
     }
   }
-  // as committed, citycoin.dev is one of the hosts served in place (attached in the same deploy that lists it: domain-cutover.md section 2)
+  // as committed, citycoin.dev is the one host served in place (attached in the same deploy that lists it: domain-cutover.md section 2); with
+  // both hosts listed (S06, the go-live) it answered exactly as vicinity.city; since stage S55 vicinity.city is refused, with no Location
   const health = await call(world(), "https://citycoin.dev/api/health");
   assert.equal(health.status, 200);
-  assert.deepEqual(health, await call(world(), "https://vicinity.city/api/health"), "the same answer as on vicinity.city");
+  assert.deepEqual(health, await call(world({ SITE_ORIGINS: TWO_HOSTS }), "https://vicinity.city/api/health"), "the same answer as on vicinity.city while both hosts were listed");
+  const gone = await call(world(), "https://vicinity.city/api/health");
+  assert.deepEqual([gone.status, JSON.parse(gone.body), headerOf(gone, "location")], [421, { error: "wrong_host", origin: CANON }, null], "stage S55: vicinity.city refused, never redirected");
 });
 
 // The reference of a refused switch is the same deployment with HOST_REDIRECT taken out: since stage S04 the site settings themselves count
@@ -347,23 +357,34 @@ test("switch accepted: unknown hosts are refused for every method and path, neve
   } finally { pagesAsCommitted(); }
 });
 
-test("switch accepted: the legacy hosts stay accepted even when SITE_ORIGINS leaves them out, and their immutable files keep their bytes", async () => {
+// (Until stage S55 this test read "the legacy hosts stay accepted even when SITE_ORIGINS leaves them out": master section 04 kept the old
+// routes 12 months after the redirect, so the old names were 308'd to citycoin.dev and their immutable files served in place. The owner's
+// decision of 24 Oct 2026 replaced that: no forwarding, the names left blank. From S55 on, with SITE_ORIGINS citycoin.dev alone, the legacy
+// hosts are unknown hosts, refused even with the switch accepted; the files keep their bytes on citycoin.dev, and the one address named on
+// chain that goes dark, https://vicinity.city/brand/vicinity-512.png, is S55's recorded deviation (b): policy amendment
+// owner-decision-2026-10-25-golive, in force, applies the owner's general go (which does not name the file) to it, with that consequence
+// stated to him in writing by the lead developer.)
+test("switch accepted with SITE_ORIGINS citycoin.dev alone (stage S55): the legacy hosts are refused, never redirected to citycoin.dev; the immutable files keep their bytes on citycoin.dev", async () => {
   pagesReachWorker();
   try {
     const only = { ...ON, SITE_ORIGINS: "https://citycoin.dev" };
     assert.equal(hostRedirect(only), true);
-    const env = world(only), ref = world();
+    const env = world(only), ref = world({ SITE_ORIGINS: TWO_HOSTS }); // (the reference: vicinity.city as served until S55)
     for (const host of LEGACY_HOSTS) {
-      for (const p of ["/brand/vicinity-512.png", `/coin-meta/${MINT}.json`, "/official-coins.csv", "/api/health"]) {
-        for (const method of ["GET", "HEAD"]) assert.deepEqual(await call(env, `https://${host}${p}`, method), await call(ref, `https://vicinity.city${p}`, method), `${method} ${host}${p}`);
+      for (const proto of ["https", "http"]) for (const method of ["GET", "HEAD", "POST"]) {
+        for (const p of ["/brand/vicinity-512.png", `/coin-meta/${MINT}.json`, "/official-coins.csv", "/api/health", "/launchpad?tab=new", "/"]) {
+          const got = await call(env, `${proto}://${host}${p}`, method);
+          assert.deepEqual([got.status, headerOf(got, "location"), headerOf(got, "set-cookie")], [421, null, null], `${method} ${proto}://${host}${p}`);
+          if (method !== "HEAD") assert.deepEqual(JSON.parse(got.body), { error: "wrong_host", origin: CANON });
+        }
       }
-      const page = await call(env, `https://${host}/launchpad?tab=new`);
-      assert.equal(page.status, 308);
-      assert.equal(headerOf(page, "location"), `${CANON}/launchpad?tab=new`, "one hop straight to the canonical origin, never via vicinity.city");
     }
-    const logo = await call(env, "https://vicinity.city/brand/vicinity-512.png");
+    for (const p of ["/brand/vicinity-512.png", `/coin-meta/${MINT}.json`, "/official-coins.csv", "/api/health"]) {
+      for (const method of ["GET", "HEAD"]) assert.deepEqual(await call(env, `${CANON}${p}`, method), await call(ref, `https://vicinity.city${p}`, method), `${method} ${CANON}${p}: the same bytes as vicinity.city served`);
+    }
+    const logo = await call(env, `${CANON}/brand/vicinity-512.png`);
     assert.equal(logo.status, 200);
-    assert.equal(logo.body, read("public/brand/vicinity-512.png").toString("base64"), "the logo named on chain: the file's exact bytes");
+    assert.equal(logo.body, read("public/brand/vicinity-512.png").toString("base64"), "the logo named on chain: the file's exact bytes, on citycoin.dev");
     // www.citycoin.dev is not listed here, and it is no legacy host: refused
     assert.equal((await call(env, "https://www.citycoin.dev/")).status, 421);
   } finally { pagesAsCommitted(); }
@@ -471,11 +492,23 @@ test("switch accepted: this computer (wrangler dev) is served as today outside p
 
 /* ---------------------------------------------------------------- members stay signed in; nothing is written */
 
-test("existing members stay signed in: a session made today (no host on its row) answers on vicinity.city with the switch off and on", async () => {
+// (Stage S55: with the committed settings vicinity.city is no longer served, so "the switch off" is checked with the settings it was served
+// under, S06's and the go-live's (both hosts listed); with the committed settings that session answers 421 on vicinity.city: the member signs
+// in again on citycoin.dev with the same wallet, domain-cutover.md section 6.)
+test("existing members stay signed in while vicinity.city is served: a session made today (no host on its row) answers there with the switch off and on; since stage S55 vicinity.city refuses it", async () => {
+  {
+    const env = world();
+    const p = await member(env);
+    const cookie = [...p.jar].map(([k, v]) => `${k}=${v}`).join("; ");
+    const me = await worker.fetch(request("https://vicinity.city/api/me", "GET", { cookie }), env, ctx);
+    assert.deepEqual([me.status, await me.json(), me.headers.get("location"), me.headers.get("set-cookie")], [421, { error: "wrong_host", origin: CANON }, null, null], "as committed (S55)");
+    const there = await (await worker.fetch(request("https://citycoin.dev/api/me", "GET", { cookie }), env, ctx)).json();
+    assert.equal(there.signedIn, false, "a vicinity.city session (host NULL) is not citycoin.dev's");
+  }
   for (const flip of [false, true]) {
     if (flip) pagesReachWorker();
     try {
-      const env = world(flip ? ON : {});
+      const env = world(flip ? ON : { SITE_ORIGINS: "https://citycoin.dev https://vicinity.city" });
       const p = await member(env);
       const cookie = [...p.jar].map(([k, v]) => `${k}=${v}`).join("; ");
       const sessions = async () => (await env.DB.prepare("SELECT COUNT(*) AS n FROM sessions").first()).n;
@@ -536,19 +569,20 @@ test("switch accepted: redirects and refusals write nothing (every D1 row before
 test("the committed wrangler.jsonc: no HOST_REDIRECT, the pages bypass the Worker, so the switch does nothing until a configuration PR", () => {
   assert.equal(VARS.HOST_REDIRECT, undefined);
   // stage S06 (domain-cutover.md section 2 item 2 and section 3 step 2): citycoin.dev attached and listed in SITE_ORIGINS in the same
-  // configuration, the production environment named; the go-live (the owner's go of 25 Oct 2026) makes citycoin.dev the canonical origin
-  // while vicinity.city still serves in place until S55 removes its routes. HOST_REDIRECT stays unset (no forwarding: section 0)
+  // configuration, the production environment named; the go-live (the owner's go of 25 Oct 2026) makes citycoin.dev the canonical origin;
+  // stage S55 (section 3 step 4) lists and attaches citycoin.dev alone: the vicinity.city routes are gone, with no redirect. HOST_REDIRECT
+  // stays unset (no forwarding: section 0)
   assert.equal(VARS.SITE_ORIGIN, "https://citycoin.dev", "citycoin.dev canonical since the go-live");
-  assert.equal(VARS.SITE_ORIGINS, "https://citycoin.dev https://vicinity.city");
+  assert.equal(VARS.SITE_ORIGINS, "https://citycoin.dev", "citycoin.dev alone since stage S55");
   assert.equal(VARS.DEPLOYMENT_ENV, "production");
   const site = siteConfig(VARS);
-  assert.deepEqual([site.origin, site.hosts, site.problems], ["https://citycoin.dev", ["citycoin.dev", "vicinity.city"], []]);
+  assert.deepEqual([site.origin, site.hosts, site.problems], ["https://citycoin.dev", ["citycoin.dev"], []]);
   assert.ok(!site.hosts.includes("www.citycoin.dev"), "www.citycoin.dev is never listed");
   assert.deepEqual(WRANGLER.assets.run_worker_first, ["/api/*", "/coin-meta/*", "/official-coins.csv"], "not changed by this stage");
-  assert.deepEqual(WRANGLER.routes, [{ pattern: "citycoin.dev", custom_domain: true }, { pattern: "vicinity.city", custom_domain: true },
-    { pattern: "www.vicinity.city", custom_domain: true }], "citycoin.dev attached as a custom domain; www.citycoin.dev is not attached");
-  // never attach a host the allowlist does not list (section 2): every attached name is listed, or one of the old names the Worker forwards
-  for (const { pattern } of WRANGLER.routes) assert.ok(site.hosts.includes(pattern) || LEGACY_HOSTS.includes(pattern), `${pattern} is attached but neither listed nor a legacy host`);
+  assert.deepEqual(WRANGLER.routes, [{ pattern: "citycoin.dev", custom_domain: true }], "citycoin.dev the one custom domain; www.citycoin.dev is not attached");
+  // never attach a host the allowlist does not list (section 2): every attached name is listed (since S55 no legacy host is attached at all)
+  for (const { pattern } of WRANGLER.routes) assert.ok(site.hosts.includes(pattern), `${pattern} is attached but not listed`);
+  assert.deepEqual(WRANGLER.routes.filter(({ pattern }) => LEGACY_HOSTS.includes(pattern)), [], "no vicinity.city name is attached");
   assert.deepEqual(pageRouting(), { pagesReachWorker: false });
   assert.match(pagesBuiltSource(), /pagesReachWorker: false/);
   assert.deepEqual(deployedAssets(), WRANGLER.assets);

@@ -137,8 +137,12 @@ test("switch off (area c): the Worker's e-mails, statements, coin JSON and messa
 // with: a BRAND set only in the Cloudflare dashboard changes none of them; a build for another label set hides it whatever BRAND says (F12).
 // Stage S06 (PR #104, main 46c5825, the base this branch is rebased on) changed today's answers on purpose (citycoin.dev on the official list,
 // so the checker calls it and www.citycoin.dev official), so the fingerprint was computed again with the same probe from the 46c5825 tree:
-// aa2d68a2... (the same probe on the 4a50794 tree gives a58d2745..., the value before S06).
-const C5DF86A_LEGACY_ANSWERS_SHA256 = "aa2d68a219ace8ba71015c808614ede6c5687947f3af1890fefd5035cdf5fc2f";
+// aa2d68a2... (the same probe on the 4a50794 tree gives a58d2745..., the value before S06). Stage S55 changed today's answers on purpose again:
+// vicinity.city, vicinitycity.com and vicinitycity.net left the official list (domain-cutover.md section 0, item 6), so the list is
+// ["citycoin.dev"] and the checker answers "vicinitycity.net" as a former address (a warning, never official). The same probe, with the suite's
+// stand-in, on a git archive of the go-live head 0606956 gives aa2d68a2... and on this tree 469e35bd...; those are the only differences
+// (implementation-report.md section 11, stage S55).
+const C5DF86A_LEGACY_ANSWERS_SHA256 = "469e35bdeea81f7f21d3071ca6eb0e95bef4841a16163dd2976f7f749e756ad7";
 const ROOT = new URL("../", import.meta.url);
 const legacyAnswers = async (extra = {}) => { const out = []; for (const env of PROBE_ENVS) out.push(await probe(ROOT, { ...env, ...extra })); return sha256(JSON.stringify(out)); };
 test("switch off (area d): the legacy token's answers (official list, checker, socials, badges, allow-lists, policy) are c5df86a's, byte for byte", async () => {

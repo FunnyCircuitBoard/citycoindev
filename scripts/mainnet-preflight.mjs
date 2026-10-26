@@ -1,7 +1,7 @@
 // Mainnet preflight: are the settings, the live site and the chain ready for the in-app swap and the launchpad's curve trades?
 //   npm run mainnet:preflight                                   (the vars of wrangler.jsonc + this shell's environment)
 //   npm run mainnet:preflight -- --cluster mainnet              (force LAUNCHPAD_CLUSTER; --set KEY=VALUE repeatable; --rpc <url> = SOLANA_RPC_URL)
-//   npm run mainnet:preflight -- --site https://vicinity.city   (also check the live Worker: health, switches, headers, cron, a live quote,
+//   npm run mainnet:preflight -- --site https://citycoin.dev    (also check the live Worker: health, switches, headers, cron, a live quote,
 //                                                               /coin-meta, the brand logo, the city-coin routes)
 //       --expect-upgrade-authority <squads vault> --expect-admin <admin wallet>   (both programs' keys on chain; FAIL when they differ)
 //       --setup <summary.json>                                  (the City coins tab's "Send this to the team" box: every address in it is

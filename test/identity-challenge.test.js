@@ -321,11 +321,18 @@ test("wrong host (D04): a challenge issued on one host is refused on every other
   const m = await memberWithWallet(env, box, { via: "google" });
   on(env, { SITE_ORIGINS: `${W.ORIGIN} https://citycoin.test` });
   const s = await signed(m.b, m.w); // issued on vicinity.test
-  for (const origin of ["https://citycoin.test", "https://vicinity.city"]) {
+  // the legacy host is an accepted host only while SITE_ORIGINS lists vicinity.city (stage S55, src/site-config.js servesLegacy): with this
+  // list it is refused before any route (421 wrong_host; until S55 it was accepted and answered wrong_site), and with vicinity.city listed it
+  // refuses the signature by its text, like any other host. Either way nothing is signed in or used there.
+  for (const [origin, refusal, extra] of [["https://citycoin.test", [400, { ok: false, error: "wrong_site" }]],
+    ["https://vicinity.city", [421, { error: "wrong_host", origin: W.ORIGIN }]],
+    ["https://vicinity.city", [400, { ok: false, error: "wrong_site" }], { SITE_ORIGINS: `${W.ORIGIN} https://citycoin.test https://vicinity.city` }]]) {
+    if (extra) on(env, extra);
     const other = at(env, origin);
-    assert.deepEqual(await answer(await other.send("/api/auth/wallet", { method: "POST", body: bodyOf(s) })), [400, { ok: false, error: "wrong_site" }], origin);
+    assert.deepEqual(await answer(await other.send("/api/auth/wallet", { method: "POST", body: bodyOf(s) })), refusal, `${origin} ${JSON.stringify(extra || {})}`);
     assert.equal(other.jar.size, 0);
   }
+  on(env, { SITE_ORIGINS: `${W.ORIGIN} https://citycoin.test` });
   // a challenge issued on citycoin.test names it, and works there only
   const cc = at(env, "https://citycoin.test");
   const c = await cc.post("/api/auth/challenge", { purpose: "login", address: m.w.address });

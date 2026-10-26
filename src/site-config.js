@@ -1,7 +1,7 @@
 /**
  * The site's own addresses, in one place (Citycoin.dev master v5, stage S02; rebrand-inventory.md U01, U05, C02):
  *
- *   SITE_ORIGIN    the canonical origin, e.g. "https://vicinity.city" (a bare https origin: no path, no port, no trailing slash)
+ *   SITE_ORIGIN    the canonical origin, e.g. "https://citycoin.dev" (a bare https origin: no path, no port, no trailing slash)
  *   SITE_ORIGINS   the origins this Worker serves in place (a list, or one string of origins separated by commas or spaces);
  *                  SITE_ORIGIN must be one of them
  *
@@ -19,14 +19,20 @@
 
 export const DEFAULT_SITE_ORIGIN = "https://vicinity.city";
 export const DEFAULT_SITE_ORIGINS = Object.freeze(["https://vicinity.city"]);
-/** The old names that forward to the canonical host (compatibility, rebrand-inventory.md C02). Never served in place unless listed. */
+/** The old names that forward to vicinity.city (compatibility, rebrand-inventory.md C02), only while this Worker serves vicinity.city in
+ *  place (servesLegacy below). Never served in place unless listed. */
 export const LEGACY_FORWARD_HOSTS = Object.freeze(["www.vicinity.city", "vicinitycity.net", "www.vicinitycity.net"]);
-/** Today's own host and the three old names: the legacy hosts. Under HOST_REDIRECT (stage S03, src/hostroute.js) each one stays an accepted
- *  host whatever SITE_ORIGINS lists (master section 04: the vicinity.city routes stay at least 12 months after the cutover, and the
- *  immutable /coin-meta/* and /brand/vicinity-512.png bytes for as long as anything names them), so they are never "unknown". */
+/** vicinity.city and the three old names: the legacy hosts. They count as accepted hosts (acceptedHost below: the host binding,
+ *  src/hostbind.js, and HOST_REDIRECT, src/hostroute.js) only while the site serves vicinity.city in place (servesLegacy). Master section
+ *  04 wanted their routes kept at least 12 months after a redirect; the owner's decision of 24 Oct 2026 replaced that (no forwarding, the
+ *  names left blank for his other use: docs/citycoin-master/domain-cutover.md section 0), and stage S55 takes vicinity.city out of
+ *  SITE_ORIGINS and its routes out of wrangler.jsonc. From then on a legacy host that reaches this Worker is an unknown host: 421, never
+ *  served, never forwarded, never redirected. */
 export const LEGACY_HOSTS = Object.freeze([new URL(DEFAULT_SITE_ORIGIN).hostname, ...LEGACY_FORWARD_HOSTS]);
 
 const blank = (v) => v == null || (typeof v === "string" && v.trim() === "");
+/** vicinity.city: today's canonical host and the first legacy host. */
+const LEGACY_HOST = new URL(DEFAULT_SITE_ORIGIN).hostname;
 
 /** A bare https origin ("https://host"), lower case, with no path, query, fragment, port, user part or trailing slash; else null. */
 export function normalizeOrigin(value) {
@@ -62,7 +68,8 @@ const build = (origin, origins, problems) => {
     host,
     origins: Object.freeze([...origins]),
     hosts: Object.freeze(hosts),
-    forwardHosts: Object.freeze(LEGACY_FORWARD_HOSTS.filter((h) => h !== host && !hosts.includes(h))),
+    // the old names forward to vicinity.city only while it is served here (stage S55: with SITE_ORIGINS https://citycoin.dev, none does)
+    forwardHosts: Object.freeze(hosts.includes(LEGACY_HOST) ? LEGACY_FORWARD_HOSTS.filter((h) => h !== host && !hosts.includes(h)) : []),
     configured: problems === null,
     problems: Object.freeze(problems || []),
   });
@@ -106,18 +113,24 @@ export const localDevAllowed = (env) => String((env && env.DEPLOYMENT_ENV) ?? ""
 
 /**
  * The cutover's own hosts: the v5 policy's canonical host (pairs_and_branding.canonical_origin, https://citycoin.dev; a test checks the two
- * agree) and its www. They are not attached to the Worker today. Until SITE_ORIGINS lists citycoin.dev (the S06 configuration), a request
+ * agree) and its www. citycoin.dev is attached since stage S06 and listed in SITE_ORIGINS; www.citycoin.dev never is. Until SITE_ORIGINS
+ * lists citycoin.dev (as before S06, or after a rollback of it), a request
  * for either is refused, never served unbound (src/hostbind.js servedHost): a custom domain attached before the setting can then never
  * make sessions, pairings or hand-offs with no host, nor links, QR codes or signed texts built from its Host header. www.citycoin.dev is
  * never meant to be listed (it moves to the apex: docs/citycoin-master/domain-cutover.md section 2), so it stays refused.
  */
 export const CUTOVER_HOSTS = Object.freeze(["citycoin.dev", "www.citycoin.dev"]);
 
-/** The accepted host's own allowlist entry (SITE_ORIGINS or a legacy host; exact, lower case, never a suffix match), or null. The value
- *  returned is the configuration's string, never the request's (stage S03 src/hostroute.js and stage S04 src/hostbind.js both use it). */
+/** Does this site serve vicinity.city in place (SITE_ORIGINS lists it, or the settings are unset or refused, which is today's site)? Only
+ *  then do the legacy hosts count as accepted and the old names forward there. False from stage S55 on (SITE_ORIGINS https://citycoin.dev). */
+export const servesLegacy = (site) => site.hosts.includes(LEGACY_HOST);
+
+/** The accepted host's own allowlist entry (SITE_ORIGINS, or a legacy host while servesLegacy; exact, lower case, never a suffix match), or
+ *  null. The value returned is the configuration's string, never the request's (stage S03 src/hostroute.js and stage S04 src/hostbind.js
+ *  both use it). */
 export function acceptedHost(site, hostname) {
   const h = String(hostname || "").toLowerCase();
-  const entry = site.hosts.find((x) => x === h) || LEGACY_HOSTS.find((x) => x === h);
+  const entry = site.hosts.find((x) => x === h) || (servesLegacy(site) ? LEGACY_HOSTS.find((x) => x === h) : undefined);
   return entry || null;
 }
 

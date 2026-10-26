@@ -3,9 +3,11 @@
 // go ahead and execute all the changes." What is checked here, against the committed files (read past the suite's stand-in for today's site,
 // test/helpers/today-build.mjs): the committed wrangler.jsonc, the pages and the record it builds, the two-way rule between the label set and
 // wallet-only sign-in, the wallet-only copy (the S15 gate, review finding F3), the editions of the Rules and the Terms, the moved noindex rule,
-// a rollback to the previous values, and the Worker with the committed settings on both served hosts (registration with a fake wallet and the
-// location once, sign-in, the refused Google, e-mail and password routes, the frozen seat writers, the closed launch writers, a swap quote of the
-// fake Jupiter, the job). Fake wallets and fake data only; nothing here reaches a network.
+// a rollback to the previous values, and the Worker with the committed settings (registration with a fake wallet and the location once,
+// sign-in, the refused Google, e-mail and password routes, the frozen seat writers, the closed launch writers, a swap quote of the fake
+// Jupiter, the job). Since stage S55 (domain-cutover.md section 3, step 4) the committed settings serve citycoin.dev alone: the Worker is
+// checked there, and vicinity.city, no longer served, is checked to be refused (421 wrong_host, never served, never redirected). Fake
+// wallets and fake data only; nothing here reaches a network.
 import { test, beforeEach, after } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -42,19 +44,21 @@ after(() => { W.realClock(); _pagesBuiltForTests(null); });
 /* ---------------------------------------------------------------- the committed configuration */
 
 test("the committed wrangler.jsonc carries the go-live settings, each with a comment naming the owner's go of 25 Oct 2026, and nothing more", () => {
+  // (stage S55 moved SITE_ORIGINS from "https://citycoin.dev https://vicinity.city" to citycoin.dev alone, and removed the two vicinity.city
+  // routes: the last step of the domain cutover, on the same go; implementation-report.md section 11, stage S55)
   assert.deepEqual([V.BRAND, V.LEGACY_SEATS, V.LEGACY_LAUNCH, V.WALLET_ONLY, V.EMAIL_FROM, V.SITE_ORIGIN, V.SITE_ORIGINS, V.DEPLOYMENT_ENV],
-    ["citycoin", "frozen", "off", "on", "Citycoin.dev <noreply@citycoin.dev>", "https://citycoin.dev", "https://citycoin.dev https://vicinity.city", "production"]);
+    ["citycoin", "frozen", "off", "on", "Citycoin.dev <noreply@citycoin.dev>", "https://citycoin.dev", "https://citycoin.dev", "production"]);
   // LEGACY_LINK stays unset (0 members when the owner deleted all member data on 24 Oct 2026; the pre-merge census must still find no Google- or
   // e-mail-only account, or the same pull request sets the window: the deploy checklist), and so does every
   // switch this pull request does not move (HOST_REDIRECT is never to be set: the owner's decision of 24 Oct 2026, no forwarding)
   for (const k of ["LEGACY_LINK", "LEGACY_LINK_UNTIL", "HOST_REDIRECT", "MAIN_TOKEN_V5", "MAIN_TOKEN_MINT", "PUBLIC_V5", "SELECTION_V5", "LAUNCH_V5", "CC_TRADING", "CC_HOURLY"])
     assert.equal(Object.hasOwn(V, k), false, `${k} is not set`);
   assert.equal(Object.keys(V).at(-1), "FEED_V2", "FEED_V2 stays the last setting");
-  assert.deepEqual(WR.routes, [{ pattern: "citycoin.dev", custom_domain: true }, { pattern: "vicinity.city", custom_domain: true }, { pattern: "www.vicinity.city", custom_domain: true }], "the routes are unchanged");
+  assert.deepEqual(WR.routes, [{ pattern: "citycoin.dev", custom_domain: true }], "one route: citycoin.dev (stage S55 removed vicinity.city and www.vicinity.city)");
   assert.deepEqual(WR.triggers, { crons: ["*/10 * * * *"] }, "one cron");
   // each new or changed setting: the comment block right above its line names the owner's go of 25 Oct 2026, and the go itself is quoted once
   const lines = TEXT.split("\n");
-  for (const k of ["EMAIL_FROM", "SITE_ORIGIN", "BRAND", "LEGACY_SEATS", "LEGACY_LAUNCH", "WALLET_ONLY"]) {
+  for (const k of ["EMAIL_FROM", "SITE_ORIGINS", "SITE_ORIGIN", "BRAND", "LEGACY_SEATS", "LEGACY_LAUNCH", "WALLET_ONLY"]) {
     const at = lines.findIndex((l) => l.trim().startsWith(`"${k}":`));
     let i = at - 1, block = "";
     while (i >= 0 && lines[i].trim().startsWith("//")) block = lines[i--].trim().replace(/^\/\/\s*/, "") + " " + block;
@@ -62,9 +66,9 @@ test("the committed wrangler.jsonc carries the go-live settings, each with a com
     assert.match(block, /roll back|rollback/i, `${k}: its comment says how to roll it back (a value, never a deleted line)`);
   }
   assert.equal(TEXT.replace(/\n\s*\/\/\s*/g, " ").split(QUOTE).length - 1, 1, "the owner's words, quoted once as written");
-  // the site settings: citycoin.dev canonical while vicinity.city still serves in place
+  // the site settings: citycoin.dev canonical and the only host served in place (stage S55)
   const site = siteConfig(V);
-  assert.deepEqual([site.origin, site.hosts, site.problems], ["https://citycoin.dev", ["citycoin.dev", "vicinity.city"], []]);
+  assert.deepEqual([site.origin, site.hosts, site.problems], ["https://citycoin.dev", ["citycoin.dev"], []]);
   assert.deepEqual(pageV5Config(V), { ok: true });
 });
 
@@ -88,7 +92,11 @@ test("one edition, one text: WALLET_ONLY=on is built only with BRAND=citycoin, a
   assert.throws(() => pageBrandPrerequisites(without(V, "WALLET_ONLY")), /BRAND=citycoin in wrangler\.jsonc needs, in the same pull request: WALLET_ONLY=on \(with SITE_ORIGIN, SITE_ORIGINS and DEPLOYMENT_ENV\)/);
   assert.throws(() => pageBrandPrerequisites({ ...V, WALLET_ONLY: "off" }), /WALLET_ONLY=on/);
   assert.throws(() => pageWalletOnly(without(V, "BRAND")), /WALLET_ONLY=on in wrangler\.jsonc needs BRAND=citycoin/);
-  assert.deepEqual(pageWalletOnly(without(V, "SITE_ORIGIN")), { walletOnly: true }, "SITE_ORIGINS alone is a configuration the Worker accepts (its first origin canonical)");
+  // SITE_ORIGINS alone is a configuration the Worker accepts while it lists vicinity.city (today's canonical host, then the default origin), as
+  // S06 and the go-live committed it; since stage S55 it lists citycoin.dev alone, so taking SITE_ORIGIN out by itself is refused
+  // (SITE_ORIGIN_NOT_ALLOWED): rolling the go-live back needs S55 rolled back first (the rollback test below)
+  assert.deepEqual(pageWalletOnly({ ...without(V, "SITE_ORIGIN"), SITE_ORIGINS: "https://citycoin.dev https://vicinity.city" }), { walletOnly: true }, "SITE_ORIGINS alone, as S06 committed it, is accepted");
+  assert.throws(() => pageWalletOnly(without(V, "SITE_ORIGIN")), /WALLET_ONLY=on in wrangler\.jsonc with a configuration the Worker refuses \(WALLET_ONLY_SITE_REFUSED/, "S55's SITE_ORIGINS without SITE_ORIGIN is refused");
   assert.throws(() => pageWalletOnly(without(V, "SITE_ORIGIN", "SITE_ORIGINS")), /WALLET_ONLY=on in wrangler\.jsonc with a configuration the Worker refuses \(WALLET_ONLY_SITE_REFUSED/);
   assert.throws(() => pageWalletOnly({ ...V, DEPLOYMENT_ENV: "" }), /WALLET_ONLY_POLICY_REFUSED/);
   assert.deepEqual(pageWalletOnly(without(V, "WALLET_ONLY")), { walletOnly: false });
@@ -215,7 +223,10 @@ test("public/_headers: citycoin.dev (canonical, SITE_ORIGIN) is indexed; every o
 /* ---------------------------------------------------------------- rollback */
 
 test("rollback: one pull request that puts the previous values back (lines kept, values changed: keep_vars) builds today's pages and record again", () => {
-  const back = { ...V, BRAND: "", LEGACY_SEATS: "on", LEGACY_LAUNCH: "on", WALLET_ONLY: "off", SITE_ORIGIN: "", EMAIL_FROM: TODAY_EMAIL_FROM };
+  // since stage S55 the go-live's rollback comes after S55's own (SITE_ORIGINS back to both hosts, with the two vicinity.city routes):
+  // SITE_ORIGIN "" with S55's SITE_ORIGINS (citycoin.dev alone) is a configuration the build refuses, so the order cannot be got wrong
+  assert.throws(() => pageV5Config({ ...V, BRAND: "", LEGACY_SEATS: "on", LEGACY_LAUNCH: "on", WALLET_ONLY: "off", SITE_ORIGIN: "", EMAIL_FROM: TODAY_EMAIL_FROM }), /SITE_ORIGIN_NOT_ALLOWED/);
+  const back = { ...V, BRAND: "", LEGACY_SEATS: "on", LEGACY_LAUNCH: "on", WALLET_ONLY: "off", SITE_ORIGIN: "", SITE_ORIGINS: "https://citycoin.dev https://vicinity.city", EMAIL_FROM: TODAY_EMAIL_FROM };
   assert.deepEqual(pageBrandPrerequisites(back), { ok: true });
   assert.deepEqual(pageWalletOnly(back), { walletOnly: false });
   assert.deepEqual(pageV5Config(back), { ok: true });
@@ -228,7 +239,7 @@ test("rollback: one pull request that puts the previous values back (lines kept,
   for (const [f, html] of [...buildPages(), ...buildStandalonePages()]) assert.equal(html, readFileSync(new URL(`../public/${f}`, import.meta.url), "utf8"), f);
 });
 
-/* ---------------------------------------------------------------- the Worker with the committed settings, on both served hosts */
+/* ---------------------------------------------------------------- the Worker with the committed settings, on the one served host */
 
 const answer = async (res) => [res.status, await res.json()];
 const signed = async (b, w, purpose) => {
@@ -237,14 +248,26 @@ const signed = async (b, w, purpose) => {
   return { challengeId: c.challengeId, address: w.address, message: c.message, signature: await w.sign(c.message) };
 };
 
-test("the Worker as committed, on citycoin.dev and on vicinity.city: register with a wallet and the location once, sign in again, every other way in refused", async () => {
+test("the Worker as committed, on citycoin.dev: register with a wallet and the location once, sign in again, every other way in refused; vicinity.city is refused", async () => {
   _pagesBuiltForTests(BUILT);
   try {
     const env = W.newWorld({ ...V, SOLANA_RPC_URL: "https://rpc.test" });
     assert.equal(walletOnly(env), true);
     assert.equal(legacySeats(env), "frozen");
     assert.equal(legacyLaunch(env), "off");
-    for (const site of ["https://citycoin.dev", "https://vicinity.city"]) {
+    // stage S55: vicinity.city and www.vicinity.city are no longer served (until S55 this test registered on both hosts). Should either name
+    // ever reach this Worker again, every Worker path answers 421 wrong_host naming the canonical origin, no Location, no cookie: nothing is
+    // read, registered or signed in there, and nothing redirects to citycoin.dev
+    for (const old of ["https://vicinity.city", "https://www.vicinity.city"]) {
+      const b = W.browser(env, { site: old }), w = await W.wallet();
+      for (const [m, p, body] of [["GET", "/api/me"], ["POST", "/api/signup/start", {}], ["POST", "/api/auth/challenge", { purpose: "login", address: w.address }],
+        ["GET", "/api/policy"], ["GET", "/official-coins.csv"]]) {
+        const res = await b.send(p, { method: m, body });
+        assert.deepEqual([res.status, res.headers.get("location"), res.headers.get("set-cookie"), await res.json()],
+          [421, null, null, { error: "wrong_host", origin: "https://citycoin.dev" }], `${old} ${m} ${p}`);
+      }
+    }
+    for (const site of ["https://citycoin.dev"]) {
       const b = W.browser(env, { site }), w = await W.wallet();
       const me0 = await b.get("/api/me");
       assert.equal(me0.walletOnly, true, site);
@@ -292,7 +315,7 @@ test("the Worker as committed, on citycoin.dev and on vicinity.city: register wi
       assert.deepEqual([pol.policy.version, pol.policy.effectiveAt, Boolean(pol.legacySeats)], [7, "2026-10-25", true]);
       assert.doesNotMatch(JSON.stringify(pol), /vicinity/i);
     }
-    assert.equal((await env.DB.prepare("SELECT COUNT(*) AS n FROM users").first()).n, 2);
+    assert.equal((await env.DB.prepare("SELECT COUNT(*) AS n FROM users").first()).n, 1, "one registration, on citycoin.dev; none on the old host");
   } finally { _pagesBuiltForTests(null); }
 });
 
@@ -319,7 +342,10 @@ test("the Worker as committed: SOL and USDC still quote (a fake Jupiter, no plat
     const env = W.newWorld({ ...V, SOLANA_RPC_URL: "https://rpc.test" });
     const jup = fakeJupiter(), chain = W.chain(), others = [];
     const fetchImpl = async (url, init) => (await jup.fetch(url, init)) || (/rpc/.test(String(url)) ? chain(url, init) : (others.push(String(url)), new Response("blocked", { status: 599 })));
-    for (const site of ["https://citycoin.dev", "https://vicinity.city"]) {
+    // stage S55: citycoin.dev only (vicinity.city answers 421 wrong_host before any route, the swap's included)
+    const old = await W.browser(env, { site: "https://vicinity.city" }).send("/api/swap/config", { fetchImpl });
+    assert.deepEqual([old.status, (await old.json()).error], [421, "wrong_host"]);
+    for (const site of ["https://citycoin.dev"]) {
       const b = W.browser(env, { site });
       const cfg = await b.send("/api/swap/config", { fetchImpl });
       assert.equal(cfg.status, 200);

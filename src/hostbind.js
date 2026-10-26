@@ -12,8 +12,9 @@
  * unbound. Rolling back is unsetting SITE_ORIGINS: every session, pairing, hand-off and sign-up row then works on any host again, as today.
  *
  * WHAT IT DOES WHILE IT COUNTS.
- *   - The request's host is looked up in the allowlist (SITE_ORIGINS plus the legacy hosts, src/site-config.js acceptedHost; exact, lower
- *     case, never a suffix match). The value used is the allowlist's own entry, never the request's text. A host outside the allowlist is
+ *   - The request's host is looked up in the allowlist (SITE_ORIGINS, plus the legacy hosts only while SITE_ORIGINS lists vicinity.city,
+ *     src/site-config.js acceptedHost; exact, lower case, never a suffix match: from stage S55 on, SITE_ORIGINS https://citycoin.dev, the
+ *     allowlist is citycoin.dev alone). The value used is the allowlist's own entry, never the request's text. A host outside the allowlist is
  *     refused (src/index.js answers 421 {"error":"wrong_host"}, before any route and before the http and old-name 301s). Outside production
  *     only (src/site-config.js localDevAllowed), a local development host (localhost, 127.0.0.1, [::1], *.localhost: `wrangler dev`, never a
  *     Cloudflare route) is served as its own host, and `wrangler dev`'s visit of a route's name over http from this computer keeps its http.
