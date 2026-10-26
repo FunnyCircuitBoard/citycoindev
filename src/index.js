@@ -101,6 +101,7 @@ import { SECURITY_HEADERS, json } from "./http.js";
 import { readSigned } from "./signed.js";
 import { ensureSchema } from "./store.js";
 import { LEGACY_NEVER, POLICY, founderAmount } from "./policy.js";
+import { rulesEdition } from "./editions.js";
 import { ledgerStatus } from "./ledger.js";
 import { handleChallenge, handleEmailStart, handleEmailVerify, handleGoogleAdd, handleLogout, handleOAuthCallback, handleOAuthStart, handlePairFinish, handlePairStart, handlePairStatus,
   handlePairStatusPost, handleReprove, handleTransferCheck, handleTransferStart, handleWalletLogin } from "./auth.js";
@@ -540,8 +541,10 @@ export async function handleApi(request, env = {}, fetchImpl = fetch, ctx = null
       if (blocked) return blocked;
       // the Rules page shows the never-list as it comes: in the product's own name (today's words while BRAND is unset), and under another
       // label set without the legacy token's own line (it is shown nowhere then, src/official.js legacyHidden)
+      // Under another label set the version and effective date are that edition's (src/editions.js: the Citycoin.dev Rules are version 7, in
+      // effect since 2026-10-25); today's label set answers POLICY as it is
       const bw = brandWords(env);
-      const out = { policy: bw.on ? { ...POLICY, never: POLICY.never.filter((t) => t !== LEGACY_NEVER).map((t) => bw.say(t)) } : POLICY, snapshotCutoff: snapshotCutoff(env), launched: Boolean(tokenMint(env)),
+      const out = { policy: bw.on ? { ...POLICY, ...rulesEdition(env), never: POLICY.never.filter((t) => t !== LEGACY_NEVER).map((t) => bw.say(t)) } : POLICY, snapshotCutoff: snapshotCutoff(env), launched: Boolean(tokenMint(env)),
         balanceHistory: env.DB ? await ledgerStatus(env, Date.now()) : { running: false } };
       // the legacy seats frozen (stage S16, src/seats.js LEGACY_SEATS_STATUS): the seat, squad, steward and election rules of `policy` are history,
       // and the answer says so; otherwise no such key, exactly today's answer

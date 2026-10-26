@@ -68,7 +68,7 @@ import { DAY, POLICY } from "./policy.js";
 import { autoUsername } from "./text.js";
 import { v2On } from "./flags.js";
 import { check, clientKey, hits, limitKey, peek, refund } from "./limits.js";
-import { TERMS_VERSION, asText, endSignup, getSignup, recordIdentity } from "./signup-core.js";
+import { termsVersion, asText, endSignup, getSignup, recordIdentity } from "./signup-core.js";
 import { finishCore } from "./signup-finish.js";
 import { LEGACY_PROOF, SESSION_COOKIE, SESSION_SECONDS } from "./session.js";
 import { accountName, linkLocked, linkNotice, linkWallet, lockedAnswer, maskName } from "./walletlink.js";
@@ -796,7 +796,7 @@ async function pairStatus(env, request, code, now) {
   const out = { status: p.wallet ? "ready" : "waiting", pin: p.pin, purpose: p.purpose === "link" ? "link" : p.purpose === "register" ? "register" : "login" };
   if (p.purpose === "link" && p.user_id) {
     const o = await env.DB.prepare("SELECT handle, name, home_name, home_country FROM users WHERE id = ?").bind(p.user_id).first();
-    if (o) Object.assign(out, { name: maskName(o.name || o.handle), handle: maskName(o.handle), community: o.home_name ? { name: o.home_name, country: o.home_country } : null, terms: TERMS_VERSION });
+    if (o) Object.assign(out, { name: maskName(o.name || o.handle), handle: maskName(o.handle), community: o.home_name ? { name: o.home_name, country: o.home_country } : null, terms: termsVersion() });
   }
   return json(out);
 }
@@ -920,7 +920,7 @@ export async function handleOAuthStart(request, env, provider) {
     let row;
     try { await ensureSignupSchema(env.DB); row = await getSignup(env, request); }
     catch (e) { console.error("sign-up lookup failed", String((e && e.message) || e)); return redirect("/connect?error=login_unavailable"); }
-    if (!row || row.terms_version !== TERMS_VERSION) return redirect("/connect?error=terms_required");
+    if (!row || row.terms_version !== termsVersion()) return redirect("/connect?error=terms_required");
     marker = ".s";
   }
   const go = await oauthStart(request, env, provider, marker);

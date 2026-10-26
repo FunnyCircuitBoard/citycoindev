@@ -28,6 +28,12 @@
 // the freeze in src/pages-built.js (legacySeats "frozen", only then), so the Worker holds the freeze when its own setting differs from what
 // the pages were built with (src/v5policy.js legacySeats).
 //
+// Wallet-only sign-in (stage S15 switch-on, WALLET_ONLY=on in wrangler.jsonc): the build replaces every passage that offers Google, e-mail or
+// password sign-in with plain wallet sign-in words, from scripts/pages/walletonly-copy.mjs (exact whole-line passages, applied after the frozen
+// copy; a passage not found exactly once stops the build), gives the account sheet its wallet-only hint, and records walletOnly: true in
+// src/pages-built.js. Only with BRAND=citycoin (pageWalletOnly), and BRAND=citycoin only with it (pageBrandPrerequisites): the Rules and Terms
+// of the Citycoin.dev pages are one edition (src/editions.js: Rules version 7 and Terms 2026-10-25), which describes wallet-only sign-in.
+//
 // The brand (the label migration, stage S48; owner directive 24 Oct 2026: "there should be no existence of vicinity. only citycoin."). A
 // page source writes the product's name through a label fill and keeps any other brand difference in a brand block:
 //   {{productName}} {{shortName}} {{domain}} {{siteLabel}} {{tagline}}   the label of src/brand.js (escaped), in the body and in the settings
@@ -53,6 +59,8 @@ import { LEGACY_HOSTS, siteConfig } from "../../src/site-config.js";
 import { isSolanaAddress } from "../../src/solana.js";
 import { settingsFrom } from "../mainnet-preflight.mjs";
 import { FROZEN_COPY } from "./frozen-copy.mjs";
+import { WALLET_ONLY_COPY } from "./walletonly-copy.mjs";
+import { editionFor } from "../../src/editions.js";
 
 const SRC = fileURLToPath(new URL("./src/", import.meta.url));
 const OUT = fileURLToPath(new URL("../../public/", import.meta.url));
@@ -81,7 +89,10 @@ const ACCOUNT_LINKS = [
   ["account", "/dashboard#profile-account", "Account", "Wallet, sign-in, e-mail and phone", '<circle cx="8" cy="15.5" r="3.5"/><path d="M10.5 13 19 4.5M15.5 8l2.5 2.5M17.5 6l2 2"/>'],
   ["settings", "/dashboard#notice-prefs", "Settings", "Notifications: what you get told about", '<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>'],
 ];
-const ACCOUNT_SHEET = `  <div class="acct" id="acct-sheet" data-acct hidden>
+// Wallet-only sign-in (WALLET_ONLY=on, pageWalletOnly): the Account entry names what that section of the dashboard holds then (the wallet, the
+// way you signed in, which is the wallet, and the phone number: no Google sign-in and no contact e-mail can be added, review finding F1)
+export const ACCOUNT_LINKS_WALLET_ONLY = ACCOUNT_LINKS.map((l) => (l[0] === "account" ? [l[0], l[1], l[2], "Wallet, sign-in and phone", l[4]] : l));
+const accountSheet = (links) => `  <div class="acct" id="acct-sheet" data-acct hidden>
     <div class="acct__scrim" data-acct-close></div>
     <div class="acct__panel" id="acct-panel" role="dialog" aria-modal="true" aria-label="Your account" tabindex="-1">
       <span class="acct__grab" aria-hidden="true"></span>
@@ -95,12 +106,13 @@ const ACCOUNT_SHEET = `  <div class="acct" id="acct-sheet" data-acct hidden>
       </div>
       <nav class="acct__nav" aria-label="Account menu">
         <ul class="acct__links">
-${ACCOUNT_LINKS.map(([k, href, label, hint, paths]) => `          <li><a class="acct__link" href="${href}" data-acct-go="${k}"><span class="acct__ico">${SHEET_ICON(paths)}</span><span class="acct__text"><strong>${label}</strong><span>${hint}</span></span><span class="acct__chev" aria-hidden="true">${SHEET_ICON('<path d="M9.5 6l6 6-6 6"/>')}</span></a></li>`).join("\n")}
+${links.map(([k, href, label, hint, paths]) => `          <li><a class="acct__link" href="${href}" data-acct-go="${k}"><span class="acct__ico">${SHEET_ICON(paths)}</span><span class="acct__text"><strong>${label}</strong><span>${hint}</span></span><span class="acct__chev" aria-hidden="true">${SHEET_ICON('<path d="M9.5 6l6 6-6 6"/>')}</span></a></li>`).join("\n")}
         </ul>
       </nav>
       <button class="acct__out" type="button" data-acct-logout>${SHEET_ICON('<path d="M14 4.5h3.5a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H14"/><path d="M10 8l-4 4 4 4M6 12h9.5"/>')}<span>Log out</span></button>
     </div>
   </div>`;
+const ACCOUNT_SHEET = accountSheet(ACCOUNT_LINKS), ACCOUNT_SHEET_WALLET_ONLY = accountSheet(ACCOUNT_LINKS_WALLET_ONLY);
 const icon = (paths) => `<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
 const current = (page, p) => (page === p ? ' aria-current="page"' : "");
 // the theme switch: a moon in the dark theme, a sun in the light one (style.css shows one); in the header, and in the footer on phones
@@ -173,7 +185,9 @@ function lookHead(look, B, fullTitle, description, site) {
 // it is listed there; a network without an icon shows its name. With MAIN_TOKEN_V5 off that is SOCIAL_PROFILES, as before.
 // `L`: the labels of src/brand.js brandLabels(), made from an escaped label set (escBrand below), so each is safe in markup as it is;
 // `B`: that escaped label set itself; `look`: lookOf(brand) (null: today's layout, byte for byte); `site`: src/site-config.js siteConfig
-function layout({ title, description, page, nav: navPage = page, scripts = [], styles = [], main = "", noindex = false }, body, L, socials, { B, look = null, site = null } = {}) {
+// `walletOnly`: built with WALLET_ONLY=on (the account sheet's wallet-only words); a look's pages also carry their Terms edition (data-terms,
+// src/editions.js), which public/site.js asks a member to confirm
+function layout({ title, description, page, nav: navPage = page, scripts = [], styles = [], main = "", noindex = false }, body, L, socials, { B, look = null, site = null, walletOnly = false } = {}) {
   const nav = HEADER_NAV.map(([p, href, label]) => `        <a href="${href}"${current(navPage, p)}>${label}</a>`).join("\n");
   const tabs = TABS.filter(([p]) => !look || !look.hiddenTabs.includes(p)).map(([p, href, label, paths]) => `    <a href="${href}"${current(navPage, p)}>${navPage === p ? '<span class="tabbar__ind" aria-hidden="true"></span>' : ""}${icon(paths)}<span>${label}</span></a>`).join("\n");
   // feedback.js (the floating Feedback / Support widget) runs last on every page: it needs window.V from site.js and nothing else needs it
@@ -183,7 +197,7 @@ function layout({ title, description, page, nav: navPage = page, scripts = [], s
   const footerLinks = FOOTER_LINKS.map(([href, text]) => `<a href="${look && Object.hasOwn(look.footerLinkTargets, href) ? look.footerLinkTargets[href] : href}">${text}</a>`).join("");
   return `<!doctype html>
 <!-- Generated by scripts/pages/build.mjs from scripts/pages/src/${page === "home" ? "index" : page}.html. Edit those, then run: npm run pages -->
-<html lang="en"${look ? ` data-brand="${esc(B.key)}" data-brand-name="${B.productName}" data-brand-domain="${B.domain}"` : ""}>
+<html lang="en"${look ? ` data-brand="${esc(B.key)}" data-brand-name="${B.productName}" data-brand-domain="${B.domain}" data-terms="${esc(editionFor(B.key).terms)}"` : ""}>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -222,7 +236,7 @@ ${nav}
       </div>
     </div>
   </header>
-${ACCOUNT_SHEET}
+${walletOnly ? ACCOUNT_SHEET_WALLET_ONLY : ACCOUNT_SHEET}
 
   <main id="main"${main ? ` class="${main}"` : ""}>
 ${body.trimEnd()}
@@ -336,6 +350,20 @@ export function frozenFor(f, entry, brand, B = escBrand(brand)) {
     description: entry.description == null ? entry.description : as(entry.description),
     replace: entry.replace.map(([old, next]) => [as(old), as(next)]).filter(([old, next]) => old !== "" || next !== ""),
   };
+}
+
+/**
+ * One page's wallet-only copy (stage S15 switch-on), its entry already resolved by frozenFor: every [old, new] passage replaced in order, each
+ * found exactly once (the same rule as frozenCopy, with its own message).
+ */
+export function walletOnlyCopy(f, body, entry) {
+  let out = body;
+  entry.replace.forEach(([old, next], i) => {
+    const at = out.indexOf(old);
+    if (at < 0 || out.indexOf(old, at + 1) >= 0) throw new Error(`${f}: wallet-only copy passage ${i + 1} is not in the source exactly once (edit scripts/pages/walletonly-copy.mjs with the source)`);
+    out = out.slice(0, at) + next + out.slice(at + old.length);
+  });
+  return out;
 }
 
 /* ---------------------------------------------------------------- brand blocks and label fills (see the top of this file) */
@@ -521,9 +549,12 @@ export function pageLegacySeats(vars = deployedVars()) {
  *                         answer presents them as current, and none restates them in a token that has no supply yet (the pages are built
  *                         with scripts/pages/frozen-copy.mjs; the Worker holds the freeze because src/pages-built.js records it)
  *   EMAIL_FROM            set, and without the old name: under that label set the Worker never sends from a sender that shows the old
- *                         name (src/mail.js senderShowsOldName) and turns e-mail off instead, while the pages (the home FAQ, the Terms,
- *                         /connect) still offer an e-mail address as a way in. A Gmail sender (GMAIL_USER, a secret) is not visible here:
- *                         the deploy checklist checks it.
+ *                         name (src/mail.js senderShowsOldName) and turns e-mail off instead. A Gmail sender (GMAIL_USER, a secret) is not
+ *                         visible here: the deploy checklist checks it.
+ *   WALLET_ONLY=on        (go-live, owner's go of 25 Oct 2026) the Citycoin.dev Rules and Terms are one edition (src/editions.js: Rules version
+ *                         7, Terms 2026-10-25), and that text describes wallet-only sign-in (scripts/pages/walletonly-copy.mjs): the label set
+ *                         is never shipped with today's Google and e-mail sign-in under that version. The switch's own inputs (DEPLOYMENT_ENV,
+ *                         SITE_ORIGIN, SITE_ORIGINS) are checked by pageV5Config and pageWalletOnly.
  * Values set only in the Cloudflare dashboard are not seen here: src/pages-built.js keeps the freeze held at run time, and src/mail.js keeps
  * e-mail off under a sender of the old name.
  */
@@ -533,9 +564,26 @@ export function pageBrandPrerequisites(vars = deployedVars()) {
   const missing = [];
   if (pageLegacySeats(vars).legacySeats !== "frozen") missing.push("LEGACY_SEATS=frozen (with DEPLOYMENT_ENV): the old founder rules belong to the legacy token");
   const from = typeof vars.EMAIL_FROM === "string" ? vars.EMAIL_FROM.trim() : "";
-  if (!from || /vicinity/i.test(from)) missing.push(`EMAIL_FROM without the old name (it is ${from ? JSON.stringify(from) : "unset"}): the pages offer e-mail sign-in, which the Worker turns off under a sender of the old name`);
+  if (!from || /vicinity/i.test(from)) missing.push(`EMAIL_FROM without the old name (it is ${from ? JSON.stringify(from) : "unset"}): the Worker turns e-mail off under a sender of the old name`);
+  if (!walletOnlyOn(vars)) missing.push("WALLET_ONLY=on (with SITE_ORIGIN, SITE_ORIGINS and DEPLOYMENT_ENV): the Citycoin.dev Rules and Terms (edition 2026-10-25, src/editions.js) describe wallet-only sign-in");
   if (missing.length) throw new Error(`BRAND=${b.key} in wrangler.jsonc needs, in the same pull request: ${missing.join("; ")}`);
   return { ok: true };
+}
+
+/**
+ * Whether the pages are built with the wallet-only copy (stage S15 switch-on): { walletOnly: true } when wrangler.jsonc sets WALLET_ONLY=on
+ * (trimmed, any letter case, as the Worker reads it), else { walletOnly: false }, the pages as they are. On, the build stops unless BRAND names
+ * the Citycoin.dev label set (scripts/pages/walletonly-copy.mjs is written for its pages, whose Rules and Terms the owner approved; today's pages
+ * offer Google and e-mail sign-in: S15 gate, review finding F3) and unless the Worker would accept the switch (src/v5policy.js
+ * walletOnlyRefusals: DEPLOYMENT_ENV, SITE_ORIGIN and SITE_ORIGINS; pageV5Config says the same). Never from this shell. A WALLET_ONLY set only in
+ * the Cloudflare dashboard is not seen here: the deploy checklist checks the dashboard variables.
+ */
+export function pageWalletOnly(vars = deployedVars()) {
+  if (!walletOnlyOn(vars)) return { walletOnly: false };
+  if (!lookOf(pageBrand(vars))) throw new Error("WALLET_ONLY=on in wrangler.jsonc needs BRAND=citycoin in the same pull request: the wallet-only copy (scripts/pages/walletonly-copy.mjs) and the Rules and Terms of edition 2026-10-25 are written for the Citycoin.dev pages, and today's pages offer Google and e-mail sign-in (S15 gate, review finding F3)");
+  const refused = walletOnlyRefusals(vars);
+  if (refused.length) throw new Error(`WALLET_ONLY=on in wrangler.jsonc with a configuration the Worker refuses (${refused.join(", ")}): wallet-only sign-in needs DEPLOYMENT_ENV and a site configuration the Worker accepts (SITE_ORIGIN or SITE_ORIGINS, src/site-config.js)`);
+  return { walletOnly: true };
 }
 
 export const PAGES_BUILT_FILE = fileURLToPath(new URL("../../src/pages-built.js", import.meta.url));
@@ -552,12 +600,15 @@ export function pagesBuiltSource(vars = deployedVars(), assets = deployedAssets(
   const built = { mainTokenV5: mainTokenV5On(vars), brand: pageBrand(vars).value, pagesReachWorker };
   // the legacy seat freeze (stage S16): recorded only when the pages carry it, so the file of pages built without it is the same bytes as before
   const frozen = pageLegacySeats(vars).legacySeats === "frozen";
+  // the wallet-only copy (stage S15 switch-on): the same rule
+  const walletOnly = pageWalletOnly(vars).walletOnly;
   return [
     "// Written by scripts/pages/build.mjs from the settings of wrangler.jsonc; do not edit (test/build-parity.test.js checks it).",
     "// What the deployed pages in public/ were built with, and whether wrangler.jsonc sends them through the Worker (run_worker_first true).",
     "// src/v5policy.js counts MAIN_TOKEN_V5 only when mainTokenV5 is true here, and HOST_REDIRECT only when pagesReachWorker is true.",
     ...(frozen ? ["// legacySeats \"frozen\": built with LEGACY_SEATS=frozen (no old founder copy); src/v5policy.js holds the freeze if the Worker's setting differs."] : []),
-    `export const PAGES_BUILT = Object.freeze({ mainTokenV5: ${built.mainTokenV5}, brand: ${JSON.stringify(built.brand)}, pagesReachWorker: ${built.pagesReachWorker}${frozen ? ', legacySeats: "frozen"' : ""} });`,
+    ...(walletOnly ? ["// walletOnly true: built with WALLET_ONLY=on (scripts/pages/walletonly-copy.mjs: no page offers Google, e-mail or password sign-in)."] : []),
+    `export const PAGES_BUILT = Object.freeze({ mainTokenV5: ${built.mainTokenV5}, brand: ${JSON.stringify(built.brand)}, pagesReachWorker: ${built.pagesReachWorker}${frozen ? ', legacySeats: "frozen"' : ""}${walletOnly ? ", walletOnly: true" : ""} });`,
     "",
   ].join("\n");
 }
@@ -572,9 +623,10 @@ export function settingsFor(f, settings, brand) {
   return lookOf(brand) && perBrand && Object.hasOwn(perBrand, brand.key) ? { ...own, ...perBrand[brand.key] } : own;
 }
 
-function build(standalone, brand, socials, site, legacySeats, { allowResidue = false } = {}) {
+function build(standalone, brand, socials, site, legacySeats, { allowResidue = false, walletOnly = false } = {}) {
   const B = escBrand(brand), L = brandLabels(B), look = lookOf(brand);
   if (legacySeats !== "on" && legacySeats !== "frozen") throw new Error(`legacySeats must be "on" or "frozen" (got ${JSON.stringify(legacySeats)})`);
+  if (typeof walletOnly !== "boolean") throw new Error(`walletOnly must be true or false (got ${JSON.stringify(walletOnly)})`);
   const frozen = legacySeats === "frozen";
   const out = [];
   for (const f of readdirSync(SRC).filter((x) => x.endsWith(".html")).sort()) {
@@ -586,11 +638,15 @@ function build(standalone, brand, socials, site, legacySeats, { allowResidue = f
     // the legacy seats frozen (stage S16): the page's frozen description and copy, resolved for the label set; otherwise the source as it is
     const fz = frozen && Object.hasOwn(FROZEN_COPY, f) ? frozenFor(f, FROZEN_COPY[f], brand, B) : null;
     if (fz && fz.description) settings.description = fz.description;
+    // wallet-only sign-in (stage S15 switch-on): the page's wallet-only description and copy, resolved for the label set, after the frozen copy
+    const wo = walletOnly && Object.hasOwn(WALLET_ONLY_COPY, f) ? frozenFor(f, WALLET_ONLY_COPY[f], brand, B) : null;
+    if (wo && wo.description) settings.description = wo.description;
     for (const k of ["title", "description"]) if (typeof settings[k] === "string") settings[k] = brandFill(f, settings[k], B);
     const own = brandFill(f, brandBlocks(f, src.slice(m[0].length), brand), B);
-    let body = fill(f, fz ? frozenCopy(f, own, { [f]: fz }) : own, { brand });
+    const afterFreeze = fz ? frozenCopy(f, own, { [f]: fz }) : own;
+    let body = fill(f, wo ? walletOnlyCopy(f, afterFreeze, wo) : afterFreeze, { brand });
     if (look) body = stripComments(body);
-    const html = layout(settings, body, L, socials, { B, look, site });
+    const html = layout(settings, body, L, socials, { B, look, site, walletOnly });
     // other configured lists (MAIN_TOKEN_V5 on): the page's other links to the former X account follow too (the dashboard's "Contact us on
     // X"), by the same function the Worker rewrites with, so a built page and a rewritten one are the same bytes; today's list: untouched
     out.push([f, socials === SOCIAL_PROFILES ? html : rewriteSocialLinks(html, socials, L)]);
@@ -604,11 +660,14 @@ function build(standalone, brand, socials, site, legacySeats, { allowResidue = f
 /** The main pages: [output file, html]. `brand` (a label set of src/brand.js shape), `socials` (profiles of src/official.js socialProfiles
  *  shape), `site` (src/site-config.js siteConfig shape), `legacySeats` ("on" or "frozen") and `allowResidue` are for tests; the defaults are
  *  pageBrand(), pageSocials() for that label set, siteConfig() of wrangler.jsonc and pageLegacySeats(), except that a label set with a look
- *  is built with the freeze unless a test asks otherwise: it ships only with it (pageBrandPrerequisites). */
-const opts = ({ brand, socials, site, legacySeats, allowResidue } = {}, standalone) => {
+ *  is built with the freeze unless a test asks otherwise: it ships only with it (pageBrandPrerequisites). `walletOnly` (true or false): the
+ *  wallet-only copy; by default what wrangler.jsonc builds (pageWalletOnly) for a label set with a look, and never for today's label set. */
+const opts = ({ brand, socials, site, legacySeats, allowResidue, walletOnly } = {}, standalone) => {
   const b = brand ?? pageBrand();
   const seats = legacySeats ?? (lookOf(b) ? "frozen" : pageLegacySeats().legacySeats);
-  return build(standalone, b, socials ?? pageSocials(deployedVars(), b), site ?? siteConfig(deployedVars()), seats, { allowResidue });
+  // wallet-only copy: what wrangler.jsonc builds (pageWalletOnly), for a label set it is written for; a test asks for it with `walletOnly`
+  const wo = walletOnly ?? (lookOf(b) ? pageWalletOnly().walletOnly : false);
+  return build(standalone, b, socials ?? pageSocials(deployedVars(), b), site ?? siteConfig(deployedVars()), seats, { allowResidue, walletOnly: wo });
 };
 export const buildPages = (o) => opts(o, false);
 /** Pages that carry "standalone": true (see the top of this file). */
@@ -619,7 +678,8 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   pageLegacyLink(); // and when it sets LEGACY_LINK=on without a window the Worker would open (stage S14), or a past LEGACY_LINK_UNTIL
   pageV5Config(); // and on any v5 switch or input the Worker would refuse (review finding SEC-1)
   pageLegacySeats(); // and on LEGACY_SEATS=frozen whose own inputs the Worker would refuse (stage S16)
-  pageBrandPrerequisites(); // and on BRAND=citycoin without LEGACY_SEATS=frozen and an EMAIL_FROM of the new name (rebrand findings F3, F7)
+  pageBrandPrerequisites(); // and on BRAND=citycoin without LEGACY_SEATS=frozen, an EMAIL_FROM of the new name and WALLET_ONLY=on (rebrand findings F3, F7)
+  pageWalletOnly(); // and on WALLET_ONLY=on without BRAND=citycoin or with inputs the Worker refuses (S15 gate, finding F3)
   for (const [f, html] of [...buildPages(), ...buildStandalonePages()]) { writeFileSync(OUT + f, html); console.log("page ready:", f); }
   writeFileSync(PAGES_BUILT_FILE, pagesBuiltSource());
   console.log("ready: src/pages-built.js");

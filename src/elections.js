@@ -14,6 +14,7 @@
 import { json, readJson } from "./http.js";
 import { access, voterProblem } from "./access.js";
 import { DAY, POLICY, iso } from "./policy.js";
+import { rulesVersion } from "./editions.js";
 import { averages, dayOf, latestBalances, samplesStale } from "./ledger.js";
 import { activeBan, amountsFor } from "./roles.js";
 import { sha256hex } from "./blobs.js";
@@ -67,7 +68,7 @@ export async function advanceElections(env, now = Date.now(), fetchImpl = fetch)
     const due = !upcoming && (!active || Date.parse(active.ends_at) - now <= M.electionDays * DAY);
     if (!due || !(await candidates(env, cc, now)).length) continue;
     try {
-      const r = await db.prepare("INSERT INTO elections (country, policy, opened_at, closes_at) VALUES (?, ?, ?, ?)").bind(cc, POLICY.version, iso(now), iso(now + M.electionDays * DAY)).run();
+      const r = await db.prepare("INSERT INTO elections (country, policy, opened_at, closes_at) VALUES (?, ?, ?, ?)").bind(cc, rulesVersion(), iso(now), iso(now + M.electionDays * DAY)).run();
       out.opened++;
       // in-app notice (NOTIFY=on) to every member of the country, one statement, at most 5,000 rows (the oldest accounts first; `notified`
       // says how many, `capped` when the country was larger than that: the rest see the election on the Community tab's country card as always)

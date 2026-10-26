@@ -581,7 +581,7 @@
       approveV2 = false; $(".connect__intro").hidden = false; $("#approve-tap").hidden = true; // today's sign-up: its hero and 1-2-3 steps, as before
     });
     const s = wo ? await api("/api/pair/status", { code: approveCode }) : await api(`/api/pair?code=${encodeURIComponent(approveCode)}`);
-    if (s.purpose === "link" && s.status === "waiting" && window.V.termsGate) window.V.termsGate.agreed(s.terms || "2026-10-01"); else gateNow();
+    if (s.purpose === "link" && s.status === "waiting" && window.V.termsGate) window.V.termsGate.agreed(s.terms || window.V.termsNow || "2026-10-01"); else gateNow();
     if (s.status !== "waiting") { $("#approve-wallets").hidden = true; return setErr(s.status === "ready" ? "This code was already used." : "This code has expired. Go back to where you started and try again.", $("#approve-pin").parentNode); }
     pairPin = s.pin; pairPurpose = s.purpose === "link" ? "link" : wo && s.purpose === "register" ? "register" : "login";
     $("#approve-pin").textContent = s.pin;

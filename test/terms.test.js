@@ -29,10 +29,11 @@ test("POST /api/me/terms rejects anonymous users and bad versions", async () => 
   assert.equal((await p.post("/api/me/terms", { version: "2026-10-01'; DROP TABLE users;--" })).error, "bad_version");
 });
 
-test("agreeing again updates the version (re-accepting new terms)", async () => {
+test("agreeing again records the published edition; a version the pages do not publish is refused and never stored (go-live review GL-HON-9)", async () => {
   const p = await person(env);
   assert.equal((await p.post("/api/me/terms", { version: "2026-10-01" })).ok, true);
-  assert.equal((await p.post("/api/me/terms", { version: "2026-11-01" })).ok, true);
+  assert.deepEqual(await p.post("/api/me/terms", { version: "2026-11-01" }), { ok: false, error: "bad_version", current: "2026-10-01" });
+  assert.deepEqual(await p.post("/api/me/terms", { version: "2099-01-01" }), { ok: false, error: "bad_version", current: "2026-10-01" });
   const row = await env.DB.prepare("SELECT terms_version FROM users WHERE wallet = ?").bind(p.w.address).first();
-  assert.equal(row.terms_version, "2026-11-01");
+  assert.equal(row.terms_version, "2026-10-01");
 });

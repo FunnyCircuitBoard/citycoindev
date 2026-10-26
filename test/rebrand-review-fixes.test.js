@@ -134,7 +134,9 @@ test("F3/F7: BRAND=citycoin is built only with LEGACY_SEATS=frozen and an EMAIL_
   assert.throws(() => pageBrandPrerequisites({ ...base, EMAIL_FROM: "Citycoin.dev <noreply@example.com>" }), /LEGACY_SEATS=frozen/);
   assert.throws(() => pageBrandPrerequisites({ ...base, LEGACY_SEATS: "frozen", DEPLOYMENT_ENV: "production", EMAIL_FROM: "" }), /EMAIL_FROM without the old name \(it is unset\)/);
   assert.throws(() => pageBrandPrerequisites({ ...base, LEGACY_SEATS: "frozen", DEPLOYMENT_ENV: "production", EMAIL_FROM: "Team <hi@VICINITY.example>" }), /EMAIL_FROM/);
-  assert.deepEqual(pageBrandPrerequisites({ ...base, LEGACY_SEATS: "frozen", DEPLOYMENT_ENV: "production", EMAIL_FROM: "Citycoin.dev <noreply@example.com>" }), { ok: true });
+  // since the go-live, wallet-only sign-in too (the Citycoin.dev Rules and Terms of edition 2026-10-25 describe it: src/editions.js)
+  assert.throws(() => pageBrandPrerequisites({ ...base, LEGACY_SEATS: "frozen", DEPLOYMENT_ENV: "production", EMAIL_FROM: "Citycoin.dev <noreply@example.com>" }), /WALLET_ONLY=on \(with SITE_ORIGIN, SITE_ORIGINS and DEPLOYMENT_ENV\)/);
+  assert.deepEqual(pageBrandPrerequisites({ ...base, LEGACY_SEATS: "frozen", DEPLOYMENT_ENV: "production", EMAIL_FROM: "Citycoin.dev <noreply@example.com>", WALLET_ONLY: "on" }), { ok: true });
 });
 
 test("CRAWL-2: a founder on a Citycoin.dev page sees no holding bar, no founder amount and no grace top-up, whatever /api/me says", async () => {
@@ -258,7 +260,8 @@ const withVars = (base, set) => {
 };
 const S06_SETTINGS = Object.freeze({ SITE_ORIGINS: "https://citycoin.dev https://vicinity.city", DEPLOYMENT_ENV: "production" });
 const BASES = [["as committed", WRANGLER], ["as stage S06 commits it", withVars(WRANGLER, S06_SETTINGS)]];
-const switched = (base) => withVars(base, { EMAIL_FROM: OWNER_FROM, BRAND: "citycoin", LEGACY_SEATS: "frozen", DEPLOYMENT_ENV: "production" });
+// (since the go-live, with wallet-only sign-in and citycoin.dev canonical: the page build takes BRAND=citycoin only with WALLET_ONLY=on)
+const switched = (base) => withVars(base, { EMAIL_FROM: OWNER_FROM, BRAND: "citycoin", LEGACY_SEATS: "frozen", DEPLOYMENT_ENV: "production", WALLET_ONLY: "on", SITE_ORIGIN: "https://citycoin.dev" });
 const cli = (text) => {
   const dir = mkdtempSync(join(tmpdir(), "switch-trial-"));
   try {
@@ -276,7 +279,7 @@ test("final check finding 2: wrangler.jsonc already carrying BRAND=citycoin with
     assert.deepEqual(pageBrandPrerequisites(vars), { ok: true }, `${name}: the committed switch is one the page build accepts`);
     const p = trialPlan(SWITCHED);
     assert.equal(p.action, "noop", name);
-    assert.match(p.line, /^switch-trial: wrangler\.jsonc already sets the switch with its prerequisites \(BRAND=citycoin, LEGACY_SEATS=frozen, DEPLOYMENT_ENV=production, EMAIL_FROM without the old name\): nothing to try and nothing written/);
+    assert.match(p.line, /^switch-trial: wrangler\.jsonc already sets the switch with its prerequisites \(BRAND=citycoin, LEGACY_SEATS=frozen, DEPLOYMENT_ENV=production, WALLET_ONLY=on, SITE_ORIGIN=https:\/\/citycoin\.dev, EMAIL_FROM without the old name\): nothing to try and nothing written/);
     assert.throws(() => withTrialSettings(SWITCHED), /already sets the switch/);
     // the letter case the Worker accepts (trimmed, any case) counts the same
     assert.equal(trialPlan(withVars(SWITCHED, { BRAND: " CityCoin " })).action, "noop", name);
@@ -294,6 +297,9 @@ test("final check finding 2: a half-set or inconsistent wrangler.jsonc still fai
       ["BRAND=citycoin without LEGACY_SEATS", withVars(base, { EMAIL_FROM: OWNER_FROM, BRAND: "citycoin", LEGACY_SEATS: undefined }), /LEGACY_SEATS=frozen \(with DEPLOYMENT_ENV\)/],
       ["BRAND=citycoin with today's sender", withVars(switched(base), { EMAIL_FROM: TODAY_FROM }), /EMAIL_FROM without the old name/],
       ["BRAND=citycoin and the freeze without DEPLOYMENT_ENV", withVars(switched(base), { DEPLOYMENT_ENV: undefined }), /ENVIRONMENT_UNSET/],
+      // the go-live: the label set and wallet-only sign-in go together (one edition of the Rules and Terms), both ways
+      ["BRAND=citycoin without WALLET_ONLY", withVars(switched(base), { WALLET_ONLY: undefined }), /WALLET_ONLY=on \(with SITE_ORIGIN, SITE_ORIGINS and DEPLOYMENT_ENV\)/],
+      ["WALLET_ONLY=on without BRAND", withVars(base, { WALLET_ONLY: "on", SITE_ORIGIN: "https://citycoin.dev" }), /WALLET_ONLY=on in wrangler\.jsonc needs BRAND=citycoin/],
       ["the freeze without DEPLOYMENT_ENV, no BRAND", withVars(base, { LEGACY_SEATS: "frozen", DEPLOYMENT_ENV: undefined }), /ENVIRONMENT_UNSET/],
       ["a BRAND that names no label set", withVars(base, { BRAND: "nope" }), /BRAND_UNKNOWN/],
       ["a LEGACY_SEATS outside the switch's values", withVars(base, { LEGACY_SEATS: "freeze" }), /refused by the page build/],
@@ -318,7 +324,7 @@ test("final check finding 2: a half-set or inconsistent wrangler.jsonc still fai
 });
 
 test("final check finding 2: prerequisites committed before BRAND (the freeze, DEPLOYMENT_ENV, a new sender) are kept, and the trial still tries the switch on top", () => {
-  const strip = (t) => t.split("\n").filter((l) => !/^\s*"(EMAIL_FROM|BRAND|LEGACY_SEATS|DEPLOYMENT_ENV)"\s*:/.test(l) && !l.includes(TRIAL_MARK)).join("\n");
+  const strip = (t) => t.split("\n").filter((l) => !/^\s*"(EMAIL_FROM|BRAND|LEGACY_SEATS|DEPLOYMENT_ENV|WALLET_ONLY|SITE_ORIGINS|SITE_ORIGIN)"\s*:/.test(l) && !l.includes(TRIAL_MARK)).join("\n");
   for (const [name, base] of BASES) {
     const cases = [
       ["the freeze switched on alone", withVars(base, { LEGACY_SEATS: "frozen", DEPLOYMENT_ENV: "production" }), ["LEGACY_SEATS", "DEPLOYMENT_ENV"]],
@@ -327,9 +333,10 @@ test("final check finding 2: prerequisites committed before BRAND (the freeze, D
       ["a blank BRAND line", withVars(base, { BRAND: "" }), varsOf(base).DEPLOYMENT_ENV ? ["DEPLOYMENT_ENV"] : []],
       // rebrand second check TRIAL-ENV-UNSET: "unset" is an environment the page build takes with BRAND unset, but the freeze refuses it, so
       // the trial writes production over it (and takes it back after) instead of failing on a valid configuration
-      ["DEPLOYMENT_ENV unset", withVars(base, { DEPLOYMENT_ENV: "unset" }), []],
+      // (without the go-live's LEGACY_LAUNCH=off, which needs an accepted environment)
+      ["DEPLOYMENT_ENV unset", withVars(base, { DEPLOYMENT_ENV: "unset", LEGACY_LAUNCH: undefined }), []],
     ];
-    for (const [what, text, kept] of cases) {
+    for (let [what, text, kept] of cases) {
       const at = `${name}: ${what}`;
       assert.deepEqual(pageV5Config(varsOf(text)), { ok: true }, `${at}: a configuration the page build takes`);
       const p = trialPlan(text);
@@ -343,6 +350,9 @@ test("final check finding 2: prerequisites committed before BRAND (the freeze, D
       for (const k of Object.keys(TRIAL_SETTINGS)) assert.equal(settingLines.filter((l) => l.includes(`"${k}":`)).length, 1, `${at}: one ${k} line`);
       assert.deepEqual(pageBrandPrerequisites(vars), { ok: true }, at);
       assert.deepEqual(pageV5Config(vars), { ok: true }, at);
+      // (and the wallet-only inputs the base already has: since the go-live, citycoin.dev in SITE_ORIGINS and as SITE_ORIGIN)
+      const base0 = varsOf(text), site = [...(String(base0.SITE_ORIGINS || "").split(/[\s,]+/).includes("https://citycoin.dev") ? ["SITE_ORIGINS"] : []), ...(base0.SITE_ORIGIN === "https://citycoin.dev" ? ["SITE_ORIGIN"] : [])];
+      kept = [...kept, ...site];
       if (kept.length) assert.match(p.line, new RegExp(`kept as committed: ${kept.join(", ")}\\)$`), at);
       else assert.match(p.line, /\(this copy only\)$/, at);
       // every other setting of wrangler.jsonc is untouched, and what the trial wrote is taken back exactly (its own line)
@@ -355,7 +365,7 @@ test("final check finding 2: prerequisites committed before BRAND (the freeze, D
   // the committed file of today, as the CI job sees it: written, exit 0
   const r = cli(WRANGLER);
   assert.equal(r.status, 0, r.err);
-  assert.match(r.out, /^switch-trial: wrangler\.jsonc now sets EMAIL_FROM=Citycoin\.dev <noreply@example\.com>, BRAND=citycoin, LEGACY_SEATS=frozen, DEPLOYMENT_ENV=production \(this copy only/);
+  assert.match(r.out, /^switch-trial: wrangler\.jsonc now sets EMAIL_FROM=Citycoin\.dev <noreply@example\.com>, BRAND=citycoin, LEGACY_SEATS=frozen, DEPLOYMENT_ENV=production, WALLET_ONLY=on, SITE_ORIGINS=https:\/\/citycoin\.dev https:\/\/vicinity\.city, SITE_ORIGIN=https:\/\/citycoin\.dev \(this copy only/);
   assert.equal(r.text, withTrialSettings(WRANGLER));
 });
 

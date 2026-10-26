@@ -23,7 +23,12 @@
     // "live" is the real site (countdown until the Launchpad opens, no banner, no test lab seeding).
     "SITE_MODE": "live",
     "GOOGLE_CLIENT_ID": "508878292080-h05nh9h4p6u4ajpqldc423f6elmqc0nl.apps.googleusercontent.com",
-    "EMAIL_FROM": "Vicinity <noreply@vicinity.city>",
+    // The mail sender for the Citycoin.dev name (owner decision 3 of the rebrand stage, E10): the owner's go of 25 Oct 2026 ("Get them all
+    // sorted. Don't wait for my permission just go ahead and execute all the changes."). citycoin.dev has no sending records at the mail
+    // provider yet (Resend is set up for vicinity.city only), so mail from this sender does not arrive until the owner verifies the domain
+    // there. With WALLET_ONLY on (below) no sign-in or registration depends on an e-mail. Was "Vicinity <noreply@vicinity.city>"; to roll
+    // back, put that value back (do not delete the line: keep_vars would keep this one).
+    "EMAIL_FROM": "Citycoin.dev <noreply@citycoin.dev>",
     // The one official $VICINITY contract (Raydium LaunchLab, launched 3 Oct 2026 at 16:48 UTC). Verified on-chain before it
     // was set here: classic SPL token, 1,000,000,000 supply, 6 decimals, mint authority and freeze authority both removed,
     // metadata "VICINITY CITY" / VICINITY. The checker, the registry, the holder list, the balance history and every "Buy"
@@ -102,11 +107,12 @@
     // else than "on" is the site exactly as before (change the value, do not delete the line: keep_vars).
     "COIN_V2_REVIEW": "off",
     // The hosts this Worker serves in place (src/site-config.js; stage S06, docs/citycoin-master/domain-cutover.md section 2 item 2):
-    // citycoin.dev, attached as a custom domain below in this same deploy, and vicinity.city, which stays canonical (SITE_ORIGIN unset)
-    // until stage S55. With a second host listed, sessions, pairings, hand-offs and sign-ups are bound to the host they were made on
-    // (src/hostbind.js). www.citycoin.dev is not listed and not attached. Owner's go on 25 Oct 2026 ("go ahead and execute all the changes").
-    // To roll back, change the value to "https://vicinity.city" and remove the citycoin.dev route in the same pull request (do not delete
-    // the line: keep_vars would keep the old value).
+    // citycoin.dev, attached as a custom domain below, and vicinity.city, which keeps serving the same site until stage S55 removes its
+    // routes (citycoin.dev is the canonical origin since the go-live, SITE_ORIGIN below). With a second host listed, sessions, pairings,
+    // hand-offs and sign-ups are bound to the host they were made on (src/hostbind.js). www.citycoin.dev is not listed and not attached.
+    // Owner's go on 25 Oct 2026 ("go ahead and execute all the changes"). Unchanged by the go-live. To roll back S06, change the value to
+    // "https://vicinity.city" and remove the citycoin.dev route in the same pull request (do not delete the line: keep_vars would keep
+    // the old value); SITE_ORIGIN must then be "" too, since it must be one of these origins.
     "SITE_ORIGINS": "https://citycoin.dev https://vicinity.city",
     // The production Worker (src/site-config.js localDevAllowed): turns off the local development exemption here; the v5 configuration
     // check wants it for any changed switch. With it, a v5 switch whose only missing input was the environment counts when set alone, here
@@ -121,6 +127,38 @@
     // difference is the admin configuration view (GET /api/admin/config), which then reports that it is set (presence, never the value).
     // OFFICIAL_TELEGRAM_URL and MAIN_TOKEN_MINT stay unset until the owner supplies them.
     "OFFICIAL_X_URL": "https://x.com/CityCoinDev",
+    // The go-live of Citycoin.dev (docs/citycoin-master/implementation-report.md section 11, "Go-live switch-on"): the owner's go of 25 Oct
+    // 2026, in writing: "I still see nothing on Citycoin.dev. Vicinity still active. What are you doing? Get them all sorted. Don't wait for my
+    // permission just go ahead and execute all the changes." Rollback: one pull request that puts back the earlier values (the line's value
+    // changed to "", "on" or the old text as each comment says; never delete a line: keep_vars would keep the old value in Cloudflare).
+    //
+    // The canonical origin (src/site-config.js): citycoin.dev, while vicinity.city still serves the same site in place (SITE_ORIGINS above,
+    // unchanged; stage S55 removes the vicinity.city routes). Links the Worker builds from the configuration (mail buttons with no served
+    // host, the social image of the pages, the Citycoin.dev websites list, new coins' metadata) name citycoin.dev; the old names' 301 keeps
+    // its constant target, vicinity.city (src/index.js). Owner's go of 25 Oct 2026 (above). Was unset; to roll back, set it to "".
+    "SITE_ORIGIN": "https://citycoin.dev",
+    // The Citycoin.dev labels (stage S48; owner directive of 24 Oct 2026, "there should be no existience of vicinty. only citycoin."): the
+    // pages are built with them (src/pages-built.js) and the Worker uses them only while the deployed pages were built with them
+    // (src/brand.js brandOf). The page build requires LEGACY_SEATS=frozen, WALLET_ONLY=on and an EMAIL_FROM without the old name next to it
+    // (scripts/pages/build.mjs pageBrandPrerequisites). Owner's go of 25 Oct 2026 (above). Was unset; to roll back, set it to "".
+    "BRAND": "citycoin",
+    // The legacy seat freeze (stage S16): every seat, squad, endorsement, objection, resign and election writer answers 410 seats_frozen;
+    // the pages are built without the old founder rules (scripts/pages/frozen-copy.mjs). Production had 0 seats on 25 Oct 2026. Owner's go of
+    // 25 Oct 2026 (above). Was unset; to roll back, set it to "on".
+    "LEGACY_SEATS": "frozen",
+    // The legacy launch path closed (stage S23): the website builds and accepts no new approval, launch or coin design on the legacy
+    // launchpad (410 legacy_launch_closed); it still records a coin the chain already has. It pauses nothing on chain: only the owner's
+    // set_pause(launches = true) and revoking any pending approval do (deploy checklist). Owner's go of 25 Oct 2026 (above). Was unset; to
+    // roll back, set it to "on".
+    "LEGACY_LAUNCH": "off",
+    // Wallet-only sign-in and registration with location once (stages S09 to S13; the S15 switch-on): Google, e-mail, password and
+    // tiny-transfer sign-in answer 404, a new member registers with a wallet and a location check once. The pages are built with the
+    // wallet-only copy (scripts/pages/walletonly-copy.mjs), and src/v5policy.js holds the switch closed if this value is ever not exactly
+    // "on" while those pages are deployed. LEGACY_LINK stays unset only on the pre-merge census: production had 0 members when the owner
+    // deleted all member data on 24 Oct 2026, and the census in the deploy checklist must still find no Google- or e-mail-only account
+    // (else this pull request sets the window). Owner's go of 25 Oct 2026 (above), with the S15 gate (implementation-report.md section 11).
+    // Was unset; to roll back, set it to "off" and rebuild the pages in the same pull request.
+    "WALLET_ONLY": "on",
     // Community feed v2 (src/flags.js feedV2On): the "update" post kind, delete your own post, mute, the author's city on every
     // national post, one confirmation before the first national post. ON since 17 Oct 2026, by the owner ("switch on all the
     // builds"). To switch off: "off" (change the value, do not delete the line: keep_vars) in a pull request; anything else than
@@ -138,9 +176,10 @@
     "run_worker_first": ["/api/*", "/coin-meta/*", "/official-coins.csv"],
     "not_found_handling": "404-page"
   },
-  // citycoin.dev (stage S06, listed in SITE_ORIGINS above in the same deploy) serves the same site. vicinity.city is the canonical
-  // site until stage S55; www.vicinity.city forwards to it on the Worker-first paths (src/index.js). Both vicinity routes stay until
-  // stage S55 removes them, with no redirect (owner decision of 24 Oct 2026, docs/citycoin-master/domain-cutover.md section 0).
+  // citycoin.dev (stage S06, listed in SITE_ORIGINS above) serves the site and is its canonical origin since the go-live (SITE_ORIGIN).
+  // vicinity.city still serves the same site in place; www.vicinity.city forwards to vicinity.city on the Worker-first paths (src/index.js).
+  // Both vicinity routes stay until stage S55 removes them, with no redirect (owner decision of 24 Oct 2026,
+  // docs/citycoin-master/domain-cutover.md section 0); their pages carry X-Robots-Tag noindex meanwhile (public/_headers).
   // www.citycoin.dev: not attached (domain-cutover.md section 2 item 2). vicinitycity.net and www.vicinitycity.net: not attached.
   "routes": [
     { "pattern": "citycoin.dev", "custom_domain": true },

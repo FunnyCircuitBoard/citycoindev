@@ -63,6 +63,12 @@ What stops answering once vicinity.city is removed (section 3, step 4), for the 
 1. **Coin metadata.** A coin launched through the legacy launchpad would name a dead address for good. So the legacy launch path is
    closed first: the website's legacy launch flow switched off (`LEGACY_LAUNCH=off`; the switch is stage S23's, not built yet) and the on-chain pause
    `set_pause(launches = true)`, which needs the signature of the legacy admin `13qRam…sRiN` (stage S58, external E3).
+   *Go-live note (25 Oct 2026):* S23 is merged, and the go-live pull request (PR #106, not merged) sets `LEGACY_LAUNCH=off`. The on-chain
+   pause is not a pre-merge item of the go-live. There it is a deviation taken under the owner's go of 25 Oct 2026 and recorded with its
+   evidence: a launch needs an `Approval` that only the admin wallet can create, and 0 `Approval` accounts and 0 coins exist on chain
+   (read-only, 25 Oct 2026 14:08 UTC, slots 461285542 and 461285543; `launches_paused` still 0). A fresh read-only re-check right before that merge is
+   blocking, and any `Approval` stops the merge (implementation-report.md section 11, go-live deploy checklist item 6). The pause stays
+   the owner's recommended step. How it bears on step 4 is S55's record.
 2. **`/brand/vicinity-512.png` on vicinity.city.** The Meteora DBC partner-metadata account `2be9mDcn…si11` names this address on chain
    (rebrand-inventory.md C04). After step 4 it gets no answer from this site; the file itself stays and is served on citycoin.dev.
    Whether DBC lets the fee-claimer wallet update that record was not verified. The policy keeps this file under
@@ -337,7 +343,9 @@ are rehearsed first.
   `https://citycoin.dev/launchpad?tab=new`; without it the name does not resolve.
 - `node scripts/check-live.mjs https://citycoin.dev` passes (the deploy workflow runs it only for vicinity.city; retry while the
   certificate is being issued).
-- `curl -sI https://citycoin.dev/` carries `x-robots-tag: noindex`; `curl -sI https://vicinity.city/` carries none.
+- `curl -sI https://citycoin.dev/` carries `x-robots-tag: noindex`; `curl -sI https://vicinity.city/` carries none. (Until the go-live pull
+  request, branch `cc/golive`, not merged. From its deploy on it is the other way round: citycoin.dev carries none, and vicinity.city
+  and www.vicinity.city carry `x-robots-tag: noindex`; implementation-report.md section 11, "Go-live switch-on".)
 - On citycoin.dev, "Check a link" (`/api/check?q=citycoin.dev`) answers official; an e-mail sign-up's code e-mail asked there says "Enter it
   at https://citycoin.dev/connect"; with the Google console entry (section 1.3) "Continue with Google" comes back signed in, without it
   Google shows `redirect_uri_mismatch`.
@@ -346,6 +354,22 @@ are rehearsed first.
   Origin rule of section 1.2 (a write whose Origin is spelled `http://vicinity.city`, `https://vicinity.city:443` or
   `https://VICINITY.CITY` now answers 403; browsers never send those spellings). Its e-mails are byte for byte as before.
 - The synthetic probes of S54 are green on both hosts.
+
+*Go-live note (the go-live pull request, PR #106, not merged; owner's go of 25 Oct 2026).* These checks were written for S06. They are first
+run after S06's deploy attaches citycoin.dev, with S06's version live and before the go-live merge (its deploy checklist item 2). Run after
+the go-live's deploy (`WALLET_ONLY=on`, `BRAND=citycoin`, `SITE_ORIGIN=https://citycoin.dev`), they read as follows:
+- Replaced by the go-live: the code e-mail and "Continue with Google". Neither is offered, and the e-mail and Google sign-in routes answer
+  404. In their place: the wallet sign-in check above and the go-live's own checks (implementation-report.md section 11, go-live deploy
+  checklist item 8: `GET /api/auth/google/start` answers 404; a wallet registers, and signs in again, on citycoin.dev).
+- Replaced by the go-live: "vicinity.city answers exactly as before". After the go-live vicinity.city serves the Citycoin.dev pages with
+  `x-robots-tag: noindex`. In its place: the go-live's checks of vicinity.city and www.vicinity.city (item 8: 200 with
+  `x-robots-tag: noindex`, and `node scripts/check-live.mjs https://vicinity.city` passes).
+- The `x-robots-tag` line: the other way round, as its own note says.
+- Not met: the synthetic probes of S54. S54 is not built (external E15), so this check cannot be met; it is recorded as not met and
+  blocks nothing.
+- Unchanged: 200 over a certificate for citycoin.dev with the main pages and `/api/health`, the byte hashes of the legacy files on both
+  hosts, the host binding (a wallet sign-in, the copied `vs` cookie, the cross-host `Origin`), www.citycoin.dev,
+  `node scripts/check-live.mjs https://citycoin.dev` and "Check a link".
 
 **Before step 4:**
 
@@ -364,6 +388,9 @@ are rehearsed first.
 - Items 3 to 6 of section 0 are known to the owner; the mail sender and the link checker's list (items 5 and 6) are settled.
 - The S55 pull request removes the `https://citycoin.dev/*` rule (`X-Robots-Tag: noindex`) from `public/_headers`, or the canonical site
   stays out of search engines.
+  Since the go-live pull request (branch `cc/golive`, not merged; owner's go of 25 Oct 2026), the rules in `public/_headers` are
+  `https://vicinity.city/*` and `https://www.vicinity.city/*` instead, and citycoin.dev is indexed. Once the go-live is deployed, the S55
+  pull request removes those two rules together with the routes.
 
 **After step 4:**
 

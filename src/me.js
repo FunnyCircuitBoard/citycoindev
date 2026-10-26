@@ -16,6 +16,7 @@ import { countRecent, noteEvent, useAttestation } from "./attest.js";
 import { configuredSocialProfiles, teamFor, tokenMint } from "./official.js";
 import { getHolding, holderSnapshot, isTeamWallet, rankOf } from "./chain.js";
 import { DAY, HOUR, POLICY, iso } from "./policy.js";
+import { rulesVersion, termsVersion } from "./editions.js";
 import { VOTE_WEIGHT, activeBan, adminWallets, amountsFor, liveSeatOfUser, managerOf } from "./roles.js";
 import { cityPicture, cooldownUntil, eligibility, squadPicture } from "./seats.js";
 import { countryPicture } from "./elections.js";
@@ -51,13 +52,15 @@ const TOKEN_BADGES = new Set(["holder", "founder_ready", "whale", "top100", "top
 // (unitOf). "Early member" stays history: joined before $VICINITY launched (under another label set it says so without the old name).
 // `legacyFrozen` (the legacy seats frozen, stage S16; src/v5policy.js legacySeats): the seven-day "Founder-ready" badge is gone (nobody qualifies
 // or applies any more), and the founder and manager badges keep their names and their holders but describe a record, not today's seat rules.
-// `bw`: the product's name in the words (src/brandwords.js; today's words by default).
-export function badgesFor({ u, launched, amount, position, seat, manager, admin, checkins, posts, tenure, threshold, unit = "$VICINITY", legacyFrozen = false, bw = SAME }) {
+// `bw`: the product's name in the words (src/brandwords.js; today's words by default). `walletOnly` (WALLET_ONLY counting, src/v5policy.js
+// walletOnly; the S15 switch-on): an account is made and signed in to with its wallet only, so "Verified account" says that, never a Google
+// login or an e-mail; and "On the streets" stays only for a member who already earned it, since new check-ins are not posted (stage S13).
+export function badgesFor({ u, launched, amount, position, seat, manager, admin, checkins, posts, tenure, threshold, unit = "$VICINITY", legacyFrozen = false, bw = SAME, walletOnly: wo = false }) {
   const pct = (v, of) => Math.max(0, Math.min(1, v / of));
   const T = threshold || POLICY.founder.ladder.base;
   const list = [
     { id: "early", icon: "🌱", name: "Early member", detail: bw.on ? "One of the first members. This one can never be earned again." : "Joined before $VICINITY launched. This one can never be earned again.", earned: Boolean(u.early) },
-    { id: "verified", icon: "✅", name: "Verified account", detail: "A verified Google login or e-mail.", earned: true },
+    { id: "verified", icon: "✅", name: "Verified account", detail: wo ? "An account opened with one free signature from its Solana wallet." : "A verified Google login or e-mail.", earned: true },
     { id: "wallet", icon: "🔗", name: "Wallet linked", detail: "A Solana wallet linked to your account with one free signature. It unlocks holdings, rank, badges and the founder path.", earned: Boolean(u.wallet) },
     { id: "local", icon: "📍", name: "Local", detail: "Home community confirmed by location.", earned: Boolean(u.home_city) },
     { id: "holder", icon: "🏅", name: "Holder", detail: launched ? `Hold any ${unit}.` : bw.on ? `Hold ${unit} once the token is live.` : `Hold ${unit} once it launches.`, earned: amount > 0, progress: amount > 0 ? 1 : 0 },
@@ -76,9 +79,16 @@ export function badgesFor({ u, launched, amount, position, seat, manager, admin,
     { id: "streak", icon: "🔥", name: "On the streets", detail: "Checked in on 3 different days.", earned: checkins >= 3, progress: pct(checkins, 3) },
   ];
   if (admin) list.unshift({ id: "admin", icon: "⚙️", name: "Admin", detail: bw`Runs Vicinity, within the published rules.`, earned: true });
+  if (wo) { const i = list.findIndex((b) => b.id === "streak"); if (i >= 0 && !list[i].earned) list.splice(i, 1); }
   // a label set other than today's with no live token (src/official.js legacyHidden, MAIN_TOKEN_V5 not counting): no holding is measured, so
   // no badge describes a holding, an amount or a holder rank of a token that has no supply yet (review finding F3); they come back with it
   if (bw.on && !launched) for (let i = list.length - 1; i >= 0; i--) if (TOKEN_BADGES.has(list[i].id)) list.splice(i, 1);
+  // a badge nobody can earn is not offered "to earn" (go-live review finding GL-4): under a label set other than today's, "Early member" (its
+  // record, users.early, is set only before today's token launched, so no member of the label set's site gets it; whether its first members
+  // should is an owner decision not taken here), and while the legacy seats are frozen, City Founder and Country Manager (no seat and no
+  // term can be won). Earned ones stay, as records
+  const unearnable = new Set([...(bw.on ? ["early"] : []), ...(legacyFrozen ? ["city_founder", "country_manager"] : [])]);
+  for (let i = list.length - 1; i >= 0; i--) if (unearnable.has(list[i].id) && !list[i].earned) list.splice(i, 1);
   if (!legacyFrozen) return list;
   // (and the wallet badge no longer promises a founder path: the dashboards built with the freeze show none; under a label set other than today's
   // with no live token it promises no holdings or rank either, which do not exist there yet: rebrand review finding RB-3)
@@ -184,7 +194,7 @@ async function liveStatus(env, s, fetchImpl, now) {
     `SELECT COUNT(*) AS posts, COUNT(DISTINCT CASE WHEN kind = 'checkin' THEN substr(created_at, 1, 10) END) AS days FROM posts WHERE user_id = ? AND hidden = 0${alive}`,
   ).bind(u.id).first();
   const bw = brandWords(env);
-  const badges = badgesFor({ u, launched, amount, position, seat, manager: isManager, admin, checkins: act?.days || 0, posts: act?.posts || 0, tenure: elig.tenure, threshold: elig.threshold, unit: unitOf(env, bw), legacyFrozen: frozen, bw });
+  const badges = badgesFor({ u, launched, amount, position, seat, manager: isManager, admin, checkins: act?.days || 0, posts: act?.posts || 0, tenure: elig.tenure, threshold: elig.threshold, unit: unitOf(env, bw), legacyFrozen: frozen, bw, walletOnly: walletOnly(env) });
   const earned = badges.filter((b) => b.earned).map((b) => b.id);
   let lost = [];
   try { lost = JSON.parse(u.badges || "[]").filter((id) => HOLDING_BADGES.has(id) && !earned.includes(id)); } catch {}
@@ -220,7 +230,7 @@ async function liveStatus(env, s, fetchImpl, now) {
   const setup = { percent: u.wallet ? 100 : 67, steps: [{ id: "location", done: true }, { id: "account", done: true }, { id: "wallet", done: Boolean(u.wallet) }] };
 
   return {
-    launched, chain, checkedAt: iso(now), level, fresh: isFresh(s, now), policyVersion: POLICY.version, setup,
+    launched, chain, checkedAt: iso(now), level, fresh: isFresh(s, now), policyVersion: rulesVersion(), setup,
     roles: { admin, manager: isManager, founder: founderLive, steward: Boolean(seat && seat.status === "steward"), holder: amount > 0,
       weight: VOTE_WEIGHT[isManager ? "manager" : founderLive ? "founder" : "member"] }, // the same weight powersOf gives for feed votes
     holding: { amount, rank: position ? position.rank : null, total: position ? position.total : null, percent: position ? position.percent : null,
@@ -299,15 +309,18 @@ export async function handleMe(request, env, fetchImpl = fetch, now = Date.now()
 }
 
 /**
- * POST /api/me/terms { version } → record that the signed-in user agreed to the Terms of Use.
- * The frontend also keeps a local copy so anonymous visitors are gated before entry.
+ * POST /api/me/terms { version } → record that the signed-in user agreed to the Terms of Use: `version` must be the edition the deployed
+ * pages publish (src/editions.js termsVersion), else 400 bad_version with `current`. The frontend also keeps a local copy so anonymous
+ * visitors are gated before entry.
  */
 export async function handleTermsAgree(request, env, now = Date.now()) {
   const a = await access(request, env, now);
   if (a.error) return a.error;
   const body = await readJson(request);
   const version = typeof body?.version === "string" ? body.version.slice(0, 32) : "";
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(version)) return json({ ok: false, error: "bad_version" }, 400);
+  // only the edition the deployed pages publish (src/editions.js termsVersion) is recorded: a made-up or an older version is refused, never
+  // stored (go-live review finding GL-HON-9). A page from before a deploy sends its own edition and gets the current one back, to show again
+  if (version !== termsVersion(env)) return json({ ok: false, error: "bad_version", current: termsVersion(env) }, 400);
   await ensureSchema(env.DB);
   await env.DB.prepare("UPDATE users SET terms_version = ?, terms_agreed_at = ? WHERE id = ?")
     .bind(version, new Date(now).toISOString(), a.u.id).run();

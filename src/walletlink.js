@@ -54,7 +54,7 @@ import { checkSigned } from "./signed.js";
 import { ensureHostSchema, ensureOnboardSchema } from "./store.js";
 import { RELAY_ASNS, VPN_NETWORK_RE, isRelayNetwork } from "./network.js";
 import { check, clientKey, limitKey } from "./limits.js";
-import { TERMS_VERSION } from "./signup-core.js";
+import { termsVersion } from "./signup-core.js";
 import { carryRelayOn, v2On } from "./flags.js";
 import { legacySeatsFrozen, walletOnly } from "./v5policy.js";
 import { emailConfigured, sendMail, walletLinkedEmail } from "./mail.js";
@@ -372,7 +372,7 @@ async function handleCarryInfo(request, env, x) {
     ok: true, pin: await carryPin(body.code),
     owner: { name: maskName(shown), handle: accountName(u.owner), initial: Array.from(String(shown).trim())[0] || "•" },
     community: u.owner.home_name ? { name: u.owner.home_name, country: u.owner.home_country } : null,
-    terms: TERMS_VERSION, expiresAt: u.row.expires_at, relay: u.relay, here, opener: mine,
+    terms: termsVersion(), expiresAt: u.row.expires_at, relay: u.relay, here, opener: mine,
   }, 200, { "Set-Cookie": cookie(OPENER_COOKIE, mine, MINUTES * 60) });
 }
 

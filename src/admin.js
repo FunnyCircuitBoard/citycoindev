@@ -29,6 +29,7 @@ import { KINDS as FEEDBACK_KINDS, STATUSES as FEEDBACK_STATUSES } from "./feedba
 import { autoUsername, cleanText } from "./text.js";
 import { isSolanaAddress } from "./solana.js";
 import { POLICY, DAY, iso } from "./policy.js";
+import { rulesVersion } from "./editions.js";
 import { legacyHidden, withMint } from "./official.js";
 import { mainTokenStatus } from "./maintoken.js";
 import { mainTokenRefusals, mainTokenV5 } from "./v5policy.js";
@@ -379,7 +380,7 @@ async function handleElectionCreate(request, ctx) {
     return json({ ok: false, error: "already_open" }, 409);
   const closesAt = iso(ctx.now + days * DAY);
   const r = await ctx.db.prepare("INSERT INTO elections (country, policy, opened_at, closes_at, status) VALUES (?, ?, ?, ?, 'open')")
-    .bind(country, POLICY.version, iso(ctx.now), closesAt).run();
+    .bind(country, rulesVersion(), iso(ctx.now), closesAt).run();
   const id = r.meta.last_row_id;
   await logAudit(ctx.db, { actor: ctx.wallet, action: "elections/create", target: `election:${id}`, detail: `${country}, ${seats} seat(s), closes ${closesAt}` }, ctx.now).run();
   return json({ ok: true, id, country, seats, closesAt });
@@ -512,7 +513,7 @@ async function handleSnapshotCreate(request, ctx) {
   const r = await ctx.db.prepare(
     `INSERT INTO snapshots (cutoff_at, policy, created_at, status, activates_at, holders, total, samples, input_hash, merkle_root, note)
      VALUES (?, ?, ?, 'provisional', ?, 0, 0, 0, 'admin-manual', 'admin-manual', ?)`)
-    .bind(new Date(at).toISOString(), POLICY.version, iso(ctx.now), new Date(at + 7 * DAY).toISOString(),
+    .bind(new Date(at).toISOString(), rulesVersion(), iso(ctx.now), new Date(at + 7 * DAY).toISOString(),
       "Created from the admin dashboard; holder data not computed yet.").run();
   const id = r.meta.last_row_id;
   await logAudit(ctx.db, { actor: ctx.wallet, action: "snapshots/create", target: `snapshot:${id}`, detail: `cutoff ${new Date(at).toISOString()}` }, ctx.now).run();
@@ -530,7 +531,7 @@ async function handleConfig(ctx) {
   return json({
     ok: true,
     siteMode: env.SITE_MODE || "live",
-    policyVersion: POLICY.version,
+    policyVersion: rulesVersion(),
     // Presence only — secret values never leave the server.
     flags: {
       GOOGLE_CLIENT_ID: Boolean(env.GOOGLE_CLIENT_ID),

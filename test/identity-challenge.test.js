@@ -55,7 +55,7 @@ const answer = async (res) => [res.status, await res.json()];
 
 /* ---------------------------------------------------------------- the switch */
 
-test("WALLET_ONLY counts only with every precondition; each missing one is named, and anything odd reads as off", () => {
+test("WALLET_ONLY counts only with every precondition; each missing one is named; a value outside its set holds closed", () => {
   assert.equal(walletOnly({}), false);
   assert.equal(walletOnly({ WALLET_ONLY: "on" }), false);
   assert.deepEqual(walletOnlyRefusals({ WALLET_ONLY: "on" }), ["WALLET_ONLY_SITE_REFUSED", "WALLET_ONLY_POLICY_REFUSED"]);
@@ -76,7 +76,13 @@ test("WALLET_ONLY counts only with every precondition; each missing one is named
     assert.equal(walletOnlyHeld(env), true, JSON.stringify(env));
     assert.equal(walletOnly(env), false, JSON.stringify(env));
   }
-  for (const env of [{}, { ...ON, WALLET_ONLY: "off" }, { ...ON, WALLET_ONLY: "true" }, ON]) assert.equal(walletOnlyHeld(env), false, JSON.stringify(env));
+  for (const env of [{}, { ...ON, WALLET_ONLY: "off" }, ON]) assert.equal(walletOnlyHeld(env), false, JSON.stringify(env));
+  // a value outside the switch's set ("true", a typo) holds closed, like LEGACY_SEATS (go-live review finding GL-SAFE-2; before, it read as off)
+  for (const v of ["true", "yes", "1"]) {
+    assert.equal(walletOnlyHeld({ ...ON, WALLET_ONLY: v }), true, v);
+    assert.equal(walletOnly({ ...ON, WALLET_ONLY: v }), false, v);
+    assert.ok(walletOnlyRefusals({ ...ON, WALLET_ONLY: v }).includes("WALLET_ONLY_VALUE_REFUSED"), v);
+  }
   for (const v of ["on", " ON ", "On"]) assert.equal(walletOnly({ ...ON, WALLET_ONLY: v }), true, v);
   for (const v of ["off", "true", "1", "yes", "", undefined]) assert.equal(walletOnly({ ...ON, WALLET_ONLY: v }), false, String(v));
   const throwing = new Proxy({}, { get: () => { throw new Error("boom"); } });
@@ -103,7 +109,8 @@ test("a switch set on but refused says why, once per isolate, as codes only; uns
 });
 
 test("switch off: POST /api/auth/challenge is an unknown path for every method, and nothing is written", async () => {
-  for (const extra of [{}, { ...ON, WALLET_ONLY: "true" }, { ...ON, WALLET_ONLY: "off" }]) {
+  // (a value outside the switch's set, such as "true", is held now, not off: the 503 test below; go-live review finding GL-SAFE-2)
+  for (const extra of [{}, { ...ON, WALLET_ONLY: "off" }]) {
     const env = world(extra), b = W.browser(env), w = await W.wallet();
     const before = await tableNames(env);
     for (const method of ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS"]) {
@@ -120,7 +127,7 @@ test("switch off: POST /api/auth/challenge is an unknown path for every method, 
 });
 
 test("set on but refused (review finding SEC-1): the sign-in routes fail closed with 503 for every method, never today's; nothing is written", async () => {
-  for (const extra of [{ WALLET_ONLY: "on" }, { ...ON, DEPLOYMENT_ENV: "" }, { WALLET_ONLY: "on", DEPLOYMENT_ENV: "test" }]) {
+  for (const extra of [{ WALLET_ONLY: "on" }, { ...ON, DEPLOYMENT_ENV: "" }, { WALLET_ONLY: "on", DEPLOYMENT_ENV: "test" }, { ...ON, WALLET_ONLY: "true" }]) {
     const env = world(extra), b = W.browser(env), w = await W.wallet();
     const before = await tableNames(env);
     for (const path of ["/api/auth/challenge", "/api/auth/wallet", "/api/auth/reprove", "/api/pair", "/api/pair/status", "/api/pair/finish", "/api/signup/start", "/api/signup/location"]) {

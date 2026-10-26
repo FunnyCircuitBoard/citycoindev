@@ -1449,7 +1449,7 @@
           if (o.offer) { S.offer = o.offer; S.mode = "linkin"; render(); return true; }
           const said = o.dead ? errText(o.dead) : o.note;
           if (me.signedIn && me.user && !me.user.wallet) { // this browser is the account's own (logged in here before): its link mode, with the reason
-            forgetLink(); if (o.dead && window.V.termsGate) window.V.termsGate.agreed(me.termsVersion || "2026-10-01");
+            forgetLink(); if (o.dead && window.V.termsGate) window.V.termsGate.agreed(me.termsVersion || window.V.termsNow || "2026-10-01");
             S.mode = "link"; render(); if (said) notice(said); return true;
           }
           if (me.signedIn) { forgetLink(); signedIn("You're already set. Taking you to your dashboard…", "/dashboard"); return true; }
@@ -1462,7 +1462,7 @@
         }
         if (me.signedIn && me.user && !me.user.wallet) { // the link mode: the account exists, the wallet does not
           S.mode = "link";
-          if ((brought.carry != null || withId !== null) && window.V.termsGate) window.V.termsGate.agreed(me.termsVersion || "2026-10-01");
+          if ((brought.carry != null || withId !== null) && window.V.termsGate) window.V.termsGate.agreed(me.termsVersion || window.V.termsNow || "2026-10-01");
           // a link this tab showed before (Back from phantom.com, a reload): the same screen, with a fresh link if nobody opened it
           const kept = W.isMobile && !inApp() ? keptCarry() : null;
           if (kept) S.carry = kept;

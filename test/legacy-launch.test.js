@@ -96,7 +96,7 @@ test("the gate is logged once per isolate when held (code only, never a value); 
   assert.deepEqual(lines.filter((l) => /legacy launch/.test(l)), ["legacy launch switch refused LEGACY_LAUNCH_POLICY_REFUSED (held off)"]);
 });
 
-test("v5 configuration acceptance and the page build: 'off' needs DEPLOYMENT_ENV, a value outside the set is named; production's wrangler.jsonc sets neither LEGACY_LAUNCH nor COIN_V2_BATCH", () => {
+test("v5 configuration acceptance and the page build: 'off' needs DEPLOYMENT_ENV, a value outside the set is named; production's wrangler.jsonc closes the path (the go-live) and no longer has COIN_V2_BATCH", () => {
   assert.deepEqual(policyConfig({ LEGACY_LAUNCH: "off" }).errors.map((e) => e.code), ["ENVIRONMENT_UNSET"]);
   assert.deepEqual(policyConfig(CLOSED).errors, []);
   assert.deepEqual(policyConfig({ LEGACY_LAUNCH: "on" }).errors, [], "the default value changes no switch");
@@ -104,9 +104,12 @@ test("v5 configuration acceptance and the page build: 'off' needs DEPLOYMENT_ENV
   assert.throws(() => pageV5Config({ LEGACY_LAUNCH: "of", DEPLOYMENT_ENV: "production" }), /FLAG_VALUE_INVALID/);
   assert.deepEqual(pageV5Config(CLOSED), { ok: true });
   const vars = wranglerVars();
-  assert.equal("LEGACY_LAUNCH" in vars, false, "LEGACY_LAUNCH stays unset until stage S58");
+  // the go-live (the owner's go of 25 Oct 2026): LEGACY_LAUNCH=off with the production environment, so the website's side of the legacy launch
+  // path is closed; the on-chain pause and the revokes stay the owner's own steps (implementation-report.md, go-live deploy checklist)
+  assert.equal(vars.LEGACY_LAUNCH, "off", "the go-live closes the legacy launch path");
+  assert.equal(vars.DEPLOYMENT_ENV, "production");
   assert.equal("COIN_V2_BATCH" in vars, false, "the deleted switch's line is gone");
-  assert.equal(legacyLaunch(vars), "on");
+  assert.equal(legacyLaunch(vars), "off");
   assert.deepEqual(pageV5Config(vars), { ok: true });
 });
 

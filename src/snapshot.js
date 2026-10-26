@@ -17,6 +17,7 @@
 import { json, readJson } from "./http.js";
 import { access } from "./access.js";
 import { DAY, HOUR, POLICY, iso } from "./policy.js";
+import { rulesVersion } from "./editions.js";
 import { averages, dayOf, legacyDayKey } from "./ledger.js";
 import { OFFICIAL, SUPPORTER_SNAPSHOT_AT } from "./official.js";
 import { getBlob, putBlob, sha256hex } from "./blobs.js";
@@ -97,7 +98,7 @@ export async function computeSnapshot(env, cutoffIso, now = Date.now()) {
   const inputs = { cutoff: cutoffIso, averageDays: S.averageDays, days, samples: sampleList, excluded: [...excluded].sort(), rule: "min(balance at cutoff, average over the days)" };
   const inputHash = await sha256hex(JSON.stringify(inputs));
   const ins = await db.prepare("INSERT INTO snapshots (cutoff_at, policy, created_at, status, activates_at, holders, total, samples, input_hash, merkle_root) VALUES (?, ?, ?, 'provisional', ?, ?, ?, ?, ?, '')")
-    .bind(cutoffIso, POLICY.version, iso(now), iso(now + S.challengeHours * HOUR), rows.length, total, samples, inputHash).run();
+    .bind(cutoffIso, rulesVersion(), iso(now), iso(now + S.challengeHours * HOUR), rows.length, total, samples, inputHash).run();
   const id = ins.meta.last_row_id;
   const leaves = await Promise.all(rows.map(([w, amt, tier]) => leafHash(id, w, amt, tier)));
   const levels = await merkleLevels(leaves);

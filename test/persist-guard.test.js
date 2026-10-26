@@ -201,6 +201,12 @@ const ALLOWED_EDGES = {
   // (and, review findings CRAWL-3 and F9: the old host names, left out of the public list of websites, and the cutover's planned hosts, which
   // the checker says do not serve the site yet; lists read, nothing named or stored)
   "src/official.js>src/site-config.js": ["CUTOVER_HOSTS", "LEGACY_HOSTS", "siteConfig"],
+  // the go-live (owner decision 2 of the rebrand stage, the owner's go of 25 Oct 2026): the Rules and Terms version a decision or an acceptance
+  // is recorded under follows the label set the deployed pages were built with (src/editions.js: today's pages version 6 and 2026-10-01, the
+  // Citycoin.dev pages version 7 and 2026-10-25), because the pages carry the text. It reads the label set's key only (brandOf(...).key, and
+  // BRANDS to know a key): no label is read or written, no identifier pinned above is made from it, and with today's pages every version is
+  // today's (test/golive-config.test.js)
+  "src/editions.js>src/brand.js": ["BRANDS", "brandOf"],
 };
 /** The relative modules a file imports (static import and export-from, and import()): [{ to, names }] (names null for a namespace or a call). */
 function importsOf(file) {

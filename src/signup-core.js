@@ -13,10 +13,14 @@ import { clearCookie, cookie, getCookie, json, randomToken, sameSite, sha256 } f
 import { ensureHostSignupSchema, ensureOnboardSchema } from "./store.js";
 import { hostWrite, onThisHost, servedHost, signupDelete } from "./hostbind.js";
 import { DAY, iso } from "./policy.js";
+import { TERMS_TODAY, termsVersion } from "./editions.js";
 
 export const SIGNUP_COOKIE = "vsu";
-/** The Terms of Use version a person accepts at sign-up. One constant (a test checks it is the version shown on /terms). */
-export const TERMS_VERSION = "2026-10-01";
+/** The Terms of Use version of today's pages (src/editions.js TERMS_TODAY; a test checks it is the version today's /terms shows). */
+export const TERMS_VERSION = TERMS_TODAY;
+/** The Terms of Use version a person accepts at sign-up: the edition of the deployed pages (src/editions.js; "2026-10-01" for today's pages,
+ *  "2026-10-25" for the Citycoin.dev pages). Every check and every recorded acceptance reads it here. */
+export { termsVersion };
 const SLIDE_SECONDS = 3600;        // the sign-up lives an hour from the last request ...
 const CAP_SECONDS = 3 * 3600;      // ... and never more than three hours from the first
 
@@ -113,7 +117,7 @@ export async function endSignup(env, request) {
  */
 export function nextStep(row) {
   if (!row.loc_city) return "location";
-  if (!(row.terms_version === TERMS_VERSION && row.identity_at)) return "account";
+  if (!(row.terms_version === termsVersion() && row.identity_at)) return "account";
   return "finish";
 }
 
@@ -127,11 +131,11 @@ export async function recordIdentity(env, request, provider, who, now) {
   catch (e) { console.error("sign-up tables unavailable", String((e && e.message) || e)); return { error: "login_unavailable" }; }
   const row = await getSignup(env, request, now);
   if (!row) return { error: "login_expired" };
-  if (row.terms_version !== TERMS_VERSION) return { error: "terms_required" };
+  if (row.terms_version !== termsVersion()) return { error: "terms_required" };
   const r = await env.DB.prepare(
     `UPDATE signups SET provider = ?, provider_id = ?, identity_name = ?, identity_at = ?, pending_email = NULL, pending_pw_hash = NULL
       WHERE id = ? AND terms_version = ? AND expires_at > ?`)
-    .bind(provider, who.id, who.name, iso(now), row.id, TERMS_VERSION, iso(now)).run();
+    .bind(provider, who.id, who.name, iso(now), row.id, termsVersion(), iso(now)).run();
   if (!r.meta.changes) return { error: "login_expired" };
   const cookie = await touchSignup(env, row, request, now);
   const updated = await env.DB.prepare("SELECT * FROM signups WHERE id = ?").bind(row.id).first();

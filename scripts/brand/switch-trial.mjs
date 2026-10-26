@@ -6,10 +6,15 @@
 //
 // What it does with the committed wrangler.jsonc (final check finding 2: the job must stay green once the configuration pull request
 // sets the switch, and on every pull request after it):
-//   BRAND unset (or blank)                 writes the switch: BRAND=citycoin, LEGACY_SEATS=frozen, DEPLOYMENT_ENV=production and the
-//                                          placeholder EMAIL_FROM. A value the committed file already has for one of them is kept when it
-//                                          is what the switch needs (LEGACY_SEATS=frozen, a DEPLOYMENT_ENV the freeze accepts, so not "unset",
-//                                          an EMAIL_FROM without the old name), so a pull request that sets them first still gets the trial.
+//   BRAND unset (or blank)                 writes the switch: BRAND=citycoin, LEGACY_SEATS=frozen, DEPLOYMENT_ENV=production, the
+//                                          placeholder EMAIL_FROM and, since the go-live (the page build takes BRAND=citycoin only with
+//                                          wallet-only sign-in: scripts/pages/build.mjs pageBrandPrerequisites), WALLET_ONLY=on with its
+//                                          inputs SITE_ORIGIN=https://citycoin.dev and a SITE_ORIGINS that lists it (citycoin.dev and
+//                                          vicinity.city, unless the committed list already names citycoin.dev). A value the committed file
+//                                          already has for one of them is kept when it is what the switch needs (LEGACY_SEATS=frozen, a
+//                                          DEPLOYMENT_ENV the freeze accepts, so not "unset", an EMAIL_FROM without the old name, WALLET_ONLY
+//                                          on, that SITE_ORIGIN, a SITE_ORIGINS with citycoin.dev), so a pull request that sets them first
+//                                          still gets the trial.
 //                                          The values are written by their place in the JSONC (scripts/brand/wrangler-vars.mjs), every other
 //                                          byte stays, and one comment line (TRIAL_MARK) records what was replaced, so the suite's stand-in for
 //                                          today's site takes back exactly the trial's change (test/helpers/today-build.mjs).
@@ -26,12 +31,17 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { brandFromSettings } from "../../src/brand.js";
-import { legacySeatsFrozenOn } from "../../src/flags.js";
-import { pageBrand, pageBrandPrerequisites, pageLegacySeats, pageV5Config } from "../pages/build.mjs";
+import { legacySeatsFrozenOn, walletOnlyOn } from "../../src/flags.js";
+import { pageBrand, pageBrandPrerequisites, pageLegacySeats, pageV5Config, pageWalletOnly } from "../pages/build.mjs";
 import { MARK_LINE, TRIAL_MARK, rawVar, setRawVar, trialMark, undoTrial, varsOf } from "./wrangler-vars.mjs";
 
 export { TRIAL_MARK, trialMark, undoTrial, varsOf };
-export const TRIAL_SETTINGS = Object.freeze({ EMAIL_FROM: "Citycoin.dev <noreply@example.com>", BRAND: "citycoin", LEGACY_SEATS: "frozen", DEPLOYMENT_ENV: "production" });
+export const TRIAL_SETTINGS = Object.freeze({ EMAIL_FROM: "Citycoin.dev <noreply@example.com>", BRAND: "citycoin", LEGACY_SEATS: "frozen", DEPLOYMENT_ENV: "production",
+  WALLET_ONLY: "on", SITE_ORIGIN: "https://citycoin.dev" });
+/** The SITE_ORIGINS the trial writes when the committed file has none that lists citycoin.dev (both hosts serve, as S06 committed it). */
+export const TRIAL_SITE_ORIGINS = "https://citycoin.dev https://vicinity.city";
+/** Does a SITE_ORIGINS value list https://citycoin.dev (a string of origins or a JSON list, any letter case and spacing)? */
+const listsCitycoin = (v) => (Array.isArray(v) ? v : typeof v === "string" ? v.split(/[\s,]+/) : []).some((o) => String(o).trim().toLowerCase() === TRIAL_SETTINGS.SITE_ORIGIN);
 
 /** Every check the page build makes on these settings that concerns the switch; throws the build's own error. */
 function buildAccepts(vars) {
@@ -39,6 +49,7 @@ function buildAccepts(vars) {
   pageLegacySeats(vars);
   pageBrandPrerequisites(vars);
   pageV5Config(vars);
+  pageWalletOnly(vars);
 }
 const said = (vars, keys) => keys.map((k) => `${k}=${vars[k]}`).join(", ");
 /** A DEPLOYMENT_ENV the freeze accepts (not blank, not "unset": the v5 policy names "unset" an environment, but the freeze refuses it,
@@ -60,7 +71,7 @@ export function trialPlan(text) {
   try { buildAccepts(vars); } catch (e) { return { action: "fail", reason: `the committed wrangler.jsonc is refused by the page build: ${e.message}` }; }
   const b = brandFromSettings(vars);
   if (b.key === TRIAL_SETTINGS.BRAND) {
-    return { action: "noop", line: `switch-trial: wrangler.jsonc already sets the switch with its prerequisites (${said(vars, ["BRAND", "LEGACY_SEATS", "DEPLOYMENT_ENV"])}, EMAIL_FROM without the old name): nothing to try and nothing written; the build that follows builds and tests these committed settings` };
+    return { action: "noop", line: `switch-trial: wrangler.jsonc already sets the switch with its prerequisites (${said(vars, ["BRAND", "LEGACY_SEATS", "DEPLOYMENT_ENV", "WALLET_ONLY", "SITE_ORIGIN"])}, EMAIL_FROM without the old name): nothing to try and nothing written; the build that follows builds and tests these committed settings` };
   }
   if (has("BRAND") && b.value !== "") return { action: "fail", reason: `wrangler.jsonc sets BRAND=${JSON.stringify(vars.BRAND)}, a label set other than ${TRIAL_SETTINGS.BRAND}: the trial does not replace it` };
   if (has("LEGACY_SEATS") && !legacySeatsFrozenOn(vars) && !["", "on"].includes(String(vars.LEGACY_SEATS).trim().toLowerCase()))
@@ -73,6 +84,9 @@ export function trialPlan(text) {
     BRAND: TRIAL_SETTINGS.BRAND,
     LEGACY_SEATS: legacySeatsFrozenOn(vars) ? vars.LEGACY_SEATS : TRIAL_SETTINGS.LEGACY_SEATS,
     DEPLOYMENT_ENV: has("DEPLOYMENT_ENV") && freezeTakes(vars, vars.DEPLOYMENT_ENV) ? vars.DEPLOYMENT_ENV : TRIAL_SETTINGS.DEPLOYMENT_ENV,
+    WALLET_ONLY: walletOnlyOn(vars) ? vars.WALLET_ONLY : TRIAL_SETTINGS.WALLET_ONLY,
+    SITE_ORIGINS: has("SITE_ORIGINS") && listsCitycoin(vars.SITE_ORIGINS) ? vars.SITE_ORIGINS : TRIAL_SITE_ORIGINS,
+    SITE_ORIGIN: TRIAL_SETTINGS.SITE_ORIGIN,
   };
   if (!has("EMAIL_FROM")) return { action: "fail", reason: "wrangler.jsonc: no EMAIL_FROM line to put the trial settings after" };
   let out = text, last = "EMAIL_FROM";
@@ -80,8 +94,8 @@ export function trialPlan(text) {
   try {
     for (const [k, v] of Object.entries(want)) {
       const raw = rawVar(out, k);
+      if (raw !== null && vars[k] === v) continue; // kept as committed (a SITE_ORIGINS written as a JSON list included)
       if (raw !== null && typeof vars[k] !== "string") return { action: "fail", reason: `wrangler.jsonc sets ${k} to something other than a text value, which the trial does not rewrite` };
-      if (raw !== null && vars[k] === v) continue; // kept as committed
       before[k] = raw;
       out = setRawVar(out, k, JSON.stringify(v), { after: last });
       if (raw === null) last = k;
@@ -93,7 +107,7 @@ export function trialPlan(text) {
   } catch (e) { return { action: "fail", reason: `the trial could not write the switch into wrangler.jsonc (${e.message})` }; }
   let after;
   try { after = varsOf(out); } catch (e) { return { action: "fail", reason: `the trial could not write the switch into wrangler.jsonc (${e.message})` }; }
-  for (const [k, v] of Object.entries(want)) if (after[k] !== v) return { action: "fail", reason: `the trial could not write ${k} into wrangler.jsonc` };
+  for (const [k, v] of Object.entries(want)) if (JSON.stringify(after[k]) !== JSON.stringify(v)) return { action: "fail", reason: `the trial could not write ${k} into wrangler.jsonc` };
   if (undoTrial(out) !== text) return { action: "fail", reason: "the trial's change to wrangler.jsonc could not be taken back exactly" };
   try { buildAccepts(after); } catch (e) { return { action: "fail", reason: `the switch on top of the committed wrangler.jsonc is refused by the page build: ${e.message}` }; }
   const kept = Object.keys(want).filter((k) => has(k) && vars[k] === want[k]);

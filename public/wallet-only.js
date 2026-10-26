@@ -234,7 +234,7 @@
     async function restart(msg) {
       stopCarry(); forgetCarry();
       Object.assign(S, { hold: null, redo: false, started: false, tab: "register" });
-      S.srv = { terms: { done: false, version: (S.srv && S.srv.terms && S.srv.terms.version) || "2026-10-01" }, location: { done: false }, name: null, next: "location" };
+      S.srv = { terms: { done: false, version: (S.srv && S.srv.terms && S.srv.terms.version) || window.V.termsNow || "2026-10-01" }, location: { done: false }, name: null, next: "location" };
       render(); notice(msg);
     }
 
@@ -603,7 +603,7 @@
       fieldErr("wo-terms", ""); fieldErr("wo-name", ""); setErr("");
       if (!box.checked) { fieldErr("wo-terms", errText("terms_required")); box.focus(); announce(errText("terms_required")); return false; }
       if (!S.srv || !S.srv.terms || !S.srv.terms.done) {
-        const r = await call("/api/signup/terms", { version: (S.srv && S.srv.terms && S.srv.terms.version) || "2026-10-01" });
+        const r = await call("/api/signup/terms", { version: (S.srv && S.srv.terms && S.srv.terms.version) || window.V.termsNow || "2026-10-01" });
         if (r._handled) return false;
         if (!r.ok) { fieldErr("wo-terms", errText(r)); return false; }
         if (r.state) S.srv = r.state;
