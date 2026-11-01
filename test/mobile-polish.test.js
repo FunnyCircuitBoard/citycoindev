@@ -207,7 +207,7 @@ test("review fixes of 9 Oct 2026: the strips keep their gutter, no mid-word brea
   const lightBlock = style.slice(style.indexOf(':root[data-theme="light"] {'));
   const light = /--pin-2: (#[0-9A-Fa-f]{6})/.exec(lightBlock);
   assert.ok(light, "the light theme sets its own accent text colour");
-  for (const bg of ["#FFFFFF", "#F4F6FA", "#EEF2F7"]) assert.ok(ratio(light[1], bg) >= 4.5, `${light[1]} on ${bg}: ${ratio(light[1], bg).toFixed(2)}:1`);
+  for (const bg of ["#FFFFFF", "#F5F7FB", "#EEF2F7"]) assert.ok(ratio(light[1], bg) >= 4.5, `${light[1]} on ${bg}: ${ratio(light[1], bg).toFixed(2)}:1`); // white, the light page (design v5: #F5F7FB), the light well
   assert.match(polish, /\.member-cloud__more \{[^}]*color: var\(--pin-2\);/, "the +N more chip: the accent text token");
   assert.match(style, /\.problem__num \{[^}]*color: var\(--pin-2\);/, "the problem numbers: accent text, not the accent fill (3.7:1 in light)");
   assert.doesNotMatch(polish, /#B8430F/, "no hard-coded override left: the token covers the three");

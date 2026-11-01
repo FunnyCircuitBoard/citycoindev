@@ -59,7 +59,7 @@ test("markup: the strip (two tabs, the Launchpad's pill) over the Trades card an
   assert.match(css, /\.trade__meta a \{ display: inline-block; padding: 13px 0; margin: -13px 0;/, "a 44 px hit area on the wallet and Solscan links at every width (the line is .76rem on a phone), like the list's wallets");
   assert.match(css, /\.trades__list:empty \{ display: none; \}/, "the guard's sentence has no empty bordered box under it");
   assert.match(css, /\.trade__side\.is-sell \{ color: var\(--bad-text\); background: var\(--bad-soft, rgba\(255,90,54,\.1\)\); \}/, "the sell pill reads a theme token");
-  assert.equal((read("public/style.css").match(/--bad-soft: rgba\([^)]+\);/g) || []).length, 2, "--bad-soft next to --ok-soft, dark and light");
+  assert.equal((read("public/style.css").match(/--bad-soft: rgba\((?:[^()]|\([^()]*\))+\);/g) || []).length, 2, "--bad-soft next to --ok-soft, dark and light (design v5: it reads the --bad-rgb triplet, so the value nests one var())");
   assert.match(read("public/polish.css"), /\.tabpanel\[hidden\] \{ display: none; \}/, "a hidden panel is gone, card or not");
   assert.equal((js.match(/\/api\/coin\?/g) || []).length, 1, "one place asks for the coin answer: the chip and the tab share it (no new call upstream)");
 });
