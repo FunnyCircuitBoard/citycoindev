@@ -135,7 +135,10 @@ test("a control reached with Tab stops above the phone's tab bar; forced colours
   assert.match(polish, /html \{ scroll-padding-bottom: calc\(var\(--tabbar-h\) \+ env\(safe-area-inset-bottom\) \+ 12px\); \}/);
   assert.match(style, /@media \(forced-colors: active\) \{\n  \.site-header, \.tabbar, \.terms-note \{ background: Canvas;/);
   assert.match(style, /\.seg :is\(button\[aria-selected="true"\], button\[aria-pressed="true"\]\), \.tabbar a\[aria-current="page"\], \.nav a\[aria-current="page"\] \{ outline: 2px solid Highlight;/);
-  assert.match(cities, /:root\[data-theme="light"\] #cities \.city-status \{ color: var\(--ok-text\); \}/, "the 12 px status pill at AA in light (design v5: the light --ok-text, 5.2:1 on its tint)");
+  // design v5: the pill reads --ok-text in both themes from its base rule (light 5.2:1 on its tint); fix round 1 removed the light
+  // restatement of the same value
+  assert.match(cities, /#cities \.city-status \{[^}]*color: var\(--ok-text\);/, "the 12 px status pill reads the token");
+  assert.doesNotMatch(cities, /:root\[data-theme="light"\] #cities \.city-status/);
 });
 
 test("the header's scroll shadow fades on a layer of its own (opacity), the bar itself never transitions", () => {

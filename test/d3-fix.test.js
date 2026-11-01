@@ -52,8 +52,11 @@ test("home (design v4): no sample city coins on the page (LONDON, TOKYO, NYC, PA
 
 test("home: the walkthrough's $NYC inside its disc on a 320 px phone, and readable on the light theme", () => {
   assert.match(style, /#nyc-map \.m-coin text \{ font-size: 21px; \}/);
-  // design v5: the coin reads the gold tokens (navy ink on the light theme's gold: 7.5:1), with --gold-ui as its deeper rim
-  assert.match(style, /:root\[data-theme="light"\] \.m-coin circle \{ fill: var\(--gold\); stroke: var\(--gold-ui\); stroke-width: 2\.5; \}\n:root\[data-theme="light"\] \.m-coin text \{ fill: var\(--on-gold\); \}/);
+  // design v5: the coin reads the gold tokens (navy ink on the light theme's gold: 7.5:1), with --gold-ui as its deeper rim; the ink is the
+  // base rule's --on-gold in both themes (fix round 1: the light restatement of the same value is gone)
+  assert.match(style, /\.m-coin text \{ font: 800 26px var\(--display\); fill: var\(--on-gold\); \}/);
+  assert.match(style, /:root\[data-theme="light"\] \.m-coin circle \{ fill: var\(--gold\); stroke: var\(--gold-ui\); stroke-width: 2\.5; \}/);
+  assert.doesNotMatch(style, /:root\[data-theme="light"\] \.m-coin text/);
 });
 
 test("home: no lone word at the end of the hero's lead (design v4: the fact tiles are gone, the live numbers bar replaced them)", () => {

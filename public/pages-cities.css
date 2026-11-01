@@ -49,7 +49,6 @@ main :is(h1, h2, h3) { text-wrap: balance; }
   #cities .city-status { display: inline-flex; align-items: center; gap: 6px; margin: 2px 0 0; padding: 5px 12px 5px 9px; border-radius: var(--r-pill, 999px); border: 1px solid rgba(var(--ok-rgb),.35);
     background: var(--ok-soft, rgba(52,211,153,.14)); color: var(--ok-text); font: 600 var(--fs-xs, .75rem)/1.2 var(--body); letter-spacing: .01em; white-space: nowrap; }
   #cities .city-status svg { flex: none; }
-  :root[data-theme="light"] #cities .city-status { color: var(--ok-text); } /* 12 px on its green tint over the page: the light --ok-text reads 5.2:1 */
   #cities .cities-intro .city-stats { justify-content: flex-end; align-items: stretch; }
   #cities .cities-intro .city-stats li { display: grid; align-content: end; gap: 5px; text-align: left; }
   #cities .cities-intro .city-stats li:not([hidden]) ~ li:not([hidden]) { margin-left: var(--sp-4, 16px); padding-left: var(--sp-4, 16px); border-left: 1px solid var(--line); }
@@ -135,6 +134,9 @@ html.map-is-full #cities.page-hero { isolation: auto; }
 :root[data-theme="light"] .map-find { box-shadow: 0 18px 40px -20px rgba(12,35,68,.4), inset 0 1px 0 rgba(255,255,255,.8); }
 /* the light pill's own shadow is more specific than the focus rule above: its teal ring, said again (the ring used to vanish in light) */
 :root[data-theme="light"] .map-find:focus-within { box-shadow: 0 0 0 4px var(--accent-soft, rgba(11,122,112,.09)), 0 18px 40px -20px rgba(12,35,68,.4), inset 0 1px 0 rgba(255,255,255,.8); }
+/* keyboard focus inside the pill (the field, the location button): the site's 3 px ring around the pill (5.6:1 on the light page), since
+   the field's own ring is off below and the soft halo alone is under 3:1 on paper (WCAG 1.4.11) */
+.map-find:has(:focus-visible) { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
 .map-find__title { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .map-find__row { position: relative; flex: 1 1 auto; min-width: 0; display: flex; align-items: center; }
 .map-find__ico { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }

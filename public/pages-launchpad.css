@@ -97,7 +97,11 @@
 .lp-ava span { font: 700 .8rem/1 var(--display); letter-spacing: .02em; color: inherit; text-shadow: 0 1px 1px rgba(2,8,20,.3); max-width: none; overflow: visible; }
 .lp-ava[data-color="gold"], .lp-ava:not([data-color]) { color: var(--on-gold); } /* navy on the gold disc: 6.4:1 at its darkest end */
 .lp-ava[data-color="gold"] span, .lp-ava:not([data-color]) span { text-shadow: none; }
-/* $VICINITY: the legacy token's own mark (the emblem's teal into the coin's gold, a navy V: 8.6:1 at the teal end), not a city's gold disc */
+/* the five other city colours, their light end a step deeper on this small disc only (the coin art, swatches and pass coins keep
+   style.css's values), so the white initials read 4.5:1 or more from the disc's lightest stop */
+.lp-ava[data-color="ocean"] { --c2: #2D6BD6; } .lp-ava[data-color="emerald"] { --c2: #138463; } .lp-ava[data-color="rose"] { --c2: #CF3366; }
+.lp-ava[data-color="violet"] { --c2: #7A5CE6; } .lp-ava[data-color="ink"] { --c2: #56657D; }
+/* $VICINITY: the legacy token's own mark (the emblem's teal into the coin's gold, a navy V: 7.6:1 at the teal end), not a city's gold disc */
 .lp-ava[data-kind="vicinity"] { color: #0C2344; background: linear-gradient(135deg, #00CBB6, #F8C13A); }
 .lp-ava[data-kind="vicinity"] span { font-size: 1.05rem; text-shadow: none; } /* one letter: a little larger than two initials */
 .lp-ava--sm[data-kind="vicinity"] span { font-size: .85rem; }

@@ -32,6 +32,8 @@
 .pm-btn--primary { border-color: transparent; background: linear-gradient(135deg, var(--cta-a), var(--cta-b)); color: var(--on-cta); }
 .pm-btn--block { width: 100%; }
 .pm-btn.is-off { opacity: .55; }
+/* the mock's disabled main button: the site's quiet well (style.css .btn--primary[disabled]), not the gold at 55 % */
+.pm-btn--primary.is-off { opacity: 1; background: var(--card-2); color: var(--muted); border-color: var(--line-2); }
 .pm-list { display: grid; border-radius: 14px; border: 1px solid var(--line); background: var(--surface-1); overflow: hidden; }
 .pm-row { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 10px; }
 .pm-row + .pm-row { border-top: 1px solid var(--line); }

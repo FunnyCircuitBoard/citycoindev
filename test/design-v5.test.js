@@ -101,7 +101,7 @@ function rows(T) {
   add("T", "--st-open as pill text on the chip", hex(T, "--st-open"), S.chip); add("T", "--st-open as pill text on --bg-2", hex(T, "--st-open"), S.bg2);
   add("U", "--up on --bg-2", hex(T, "--up"), S.bg2); add("U", "--down on --bg-2", hex(T, "--down"), S.bg2);
   add("U", "--chart-1 on --bg-2", hex(T, "--chart-1"), S.bg2); add("U", "--chart-2 on --bg-2", hex(T, "--chart-2"), S.bg2);
-  add("U", "--gold-ui (tab pill's gold end) on the tab bar", hex(T, "--gold-ui"), S.tabbar);
+  add("U", "--gold-ui (the progress bars' gold end) on --bg-2", hex(T, "--gold-ui"), S.bg2);
   add("T", "coin disc ink --on-gold at the disc's darkest stop #D99A1A", hex(T, "--on-gold"), "#D99A1A");
   return { rows: r, S };
 }
@@ -135,14 +135,50 @@ test("design v5: the map's figure/ground and the status hues keep their separati
 
 test("design v5: the light theme repeats every colour token of the dark block (both themes complete)", () => {
   const dark = blocks.find((b) => b.theme === "dark").decls, light = blocks.find((b) => b.theme === "light").decls;
-  // theme-independent by design: the ring, the pass, the focus ring, the radius, the fonts, the chart axis (section 3.2)
-  const shared = new Set(["--grad-ring", "--pass-a", "--pass-b", "--pass-glow-1", "--pass-glow-2", "--pass-line", "--focus-ring", "--radius", "--display", "--body", "--mono", "--chart-axis", "--glass-blur"]);
+  // theme-independent by design: the pass and its state triplets, the focus ring, the radius, the fonts, the chart axis (section 3.2)
+  const shared = new Set(["--pass-a", "--pass-b", "--pass-glow-1", "--pass-glow-2", "--pass-line", "--pass-ok-rgb", "--pass-bad-rgb", "--pass-blue-rgb", "--pass-gold-rgb", "--focus-ring", "--radius", "--display", "--body", "--mono", "--chart-axis", "--glass-blur"]);
   const missing = Object.keys(dark).filter((k) => !(k in light) && !shared.has(k));
   assert.deepEqual(missing, [], "every dark token the light theme must restate");
   for (const k of ["--bg", "--bg-2", "--bg-3", "--ink", "--card", "--card-2", "--line", "--line-2", "--field-line", "--text", "--text-2", "--muted", "--faint", "--pin", "--pin-2", "--moss", "--gold", "--gold-ui", "--blue", "--warn", "--ok-text", "--bad-text", "--gold-text", "--on-cta", "--on-gold", "--on-accent", "--accent-rgb", "--accent-2-rgb", "--gold-rgb", "--ok-rgb", "--bad-rgb", "--warn-rgb", "--blue-rgb", "--accent-line", "--scrim", "--glass", "--code-bg", "--glass-bg", "--glass-bg-strong", "--glass-border", "--glass-hi", "--grad-ink", "--grad-accent", "--grad-glow", "--grad-aurora", "--e1", "--e2", "--e3", "--chart-1", "--chart-2", "--chart-grid", "--cta-a", "--cta-b", "--shadow", "--map-bg", "--map-water", "--map-land", "--map-land-line", "--map-area", "--map-area-line", "--map-dot", "--map-label", "--map-halo"]) {
     assert.ok(k in dark, `dark ${k}`); assert.ok(k in light, `light ${k}`);
   }
   assert.match(head, /color-scheme: dark;\n\}/); assert.match(head, /color-scheme: light;\n\}/); // each theme block ends by naming its scheme
+});
+
+test("design v5, fix round 1: the portfolio ring's eight slots sit on the brand (3:1 on the page and the card, 30 degrees apart), and the fixes hold", () => {
+  const block = css.slice(css.indexOf("Member profiles (PROFILES=on)"));
+  for (const [theme, T, re] of [["dark", DARK, /^:root \{ (--pf-0[^}]*)\}/m], ["light", LIGHT, /^:root\[data-theme="light"\] \{ (--pf-0[^}]*)\}/m]]) {
+    const slots = decls(re.exec(block)[1]);
+    const { S } = table[theme];
+    const hexes = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => hex(T, slots[`--pf-${i}`]));
+    for (const [i, h] of hexes.entries()) for (const [label, bg] of [["--bg", S.bg], ["--bg-2", S.bg2]]) assert.ok(ratio(h, bg) >= 3, `${theme} --pf-${i} ${h} on ${label} ${bg}: ${ratio(h, bg).toFixed(2)}:1`);
+    for (let i = 0; i < 8; i++) for (let j = i + 1; j < 8; j++) assert.ok(hueGap(hexes[i], hexes[j]) >= 30, `${theme} --pf-${i} vs --pf-${j}: ${hueGap(hexes[i], hexes[j]).toFixed(0)} degrees apart`);
+    assert.equal(hex(T, slots["--pf-x"]), hex(T, "--faint"), `${theme} --pf-x is the --faint grey`);
+    assert.ok(ratio(hex(T, slots["--pf-x"]), S.bg2) >= 3, `${theme} --pf-x on the card`);
+  }
+  assert.equal(hex(DARK, decls(/^:root \{ (--pf-0[^}]*)\}/m.exec(block)[1])["--pf-0"]), hex(DARK, "--gold"), "dark slot 0 is the coin's gold");
+  assert.equal(hex(LIGHT, decls(/^:root\[data-theme="light"\] \{ (--pf-0[^}]*)\}/m.exec(block)[1])["--pf-0"]), hex(LIGHT, "--gold-ui"), "light slot 0 is the light theme's gold for marks");
+  // the pre-v5 ring palette never returns
+  assert.doesNotMatch(block, /#3987e5|#d95926|#199e70|#c98500|#d55181|#008300|#9085e9|#e66767|#898781|#2a78d6|#eb6834|#1baf7a|#eda100|#e87ba4|#4a3aa7|#e34948/i);
+  // the quiet well is only for a main button that cannot be used: a working one (busy by class, aria or data attribute) keeps its gold
+  assert.match(css, /\.btn--primary\[disabled\]:not\(\.is-busy, \[aria-busy="true"\], \[data-busy\]\) \{ opacity: 1; background: var\(--card-2\); color: var\(--muted\); border-color: var\(--line-2\); box-shadow: none; \}/);
+  assert.match(read("wallet-send.css"), /\.wsend__go\.btn--primary\[disabled\] \{ opacity: \.6; background: linear-gradient\(135deg, var\(--cta-a\), var\(--cta-b\)\); color: var\(--on-cta\);/, "the Send sheet's Send button (no marker) keeps its gold");
+  assert.match(read("app-phone.css"), /\.pm-btn--primary\.is-off \{ opacity: 1; background: var\(--card-2\); color: var\(--muted\); border-color: var\(--line-2\); \}/, "the app mock's disabled main button is the same quiet well");
+  // the pass avatar's initial is white on the frosted tile (the pass is navy in both themes)
+  assert.match(css, /\.pass \.idcard__avatar \{[^}]*color: #fff;/);
+  // the phone tab bar's pill is one colour; the next-step edges are the accent, not a fourth colour
+  assert.match(css, /\.tabbar__ind \{[^}]*background: var\(--pin\);/);
+  assert.match(css, /\.dv2 \.today__card::before \{[^}]*background: var\(--pin\); \}/);
+  assert.match(read("polish-dash.css"), /\.dpv__todo::before \{[^}]*background: var\(--pin\); \}/);
+  // the light headline gradient stays in the gold family (every stop's hue between 35 and 50 degrees)
+  for (const s of stops(LIGHT)) assert.ok(hue(s) >= 35 && hue(s) <= 50, `light --grad-accent stop ${s}: hue ${hue(s).toFixed(0)}`);
+  // the owner console's chosen queue chip is said for the light theme too; the map's find pill rings on keyboard focus
+  assert.match(read("admin.css"), /\.adm-subtabs \.adm-subtab\[aria-selected="true"\], :root\[data-theme="light"\] \.adm-subtabs \.adm-subtab\[aria-selected="true"\] \{ background: var\(--text\); color: var\(--bg\); box-shadow: none; \}/);
+  assert.match(read("pages-cities.css"), /\.map-find:has\(:focus-visible\) \{ outline: 3px solid var\(--focus-ring\); outline-offset: 2px; \}/);
+  // the small coin disc: white initials 4.5:1 or more at the lightest stop of every city colour
+  for (const sheet of ["pages-launchpad.css", "pages-coin.css"]) { const t = read(sheet); for (const m of t.matchAll(/\.lp-ava\[data-color="(ocean|emerald|rose|violet|ink)"\] \{ --c2: (#[0-9A-F]{6}); \}/g)) assert.ok(ratio("#FFFFFF", m[2]) >= 4.5, `${sheet} ${m[1]} ${m[2]}: ${ratio("#FFFFFF", m[2]).toFixed(2)}`); assert.equal([...t.matchAll(/\.lp-ava\[data-color="(ocean|emerald|rose|violet|ink)"\] \{ --c2:/g)].length, 5, `${sheet}: five deeper discs`); }
+  // the dead alias is gone; the header's blur is back at 18 px
+  assert.doesNotMatch(head, /--shadow-2/); assert.match(head, /--glass-blur: saturate\(1\.5\) blur\(18px\);/);
 });
 
 test("design v5: token discipline across public/*.css (no old-palette literal, no white text on the accent fill, no --focus fallback in the coin sheets)", () => {

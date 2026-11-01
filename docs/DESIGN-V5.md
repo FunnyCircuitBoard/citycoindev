@@ -65,8 +65,8 @@ them: the tab bar's pill, the progress bar, the aurora hairline, the hover ring)
    CTA-coloured control are **navy `#0C2344 → #16355E` with gold text `#F8C13A`** (9.5:1 / 7.4:1), the light lockup's own pairing. Dark keeps
    gold with navy text (8.5:1 / 10.7:1). One token pair (`--cta-a/--cta-b` + `--on-cta`) per theme does it.
 2. **Headline gradient is the coin's gold only** (judges 1, 2, 3: the teal → mint → gold aurora had a muddy middle and read "web3"; teal in the
-   headline dilutes "teal = interactive"): dark `#FFD978 → #F8C13A → #E7A92A`; light a bronze `#A87400 → #8A5F00 → #6E4B00` (3.7:1 or more
-   on paper, large text only). Three stops are kept because `test/contrast.test.js` pins the format.
+   headline dilutes "teal = interactive"): dark `#FFD978 → #F8C13A → #E7A92A`; light a deeper gold `#A87400 → #946500 → #8A5F00` (3.8:1 or
+   more on paper, large text only; fix round 1 dropped the brown end `#6E4B00`, which read muddy). Three stops are kept because `test/contrast.test.js` pins the format.
 3. **Aurora wash halved in light** (judge 2: a stain on /connect and /launchpad): light `--grad-glow` alphas `.07` / `.06`; the header's
    aurora hairline `.45` / `.55` in light.
 4. **Deeper, softer elevation with a lit top edge on every raised surface** (judge 1 graft 5, judge 2 graft 3, judge 3 graft 4): `--e2`
@@ -138,9 +138,9 @@ the final values; copy them verbatim (comments may be edited, values and formats
   --field-line: rgba(var(--ink),.36);
   /* text: four levels (16.6, 12.2, 7.3 and 5.4:1 on the page); --faint is decoration only, never a sentence or a number's source */
   --text: #EEF3FA; --text-2: #C6D3E6; --muted: #93A4BE; --faint: #7A8CA8;
-  /* the accent: --pin is the teal of marks, fills and live dots; --pin-2 the teal of links and accent text (11:1 on the page); --gold the
-     coin's gold for fills (the main action, rank, the coin); --gold-ui the gold for thin marks that must read 3:1 on the page (the tab
-     pill's gold end, the map's Founded dot, chart series 2, the progress bar's gold end); the rest are status colours (8:1 or more as text) */
+  /* --pin: the teal of marks, fills and live dots; --pin-2: the teal of links and accent text (11:1 on the page); --gold: the coin's gold for
+     fills (the main action, rank, the coin); --gold-ui: the gold for thin marks that must read 3:1 (the progress bars' gold end, the light
+     coin's rim); --blue: the informational blue (notices, map areas, the provisional state); the rest are status colours (8:1 or more as text) */
   --pin: #00CBB6; --pin-2: #37E0CA; --moss: #34D399; --gold: #F8C13A; --gold-ui: #F8C13A; --blue: #6E9BFF; --warn: #FFD27A;
   --ok-text: #7CE8A6; --bad-text: #FF9A86; --gold-text: #FFDC8A;
   /* text on a filled colour: navy on gold (8.5:1 or more) and on teal (8.6:1), the lockup's own pairing */
@@ -153,7 +153,7 @@ the final values; copy them verbatim (comments may be edited, values and formats
   --glass: rgba(7,20,38,.82); --code-bg: rgba(2,8,20,.4);
   /* glass: the floating header, the tab bar, sheets (the only blurred surfaces; a phone blurs at most these) */
   --glass-bg: rgba(10,24,46,.62); --glass-bg-strong: rgba(10,24,46,.88);
-  --glass-border: rgba(var(--ink),.10); --glass-hi: inset 0 1px 0 rgba(var(--ink),.08); --glass-blur: saturate(1.6) blur(20px);
+  --glass-border: rgba(var(--ink),.10); --glass-hi: inset 0 1px 0 rgba(var(--ink),.08); --glass-blur: saturate(1.5) blur(18px);
   /* gradients: the headline words (ink, then the coin's gold), the aurora at the top of a page, the ring a hovered main button draws, the hairline of a bar */
   --grad-ink: linear-gradient(180deg, #FFFFFF 0%, #C6D3E6 100%);
   --grad-accent: linear-gradient(100deg, #FFD978 0%, #F8C13A 50%, #E7A92A 100%); /* the coin's gold; every stop 8.3:1 or more on #071426 and #0B1B33 */
@@ -183,7 +183,8 @@ the final values; copy them verbatim (comments may be edited, values and formats
   --map-area: rgba(127,163,214,.10); --map-area-line: rgba(160,190,235,.75);
   --map-dot: #7FA3D6; --map-label: #EEF3FA; --map-halo: rgba(7,20,38,.85);
   /* the member pass and founder card: navy in both themes, lit by the emblem's teal and the coin's gold (white keeps 6:1 on the lit corners) */
-  --pass-a: #12345F; --pass-b: #071426; --pass-glow-1: rgba(0,203,182,.38); --pass-glow-2: rgba(248,193,58,.42); --pass-line: rgba(255,255,255,.14);
+  --pass-a: #12345F; --pass-b: #071426; --pass-glow-1: rgba(0,203,182,.38); --pass-glow-2: rgba(255,205,96,.46); --pass-line: rgba(255,255,255,.14);
+  --pass-ok-rgb: 52,211,153; --pass-bad-rgb: 255,154,134; --pass-blue-rgb: 110,155,255; --pass-gold-rgb: 248,193,58; /* the founder card's state corners, theme-independent like the pass */
   color-scheme: dark;
 }
 ```
@@ -198,7 +199,7 @@ the final values; copy them verbatim (comments may be edited, values and formats
   --card: #FFFFFF; --card-2: rgba(12,35,68,.05);
   --line: rgba(12,35,68,.09); --line-2: rgba(12,35,68,.15);
   --field-line: rgba(12,35,68,.52);
-  --text: #0C2344; --text-2: #2E4466; --muted: #52647A; --faint: #6C7D92;
+  --text: #0C2344; --text-2: #2E4466; --muted: #4E6076; --faint: #6C7D92; /* --muted one step deeper than the draft's #52647A: 4.8:1 on a well inside a dashboard card */
   --pin: #0B7A70; --pin-2: #006F67; --moss: #159A74; --gold: #E5AA1C; --gold-ui: #A26F00; --blue: #2F63E0; --warn: #8A5F00;
   --ok-text: #0C6F4F; --bad-text: #C0392B; --gold-text: #7A5200;
   --on-cta: #F8C13A; --on-gold: #0C2344; --on-accent: #FFFFFF;
@@ -209,7 +210,8 @@ the final values; copy them verbatim (comments may be edited, values and formats
   --glass-bg: rgba(255,255,255,.72); --glass-bg-strong: rgba(255,255,255,.92);
   --glass-border: rgba(12,35,68,.09); --glass-hi: inset 0 1px 0 rgba(255,255,255,.9);
   --grad-ink: linear-gradient(180deg, #0C2344 0%, #2E4466 100%);
-  --grad-accent: linear-gradient(100deg, #A87400 0%, #8A5F00 50%, #6E4B00 100%); /* the coin's gold deepened to bronze so it reads on paper: every stop 3.7:1 or more on #F5F7FB and on white */
+  --grad-accent: linear-gradient(100deg, #A87400 0%, #946500 50%, #8A5F00 100%); /* the coin's gold deepened so it reads on paper, kept in the gold family: 3.8 / 4.7 / 5.3:1 on #F5F7FB */
+  --grad-ring: conic-gradient(from var(--ring-a, 0deg), transparent 0 55%, rgba(55,224,202,.95) 70%, rgba(248,193,58,.85) 78%, transparent 90%); /* the teal-and-gold arc on the navy button; the dark block's ring is a white-into-gold sheen on the gold button */
   --grad-glow: radial-gradient(50% 42% at 28% 0%, rgba(0,203,182,.07), transparent 70%), radial-gradient(44% 38% at 78% 0%, rgba(248,193,58,.06), transparent 70%);
   --grad-aurora: linear-gradient(90deg, transparent, rgba(11,122,112,.45) 35%, rgba(162,111,0,.55) 65%, transparent);
   --e1: 0 1px 2px rgba(12,35,68,.06), 0 0 0 1px rgba(12,35,68,.03);
@@ -218,7 +220,7 @@ the final values; copy them verbatim (comments may be edited, values and formats
   --glow-cta: 0 8px 22px -12px rgba(12,35,68,.45), inset 0 1px 0 rgba(255,255,255,.12);
   --glow-cta-hover: 0 12px 30px -10px rgba(12,35,68,.55), 0 0 0 1px rgba(12,35,68,.55), inset 0 1px 0 rgba(255,255,255,.16);
   --cta-halo: 0 0 26px 0 rgba(12,35,68,.16);
-  --chart-1: #0B7A70; --chart-2: #A26F00; --chart-grid: rgba(12,35,68,.08);
+  --chart-1: #0B7A70; --chart-2: #16355E; --chart-grid: rgba(12,35,68,.08); /* series 2 is each theme's own fill: gold on the night canvas, the brand navy (ink bars) on paper */
   --cta-a: #0C2344; --cta-b: #16355E;
   --shadow: 0 20px 50px -30px rgba(12,35,68,.35);
   --map-bg: radial-gradient(80% 70% at 30% 35%, rgba(0,203,182,.06), transparent 60%), radial-gradient(120% 90% at 55% 45%, #EAF1FA, #DCE6F2);
@@ -247,7 +249,7 @@ Unchanged values except the ones marked **new**:
   --surface-1: linear-gradient(180deg, rgba(var(--ink),.055), rgba(var(--ink),.025)); --surface-2: var(--bg-2); --surface-inset: rgba(var(--ink), .04);
   /* new: the soft tints read the triplets, so one rule serves both themes */
   --accent-soft: rgba(var(--accent-rgb),.12); --ok-soft: rgba(var(--ok-rgb),.14); --bad-soft: rgba(var(--bad-rgb),.12); --warn-soft: rgba(var(--warn-rgb),.12); --gold-soft: rgba(var(--gold-rgb),.14);
-  --shadow-1: var(--e1); --shadow-2: var(--e3);
+  --shadow-1: var(--e1);   /* --shadow-2 was removed in fix round 1: nothing read it any more (its four readers take --e3) */
   --header-h: 60px; --sticky-top: calc(var(--header-h) + 12px);
   /* new values: a press 120 ms, a hover/colour change 180 ms, an enter or lift 320 ms, a long reveal 560 ms; one soft curve */
   --dur-1: 120ms; --dur-2: 180ms; --dur-3: 320ms; --dur-4: 560ms;
@@ -272,7 +274,7 @@ backdrop-filter`, `prefers-reduced-transparency`) and `@property --ring-a` are u
 | `polish-map.css` | `:root { --st-active: #2ED3B7; }` / `:root[data-theme="light"] { --st-active: #0E7C63; }` | **unchanged**: `cities.js` falls back to these and `test/map-labels.test.js` pins them |
 | `style.css` launchpad live block | `:root { --up: #34D399; --down: #FF8C74; --chart-halo: rgba(7,20,38,.86); }` | read by `coinchart.js` |
 | | `:root[data-theme="light"] { --up: #1E9E78; --down: #C0392B; --chart-halo: rgba(255,255,255,.92); }` | `--down` was the old accent `#E8431F`; now the light `--bad-text` (pin updated) |
-| `style.css` profiles block | `--pf-0..7`, `--pf-x` | **unchanged** (a categorical data palette, both themes, pinned by `test/profiles-ui.test.js`) |
+| `style.css` profiles block | `--pf-0..7`, `--pf-x` | fix round 1: on the brand (dark `#f8c13a #2bd9c3 #7fa3d6 #ff9a86 #6fcf7e #a78bfa #b3d15a #f28cb4`, light `#a26f00 #0b7a70 #3f67a6 #c0392b #2e8b4e #6a4fd8 #657f14 #b5306c`, `--pf-x` = `--faint`): slot 0 the coin's gold, 1 teal, 2 steel blue, 3 coral, 4 green, 5 violet, 6 lime, 7 rose; each 3:1 or more on the page and on a card, every pair 32° or more apart (pin updated, `test/design-v5.test.js` checks the numbers) |
 | `style.css` `[data-color]` coin palettes | gold default `--c1/--c2/--c3` = `#FFE9A8 / #F8C13A / #D99A1A`; rose, ocean, emerald, violet, ink as today | the gold family follows the brand gold; the five others are the member's own choices |
 | `pages-launchpad.css` / `pages-coin.css` / `swap.css` | `.lp-ava` / `.swap__mark--ava` defaults `--c2: #F8C13A; --c3: #D99A1A`, ink `var(--on-gold)` | the `.lp-ava` block stays byte-identical in the two page sheets |
 | `polish.css` | `--tabbar-h: 64px; --bottom-bars: 0px` | unchanged (pinned) |
@@ -282,7 +284,10 @@ backdrop-filter`, `prefers-reduced-transparency`) and `@property --ring-a` are u
 ### 3.5 New names, and one rename
 
 New: `--gold-ui`, `--on-cta`, `--on-gold`, `--on-accent`, `--accent-rgb`, `--accent-2-rgb`, `--gold-rgb`, `--ok-rgb`, `--bad-rgb`, `--warn-rgb`,
-`--blue-rgb`, `--focus-ring`, `--scrim`, `--grad-aurora`, `--pass-a`, `--pass-b`, `--pass-glow-1`, `--pass-glow-2`, `--pass-line`.
+`--blue-rgb`, `--focus-ring`, `--scrim`, `--grad-aurora`, `--pass-a`, `--pass-b`, `--pass-glow-1`, `--pass-glow-2`, `--pass-line`; fix round 1 added
+`--pass-ok-rgb`, `--pass-bad-rgb`, `--pass-blue-rgb`, `--pass-gold-rgb` (the founder card's state corners, theme-independent like the pass),
+gave `--grad-ring` a value per theme (a sheen on the gold button in dark, the teal-and-gold arc on the navy button in light) and removed the
+unread `--shadow-2`.
 
 Rename in the *using* sheets only: `coin-ready.css` and `coin-review.css` read `var(--focus, #F25C24)` for their focus rings; `--focus` is not
 a root token (it is the map focus card's local status colour, `style.css` 951–960 and `polish-map.css`), so those rings fell back to the old
@@ -325,7 +330,8 @@ changes only:
   28/72 px). Dark shadows are navy-black `rgba(2,8,20,…)`, light ones navy `rgba(12,35,68,…)`; nothing grey. The header's scrolled shadow is
   `--e3` on its `::after` (unchanged mechanism). The CTA glow family is gold in dark and a navy shadow in light.
 - **Glass**: `--glass-bg` at rest, `--glass-bg-strong` scrolled/opaque bars, `--glass-border` + `--glass-hi` as the inset rim, `--glass-blur`
-  `saturate(1.6) blur(20px)`. Only the header, tab bar, toast, terms note, map controls, coin mini-bar and sheets are glass. The phone tab
+  `saturate(1.5) blur(18px)` (main's radius: fix round 1 took back the 20 px, imperceptible behind the fill and dearer to paint). Only the
+  header, tab bar, toast, terms note, map controls, coin mini-bar and sheets are glass. The phone tab
   bar and the dashboard strip stay opaque (the pinned recipe).
 - **Scrims**: `--scrim` behind the account sheet, modals and the swap sheet (`::backdrop` keeps literal rgba in both theme rules, retinted
   to the same navy values, because `::backdrop` does not inherit custom properties in every supported browser).
@@ -355,8 +361,8 @@ Rules are given as the final declarations the owner of that file writes; selecto
 ### 6.2 Phone tab bar (`style.css` 223–239, 1397–1400, 1425–1429; `brand/citycoin.css` 4 columns)
 
 Opaque strong glass over `--bg` (pinned recipe), `inset 0 1px 0 var(--glass-border)`. Labels `--muted`, current label `--text`, current icon
-`var(--pin)` (pinned). `.tabbar__ind` (20 × 4 px, pinned geometry): `background: linear-gradient(90deg, var(--pin), var(--gold-ui));` —
-teal to gold, and `--gold-ui` keeps the gold end at 4.3:1 on the light bar. Tap bounce unchanged (`--ease-spring`).
+`var(--pin)` (pinned). `.tabbar__ind` (20 × 4 px, pinned geometry): `background: var(--pin);` — one colour (fix round 1: at that size the
+teal-to-gold gradient read as a mis-registered mark, half teal, half yellow). Tap bounce unchanged (`--ease-spring`).
 
 ### 6.3 Buttons (`style.css` 241–304; motion 1411–1413, 1431–1436)
 
@@ -375,6 +381,8 @@ teal to gold, and `--gold-ui` keeps the gold end at 4.3:1 on the light bar. Tap 
 }
 .btn--sm { min-height: 40px; … }  .btn--lg { min-height: 56px; … }   /* 44 px on touch via polish.css, pinned */
 .btn[disabled], .btn.is-busy { opacity: .6; cursor: progress; transform: none; }   /* unchanged */
+.btn--primary[disabled]:not(.is-busy, [aria-busy="true"], [data-busy]) { opacity: 1; background: var(--card-2); color: var(--muted); border-color: var(--line-2); box-shadow: none; }
+/* the quiet well for a main action that cannot be taken yet; a working one (busy by class, aria-busy or data-busy; the Send sheet's Send through wallet-send.css) keeps its gold at 60 % */
 .btn__dot { background: rgba(255,255,255,.75); }   /* on the primary it is drawn over --on-cta's button: keep */
 .btn--email .social-mark { color: var(--pin-2); }  .btn--google { /* Google's own colours, keep */ }
 ```
@@ -495,7 +503,8 @@ crosses `--bad-text`.
 ### 6.10 Charts and progress (`style.css` `--chart-*`, `--up/--down`, `.lp-spark`, `.coin-chart__*`, `.pf-*`, `.meter`, `.bar`, `.lp-bar`,
 `.launch-progress`; `admin.css` `.chart__*`, `.adm-spark`; `polish-dash.css` `.dpv__bar`)
 
-Series 1 teal `--chart-1`, series 2 gold `--chart-2` (light `#A26F00`, 4.4:1), grid `--chart-grid`, axis text `--chart-axis` (= `--muted`);
+Series 1 teal `--chart-1`, series 2 each theme's own fill `--chart-2` (gold in dark; light the brand navy `#16355E`, 12.3:1, ink bars on paper:
+fix round 1 replaced the bronze `#A26F00`, thirty brown bars on a white card), grid `--chart-grid`, axis text `--chart-axis` (= `--muted`);
 `--up`/`--down` mint/coral (light `--down` = `--bad-text`). Text never takes a series colour. Progress tracks `rgba(var(--ink),.08)`; fills:
 `.meter`/`.bar`/`.launch-progress` `var(--pin)`; `.lp-bar::-webkit-progress-value { background: linear-gradient(90deg, var(--pin), var(--gold-ui));`
 and the same for `::-moz-progress-bar` (pin updated); the one-time `moSheen` unchanged. `.pf-*` donut keeps `--pf-*`. `.lp-spark` line `--chart-1`,
@@ -555,9 +564,11 @@ still teal (offset 3 px puts it on the page).
 .pass .role-pill[data-level="founder"] { background: var(--gold); color: var(--on-gold); border-color: transparent; }
 ```
 
-White text keeps 6.0:1 on the teal corner and 6.5:1 on the gold corner (section 12). The founder card `.dv2 .card.fcard` uses the same
-`--pass-*` base; its states: default gold light `rgba(var(--gold-rgb),.32)`, `steward` mint `rgba(var(--ok-rgb),.4)`, `provisional` blue
-`rgba(var(--blue-rgb),.5)`, `grace` coral `rgba(var(--bad-rgb),.4)`; its kicker and `.fcard__pick` `var(--gold-text)`, its tags the section 6.8
+White text keeps 6.0:1 on the teal corner and 5.4:1 on the gold corner (section 12; fix round 1 made the gold corner a small warm glint,
+`radial-gradient(60% 80% at 100% 100%, …, transparent 62%)` of `rgba(255,205,96,.46)`, instead of the wide `.42` wash that mixed to khaki).
+The founder card `.dv2 .card.fcard` uses the same `--pass-*` base; its states read the theme-independent `--pass-*-rgb` triplets (fix round 1;
+the card is navy in both themes): default gold light `rgba(var(--pass-gold-rgb),.32)`, `steward` mint `rgba(var(--pass-ok-rgb),.4)`,
+`provisional` blue `rgba(var(--pass-blue-rgb),.5)`, `grace` coral `rgba(var(--pass-bad-rgb),.4)`; its kicker and `.fcard__pick` `var(--gold-text)`, its tags the section 6.8
 tints with the pass's white alphas. The dashboard preview `.dpv__pass` reads the same tokens (its green sample coin becomes `#34D399` with
 ink `#062A1F`, 8.0:1; pin updated); the profile pass `.prof-pass` tones the glows to `.28`/`.3`. Nothing in this family changes in light:
 "one object in two materials".
@@ -574,7 +585,9 @@ the same literal pair as `.lp-ava[data-kind="vicinity"]`; `.pm-coin--city` `rgba
 
 ### 6.18 Empty states, folds, icons (`style.css` 355–371, 362–367, 1333)
 
-`.empty` dashed `--line-2`, `--muted`, title `--text`; `.fold` `--line` top, `+`/`−` in `var(--pin-2)` (interactive); `.ico--ok` `--ok-text`,
+`.empty` a resting card (`--line` solid, `--surface-1`, `--e1`; fix round 1: the dashed frame read as a wireframe, and dashes mean a drop
+target on the dashboard), `--muted`, title `--text`; the same for `.empty-feed`, the coin page's "nothing recorded yet" chart state and the
+console's `.chart__empty`; `.fold` `--line` top, `+`/`−` in `var(--pin-2)` (interactive); `.ico--ok` `--ok-text`,
 `.ico--gold` `--gold-text`, `.ico--muted` `--muted`. Unchanged selectors (pinned).
 
 ## 7. Motion
@@ -609,7 +622,7 @@ Every page's first section is lit by `--grad-glow` (teal at 28 % left, gold at 7
 
 | page | treatment |
 |---|---|
-| `/` (`pages-home.css` `.hero4`) | "One city." in `.text-ink` (`--grad-ink`), "One coin." in `.accent` (the coin's gold; bronze in light); lead `--text-2` ≤ 34ch; two 56 px buttons: `.btn--primary.btn--lg` (Find your city) + `.btn--glass.btn--lg`; the live-numbers bar `.tk__*` on `--card` with an ok live dot; `hero4Rise .4s` unchanged |
+| `/` (`pages-home.css` `.hero4`) | "One city." in `.text-ink` (`--grad-ink`), "One coin." in `.accent` (the coin's gold; a deeper gold in light); lead `--text-2` ≤ 34ch; two 56 px buttons: `.btn--primary.btn--lg` (Find your city) + `.btn--glass.btn--lg`; the live-numbers bar `.tk__*` on `--card` with an ok live dot; `hero4Rise .4s` unchanged |
 | `/launchpad` (`pages-launchpad.css` `.lp4-hero`) | "Every city gets" ink, "its own coin." `.accent`; one `.btn--primary.btn--lg.btn--cta-glow.has-ring` (gold halo dark, navy shadow light); the hero's `::before` is the page's one glow (pinned) |
 | `/cities` (`.page-hero--map`) | title + facts in ink only (no `.accent`: the map is the picture); glow at `.5` opacity so the stage dominates; the stage on `--map-bg` with the retinted land/water |
 | `/dashboard` signed out (`.dpv`) | the navy pass preview lit teal/gold, kicker `--muted`, "Join or log in" `.btn--primary` (gold dark / navy light); signed in: no hero, the glass strip |
@@ -656,8 +669,8 @@ becomes a token, a triplet tint, or the new literal where a fallback is required
 
 ## 10. Rollout: owners, order, verification, what to record where
 
-Worktree: `/tmp/claude-0/-home-user/259e7af3-62d7-56de-8406-76246b95043c/scratchpad/cc-design` (branch `cc/design-premium`), `node_modules`
-a symlink (keep it; never `npm install` there). Each parallel owner takes a detached scratch worktree of the same branch and merges back in
+Worktree: a scratch worktree of branch `cc/design-premium` outside the repository, `node_modules` a symlink (keep it; never `npm install`
+there). Each parallel owner takes a detached scratch worktree of the same branch and merges back in
 the order below; file sets are disjoint.
 
 **Step 0 — owner A, first, short (blocks everyone):** the two token blocks + scale block of `style.css` (section 3), the `--st-*` and
@@ -741,6 +754,12 @@ Intent is kept in every case (the WCAG threshold, the rule's structure); only th
 | `v4-review.test.js` 99 | `.btn--soft { background: rgba(255,90,54,.15); border-color: rgba(255,110,70,.62); …` | `.btn--soft { background: rgba(var(--accent-rgb),.15); border-color: rgba(var(--accent-rgb),.62); color: var(--pin-2); font-weight: 700; }` | the tint reads the token |
 | `v4-review.test.js` 137 | `:root[data-theme="light"] #cities .city-status { color: #0C6B4E; }` | `{ color: var(--ok-text); }` | the status pill reads the token (light 5.75:1) |
 | `lp-launch-ui.test.js` 503 | `.lp-approve { border: 2px solid var(--gold, #FFC857);` | `var(--gold, #F8C13A);` | fallback = the brand gold |
+| `token-tabs.test.js` 62 | `/--bad-soft: rgba\([^)]+\);/g` counted twice | `/--bad-soft: rgba\((?:[^()]\|\([^()]*\))+\);/g` counted twice | the value nests one `var(--bad-rgb)`; the intent (defined once per theme) is unchanged |
+| `profiles-ui.test.js` 381–382 (fix round 1) | dark `#3987e5 #d95926 #199e70 #c98500 #d55181 #008300 #9085e9 #e66767`, light `#2a78d6 #eb6834 #1baf7a #eda100 #e87ba4 #008300 #4a3aa7 #e34948` | dark `#f8c13a #2bd9c3 #7fa3d6 #ff9a86 #6fcf7e #a78bfa #b3d15a #f28cb4`, light `#a26f00 #0b7a70 #3f67a6 #c0392b #2e8b4e #6a4fd8 #657f14 #b5306c` | the ring on the brand (V1); the slot rules at 383–385 unchanged; `test/design-v5.test.js` now checks 3:1 on the page and the card and 30° between every pair |
+| `d3-fix.test.js` 56 (fix round 1) | the light `.m-coin circle` rule followed by `:root[data-theme="light"] .m-coin text { fill: var(--on-gold); }` | the base `.m-coin text { … fill: var(--on-gold); }`, the light circle rule alone, and `doesNotMatch` the light text rule | the light restatement repeated the base rule exactly (Q3) |
+| `v4-review.test.js` 138 (fix round 1) | `:root[data-theme="light"] #cities .city-status { color: var(--ok-text); }` | the base `#cities .city-status { … color: var(--ok-text);` and `doesNotMatch` the light rule | same (Q3) |
+| `mobile-polish.test.js` 262 (fix round 1) | `--shadow-2` in the list of scale tokens that must exist | removed from the list | the alias had no reader left (Q2) |
+| `design-pages.test.js` 145 (fix round 1, comment only) | "8.6:1 at the teal end" | "7.6:1 at the teal end" | the recorded figure was `--on-accent`'s (H1); the assertion is unchanged |
 
 **New:** `test/design-v5.test.js` — reads `public/style.css` (both token blocks, `--st-*`, `--up/--down`) and `public/polish-map.css`
 (`--st-active`), composites the glass, well, chip and pass surfaces exactly as section 12's "surfaces" rows say, and asserts every row of
@@ -749,7 +768,7 @@ is `var(--pin)`, no `rgba(255,90,54`, `rgba(232,67,31`, `#FF5A36`, `#FF8A5B`, `#
 except inside `url("data:…")`, and that every `var(--focus, ` is gone from the two coin sheets.
 
 **Must not change** (their intent is a frozen script or a shape): `map-labels.test.js` 223–226 (`--st-active` values), 247–256 (pill rule
-texts); `profiles-ui.test.js` 381–385 (`--pf-*`); `wallet-tab.test.js` 111 (QR); `lp-launch-ui.test.js` 495 (`#B3261E`); `feedback-ui.test.js`
+texts); `profiles-ui.test.js` 383–385 (the `--pf-*` slot rules; the values at 381–382 moved onto the brand in fix round 1, Appendix B); `wallet-tab.test.js` 111 (QR); `lp-launch-ui.test.js` 495 (`#B3261E`); `feedback-ui.test.js`
 177/361; `live-buttons.test.js` 97–104, 182 (the comment); `build-parity.test.js`, `rebrand-review-fixes.test.js` (theme-color `#071426`);
 `motion.test.js` all; `phone-dash.test.js` all (`0 0 0 4px var(--pin)` stays a token); `site.test.js` 82–84, 124; `mobile-polish.test.js`
 everything but 210; `dashboard-design.test.js` everything but 122; `coinart*.test.js`.
@@ -760,7 +779,7 @@ Computed from the section 3 hexes with WCAG 2.x relative luminance (sRGB). Kinds
 icons, focus rings, chart lines, map marks) 3:1, **D** decoration (no bar; recorded so nobody promotes `--faint` to text). Surfaces that are
 not tokens are composites: dark glass at rest `#09162B` = `rgba(10,24,46,.62)` over `#071426`, scrolled `#0A182D` (.88); light glass `#FCFDFE`
 / `#FEFEFF`; dark well `#15243B` = ink .04 over `--bg-2`; light well `#EEF2F7`; chip `rgba(7,20,38,.82)` over water `#071427`, light
-`#FCFDFE`; pass teal corner `#0B6D80` = teal .38 over `--pass-a`, gold corner `#6C5D2E` = gold .42 over `--pass-b`; tints are the soft
+`#FCFDFE`; pass teal corner `#0B6D80` = teal .38 over `--pass-a`, gold corner `#796941` = the glint `rgba(255,205,96,.46)` over `--pass-b`; tints are the soft
 alphas over `--bg`.
 
 | kind | pair | dark | ratio | light | ratio |
@@ -769,10 +788,11 @@ alphas over `--bg`.
 | T | `--text` on `--bg-3` | | 13.22 | | 13.83 |
 | T | `--text-2` on `--bg` | `#C6D3E6` | 12.19 | `#2E4466` | 9.17 |
 | T | `--text-2` on `--bg-3` | | 9.73 | | 8.68 |
-| T | `--muted` on `--bg` | `#93A4BE` | 7.29 | `#52647A` | 5.65 |
-| T | `--muted` on `--bg-2` (card) | | 6.81 | | 6.06 |
-| T | `--muted` on `--bg-3` (tile) | | 5.82 | | 5.35 |
-| T | `--muted` (kickers, captions) on the well | | 6.16 | | 5.39 |
+| T | `--muted` on `--bg` | `#93A4BE` | 7.29 | `#4E6076` | 6.01 |
+| T | `--muted` on `--bg-2` (card) | | 6.81 | | 6.44 |
+| T | `--muted` on `--bg-3` (tile) | | 5.82 | | 5.69 |
+| T | `--muted` (kickers, captions) on the well | | 6.16 | | 5.73 |
+| T | `--muted` on a well inside a dashboard card (`--card-2` over the card's top stop over the page: light `#DADEE6`) | | 6.3 | | 4.78 (rendered 4.77–4.78; was 4.49 with `#52647A`) |
 | D | `--faint` on `--bg` | `#7A8CA8` | 5.40 | `#6C7D92` | 3.93 |
 | T | `--pin-2` links on `--bg` | `#37E0CA` | 11.15 | `#006F67` | 5.64 |
 | T | `--pin-2` on `--bg-2` | | 10.40 | | 6.05 |
@@ -791,15 +811,15 @@ alphas over `--bg`.
 | T | `--gold-text` on `--bg` / `--bg-3` / `--gold-soft` | `#FFDC8A` | 13.94 / 11.13 / 10.67 | `#7A5200` | 6.45 / 6.11 / 5.97 |
 | T | `--warn` on `--bg` / `--bg-3` / `--warn-soft` | `#FFD27A` | 12.97 / 10.36 / 10.06 | `#8A5F00` | 5.27 / 4.98 / 4.74 |
 | T | `--blue` on `--bg` | `#6E9BFF` | 6.86 | `#2F63E0` | 4.92 |
-| T | `--muted` on header glass at rest / scrolled | | 7.14 / 7.02 | | 5.96 / 6.02 |
+| T | `--muted` on header glass at rest / scrolled | | 7.14 / 7.02 | | 6.33 / 6.39 |
 | T | `--text-2` on header glass at rest | | 11.94 | | 9.66 |
 | T | `--text` on header glass scrolled | | 15.94 | | 15.55 |
-| L | `--grad-accent` stops 1 / 2 / 3 on `--bg` | `#FFD978 #F8C13A #E7A92A` | 13.59 / 11.15 / 8.89 | `#A87400 #8A5F00 #6E4B00` | 3.79 / 5.27 / 7.33 |
-| L | `--grad-accent` stops 1 / 3 on `--bg-2` | | 12.67 / 8.29 | | 4.07 / 7.87 |
+| L | `--grad-accent` stops 1 / 2 / 3 on `--bg` | `#FFD978 #F8C13A #E7A92A` | 13.59 / 11.15 / 8.89 | `#A87400 #946500 #8A5F00` | 3.79 / 4.75 / 5.27 |
+| L | `--grad-accent` stops 1 / 3 on `--bg-2` | | 12.67 / 8.29 | | 4.07 / 5.65 |
 | U | `--field-line` on `--bg` / `--bg-2` / `--bg-3` / well | white .36 | 3.32 / 3.29 / 3.15 / 3.25 | navy .52 | 3.31 / 3.37 / 3.26 / 3.29 |
 | U | focus ring `--pin-2` on `--bg` / `--bg-2` | | 11.15 / 10.40 | | 5.64 / 6.05 |
-| T | white on the pass: teal corner / gold corner / `--pass-a` | `#FFFFFF` | 5.98 / 6.48 / 12.48 | same (navy pass in both themes) | 5.98 / 6.48 / 12.48 |
-| U | `#7CE8A6` live dot on the pass's gold corner | | 4.30 | same | 4.30 |
+| T | white on the pass: teal corner / gold corner / `--pass-a` | `#FFFFFF` | 5.98 / 5.37 / 12.48 | same (navy pass in both themes) | 5.98 / 5.37 / 12.48 |
+| U | `#7CE8A6` live dot on the pass's gold corner | | 3.57 | same | 3.57 |
 | U | `--st-open` on water / land | `#7FA3D6` | 7.09 / 4.43 | `#3F67A6` | 4.46 / 5.67 |
 | U | `--st-active` on land / water | `#2ED3B7` | 6.07 / 9.72 | `#0E7C63` | 5.14 / 4.05 |
 | U | `--st-founded` on land / water | `#F8C13A` | 6.92 / 11.09 | `#A26F00` | 4.37 / 3.44 |
@@ -808,15 +828,16 @@ alphas over `--bg`.
 | — | land vs water (informational) | `#1F3A60` / `#08142A` | 1.60 | `#FFFFFF` / `#D7E6F5` | 1.27 |
 | T | `--st-open` as pill text on the chip / on `--bg-2` | | 7.13 / 6.66 | | 5.57 / 5.67 |
 | U | `--up` / `--down` on `--bg-2` | `#34D399` / `#FF8C74` | 8.96 / 7.59 | `#1E9E78` / `#C0392B` | 3.38 / 5.44 |
-| U | `--chart-1` / `--chart-2` on `--bg-2` | `#2BD9C3` / `#F8C13A` | 9.69 / 10.40 | `#0B7A70` / `#A26F00` | 5.21 / 4.37 |
-| U | `--gold-ui` (tab pill's gold end) on the tab bar | `#F8C13A` | 10.73 | `#A26F00` | 4.33 |
+| U | `--chart-1` / `--chart-2` on `--bg-2` | `#2BD9C3` / `#F8C13A` | 9.69 / 10.40 | `#0B7A70` / `#16355E` | 5.21 / 12.32 |
+| U | `--gold-ui` (the progress bars' gold end) on `--bg-2` | `#F8C13A` | 10.40 | `#A26F00` | 4.37 |
+| U | `--pf-0` … `--pf-7` (the portfolio ring) on `--bg` / `--bg-2`, and the pairs' hue gap | gold, teal, steel, coral, green, violet, lime, rose | 6.79+ / 6.33+; 32° or more | `#A26F00 #0B7A70 #3F67A6 #C0392B #2E8B4E #6A4FD8 #657F14 #B5306C` | 3.98+ / 4.27+; 32° or more |
 | T | `.dv2 .dtab__badge` white on `--pin-2` (light) | — | — | `#FFFFFF` / `#006F67` | 6.05 |
 | T | coin disc ink `--on-gold` at the disc's darkest stop `#D99A1A` | `#0C2344` | 6.41 | same | 6.41 |
 | U | lockup gold `.dev` / wordmark / teal icon on header glass (images) | | 10.92 / 18.08 / 8.80 | | 1.63 / 15.39 / 2.02 (the lockup's own art) |
 | — | `--st-active` hue vs open / choosing / founded (≥ 30°) | 170° vs 215° / 31° / 43° | 45° min | 166° vs 217° / 29° / 42° | 50° min |
 
-Also held, unchanged from today: `#062A1F` on `#34D399` 8.04 (dpv sample coin), `#0C2344` on `#00CBB6` 8.61 and on `#F8C13A` 9.47 (the
-legacy mark), `#fff` on `#B3261E` 6.5 (mainnet line), `#0B1626` on `#fff` (QR).
+Also held, unchanged from today: `#062A1F` on `#34D399` 8.04 (dpv sample coin), `#0C2344` on `#00CBB6` 7.63 and on `#F8C13A` 9.47 (the
+legacy mark; 8.61 is `--on-accent` `#06192E` on the teal, the skip link's pair), `#fff` on `#B3261E` 6.5 (mainnet line), `#0B1626` on `#fff` (QR).
 
 ## 13. Residuals (JavaScript is frozen)
 
@@ -885,6 +906,11 @@ implementation report's section 11 together.
 | d67eb33 (B3) | `notify.test.js` 708 | `.dv2 .nt-switch:checked::before { background: var(--ok-text, #37C29A); }` | `{ background: var(--ok-text, #7CE8A6); }` | the fallback is the new dark `--ok-text`; the rule reads the token first |
 | d67eb33 (B3) | `contrast.test.js` 50 | `#062A1F` on `#37C29A` ≥ 6 (the preview's sample coin) | `#062A1F` on `#34D399` ≥ 6 (8.0) | the sample coin's green is the new ok fill (`--moss` / `--up`); the 6:1 bar is unchanged |
 | d67eb33 (B3) | `lp-launch-ui.test.js` 503 | `.lp-approve { border: 2px solid var(--gold, #FFC857);` | `var(--gold, #F8C13A);` | the fallback is the brand gold; the rule reads the token first |
+| fix round 1 | `profiles-ui.test.js` 381–382 | dark `#3987e5 #d95926 #199e70 #c98500 #d55181 #008300 #9085e9 #e66767`, light `#2a78d6 #eb6834 #1baf7a #eda100 #e87ba4 #008300 #4a3aa7 #e34948` | dark `#f8c13a #2bd9c3 #7fa3d6 #ff9a86 #6fcf7e #a78bfa #b3d15a #f28cb4`, light `#a26f00 #0b7a70 #3f67a6 #c0392b #2e8b4e #6a4fd8 #657f14 #b5306c` | the portfolio ring on the brand (V1): slot 0 the coin's gold, 1 teal, 2 steel blue, 3 coral, 4 green, 5 violet, 6 lime, 7 rose, grey = `--faint`; each 3:1 or more on the page and the card in its theme, every pair 32° or more apart, checked by `test/design-v5.test.js`; the slot rules (383–385) and "nothing moves" are unchanged |
+| fix round 1 | `d3-fix.test.js` 56 | the light circle rule `\n:root[data-theme="light"] .m-coin text { fill: var(--on-gold); }` | the base `.m-coin text { font: 800 26px var(--display); fill: var(--on-gold); }`, the light circle rule alone, `doesNotMatch` the light text rule | the light rule restated the base rule's value (Q3); the ink is still `--on-gold` |
+| fix round 1 | `v4-review.test.js` 138 | `:root[data-theme="light"] #cities .city-status { color: var(--ok-text); }` | the base `#cities .city-status { … color: var(--ok-text);` and `doesNotMatch` the light rule | same (Q3); the pill still reads `--ok-text` (light 5.2:1 on its tint) |
+| fix round 1 | `mobile-polish.test.js` 262 | `"--shadow-1", "--shadow-2", "--header-h"` | `"--shadow-1", "--header-h"` | `--shadow-2` had no reader (Q2) and was removed from the scale block |
+| fix round 1 | `design-pages.test.js` 145 (a comment) | "navy ink (8.6:1 at the teal end)" | "navy ink (7.6:1 at the teal end)" | the figure was `--on-accent`'s; `#0C2344` on `#00CBB6` is 7.63 (H1); the assertion is unchanged |
 
 Stage A (`public/style.css`, `public/polish.css`, `public/feedback.css`; `public/brand/citycoin.css`, `public/theme.js` and
 `scripts/pages/build.mjs` unchanged because the Citycoin.dev `theme-color` `#071426` already equals the new `--bg`) also departs from the
@@ -892,8 +918,8 @@ section 6 text in three small places, each a value choice inside owner A's files
 every well in both themes) rather than `--faint`, so a hint is never under AA; `.pct-bar`, `.launch-progress` and `.role-meter.is-bad`
 fills are one colour (`--pin`, `--pin`, `--bad-text`) as section 6.10 says, while `.lp-bar` keeps the teal-to-gold hairline; `.verified-badge`
 is a flat `--ok-text` disc with a white inset highlight and `--on-accent` ink (a mint-to-green gradient would put white text on a light
-corner in the light theme). The `.dpv` preview pass, the dashboard strip, `onboard.css`, `swap.css` and every page sheet are the next owners'
-(B, C, D): until they land, those still show the old orange and purple.
+corner in the light theme). At stage A the `.dpv` preview pass, the dashboard strip, `onboard.css`, `swap.css` and every page sheet were
+the next owners' (B, C, D), and showed the old orange and purple until stages B1–B3 landed in `d67eb33`.
 
 ### Build notes — stage B2 (`pages-cities.css`, `polish-map.css`, `pages-app.css`, `app-phone.css`, `pages-connect.css`, `onboard.css`)
 
@@ -919,8 +945,8 @@ assertion is the Appendix B row above. Four places depart from the section 9 tex
 Renders: `/cities`, `/app`, `/connect`, `/locate` at 390 and 1440, dark and light (16 full pages, `report.json`: no console or page error
 beyond the two unmocked `/api/seats` and `/api/members` 404s on `/cities`, no horizontal overflow) plus 32 component crops at 2× (the find
 pill at rest/focus/with suggestions, the city card after a pick, the controls' menu, the legend, the browse list, the sign-up panel on both
-tabs, the stepper current/done/hover, the safe fold open, the phone frames) in
-`/tmp/claude-0/-home-user/259e7af3-62d7-56de-8406-76246b95043c/scratchpad/shots-B2-map-onboarding`. The `/connect` wizard was rendered with a
+tabs, the stepper current/done/hover, the safe fold open, the phone frames) in a session-local folder (`shots-B2-map-onboarding`; the
+render harness and its output are not in the repository, see Appendix D). The `/connect` wizard was rendered with a
 **synthetic** `/api/signup/state` fixture (hand-written from `src/signup.js registerState`, `next: "location"`; never fetched) served by the
 harness's `serve.cjs` from a copy of its fixtures; `/api/me` is the live answer of 26 Oct. `pages-connect.css` is 7,975 bytes (budget 8,000).
 
@@ -939,7 +965,7 @@ Every literal of the old palette in the six sheets became a token, a triplet tin
   `rgba(var(--ink),.10)` fill with its `--field-line` edge. The avatar's text shadow is the navy-black `rgba(2,8,20,.3)` and is off on the gold
   and legacy discs (navy ink carries no shadow).
 - **Coin page**: the contract card's three pills take the token page's `--card-2` chip (style.css lifts them and tints them teal under a
-  mouse); the "nothing recorded yet" chart state sits on `--surface-inset` inside its dashed line.
+  mouse); the "nothing recorded yet" chart state sits on `--surface-inset` inside a hairline (solid since fix round 1).
 - **Token page**: `.token-quote__chg.is-down` reads `--bad-soft` and `rgba(var(--bad-rgb),.4)` (7.4:1 dark, 4.5:1 light on the tint: the light
   `#A8321A` override is deleted); the trades list is a `--surface-inset` well with `--r-chip` corners (was a bare 14 px box); the placeholder
   rows' corners read `--r-xs`.
@@ -951,7 +977,7 @@ Every literal of the old palette in the six sheets became a token, a triplet tin
 
 Renders (harness B, `serve.cjs` with a copy of its fixtures plus **synthetic** `/api/launchpad` (three live city coins on a curve and a pool,
 one designed), `/api/coin`, `/api/coin/chart` (7 days of readings) and `/api/members`, hand-written from the API shapes in the tests, never
-fetched) in `/tmp/claude-0/-home-user/259e7af3-62d7-56de-8406-76246b95043c/scratchpad/shots-B1-public-pages`: `/`, `/launchpad`,
+fetched) in a session-local folder (`shots-B1-public-pages`, not in the repository): `/`, `/launchpad`,
 `/coin?mint=…` and `/token` at 390 and 1440, dark and light (16 full pages; `report.json`: no page error, no failed request, no horizontal
 overflow, the one 404 is the unmocked `/api/snapshots`) plus 78 state crops (`st-*`: a coin card at rest, hovered, with Details open and with
 Buy's keyboard ring, the filters open, the Buy sheet at rest, focused and with Price details open, the coin head, chart, tiles, contract
@@ -985,8 +1011,9 @@ inside these files:
 - **`.nt-switch:focus-visible` keeps `outline: 2px solid var(--pin)`** (section 6.15 names `--focus-ring`): the rule's text is pinned by
   `test/notify.test.js` and `--pin` is the same teal family (9:1 on the dark page, 4.9:1 on the light one), so the pin was not touched.
 - **The preview's progress bar is the teal-to-gold hairline** (`.dpv__fill`: `linear-gradient(90deg, var(--pin), var(--gold-ui))`, as
-  `.lp-bar`), not one colour: nothing is written on it. Its "Next for you" cards keep the `--blue` bar of the real `.dv2 .today__card`
-  (style.css), so the preview matches the dashboard it previews.
+  `.lp-bar`), not one colour: nothing is written on it. Its "Next for you" cards carry the same edge as the real `.dv2 .today__card`
+  (style.css), so the preview matches the dashboard it previews: the accent `--pin` since fix round 1 (it was `--blue`, a fourth colour on
+  the one card every signed-out visitor sees).
 - **The admin sparkline is one series** (`.adm-spark__line` and `.adm-spark__end` both `--chart-1`; the line was the second series' colour
   with an accent end dot), the sticky table head sits on `--bg-3` (6.9), and the preview-mode banner (`.admin-banner`, "Test environment")
   reads the warn family rather than gold: it is a warning, not the coin.
@@ -1005,7 +1032,7 @@ inside these files:
   "no !important" list; removing it would change the feed card's padding against style.css); the inverted chip's count pill in the
   console's phone sub-tabs keeps its neutral `rgba(127,127,127,.22)` (a translucent tint on a `--text`-coloured chip, right in both themes).
 
-Renders in `/tmp/claude-0/-home-user/259e7af3-62d7-56de-8406-76246b95043c/scratchpad/shots-B3-dashboard-admin`: `/dashboard` (signed in:
+Renders in a session-local folder (`shots-B3-dashboard-admin`, not in the repository): `/dashboard` (signed in:
 Home and every tab — Wallet, City, Feed, Notifications, Rankings, Founder, Profile), `/admin` (the owner: Overview, Inbox, Moderation,
 Users, Audit, Config), `/profile` (the search page and `?u=harbor_jo`, the pass), `/official`, `/rules`, `/terms`, `/credits` and `/404x`
 at 390 and 1440, dark and light (32 full pages from `shoot.cjs`, `report.json`: no page error, no horizontal overflow, the one console
@@ -1026,7 +1053,8 @@ Written 1 Nov 2026 after the three builders' sheets were merged, checked against
 `cc/design-premium` on `main` `0204191`: **built, not merged**. Four commits carry the design: `ae4054e` (stage A, the foundation:
 `style.css`, `polish.css`, `feedback.css`, 18 assertion rows) and `02e89d5` (its hash in Appendix B); `d67eb33` (stages B1, B2, B3 and
 the integration below: every page sheet, the two coin feature sheets, nine assertion rows, the new `test/design-v5.test.js`); and the
-documents commit that carries this appendix and the implementation report's rows.
+documents commit that carries this appendix and the implementation report's rows. Fix round 1 (the review of 1 Nov 2026) is one more
+commit, recorded in Appendix D.
 
 **What the integration changed, beyond the three builders' reports** (each a value inside the files, no selector or structure moved):
 
@@ -1039,11 +1067,14 @@ documents commit that carries this appendix and the implementation report's rows
 - `public/style.css`: `.token-chip[data-token="vic"] .token-chip__dot` (the legacy token's mark in the Buy panel's token pill) is the
   emblem's teal into the coin's gold, the same pair as `.lp-ava[data-kind="vicinity"]` and `.pm-coin--vic` (it was the old orange radial,
   the last of the old accent in `public/`); `.btn--primary[disabled]:not(.is-busy)` is a quiet well (`--card-2`, `--muted`, `--line-2`, no
-  glow) instead of the gold at 60 % (B1's open issue: olive on the navy, grey-blue on paper; a *busy* main button keeps its gold).
+  glow) instead of the gold at 60 % (B1's open issue: olive on the navy, grey-blue on paper; a *busy* main button keeps its gold). Fix
+  round 1 narrowed that selector to `:not(.is-busy, [aria-busy="true"], [data-busy])` and excluded the Send sheet's Send button
+  (`wallet-send.css`), because the scripts mark a working button in three ways and one not at all (Appendix D, FR-1).
 - Nothing else: the sweep of the old accent (`FF5A36 FF8A5B E8431F FFC857 C93512 D0441C CF3A1A B8430F F25C24` and their `rgba(…)` tints, and
   every other retired value of sections 3 and 11) finds nothing in `public/*.css` and `public/brand/citycoin.css`; `public/brand/tokens.css`
-  is the unlinked draft (frozen by `test/coinart-t2.test.js`). The `[data-color]` member palettes, the `--pf-*` palette, the third-party
-  colours (SOL, USDC, RAY, Google, the mainnet red, the QR) stay literal by design.
+  is the unlinked draft (frozen by `test/coinart-t2.test.js`). The `[data-color]` member palettes, the `--pf-*` palette (moved onto the brand
+  in fix round 1, still literal hexes: the pin reads them as such) and the third-party colours (SOL, USDC, RAY, Google, the mainnet red,
+  the QR) stay literal by design.
 
 **The new test, `test/design-v5.test.js`** (section 11, "New"; 4 tests): it reads both theme blocks and both scale blocks of `style.css`
 (every `--name: value;` of the four `:root` blocks before the base marker), the map's `--st-*` lines, the market's `--up/--down` lines and
@@ -1062,8 +1093,9 @@ for byte as committed (no HTML source changed; `test/build-parity.test.js` holds
 opt-in live Squads read), against 2,736 on `main`: the four new ones are `test/design-v5.test.js`. The same command run before the
 integration edits, with the three builders' sheets as they were, gave 2,736 / 2,735 / 0 / 1.
 
-**The renders** (`/tmp/claude-0/-home-user/259e7af3-62d7-56de-8406-76246b95043c/scratchpad/shots-stageC`): harness B (`render-harness/serve.cjs`
-+ `shoot.cjs`) over this worktree's `public/`, with the seven live fixtures of 26 Oct plus the builders' **synthetic** fixtures (B1's
+**The renders** (a session-local folder, `shots-stageC`; the render harness, `serve.cjs` + `shoot.cjs`, and every render folder named in
+this file live outside the repository and are not reproducible from it; the before / after shots travel with the pull request): harness B
+(`serve.cjs` + `shoot.cjs`) over this worktree's `public/`, with the seven live fixtures of 26 Oct plus the builders' **synthetic** fixtures (B1's
 `/api/launchpad`, `/api/coin`, `/api/coin/chart`, `/api/members`; B2's `/api/signup/state`; never fetched), so `/launchpad` shows three coin
 cards and `/connect` its wizard. All 16 pages × 390 / 1440 × dark / light = 64 full pages + 30 component captures (header, tab bar, main and
 secondary button, card, the find box, the theme toggle's keyboard ring, the account sheet); `report.json`: every shot `ok`, **no horizontal
@@ -1081,7 +1113,50 @@ colours, the lines, the depth and the motion timing.
 `cities.js`'s canvas label colours (`foundedText #FFB39C` …) are the old palette and JavaScript is frozen (section 13); `coinchart.js`'s
 canvas grows during a full-page phone capture (the `/coin` phone shots are 4,176 px tall in B1's run and this one; the chart is 546 px on
 screen, as B1's 2× crops show); `.dv2 .feed { … !important }` is pre-existing; the dashboard strip pill's glow colours are literal
-`rgba()` (the test's reach regex); `:root[data-theme="light"] #cities .city-status { color: var(--ok-text); }` repeats the base rule
-(kept for the pin); `.nt-switch:focus-visible` keeps `var(--pin)` (pinned); `lp-launch.css` is unrendered (a founder's card); the light
+`rgba()` (the test's reach regex); `.nt-switch:focus-visible` keeps `var(--pin)` (pinned); `lp-launch.css` is unrendered (a founder's card); the light
 `#city-stage --map-bg` keeps its `#E6F0FA / #D9E6F4` stops (a step off the light `--map-bg`, by design: the map tray is its own surface);
 Fraunces stays deferred (Appendix A). Next: pull request, CI, merge, deploy, then the live before / after for the owner.
+
+## Appendix D. Fix round 1 (the review of 1 Nov 2026)
+
+The review of the stage C branch (visual, accessibility, regression and record lenses, 30 findings) was answered in one commit on
+`cc/design-premium`: CSS, test pins and documents only; no JavaScript, page source, build script or setting changed, and `public/*.html`
+is rebuilt byte for byte. Every finding was rendered or measured again first (Chromium, harness B with the stage C fixtures, 390 / 768 /
+1440 px, dark and light); the measurements below are from that run. The render harness and its output stay session-local (outside the
+repository); the before / after shots travel with the pull request.
+
+| id | verdict | what changed (files) and what the render shows |
+|---|---|---|
+| V1 ring palette | fixed | `style.css` `--pf-0..7`, `--pf-x` on the brand per theme (section 3.4 row): dark `#f8c13a #2bd9c3 #7fa3d6 #ff9a86 #6fcf7e #a78bfa #b3d15a #f28cb4`, light `#a26f00 #0b7a70 #3f67a6 #c0392b #2e8b4e #6a4fd8 #657f14 #b5306c`, grey = `--faint`. Every slot 3:1 or more on the page and the card (dark 6.79+ / 6.33+, light 3.98+ / 4.27+), every pair 32° or more apart; `test/design-v5.test.js` checks all of it and refuses the sixteen old hexes; `profiles-ui.test.js` 381–382 updated (Appendix B). Rendered: the ring is gold / teal / steel blue on the profile card |
+| V2 mock Send | fixed | `app-phone.css` `.pm-btn--primary.is-off`: the site's quiet well (`--card-2`, `--muted`, `--line-2`, opacity 1). Rendered: label 6.1:1 dark, 5.4:1 light on the well; the other mock buttons keep `.is-off` at 55 % |
+| V3 blue bars | fixed | `polish-dash.css` `.dpv__todo::before`, `style.css` `.dv2 .today__card::before` → `var(--pin)`; `.dv2 .fs-rank` → `--pin` edge, `rgba(var(--accent-rgb),.08)` tint. `--blue` / `--blue-rgb` stay: the map area tint, the `.pf-notice` and `.swap__note` tints, the founder card's provisional corner and the mock's city coin read them (section 3.1 comment says so) |
+| V4 light headline | fixed | light `--grad-accent: #A87400 → #946500 → #8A5F00` (3.79 / 4.75 / 5.27 on the page, 4.07 / 5.65 on white); the hue of every stop stays between 35° and 50° (new assertion). Rendered: "One coin." reads gold, not brown |
+| V5 pass gold corner | fixed | `--pass-glow-2: rgba(255,205,96,.46)` and the corner's radial `60% 80% … transparent 62%` (`.pass`; the profile pass the same shape at `.34`): a small warm glint, not a wide wash. White 5.37:1 and the live dot 3.57:1 on the full glint (section 12); rendered bottom-right 26 px: `#60583D` median, white 7.1:1 |
+| V6 tab pill | fixed | `.tabbar__ind { background: var(--pin) }` (geometry pinned, unchanged). `--gold-ui` keeps its other readers (the progress bars' gold end, the light coin's rim); its section 12 row is now measured on `--bg-2` |
+| V7 light bars | fixed | light `--chart-2: #16355E` (the brand navy, 12.3:1 on white): series 2 is each theme's own fill, gold on the night canvas, ink bars on paper. The curve bar keeps `--pin → --gold-ui` (the gold end must stay 3:1 on the track; `--pin` alone would lose the pinned two-colour hairline) |
+| V8 hover ring | fixed | dark `--grad-ring` a white-into-light-gold sheen; the light block restates the teal-and-gold arc for its navy button (`--grad-ring` left the test's theme-independent set). Rendered: no teal fringe on the gold pill |
+| V9 launchpad min-height | not changed | `.lp-skels, #lp-panel { min-height: calc(100vh - 240/300px) }` is a pinned no-jump guard (`test/design-pages.test.js` 59–60 and its comment: the sources, the fold and the footer never show and then jump when the list arrives); shortening or capping it trades the empty band for that jump on most screens. Same at `0204191`; a layout decision for the owner, outside a re-theme |
+| V10 half-empty Home | fixed | `polish-dash.css` (≥ 1000 px): when the Home panel has no Buy card (`#trade` `.cc-off` under this brand, or hidden by a wallet app) the portfolio and badges take the right column and each row's two cards share a height. Rendered at 1440: pass 144–798 / portfolio 812–1296 on one row, role / badges on the next; the Buy-card layouts are untouched |
+| V11 tablet cards | fixed (home), not changed (launchpad) | `pages-home.css`: 601–900 px two how-it-works cards side by side and the third across (rendered at 768: 24–376, 392–744, then 24–744), three from 901 px. The launchpad grid keeps `repeat(auto-fill, minmax(min(100%, 300px), 1fr))` (pinned, `launchpad-ui.test.js` 361): with three coins and two columns the third card is alone whatever the breakpoint, and a card made two columns wide would be a narrow card stretched; left as it is |
+| V12 dashed empty states | fixed | `.empty` a resting card (`--line` solid, `--surface-1`, `--e1`); the same for `.empty-feed`, the coin page's "nothing recorded yet" state and the console's `.chart__empty`. Dashes stay where they mean something: the drop target and the layout-edit outline, a blocked coin card, the choosing ring, the chart's "none" line, the wizard's optional step, the contract card's note hairline |
+| A11Y-1 pass avatar (blocking) | fixed | `.pass .idcard__avatar { color: #fff }`. Rendered (text hidden, tile pixels sampled under the 20.8 px bold initial): white on `#335D77` 7.06:1 at 390 px, 6.76:1 at 1440 px, both themes (was 2.2:1); the profile pass already had its own white |
+| A11Y-2 console sub-tabs | fixed | `admin.css` (`@container admbody ≤ 639 px`): the chosen chip's rule is said for the light theme too (`:root[data-theme="light"] .adm-subtabs .adm-subtab[aria-selected="true"]`), so style.css's light `.seg` rule no longer paints it white. Rendered on a phone: "Claims" `#F5F7FB` on `#0C2344` 14.6:1 light, 16.6:1 dark |
+| A11Y-3 find pill focus | fixed | `pages-cities.css` `.map-find:has(:focus-visible) { outline: 3px solid var(--focus-ring); outline-offset: 2px }`: the site's ring around the pill on keyboard focus (light `#006F67`, 5.6:1 on the page). Rendered with Tab: `solid 3px rgb(0, 111, 103)` light, `rgb(55, 224, 202)` dark |
+| A11Y-4 coin disc initials | fixed | `pages-launchpad.css` and `pages-coin.css` (the shared `.lp-ava` block, still byte-identical): the five city colours' light stop a step deeper on this 40 px disc only (`ocean #2D6BD6`, `emerald #138463`, `rose #CF3366`, `violet #7A5CE6`, `ink #56657D`; white 4.66:1 or more at the lightest stop, asserted); the coin art, swatches and pass coins keep `style.css`'s values. Rendered under the glyphs: emerald 4.9:1 (was 3.3), ocean 5.8:1 (was 4.0), gold 7.9:1 |
+| A11Y-5 light `--muted` | fixed | light `--muted: #4E6076` (one step deeper): 6.01 on the page, 6.44 on a card, 4.78 on a well inside a dashboard card (section 12 rows updated). Rendered on a phone: "No founder" tag 4.78:1, the feed's chips 4.77:1 (were 4.49) |
+| FR-1 busy main buttons | fixed | `style.css`: the quiet well is `.btn--primary[disabled]:not(.is-busy, [aria-busy="true"], [data-busy])`, so a button the scripts disable while it works (connect.js and profile.js set `aria-busy`, signup.js `data-busy`, swap.js, cities.js and the Send sheet's Review `.is-busy`) keeps its gold at 60 %; `wallet-send.css` keeps the Send sheet's Send (no marker) gold while it waits. Pinned in `test/design-v5.test.js`. Rendered under the real sheets: a plain disabled primary is the well; `.is-busy`, `aria-busy`, `data-busy` and `.wsend__go` are the gold gradient at opacity .6 with `--on-cta` ink, both themes |
+| H1 7.6:1 | fixed | `#0C2344` on `#00CBB6` is 7.63:1 (8.61 is `--on-accent` `#06192E` on the teal): the six places now say 7.6 / 7.63 (section 12 "Also held", the section 11 and Appendix B rows, both sheets' comments, the test comment) |
+| H2 commits | fixed | the implementation report's status paragraph names the five commits (`02e89d5` included) |
+| H3 "every text pair" | fixed | the report says what is true: the section 12 table recomputed from the tokens on every run, the review's pixel-measured pairs in this appendix, the whole site not re-measured |
+| H4 session-local paths | fixed (stated) | every `/tmp/…/scratchpad/…` path in this file and the report is now a plain statement that the render folders and the harness are session-local and outside the repository, with the shots travelling with the pull request; the harness was not committed (its fixtures include live answers and synthetic members, and its scripts would enter the suite's sweeps for nothing the site needs) |
+| H5 stage-A paragraph | fixed | Appendix B's closing sentence is in the past tense ("showed the old orange and purple until stages B1–B3 landed in `d67eb33`") |
+| H6 token-tabs 62 | fixed | the row is in section 11's table too (27 rows there and in Appendix B's stage rows) |
+| Q1 connect budget | fixed | `pages-connect.css` 7,975 → 7,824 bytes: five comments shorter (the header, the panel, the intro, the wallet rows, the recap chip). The three `var(--surface-inset, rgba(var(--ink),.04))` fallbacks stay: `test/design-pages.test.js` 38 pins "tokens with a fallback where they are new" for the page sheets (dropping them was tried and failed that pin) |
+| Q2 `--shadow-2` | fixed | removed from the scale block (no reader; the four former readers take `--e3`); `mobile-polish.test.js` 262 no longer lists it (Appendix B); section 3.3 says so |
+| Q3 redundant light rules | fixed | `:root[data-theme="light"] .m-coin text` and `:root[data-theme="light"] #cities .city-status` removed; `d3-fix.test.js` 56 and `v4-review.test.js` 138 assert the base rule and `doesNotMatch` the light one (Appendix B) |
+| Q4 founder card corners | fixed | `--pass-ok-rgb`, `--pass-bad-rgb`, `--pass-blue-rgb`, `--pass-gold-rgb` (the dark triplets, theme-independent like `--pass-*`); `.dv2 .fcard` and its state and tag rules read them, so the navy card's corners and tints are the same in both themes (section 6.16, the test's theme-independent set) |
+| P1 comment bytes | partly | the two longest token-block essays in `style.css` are shorter and every rule this round adds carries a one-line reason, but the round still adds bytes: across the eleven touched sheets +1,550 B of code and +2,209 B of comments (`style.css` 232,753 → 233,674 B, code +328 / comments +593; against `main` 227,894 → 233,674). A stand-alone trim of the stage A and B prose (the builders' notes to the reviewer) is left as a follow-up: it changes nothing the owner sees |
+| P2 blur | fixed | `--glass-blur: saturate(1.5) blur(18px)` (main's radius; asserted); `--e3`'s 72 px and the two-stop `--grad-glow` stay (the review let them) |
+| P3 console transitions | fixed | the admin transition list is `.adm-nav__item, .adm-icon-btn, .adm-metric__go, .adm-subtab, .lp-card` for background, colour and border only; `.admin-table tbody tr td`, `.lp-step` and `box-shadow` are out (nothing of theirs changes under a mouse) |
+
+**The suite.** The trial writes nothing (`wrangler.jsonc` already carries the switch with its prerequisites; exit 0; `wrangler.jsonc` unchanged); the page build leaves every `public/*.html` byte for byte as committed (no page source changed); `npm test`: exit 0, 2,741 tests, 2,740 pass, 0 fail, 1 skipped (the opt-in live Squads read); one test more than stage C: `test/design-v5.test.js` gained the fix-round-1 test (the ring palette's contrast and hue gaps, the disabled-button selectors, the pass avatar's ink, the tab pill, the next-step edges, the light headline's hue, the console chip, the find pill's ring, the coin discs, `--shadow-2` gone, the blur).

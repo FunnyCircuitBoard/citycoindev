@@ -80,7 +80,8 @@
   .adm-nav__item .tab-badge { margin-left: 2px; }
 }
 @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
-  .adm-nav__item, .adm-icon-btn, .adm-metric__go, .adm-subtab, .admin-table tbody tr td, .lp-step, .lp-card { transition: background-color var(--dur-2, 180ms) var(--ease-out, cubic-bezier(.22,.61,.36,1)), color var(--dur-2, 180ms) var(--ease-out, cubic-bezier(.22,.61,.36,1)), border-color var(--dur-2, 180ms) var(--ease-out, cubic-bezier(.22,.61,.36,1)), box-shadow var(--dur-2, 180ms) var(--ease-out, cubic-bezier(.22,.61,.36,1)); }
+  /* only what changes under a mouse: the nav items, icon buttons, metric links and sub-tabs (background and colour), the lp cards (edge) */
+  .adm-nav__item, .adm-icon-btn, .adm-metric__go, .adm-subtab, .lp-card { transition: background-color var(--dur-2, 180ms) var(--ease-out, cubic-bezier(.22,.61,.36,1)), color var(--dur-2, 180ms) var(--ease-out, cubic-bezier(.22,.61,.36,1)), border-color var(--dur-2, 180ms) var(--ease-out, cubic-bezier(.22,.61,.36,1)); }
   .adm-search__input, .admin-row .adm-field :is(input, select, textarea), .admin-row .field select, .lp-input, .lp-select { transition: border-color var(--dur-2, 180ms), box-shadow var(--dur-2, 180ms); }
 }
 
@@ -261,7 +262,7 @@
 .chart__col.is-hot, .chart__bar.is-hot { filter: brightness(1.18); }
 .chart__cat { fill: var(--text-2, #C6D3E6); font: 500 12.5px/1 var(--body); }
 .chart__val { fill: var(--text); font: 600 12px/1 var(--body); font-variant-numeric: tabular-nums; }
-.chart__empty { display: grid; place-items: center; height: 100%; min-height: 120px; margin: 0; padding: 0 var(--sp-4, 16px); border: 1px dashed var(--line-2); border-radius: var(--r-chip, 12px); text-align: center; color: var(--muted); font-size: var(--fs-sm, .875rem); line-height: 1.5; }
+.chart__empty { display: grid; place-items: center; height: 100%; min-height: 120px; margin: 0; padding: 0 var(--sp-4, 16px); border: 1px solid var(--line); background: var(--surface-inset, rgba(var(--ink),.04)); border-radius: var(--r-chip, 12px); text-align: center; color: var(--muted); font-size: var(--fs-sm, .875rem); line-height: 1.5; }
 .chart__tip { position: absolute; left: 0; top: 0; z-index: 2; display: grid; gap: 2px; padding: 8px 10px; border-radius: var(--r-chip, 12px); background: var(--bg-2, #0B1B33); box-shadow: inset 0 0 0 1px var(--line-2), var(--e3, 0 28px 72px -28px rgba(2,8,20,.8)); pointer-events: none; white-space: nowrap; }
 .chart__tip-v { font: 600 .9375rem/1.2 var(--display); color: var(--text); font-variant-numeric: tabular-nums; }
 .chart__tip-k { font-size: var(--fs-xs, .75rem); color: var(--muted); }
@@ -308,7 +309,7 @@
   .adm-subtabs.seg { width: auto; max-width: none; gap: var(--sp-2, 8px); margin-inline: calc(-1 * var(--gutter, 16px)); padding: 2px var(--gutter, 16px) 4px; border: 0; border-radius: 0; background: none; scroll-padding-inline: var(--gutter, 16px);
     -webkit-mask-image: linear-gradient(90deg, transparent, #000 var(--gutter, 16px), #000 calc(100% - var(--gutter, 16px)), transparent); mask-image: linear-gradient(90deg, transparent, #000 var(--gutter, 16px), #000 calc(100% - var(--gutter, 16px)), transparent); }
   .adm-subtabs .adm-subtab { min-height: 44px; padding: 0 16px; border-radius: var(--r-pill, 999px); box-shadow: inset 0 0 0 1px var(--line-2); background: rgba(var(--ink, 255,255,255), .04); }
-  .adm-subtabs .adm-subtab[aria-selected="true"] { background: var(--text); color: var(--bg); box-shadow: none; }
+  .adm-subtabs .adm-subtab[aria-selected="true"], :root[data-theme="light"] .adm-subtabs .adm-subtab[aria-selected="true"] { background: var(--text); color: var(--bg); box-shadow: none; } /* said for the light theme too: its .seg rule in style.css outranks the plain selector and painted the chosen chip white on white */
   .adm-subtabs .adm-subtab[aria-selected="true"] .adm-count { background: rgba(127,127,127,.22); color: inherit; }
 }
 .adm-subpanel:focus-visible { outline-offset: 4px; border-radius: var(--r-card, 16px); }

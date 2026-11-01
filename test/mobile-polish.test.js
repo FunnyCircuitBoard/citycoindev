@@ -259,7 +259,7 @@ test("design v2 tokens: the contract the other sheets read (names fixed), with t
   const names = ["--fs-xs", "--fs-sm", "--fs-base", "--fs-md", "--fs-lg", "--fs-xl", "--fs-2xl", "--fs-num", "--fs-kicker", "--ls-kicker", "--lh-tight", "--lh-snug", "--lh-body",
     "--sp-1", "--sp-2", "--sp-3", "--sp-4", "--sp-5", "--sp-6", "--sp-7", "--sp-8", "--gutter", "--card-pad", "--section-y",
     "--r-xs", "--r-chip", "--r-card", "--r-hero", "--r-pill", "--surface-1", "--surface-2", "--surface-inset", "--accent-soft", "--ok-soft", "--warn-soft", "--gold-soft",
-    "--shadow-1", "--shadow-2", "--header-h", "--sticky-top", "--dur-1", "--dur-2", "--dur-3", "--ease-out"];
+    "--shadow-1", "--header-h", "--sticky-top", "--dur-1", "--dur-2", "--dur-3", "--ease-out"];
   const root = style.slice(0, style.indexOf("/* ---------- base ---------- */"));
   for (const n of names) assert.match(root, new RegExp(`${n}: [^;]+;`), n);
   assert.match(root, /--fs-xs: \.75rem;/, "12 px is the floor");

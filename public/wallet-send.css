@@ -47,3 +47,6 @@
 .wsend__back { justify-self: center; min-height: 44px; min-width: 44px; padding: 0 10px; }
 /* the Send button in the Balances card (next to Buy & swap) */
 .dv2 .wsend-open { min-height: 44px; min-width: 44px; }
+/* Send is disabled while it waits (the wallet, the details' re-check, the signature) and carries no busy marker: it keeps its gold at 60 %
+   like every working main button, not the quiet well of one that cannot be used (style.css .btn--primary[disabled]) */
+.wsend__go.btn--primary[disabled] { opacity: .6; background: linear-gradient(135deg, var(--cta-a), var(--cta-b)); color: var(--on-cta); border-color: transparent; box-shadow: var(--glow-cta); }

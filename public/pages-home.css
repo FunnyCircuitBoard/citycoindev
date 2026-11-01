@@ -101,7 +101,9 @@
 
 /* ---------- How it works: three cards, each one link ---------- */
 .how4__grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
-@media (min-width: 768px) { .how4__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; } }
+/* a tablet: two cards side by side and the third across (three 230 px columns broke the words every three or four); three from 901 px */
+@media (min-width: 601px) and (max-width: 900px) { .how4__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; } .how4__grid > li:last-child:nth-child(odd) { grid-column: 1 / -1; } }
+@media (min-width: 901px) { .how4__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; } }
 @media (min-width: 1024px) { .how4__grid { gap: 20px; } }
 .how4__card { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
 @media (min-width: 601px) { .how4__card { padding: 28px; } }
