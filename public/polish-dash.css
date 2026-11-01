@@ -529,6 +529,9 @@ body.is-dv2 .dash::before { content: none; }
      Buy card keep their own height beside a taller card instead of spreading their rows down it */
   .dv2 #panel-home:not(:has(> #trade:not([hidden]):not(.cc-off))) > :is(#dash-top, #role-home, #portfolio, #badges) { align-self: stretch; }
   .dv2 #panel-home:not(:has(> #trade:not([hidden]):not(.cc-off))) > :is(#portfolio, #badges) { grid-column: 2; }
+  /* the "Next for you" block runs the full width above the role and badges row: beside the taller badges card it left a blank band
+     under its one-line rows (every new desktop member's first screen; review V10-R2) */
+  .dv2 #panel-home:not(:has(> #trade:not([hidden]):not(.cc-off))) > #today { grid-column: 1 / -1; }
   /* one main action never runs the width of the screen */
   .dv2 .wcard:not(.wcard--folded) .wcard__actions { justify-items: center; }
   .dv2 .wcard:not(.wcard--folded) .wcard__actions .btn { width: min(100%, 420px); }
