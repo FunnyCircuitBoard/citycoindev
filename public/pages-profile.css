@@ -1,12 +1,14 @@
-/* Design v2 (10 Oct 2026): a member's public profile. One sheet per page, loaded last there (scripts/pages/src/<page>.html "styles").
+/* Design v2 (10 Oct 2026), colours design v5 (docs/DESIGN-V5.md): a member's public profile. One sheet per page, loaded last there (scripts/pages/src/<page>.html "styles").
    Phone first; the shared tokens come from style.css, each with a fallback here; motion only inside prefers-reduced-motion: no-preference. */
 /* ---------- /profile: the member's pass, the cards and the counts (profile.js belongs to the dashboard work: CSS and profile.html only) ---------- */
 .prof-head .kicker { margin-bottom: 4px; }
 .prof-search__row .btn { min-height: 48px; }
 /* the pass: a round initials disc (the avatar recipe), the home line with the pin icon, and a calm glass coin (no gold: gold means
    founder or a top rank on this site, and the city has no colour of its own here) */
-/* the pass's orange corner glow is toned down here, so the white words over it ("Vicinity Pass", the home line) read at 4.5:1 */
-.prof-pass { background: radial-gradient(90% 120% at 0% 0%, rgba(255,106,61,.55), transparent 60%), radial-gradient(90% 120% at 100% 100%, rgba(122,92,255,.75), transparent 60%), linear-gradient(135deg, #1B1030, #0B1426); }
+/* design v5: the member pass's navy (style.css .pass, --pass-a/--pass-b, the same in both themes), lit by the emblem's teal at .28 and one
+   small warm glint of the coin's gold at .34 (the dashboard's pass: .38 / .46; a wide gold wash read khaki), so the white words over the
+   corners (the brand line, the home line) keep 6:1 */
+.prof-pass { background: radial-gradient(90% 120% at 0% 0%, rgba(0,203,182,.28), transparent 60%), radial-gradient(60% 80% at 100% 100%, rgba(255,205,96,.34), transparent 62%), linear-gradient(135deg, var(--pass-a, #12345F), var(--pass-b, #071426)); }
 .prof-pass .idcard__avatar { border-radius: 50%; font: 650 1.35rem/1 var(--display); letter-spacing: .02em; color: #fff; }
 .prof-pass .pass__home { display: flex; align-items: center; gap: 5px; min-width: 0; }
 .prof-pass .pass__home span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }

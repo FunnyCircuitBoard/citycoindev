@@ -378,8 +378,10 @@ test("accessibility: the ring has a text alternative AND the real table beside i
 test("styles: the ring colours are the validated palette in both themes, no animation outside 'no-preference', 44 px controls", () => {
   const block = css.slice(css.indexOf("Member profiles (PROFILES=on)"));
   assert.ok(block.length > 3000);
-  const dark = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767"];
-  const light = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948"];
+  // design v5, fix round 1: the slots on the brand (gold, teal, steel blue, coral, green, violet, lime, rose), each 3:1 or more on the page
+  // and on a card in its theme and every pair 30 degrees of hue or more apart (test/design-v5.test.js checks both)
+  const dark = ["#f8c13a", "#2bd9c3", "#7fa3d6", "#ff9a86", "#6fcf7e", "#a78bfa", "#b3d15a", "#f28cb4"];
+  const light = ["#a26f00", "#0b7a70", "#3f67a6", "#c0392b", "#2e8b4e", "#6a4fd8", "#657f14", "#b5306c"];
   const root = block.match(/:root \{ (--pf-0[^}]*)\}/)[1], lroot = block.match(/:root\[data-theme="light"\] \{ (--pf-0[^}]*)\}/)[1];
   assert.deepEqual([...root.matchAll(/--pf-\d: (#[0-9a-f]{6})/g)].map((m) => m[1]), dark);
   assert.deepEqual([...lroot.matchAll(/--pf-\d: (#[0-9a-f]{6})/g)].map((m) => m[1]), light);

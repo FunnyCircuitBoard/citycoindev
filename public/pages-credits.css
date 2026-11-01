@@ -15,7 +15,7 @@
 .credits__row dd p { margin: 0; font-size: var(--fs-base, 1rem); line-height: 1.6; color: var(--text); overflow-wrap: anywhere; }
 .credits__row dd p + p { margin-top: var(--sp-2, 8px); }
 .credits__row .credits__note { font-size: var(--fs-sm, .875rem); line-height: 1.55; color: var(--text-2); }
-.credits code { padding: 1px 4px; border-radius: var(--r-xs, 6px); background: var(--code-bg, rgba(0, 0, 0, .3)); font: 500 .9em/1.4 var(--mono); color: var(--text); }
+.credits code { padding: 1px 4px; border-radius: var(--r-xs, 6px); background: var(--code-bg, rgba(2,8,20,.4)); font: 500 .9em/1.4 var(--mono); color: var(--text); }
 .credits__row a { text-decoration-thickness: 1px; }
 @media (max-width: 600px) {
   .credits__row { grid-template-columns: minmax(0, 1fr); padding: 14px 0; }

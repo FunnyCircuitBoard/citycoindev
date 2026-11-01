@@ -54,16 +54,14 @@ input, select, textarea { min-height: 44px; }
 :root[data-theme]:not([data-guest]) .hdr-avatar[hidden]:not(.is-off) { display: inline-grid !important; visibility: hidden; }
 :root[data-theme]:not([data-guest]) [data-account]:not(.is-shown) { display: none; }
 .hdr-avatar__face, .acct__av { display: grid; place-items: center; border-radius: 50%; color: var(--text); font-family: var(--display); font-weight: 700;
-  background: linear-gradient(145deg, rgba(255,90,54,.34), rgba(255,200,87,.16)); box-shadow: inset 0 0 0 1px rgba(255,138,91,.5), inset 0 1px 0 rgba(255,255,255,.12); }
-:root[data-theme="light"] .hdr-avatar__face, :root[data-theme="light"] .acct__av { background: linear-gradient(145deg, rgba(232,67,31,.16), rgba(217,154,26,.12)); box-shadow: inset 0 0 0 1px rgba(184,67,15,.35); }
+  background: linear-gradient(145deg, rgba(var(--accent-rgb),.30), rgba(var(--gold-rgb),.16)); box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb),.5), inset 0 1px 0 rgba(255,255,255,.12); } /* one rule, both themes: the triplets change with the theme */
 .hdr-avatar__face { width: 34px; height: 34px; font-size: .92rem; line-height: 1; }
-.hdr-avatar:hover .hdr-avatar__face, .hdr-avatar[aria-expanded="true"] .hdr-avatar__face { box-shadow: inset 0 0 0 1px rgba(255,138,91,.5), 0 0 0 3px var(--accent-soft); }
-.hdr-avatar:focus-visible { outline: 2px solid var(--pin); outline-offset: 0; }
+.hdr-avatar:hover .hdr-avatar__face, .hdr-avatar[aria-expanded="true"] .hdr-avatar__face { box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb),.5), 0 0 0 3px var(--accent-soft); }
+.hdr-avatar:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 0; }
 /* a phone's dashboard on its Profile tab (dashboard-v2.js; Profile has no tab in a phone's strip): the avatar wears the chosen tab's
-   ember ring, so the screen still says where you are */
+   teal ring, so the screen still says where you are */
 @media (max-width: 600px) {
-  .hdr-avatar.is-current .hdr-avatar__face { box-shadow: inset 0 0 0 1px rgba(255,138,91,.5), 0 0 0 2px var(--bg-2), 0 0 0 4px var(--pin); }
-  :root[data-theme="light"] .hdr-avatar.is-current .hdr-avatar__face { box-shadow: inset 0 0 0 1px rgba(184,67,15,.35), 0 0 0 2px var(--bg-2), 0 0 0 4px #CF3A1A; }
+  .hdr-avatar.is-current .hdr-avatar__face { box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb),.5), 0 0 0 2px var(--bg-2), 0 0 0 4px var(--pin); }
 }
 
 /* the sheet: a phone's bottom sheet over a dimmed page (a grab handle, swipe it down to close); from 601 px a small popover under the
@@ -72,14 +70,13 @@ input, select, textarea { min-height: 44px; }
 .acct[hidden] { display: none; }
 /* a modal sheet holds the page behind it still: a finger dragging on the dimmed page scrolls nothing (touch-action), and on a phone the
    page itself does not scroll while the sheet is open (site.js sets html.acct-open from opening until the sheet has gone) */
-.acct__scrim { position: absolute; inset: 0; background: rgba(3,7,14,.56); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); touch-action: none; }
+.acct__scrim { position: absolute; inset: 0; background: var(--scrim); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); touch-action: none; }
 @media (max-width: 600px) { html.acct-open { overflow: hidden; } }
-:root[data-theme="light"] .acct__scrim { background: rgba(11,22,38,.3); }
 .acct__panel { position: absolute; left: 0; right: 0; bottom: 0; max-height: min(86vh, 640px); overflow-y: auto; overscroll-behavior: contain;
   padding: 8px 16px calc(14px + env(safe-area-inset-bottom)); border-radius: 22px 22px 0 0; background: var(--bg-2);
-  box-shadow: inset 0 1px 0 var(--glass-border), 0 -24px 60px -24px rgba(0,0,0,.75); }
+  box-shadow: inset 0 1px 0 var(--glass-border), 0 -24px 60px -24px rgba(2,8,20,.75); }
 .acct__panel:focus { outline: none; } /* (it takes a click inside it, never a Tab stop) */
-:root[data-theme="light"] .acct__panel { box-shadow: inset 0 1px 0 var(--line), 0 -20px 50px -24px rgba(11,22,38,.3); }
+:root[data-theme="light"] .acct__panel { box-shadow: inset 0 1px 0 var(--line), 0 -20px 50px -24px rgba(12,35,68,.3); }
 .acct__grab { display: block; width: 40px; height: 5px; margin: 0 auto 8px; border-radius: 3px; background: var(--line-2); }
 .acct__grab, .acct__who { touch-action: none; } /* the sheet's top takes a finger dragging it down (site.js); the whole sheet does when it has nothing to scroll */
 .acct__who { display: flex; align-items: center; gap: 12px; padding: 4px 0 14px; border-bottom: 1px solid var(--line); }
@@ -93,7 +90,7 @@ input, select, textarea { min-height: 44px; }
 .acct__links { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 2px; }
 .acct__link { display: flex; align-items: center; gap: 12px; min-height: 56px; margin: 0 -8px; padding: 8px; border-radius: 14px; color: var(--text); text-decoration: none; }
 .acct__link:hover, .acct__link[aria-current="true"] { background: var(--card-2); } /* (aria-current: the dashboard's Profile tab is open, dashboard-v2.js) */
-.acct__link:focus-visible { outline: 2px solid var(--pin); outline-offset: -2px; }
+.acct__link:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
 .acct__ico { flex: none; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; background: var(--card-2); color: var(--text-2); }
 .acct__ico svg { width: 20px; height: 20px; }
 .acct__text { flex: 1 1 auto; min-width: 0; display: grid; gap: 1px; }
@@ -108,7 +105,6 @@ input, select, textarea { min-height: 44px; }
 .acct__out:disabled { opacity: .6; cursor: default; }
 @media (min-width: 601px) {
   .acct__scrim { background: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
-  :root[data-theme="light"] .acct__scrim { background: none; }
   .acct__panel { left: auto; bottom: auto; top: calc(var(--header-h) + 8px); right: max(var(--gutter), calc((100% - 1152px) / 2)); width: 360px; max-height: calc(100vh - var(--header-h) - 24px);
     padding: 12px 16px 16px; border-radius: 18px; transform-origin: top right; box-shadow: inset 0 0 0 1px var(--line-2), var(--e3); }
   .acct__grab { display: none; }
@@ -192,7 +188,7 @@ input, select, textarea { min-height: 44px; }
 .hero__outline { display: none; }
 @media (max-width: 960px) {
   .hero__outline { display: block; position: absolute; top: 18px; right: -18%; width: 78%; height: auto; max-width: 420px; opacity: .14; pointer-events: none; }
-  .hero__outline path { fill: rgba(255,90,54,.10); stroke: var(--pin-2); stroke-width: 1.4; vector-effect: non-scaling-stroke; }
+  .hero__outline path { fill: rgba(var(--accent-rgb),.10); stroke: var(--pin-2); stroke-width: 1.4; vector-effect: non-scaling-stroke; }
   :root[data-theme="light"] .hero__outline { opacity: .12; }
 }
 
@@ -237,7 +233,7 @@ input, select, textarea { min-height: 44px; }
 .member-cloud li { font-size: .78rem; min-height: 28px; display: inline-flex; align-items: center; }
 .member-cloud li.is-more { display: none; }
 .member-cloud.is-open li.is-more { display: inline-flex; }
-.member-cloud__more { font: 600 .78rem var(--body); color: var(--pin-2); background: none; border: 1px dashed rgba(255,138,91,.5); border-radius: 999px; padding: 3px 10px; min-height: 28px; cursor: pointer; position: relative; }
+.member-cloud__more { font: 600 .78rem var(--body); color: var(--pin-2); background: none; border: 1px dashed rgba(var(--accent-2-rgb),.5); border-radius: 999px; padding: 3px 10px; min-height: 28px; cursor: pointer; position: relative; }
 .member-cloud__more::after { content: ""; position: absolute; inset: -8px 0; } /* a 44 px hit area in a 28 px chip */
 .member-cloud__more:hover { border-style: solid; }
 .member-cloud li:has(> .member-cloud__more) { padding: 0; border: 0; background: none; }
@@ -268,7 +264,7 @@ input, select, textarea { min-height: 44px; }
   /* where the story is: four segments along the card's top edge, right under the map, filled up to the step showing (still; the card's own state) */
   .steps { position: relative; }
   .steps::after { content: ""; position: absolute; left: 14px; right: 14px; top: 0; height: 3px; pointer-events: none;
-    background: linear-gradient(var(--pin-2), var(--pin-2)) 0 0 / var(--steps-done, 25%) 100% no-repeat, var(--line-2);
+    background: linear-gradient(var(--pin), var(--pin)) 0 0 / var(--steps-done, 25%) 100% no-repeat, var(--line-2);
     -webkit-mask: repeating-linear-gradient(90deg, #000 0 calc(25% - 4px), transparent calc(25% - 4px) 25%); mask: repeating-linear-gradient(90deg, #000 0 calc(25% - 4px), transparent calc(25% - 4px) 25%); }
   .nyc[data-step="2"] .steps { --steps-done: 50%; } .nyc[data-step="3"] .steps { --steps-done: 75%; } .nyc[data-step="4"] .steps { --steps-done: 100%; }
   .steps strong { font-size: 1rem; }
@@ -300,7 +296,7 @@ input, select, textarea { min-height: 44px; }
 /* tabs: the site's segmented control as a tab list, full width; each panel one list */
 .seg--tabs { display: flex; width: 100%; margin: 0 0 18px; }
 .seg--tabs button { flex: 1 1 0; min-height: 44px; padding: 0 10px; font-size: .9rem; white-space: nowrap; }
-.seg--tabs button:focus-visible { outline: 2px solid var(--pin-2); outline-offset: 2px; }
+.seg--tabs button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 @media (max-width: 380px) { .seg--tabs button { font-size: .84rem; padding: 0 6px; } }
 .tabpanel[hidden] { display: none; }
 .facts { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
@@ -429,7 +425,7 @@ input, select, textarea { min-height: 44px; }
 .holders__table a.tag { padding: 2px 10px; font-family: inherit; color: var(--ok-text); } .holders__table a.tag:hover { text-decoration: underline; } /* the team lock's tag opens its page: still a tag, not a wallet link */
 /* a keyboard skips the holder list (300 wallet links) with one Tab: the link shows where it sits once it has focus */
 .holders__skip { position: absolute; left: -999px; }
-.holders__skip:focus { position: static; display: inline-flex; align-items: center; min-height: 44px; margin: 0 0 8px; padding: 0 14px; border-radius: 999px; background: var(--pin); color: #fff; text-decoration: none; }
+.holders__skip:focus { position: static; display: inline-flex; align-items: center; min-height: 44px; margin: 0 0 8px; padding: 0 14px; border-radius: 999px; background: var(--pin); color: var(--on-accent); text-decoration: none; }
 .registry__table td { font-size: .9rem; }
 .contract__badge { font-size: .75rem; }
 @media (max-width: 480px) { .registry__table td:nth-child(1) { font-size: .75rem; } }
@@ -541,7 +537,7 @@ input, select, textarea { min-height: 44px; }
 .rules-toc { display: flex; gap: 8px; overflow-x: auto; margin: 16px -16px 0; padding: 4px 16px 8px; scrollbar-width: none; }
 .rules-toc::-webkit-scrollbar { display: none; }
 .rules-toc a { flex: none; display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line-2); background: var(--card); color: var(--text); text-decoration: none; font: 600 .84rem var(--body); white-space: nowrap; }
-.rules-toc a:hover { border-color: rgba(255,90,54,.6); }
+.rules-toc a:hover { border-color: var(--accent-line); }
 @media (min-width: 900px) { .rules-toc { flex-wrap: wrap; overflow: visible; margin: 16px 0 0; padding: 0; } }
 .rules-grid details.card { padding: 0 22px; }
 .rules-grid details.card > summary { cursor: pointer; list-style: none; display: block; padding: 18px 0; }

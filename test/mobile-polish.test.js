@@ -207,7 +207,7 @@ test("review fixes of 9 Oct 2026: the strips keep their gutter, no mid-word brea
   const lightBlock = style.slice(style.indexOf(':root[data-theme="light"] {'));
   const light = /--pin-2: (#[0-9A-Fa-f]{6})/.exec(lightBlock);
   assert.ok(light, "the light theme sets its own accent text colour");
-  for (const bg of ["#FFFFFF", "#F4F6FA", "#EEF2F7"]) assert.ok(ratio(light[1], bg) >= 4.5, `${light[1]} on ${bg}: ${ratio(light[1], bg).toFixed(2)}:1`);
+  for (const bg of ["#FFFFFF", "#F5F7FB", "#EEF2F7"]) assert.ok(ratio(light[1], bg) >= 4.5, `${light[1]} on ${bg}: ${ratio(light[1], bg).toFixed(2)}:1`); // white, the light page (design v5: #F5F7FB), the light well
   assert.match(polish, /\.member-cloud__more \{[^}]*color: var\(--pin-2\);/, "the +N more chip: the accent text token");
   assert.match(style, /\.problem__num \{[^}]*color: var\(--pin-2\);/, "the problem numbers: accent text, not the accent fill (3.7:1 in light)");
   assert.doesNotMatch(polish, /#B8430F/, "no hard-coded override left: the token covers the three");
@@ -259,7 +259,7 @@ test("design v2 tokens: the contract the other sheets read (names fixed), with t
   const names = ["--fs-xs", "--fs-sm", "--fs-base", "--fs-md", "--fs-lg", "--fs-xl", "--fs-2xl", "--fs-num", "--fs-kicker", "--ls-kicker", "--lh-tight", "--lh-snug", "--lh-body",
     "--sp-1", "--sp-2", "--sp-3", "--sp-4", "--sp-5", "--sp-6", "--sp-7", "--sp-8", "--gutter", "--card-pad", "--section-y",
     "--r-xs", "--r-chip", "--r-card", "--r-hero", "--r-pill", "--surface-1", "--surface-2", "--surface-inset", "--accent-soft", "--ok-soft", "--warn-soft", "--gold-soft",
-    "--shadow-1", "--shadow-2", "--header-h", "--sticky-top", "--dur-1", "--dur-2", "--dur-3", "--ease-out"];
+    "--shadow-1", "--header-h", "--sticky-top", "--dur-1", "--dur-2", "--dur-3", "--ease-out"];
   const root = style.slice(0, style.indexOf("/* ---------- base ---------- */"));
   for (const n of names) assert.match(root, new RegExp(`${n}: [^;]+;`), n);
   assert.match(root, /--fs-xs: \.75rem;/, "12 px is the floor");

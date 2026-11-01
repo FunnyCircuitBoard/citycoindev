@@ -488,8 +488,8 @@ test("live card styles: still in the Launchpad block; the motion (pings, flash, 
   assert.doesNotMatch(still, /@keyframes|animation\s*:/, "nothing moves by itself there");
   for (const m of still.matchAll(/transition\s*:/g)) assert.fail("a transition outside the motion block: " + still.slice(m.index - 60, m.index + 30));
   assert.match(still, /\.lp-stats--live \{ grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/); assert.match(still, /@container \(min-width: 400px\) \{ \.lp-stats--live \{ grid-template-columns: repeat\(4, minmax\(0, 1fr\)\); \} \}/);
-  assert.match(still, /\.lp-bar::-webkit-progress-value \{ background: linear-gradient\(90deg, #FF5A36, #FFC857\);/); assert.match(still, /\.lp-bar::-moz-progress-bar \{/);
-  assert.match(still, /:root\[data-theme="light"\] \{ --up: #1E9E78; --down: #E8431F;/, "a light theme of its own");
+  assert.match(still, /\.lp-bar::-webkit-progress-value \{ background: linear-gradient\(90deg, var\(--pin\), var\(--gold-ui\)\);/, "design v5: teal to gold, from the tokens"); assert.match(still, /\.lp-bar::-moz-progress-bar \{/);
+  assert.match(still, /:root\[data-theme="light"\] \{ --up: #1E9E78; --down: #C0392B;/, "a light theme of its own (design v5: --down is the light --bad-text, never the accent)");
   const mo = css.slice(css.indexOf("Launchpad live market: motion (LAUNCHPAD_V2=on"), css.indexOf("Member profiles (PROFILES=on)"));
   assert.ok(mo.length > 500 && mo.length < 4000);
   // design v4 (no Pause control, WCAG 2.2.2): the live dot pings three times (4.8 s) and rests; only a loading sparkline shimmers while it loads

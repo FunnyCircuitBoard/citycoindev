@@ -52,7 +52,11 @@ test("home (design v4): no sample city coins on the page (LONDON, TOKYO, NYC, PA
 
 test("home: the walkthrough's $NYC inside its disc on a 320 px phone, and readable on the light theme", () => {
   assert.match(style, /#nyc-map \.m-coin text \{ font-size: 21px; \}/);
-  assert.match(style, /:root\[data-theme="light"\] \.m-coin circle \{ fill: #FFC857; stroke: #B9780F; stroke-width: 2\.5; \}\n:root\[data-theme="light"\] \.m-coin text \{ fill: #3F2702; \}/);
+  // design v5: the coin reads the gold tokens (navy ink on the light theme's gold: 7.5:1), with --gold-ui as its deeper rim; the ink is the
+  // base rule's --on-gold in both themes (fix round 1: the light restatement of the same value is gone)
+  assert.match(style, /\.m-coin text \{ font: 800 26px var\(--display\); fill: var\(--on-gold\); \}/);
+  assert.match(style, /:root\[data-theme="light"\] \.m-coin circle \{ fill: var\(--gold\); stroke: var\(--gold-ui\); stroke-width: 2\.5; \}/);
+  assert.doesNotMatch(style, /:root\[data-theme="light"\] \.m-coin text/);
 });
 
 test("home: no lone word at the end of the hero's lead (design v4: the fact tiles are gone, the live numbers bar replaced them)", () => {
@@ -61,7 +65,7 @@ test("home: no lone word at the end of the hero's lead (design v4: the fact tile
 });
 
 test("glows stay inside the content: the Why section's light, /launchpad's one glow", () => {
-  assert.match(style, /\.section--glow \{ background: radial-gradient\(min\(440px, 40%\) min\(300px, 45%\) at calc\(50% \+ min\(240px, 20%\)\) 55%, rgba\(255,90,54,\.075\), transparent 72%\), var\(--bg\); \}/);
+  assert.match(style, /\.section--glow \{ background: radial-gradient\(min\(440px, 40%\) min\(300px, 45%\) at calc\(50% \+ min\(240px, 20%\)\) 55%, rgba\(var\(--accent-rgb\),\.075\), transparent 72%\), var\(--bg\); \}/); // the tint reads the accent triplet (design v5)
   assert.doesNotMatch(style, /\.section--glow \{ background: radial-gradient\(ellipse 60% 50% at 80% 50%/, "a 60%-wide glow at 80% ran off the right edge");
   // design v4 (12 Oct 2026): the Launchpad's hero is the tagline and one button; its orbs are gone. Its light is the page's one glow
   // (--grad-glow, from the top centre), painted inside the hero's own box, so it can never reach a wide screen's corners

@@ -473,7 +473,8 @@ test("map stage CSS: big on every screen, full screen over the header and tab ba
   assert.match(css, /\.map-focus__btn \{ width: 44px; height: 44px;/);
   assert.match(css, /\.map-exit \{[^}]*width: 44px; height: 44px;/);
   assert.match(css, /\.wrap \{ --wrap-pad: 24px; \}\n@media \(max-width: 480px\) \{ \.wrap \{ --wrap-pad: 16px; \} \}/);
-  for (const t of ["--st-open: #7FA3D6", "--st-choosing: #FFC857", "--st-founded: #FF5A36", "--st-mine: #FFC857", "--chip-bg: rgba(7,14,25,.82)", "--st-open: #3F67A6", "--chip-bg: rgba(255,255,255,.92)"]) assert.ok(css.includes(t), t);
+  // design v5: founded is the coin's gold, choosing amber, yours the ink (a ring, never a status colour); the chip sits on the night-navy canvas
+  for (const t of ["--st-open: #7FA3D6", "--st-choosing: #FFA94D", "--st-founded: #F8C13A", "--st-mine: #FFFFFF", "--chip-bg: rgba(7,20,38,.82)", "--st-open: #3F67A6", "--chip-bg: rgba(255,255,255,.92)"]) assert.ok(css.includes(t), t);
   // the legend's and the card's dots: inside the motion-welcome block; design v4 (no Pause control): a ping three times, then still; the
   // open and choosing markers no longer breathe or turn; only the card's loading lines shimmer while it loads
   const block = css.slice(css.indexOf("  .map-focus__dot::after { animation:"), css.indexOf("}\n", css.indexOf("  .dot--mine::after { animation:")));

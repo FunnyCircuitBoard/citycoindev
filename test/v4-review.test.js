@@ -96,7 +96,8 @@ test("Launchpad: the four lists sized to their words on a phone (a count never s
 test("Launchpad: the hero button glows softly (no hard 6 px band), Buy outranks Details, the featured card's buttons line up with its neighbour's", () => {
   assert.match(style, /\.btn--cta-glow \{ box-shadow: var\(--glow-cta\), var\(--cta-halo\); \}/);
   assert.doesNotMatch(style, /0 0 0 6px var\(--accent-soft\)/);
-  assert.match(lp, /\.btn--soft \{ background: rgba\(255,90,54,\.15\); border-color: rgba\(255,110,70,\.62\); color: var\(--pin-2\); font-weight: 700; \}/);
+  // design v5 (1 Nov 2026): the tint reads the accent triplet (teal), one rule for both themes
+  assert.match(lp, /\.btn--soft \{ background: rgba\(var\(--accent-rgb\),\.15\); border-color: rgba\(var\(--accent-rgb\),\.62\); color: var\(--pin-2\); font-weight: 700; \}/);
   assert.match(lp, /grid-template-rows: auto auto auto minmax\(0, 1fr\) auto auto;/);
   assert.match(lp, /\.lp-card--featured:first-child > \.lp-spark \{ grid-area: spark; height: auto; min-height: 120px; align-self: stretch; \}/);
 });
@@ -134,7 +135,10 @@ test("a control reached with Tab stops above the phone's tab bar; forced colours
   assert.match(polish, /html \{ scroll-padding-bottom: calc\(var\(--tabbar-h\) \+ env\(safe-area-inset-bottom\) \+ 12px\); \}/);
   assert.match(style, /@media \(forced-colors: active\) \{\n  \.site-header, \.tabbar, \.terms-note \{ background: Canvas;/);
   assert.match(style, /\.seg :is\(button\[aria-selected="true"\], button\[aria-pressed="true"\]\), \.tabbar a\[aria-current="page"\], \.nav a\[aria-current="page"\] \{ outline: 2px solid Highlight;/);
-  assert.match(cities, /:root\[data-theme="light"\] #cities \.city-status \{ color: #0C6B4E; \}/, "the 12 px status pill at AA in light");
+  // design v5: the pill reads --ok-text in both themes from its base rule (light 5.2:1 on its tint); fix round 1 removed the light
+  // restatement of the same value
+  assert.match(cities, /#cities \.city-status \{[^}]*color: var\(--ok-text\);/, "the 12 px status pill reads the token");
+  assert.doesNotMatch(cities, /:root\[data-theme="light"\] #cities \.city-status/);
 });
 
 test("the header's scroll shadow fades on a layer of its own (opacity), the bar itself never transitions", () => {

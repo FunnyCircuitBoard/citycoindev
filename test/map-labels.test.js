@@ -210,13 +210,13 @@ test("active: its colour comes from --st-active (polish-map.css, both themes), r
   const dark = /^:root \{ --st-active: (#[0-9A-Fa-f]{6}); \}$/m.exec(polish), light = /^:root\[data-theme="light"\] \{ --st-active: (#[0-9A-Fa-f]{6}); \}$/m.exec(polish);
   assert.ok(dark && light, "defined for both themes");
   // the map's surfaces (style.css --map-land / --map-water of each theme) and the darkest and lightest ends of the map's background
-  for (const s of ["#1b2e4d", "#0B1A2E", "#10203a", "#060c16"]) assert.ok(ratio(dark[1], s) >= 3, `dark ${dark[1]} on ${s}: ${ratio(dark[1], s).toFixed(2)}:1`);
+  for (const s of ["#1F3A60", "#08142A", "#10284A", "#071426"]) assert.ok(ratio(dark[1], s) >= 3, `dark ${dark[1]} on ${s}: ${ratio(dark[1], s).toFixed(2)}:1`); // design v5: land, water, the two ends of --map-bg
   for (const s of ["#FFFFFF", "#D7E6F5", "#EAF1FA", "#DCE6F2"]) assert.ok(ratio(light[1], s) >= 3, `light ${light[1]} on ${s}: ${ratio(light[1], s).toFixed(2)}:1`);
-  assert.match(css, /--map-land: #1b2e4d; --map-land-line/); assert.match(css, /--map-water: #0B1A2E;/); assert.match(css, /--map-land: #FFFFFF;/); assert.match(css, /--map-water: #D7E6F5;/);
-  // a hue of its own in both themes: teal, at least 30° from open (steel blue), choosing and yours (gold) and founded (orange)
+  assert.match(css, /--map-land: #1F3A60; --map-land-line/); assert.match(css, /--map-water: #08142A;/); assert.match(css, /--map-land: #FFFFFF;/); assert.match(css, /--map-water: #D7E6F5;/);
+  // a hue of its own in both themes: teal, at least 30° from open (steel blue), choosing (amber) and founded (the coin's gold; design v5)
   const hue = (h) => { const [r, g, b] = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255), max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min; return d === 0 ? 0 : ((max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4) * 60) % 360; };
   for (const [theme, hex] of [["dark", dark[1]], ["light", light[1]]]) {
-    const others = theme === "dark" ? ["#7FA3D6", "#FFC857", "#FF5A36"] : ["#3F67A6", "#B57F00", "#E8431F"];
+    const others = theme === "dark" ? ["#7FA3D6", "#FFA94D", "#F8C13A"] : ["#3F67A6", "#B35A0A", "#A26F00"];
     for (const o of others) { const d = Math.abs(hue(hex) - hue(o)); assert.ok(Math.min(d, 360 - d) >= 30, `${theme}: ${hex} (${hue(hex).toFixed(0)}°) vs ${o} (${hue(o).toFixed(0)}°)`); }
   }
   // the page reads it, with the same fallbacks, and the chips' text colours
@@ -225,7 +225,7 @@ test("active: its colour comes from --st-active (polish-map.css, both themes), r
   assert.match(js, /activeText: light \? "#0E7C63" : "#7CF0C5"/);
   assert.ok(ratio("#7CF0C5", "#070E19") >= 4.5 && ratio("#0E7C63", "#FFFFFF") >= 4.5, "on the chips' backgrounds");
   // the Open pill's text (--st-open, style.css) on the dark card and the light one, and apart from the Active pill's: the two used to be 7° and 1.2:1 apart
-  assert.ok(ratio("#7FA3D6", "#0B1A2E") >= 4.5 && ratio("#3F67A6", "#FFFFFF") >= 4.5, `open pill text: ${ratio("#7FA3D6", "#0B1A2E").toFixed(1)}:1 dark, ${ratio("#3F67A6", "#FFFFFF").toFixed(1)}:1 light`);
+  assert.ok(ratio("#7FA3D6", "#08142A") >= 4.5 && ratio("#3F67A6", "#FFFFFF") >= 4.5, `open pill text: ${ratio("#7FA3D6", "#08142A").toFixed(1)}:1 dark, ${ratio("#3F67A6", "#FFFFFF").toFixed(1)}:1 light`);
   for (const [a, b] of [["#7FA3D6", "#2ED3B7"], ["#3F67A6", "#0E7C63"]]) { const d = Math.abs(hue(a) - hue(b)); assert.ok(Math.min(d, 360 - d) >= 40, `open vs active: ${a} ${hue(a).toFixed(0)}° vs ${b} ${hue(b).toFixed(0)}°`); }
   for (const t of ['l.st === "active" ? pal.activeText : pal.choosingText; g.fillText(l.t.name', 'l.st === "active" ? pal.activeText : pal.choosingText; g.fillText(l.t.a2']) assert.ok(js.includes(t), t);
   // the page loads the sheet after style.css (built from scripts/pages/src, where the setting lives)

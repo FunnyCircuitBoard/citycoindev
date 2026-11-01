@@ -3,7 +3,9 @@
    first; the shared tokens come from style.css, each with a fallback here where it is new; motion only inside prefers-reduced-motion:
    no-preference, and nothing moves by itself for longer than a few seconds.
    The page: the tagline and one glowing button; the coins as one grid of glass cards ($VICINITY first, wider on a computer), each with
-   its price, 24 h change, a mini chart, market cap, volume and holders, Buy and Details; the sources line and fold; the snapshot fold. */
+   its price, 24 h change, a mini chart, market cap, volume and holders, Buy and Details; the sources line and fold; the snapshot fold.
+   Design v5 (1 Nov 2026): every colour reads a token of style.css (teal for anything live or interactive, the coin's gold for the one
+   main action and the coin discs); the tints read the *-rgb triplets, so one rule serves both themes. */
 
 /* ---------- the hero: the tagline, centred, and the page's one main action ---------- */
 .lp4-hero { position: relative; isolation: isolate; padding: 28px 0 24px; text-align: center; }
@@ -44,9 +46,9 @@
 }
 .lp-tabs button { min-height: 44px; }
 .lp-tabs__n.is-zero { display: none; } /* a zero count says nothing */
-/* the counts read at 4.5:1 in light: a fainter pill, and the selected tab's count in the text colour (its ember tint stays) */
-:root[data-theme="light"] .lp-tabs__n { background: transparent; color: var(--text-2); } /* on the strip's own 6 % tint: 4.44:1 with a second tint, #2C3950 on one tint is well above 7:1 */
-:root[data-theme="light"] .lp-tabs button[aria-selected="true"] .lp-tabs__n { background: rgba(232,67,31,.08); color: var(--text); }
+/* the counts read at 4.5:1 in light: a fainter pill on the strip's own tint; the chosen list's count keeps style.css's teal on its
+   tint (--accent-soft + --pin-2: 9:1 dark, 5:1 light), one rule for both themes */
+:root[data-theme="light"] .lp-tabs__n { background: transparent; color: var(--text-2); }
 /* a phone: the four lists on one row, each tab as wide as its words and count plus an equal share of the room left ("auto" tracks
    share the free space), so "Upcoming 3" never runs into "Trending 6" and a count is never squeezed (review of 13 Oct 2026, 375-414 px) */
 .lp-tabs__n { flex: none; }
@@ -62,12 +64,12 @@
 .lp-search__icon { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
 .lp-search input { padding: 0 16px 0 44px; color: var(--text); font: 500 1rem var(--body); }
 .lp-search input::placeholder { color: var(--muted); opacity: 1; }
-:root[data-theme="light"] .lp-search input { background: #FFFFFF; }
+:root[data-theme="light"] .lp-search input { background: var(--card); }
 .lp-filterbtn { min-height: 48px; padding: 0 18px; gap: 8px; }
 .lp-filterbtn svg { flex: none; color: var(--text-2); }
-.lp-filterbtn[aria-expanded="true"] { border-color: var(--field-line); }
+.lp-filterbtn[aria-expanded="true"] { border-color: var(--field-line); background: rgba(var(--ink),.10); }
 .lp-filterbtn__n { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: var(--r-pill, 999px); font: 700 .75rem/1 var(--body);
-  background: var(--accent-soft, rgba(255,90,54,.12)); color: var(--pin-2); }
+  background: var(--accent-soft); color: var(--pin-2); }
 @media (max-width: 480px) {
   /* a narrow phone: the button is its icon (and its count), its words for a screen reader */
   .lp-filterbtn { width: 48px; padding: 0; gap: 2px; }
@@ -88,16 +90,20 @@
 @media (min-width: 1280px) { .lp-grid { gap: 20px; } }
 
 /* one avatar recipe (the Launchpad and the coin page; pages-coin.css carries the same block, a test keeps the two equal): the city's initials on the city's colour, a 2 px ring */
-:where(.lp-ava) { --c2: #FFC857; --c3: #D98A1F; } /* gold unless the city chose a colour ([data-color] in style.css) */
+:where(.lp-ava) { --c2: #F8C13A; --c3: #D99A1A; } /* the coin's gold unless the city chose a colour ([data-color] in style.css) */
 .lp-ava { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 50%; overflow: hidden; color: #fff;
   background: linear-gradient(140deg, var(--c2), var(--c3)); border: 2px solid rgba(var(--ink),.18); box-shadow: none; }
 .lp-ava[data-color] { background: linear-gradient(140deg, var(--c2), var(--c3)); }
-.lp-ava span { font: 700 .8rem/1 var(--display); letter-spacing: .02em; color: inherit; text-shadow: 0 1px 1px rgba(0,0,0,.25); max-width: none; overflow: visible; }
-.lp-ava[data-color="gold"], .lp-ava:not([data-color]) { color: #3A2300; }
-.lp-ava[data-color="gold"] span { text-shadow: none; }
-/* $VICINITY: the same mark as in the Buy panel's token pill (the pin orange into gold, a white V), not a city's gold disc */
-.lp-ava[data-kind="vicinity"] { color: #fff; background: linear-gradient(135deg, #FF5A36, #FFC857); }
-.lp-ava[data-kind="vicinity"] span { font-size: 1.05rem; text-shadow: 0 1px 2px rgba(0,0,0,.35); } /* one letter: a little larger than two initials */
+.lp-ava span { font: 700 .8rem/1 var(--display); letter-spacing: .02em; color: inherit; text-shadow: 0 1px 1px rgba(2,8,20,.3); max-width: none; overflow: visible; }
+.lp-ava[data-color="gold"], .lp-ava:not([data-color]) { color: var(--on-gold); } /* navy on the gold disc: 6.4:1 at its darkest end */
+.lp-ava[data-color="gold"] span, .lp-ava:not([data-color]) span { text-shadow: none; }
+/* the five other city colours, their light end a step deeper on this small disc only (the coin art, swatches and pass coins keep
+   style.css's values), so the white initials read 4.5:1 or more from the disc's lightest stop */
+.lp-ava[data-color="ocean"] { --c2: #2D6BD6; } .lp-ava[data-color="emerald"] { --c2: #138463; } .lp-ava[data-color="rose"] { --c2: #CF3366; }
+.lp-ava[data-color="violet"] { --c2: #7A5CE6; } .lp-ava[data-color="ink"] { --c2: #56657D; }
+/* $VICINITY: the legacy token's own mark (the emblem's teal into the coin's gold, a navy V: 7.6:1 at the teal end), not a city's gold disc */
+.lp-ava[data-kind="vicinity"] { color: #0C2344; background: linear-gradient(135deg, #00CBB6, #F8C13A); }
+.lp-ava[data-kind="vicinity"] span { font-size: 1.05rem; text-shadow: none; } /* one letter: a little larger than two initials */
 .lp-ava--sm[data-kind="vicinity"] span { font-size: .85rem; }
 .lp-ava img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
 .lp-ava--sm { width: 30px; height: 30px; }
@@ -138,12 +144,10 @@
 .lp-card .lp-card__actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-2, 8px); margin-top: auto; padding-top: 0; }
 .lp-card .lp-card__actions > .btn { width: 100%; min-height: 44px; padding: 0 12px; }
 .lp-card .lp-card__actions .lp-card__wait { grid-column: 1 / -1; }
-/* Buy: tinted (the orange fill is the page's one main action) but clearly above Details: the accent label (6.5:1 dark, 4.8:1 light on
-   its tint) and a firmer accent edge (review of 13 Oct 2026: the old tint read as disabled) */
-.btn--soft { background: rgba(255,90,54,.15); border-color: rgba(255,110,70,.62); color: var(--pin-2); font-weight: 700; }
-@media (hover: hover) { .btn--soft:hover { background: rgba(255,90,54,.24); border-color: rgba(255,120,80,.85); color: var(--pin-2); } }
-:root[data-theme="light"] .btn--soft { background: rgba(232,67,31,.09); border-color: rgba(232,67,31,.55); }
-@media (hover: hover) { :root[data-theme="light"] .btn--soft:hover { background: rgba(232,67,31,.14); border-color: rgba(232,67,31,.75); } }
+/* Buy: tinted teal (the gold fill is the page's one main action) but clearly above Details: the accent label (9:1 dark, 5:1 light on
+   its tint) and a firmer accent edge (review of 13 Oct 2026: the old tint read as disabled); the triplet changes per theme, so one rule */
+.btn--soft { background: rgba(var(--accent-rgb),.15); border-color: rgba(var(--accent-rgb),.62); color: var(--pin-2); font-weight: 700; }
+@media (hover: hover) { .btn--soft:hover { background: rgba(var(--accent-rgb),.24); border-color: rgba(var(--accent-rgb),.85); color: var(--pin-2); } }
 .lp-card__plus::before { content: "+"; color: var(--pin-2); font-size: 1.2rem; line-height: 1; } /* (a span: a glass button's ::after is its edge light) */
 .lp-card__more[aria-expanded="true"] .lp-card__plus::before { content: "\2212"; }
 .lp-card__more { gap: 6px; }
@@ -157,8 +161,8 @@
 .lp-card .lp-card__sub { margin: 0; }
 /* a card that is not live: its dashed line and reason, the pair and founder, "Not live yet" at its foot */
 .lp-card:not(.lp-card--live) .lp-card__meta { margin: 0; }
-/* a live card lifts under a mouse (style.css); its edge warms a little rather than turning orange */
-@media (hover: hover) and (pointer: fine) { .lp-card--live:hover { border-color: var(--accent-line, rgba(255,90,54,.35)); } }
+/* a live card lifts under a mouse (style.css); its edge takes the accent hairline rather than a fill */
+@media (hover: hover) and (pointer: fine) { .lp-card--live:hover { border-color: var(--accent-line); } }
 @media (prefers-reduced-motion: no-preference) { .lp-grid > .lp-card.card--link:has(.btn:active) { transform: none; } } /* pressing Buy presses Buy, not the card */
 
 /* $VICINITY's card: the first of the grid, two columns wide once the grid has two, its chart large on the right; its ring turns only under

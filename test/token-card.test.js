@@ -85,13 +85,13 @@ test("contract card on a phone: the address wraps into two even lines, copy is f
   const buy = rule(".contract__buy");
   assert.match(buy, /grid-column: 1 \/ -1/, "Buy on Raydium spans the card");
   assert.match(buy, /min-height: 52px/);
-  assert.match(buy, /color: #fff/);
+  assert.match(buy, /color: var\(--on-cta\)/); // design v5: navy on the gold Buy (gold on navy in the light theme)
   const ext = rule(".contract__ext");
   assert.match(ext, /min-height: 66px/, "the tiles are equal and tall enough to tap");
   assert.match(ext, /flex-direction: column/, "icon over the name on a phone");
   assert.match(rule(".contract__foot"), /border-top: 1px dashed var\(--line-2\)/, "the note is set apart under a hairline");
   // the light theme has its own card colours
-  assert.match(css, /:root\[data-theme="light"\] \.contract \{ background: [^}]*var\(--card\); border-color: rgba\(232,67,31,\.22\); \}/);
+  assert.match(css, /:root\[data-theme="light"\] \.contract \{ background: [^}]*var\(--card\); border-color: rgba\(var\(--accent-rgb\),\.22\); \}/); // the tint reads the accent triplet (design v5)
   // the old pill styles that only this card used are gone; .chip-link stays for connect.js
   assert.doesNotMatch(css, /\.chip-link--buy|\.contract__row/);
   assert.match(css, /\.chip-link \{/);

@@ -9,14 +9,14 @@
 .off-lead { margin: 0 0 var(--sp-3, 12px); }
 .off-state { margin: 0 0 var(--sp-3, 12px); font-size: var(--fs-base, 1rem); line-height: 1.6; color: var(--text); }
 .off-text { margin: 0; font-size: var(--fs-base, 1rem); line-height: 1.6; color: var(--text); }
-.off-table { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r-sm, 12px); }
+.off-table { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r-chip, 12px); background: var(--surface-1, var(--card)); box-shadow: var(--e1, none); }
 .off-table table { width: 100%; border-collapse: collapse; font-size: .94rem; }
-.off-table th { text-align: left; font-size: .74rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 600; padding: 11px 10px; border-bottom: 1px solid var(--line); }
+.off-table th { text-align: left; font-size: .74rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 600; padding: 11px 10px; border-bottom: 1px solid var(--line-2); }
 .off-table td { padding: 11px 10px; border-bottom: 1px solid var(--line); vertical-align: top; color: var(--text); }
 .off-table tr:last-child td { border-bottom: 0; }
 .off-mint { min-width: 220px; }
 @media (max-width: 560px) {
-  .off-table { overflow-x: visible; }
+  .off-table { overflow-x: visible; background: none; box-shadow: none; }
   .off-table table { font-size: .84rem; }
   .off-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .off-table tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
