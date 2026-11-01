@@ -1,5 +1,5 @@
-/* The dashboard, design v2 ("Night-city glass", phone first). Loaded by /dashboard only, after style.css, polish.css, onboard.css and
-   swap.css. Every rule is scoped under .dv2 (the tabbed dashboard), body.is-dv2 (set by dashboard-v2.js) or [data-page="dashboard"]
+/* The dashboard, design v5 ("Midnight Atlas": night navy, the emblem's teal for anything live, the coin's gold for the one main action;
+   docs/DESIGN-V5.md), phone first. Loaded by /dashboard only, after style.css, polish.css, onboard.css and swap.css. Every rule is scoped under .dv2 (the tabbed dashboard), body.is-dv2 (set by dashboard-v2.js) or [data-page="dashboard"]
    (the signed-out page and the loading placeholders), so a dashboard with DASHBOARD_V2 off renders as before; the signed-out preview
    (.dpv, only on this page) keeps its own class names. Shared tokens come from
    style.css with a fallback each (var(--name, fallback)), so this sheet also reads right on its own. Motion: transform and opacity only,
@@ -11,9 +11,9 @@ body[data-page="dashboard"] {
   --dd-inset: var(--surface-inset, rgba(var(--ink), .045));   /* a well inside a card */
   --dd-card: var(--surface-1, var(--card));
   --dd-strip: 56px;                                           /* the tab strip under the header */
-  --dd-shadow: var(--shadow-1, inset 0 1px 0 rgba(var(--ink), .05), 0 10px 30px -20px rgba(0, 0, 0, .7));
+  --dd-shadow: var(--shadow-1, inset 0 1px 0 rgba(var(--ink), .06), 0 1px 2px rgba(2,8,20,.4));
 }
-:root[data-theme="light"] body[data-page="dashboard"] { --dd-inset: var(--surface-inset, #EEF2F7); --dd-shadow: var(--shadow-1, inset 0 1px 0 rgba(255,255,255,.8), 0 10px 30px -22px rgba(11,22,38,.35)); }
+:root[data-theme="light"] body[data-page="dashboard"] { --dd-inset: var(--surface-inset, #EEF2F7); --dd-shadow: var(--shadow-1, 0 1px 2px rgba(12,35,68,.06), 0 0 0 1px rgba(12,35,68,.03)); }
 @media (min-width: 601px) { body[data-page="dashboard"] { --dd-pad: var(--card-pad, 22px); --dd-gap: 14px; } }
 
 /* ---------- D1: no band between the header and the strip (owner) ---------- */
@@ -28,39 +28,41 @@ body.is-dv2 .dash::before { content: none; }
 .dv2 .dtab { flex: 1 0 auto; justify-content: center; gap: 4px; min-width: 44px; min-height: 44px; padding: 0 8px; font: 600 .84rem/1 var(--body); white-space: nowrap; scroll-snap-align: none; }
 .dv2 .dtab__short { display: none; }
 .dv2 .dtab[aria-selected="true"] { background: var(--card-2); color: var(--text); box-shadow: none; }
-/* the indicator: a 2 px ember line under the chosen pill (the "live buttons" breathing of a chosen tab runs on this same line) */
+/* the indicator: a 2 px teal line under the chosen pill (the "live buttons" breathing of a chosen tab runs on this same line) */
 .dv2 .dtab[aria-selected="true"]::after { left: 12px; right: 12px; bottom: 0; height: 2px; border-radius: 2px; background: var(--pin); opacity: 1; }
 /* the glass pill (owner, 12 Oct 2026: "when switching tabs, a glassmorphic animation"): ONE marker behind the chosen tab that slides
    and stretches a little to the next one (dashboard-v2.js place; transform from its left edge, and the width where tabs differ; at once
    with reduced motion). It lives inside the list, so it scrolls with the tabs on a phone; it is never read out and never takes a tap.
-   The glass is drawn, not filtered: a translucent fill with a lit top edge, a fine rim and a soft ember glow, the ember line riding on
+   The glass is drawn, not filtered: a translucent fill with a lit top edge, a fine rim and a soft teal glow, the teal line riding on
    it (the bar under it already blurs the page, so a blur of its own showed nothing and only cost work on every frame of a slide).
+   The glow colours are written out (the dark and the light rule each name their theme's teal): dashboard-tabs.test.js measures every
+   shadow's reach with a pattern that reads a plain rgba() only.
    Every shadow fades out within the 4 px of list under the pill: the scrolling list clips there, and a glow cut flat looked wrong.
    Until it has measured the chosen tab (.has-ind), the tab keeps the look above, and so it does without the script. The words stay
    var(--text) on it: measured on the pixels in Chromium (1280 px), 14.5:1 dark and 15.6:1 light at the weakest point (AA asks 4.5:1). */
 .dv2 .dtabs__ind { position: absolute; left: 0; top: 0; z-index: -1; display: none; width: 0; height: 44px; box-sizing: border-box; border-radius: 999px; pointer-events: none; transform-origin: 0 0;
   border: 1px solid rgba(255,255,255,.14);
-  background: linear-gradient(180deg, rgba(255,255,255,.15), rgba(255,255,255,.05) 55%, rgba(255,90,54,.09)) border-box; /* one gradient under the rim too (from the padding box it repeated: its ember foot showed along the top edge) */
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.2), 0 2px 6px -4px rgba(255,90,54,.7), 0 1px 6px -3px rgba(0,0,0,.6); }
+  background: linear-gradient(180deg, rgba(255,255,255,.15), rgba(255,255,255,.05) 55%, rgba(var(--accent-rgb),.09)) border-box; /* one gradient under the rim too (from the padding box it repeated: its teal foot showed along the top edge) */
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.2), 0 2px 6px -4px rgba(0,203,182,.7), 0 1px 6px -3px rgba(2,8,20,.6); }
 .dv2 .dtabs.has-ind .dtabs__ind { display: block; }
 .dv2 .dtabs__ind::after { content: ""; position: absolute; left: 14px; right: 14px; bottom: -1px; height: 2px; border-radius: 2px;
-  background: linear-gradient(90deg, rgba(255,90,54,0), var(--pin) 25%, var(--pin) 75%, rgba(255,90,54,0)); box-shadow: 0 -2px 6px rgba(255,90,54,.55); }
+  background: linear-gradient(90deg, rgba(var(--accent-rgb),0), var(--pin) 25%, var(--pin) 75%, rgba(var(--accent-rgb),0)); box-shadow: 0 -2px 6px rgba(0,203,182,.55); }
 .dv2 .dtabs.has-ind .dtab[aria-selected="true"] { background: none; }
 .dv2 .dtabs.has-ind .dtab[aria-selected="true"]::after { content: none; }
 /* light: a cool, see-through glass on the white bar (not a white button), the same lit top edge and rim */
-:root[data-theme="light"] .dv2 .dtabs__ind { border-color: rgba(11,22,38,.12);
-  background: linear-gradient(180deg, rgba(255,255,255,.9), rgba(222,233,248,.72) 62%, rgba(232,67,31,.09)) border-box;
-  box-shadow: inset 0 1px 0 #fff, 0 2px 6px -4px rgba(232,67,31,.5), 0 1px 6px -3px rgba(11,22,38,.18); }
-/* the line a shade deeper than --pin on the light glass: 3.6:1 against the pill at its faintest breath (--pin would be 3.1:1) */
-:root[data-theme="light"] .dv2 .dtabs__ind::after { background: linear-gradient(90deg, rgba(207,58,26,0), #CF3A1A 25%, #CF3A1A 75%, rgba(207,58,26,0)); box-shadow: 0 -2px 5px rgba(207,58,26,.4); }
+:root[data-theme="light"] .dv2 .dtabs__ind { border-color: rgba(12,35,68,.12);
+  background: linear-gradient(180deg, rgba(255,255,255,.9), rgba(222,233,248,.72) 62%, rgba(var(--accent-rgb),.09)) border-box;
+  box-shadow: inset 0 1px 0 #fff, 0 2px 6px -4px rgba(11,122,112,.5), 0 1px 6px -3px rgba(12,35,68,.18); }
+/* the line is the light theme's --pin-2 (#006F67), a shade deeper than --pin, so it keeps 3:1 against the pill at its faintest breath */
+:root[data-theme="light"] .dv2 .dtabs__ind::after { background: linear-gradient(90deg, rgba(0,111,103,0), #006F67 25%, #006F67 75%, rgba(0,111,103,0)); box-shadow: 0 -2px 5px rgba(0,111,103,.4); }
 /* a phone: the tabs hug their words, so the pill has no rim and a fainter lit edge (a drawn edge 6 px from a word looked as if the word
    touched it) */
 @media (max-width: 600px) {
   .dv2 .dtabs__ind, :root[data-theme="light"] .dv2 .dtabs__ind { border-color: transparent; }
-  .dv2 .dtabs__ind { box-shadow: inset 0 1px 0 rgba(255,255,255,.09), 0 2px 6px -4px rgba(255,90,54,.7), 0 1px 6px -3px rgba(0,0,0,.6); }
+  .dv2 .dtabs__ind { box-shadow: inset 0 1px 0 rgba(255,255,255,.09), 0 2px 6px -4px rgba(0,203,182,.7), 0 1px 6px -3px rgba(2,8,20,.6); }
 }
 .dv2 .dtab__badge { min-width: 20px; height: 20px; padding: 0 5px; font-size: .75rem; }
-:root[data-theme="light"] .dv2 .dtab__badge { background: #B8430F; color: #fff; } /* 5.5:1 on any pill (the pale tint fell to 4.2 on the chosen one) */
+:root[data-theme="light"] .dv2 .dtab__badge { background: var(--pin-2); color: #fff; } /* white on the light --pin-2: 6.0:1 on any pill (the pale tint fell to 4.2 on the chosen one) */
 /* a crowded strip (a moderator's seven tabs on a phone, dashboard-v2.js measure), one step at a time until every tab shows: the gaps
    close (.is-snug), then "Rankings" says "Rank" (.is-short), then Founder and Moderate show as their line icons (.is-compact: crown,
    shield, the count in a corner badge; their names stay for screen readers) */
@@ -158,7 +160,7 @@ body.is-dv2 .dash::before { content: none; }
 .dv2 .dpanel .card::before { content: none; } /* one calm line around a card, no gradient rim */
 .dv2 .card .h2--sm, .dv2 .dv2-head .h2--sm { font-size: var(--fs-md, 1.125rem); line-height: 1.25; }
 @media (min-width: 601px) { .dv2 .card .h2--sm, .dv2 .dv2-head .h2--sm { font-size: 1.25rem; } }
-/* a card's kicker is a short, calm label (the one ember of a screen is its main button; accent text stays on the Pass and in links) */
+/* a card's kicker is a short, calm label (the one gold of a screen is its main button; teal stays for links and anything live) */
 .dv2 .kicker { font: 600 var(--fs-sm, .875rem)/1.3 var(--body); letter-spacing: 0; text-transform: none; color: var(--muted); margin-bottom: 4px; }
 .dv2 .kicker a { color: var(--pin-2); }
 /* an icon inline before a short label (a post's tags, Reply): the glyph alone, the label's colour (dashboard.js labelled) */
@@ -178,7 +180,7 @@ body.is-dv2 .dash::before { content: none; }
 .dv2 .nt-row__link { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 10px 12px; border-radius: 12px; background: var(--dd-inset); color: var(--text); text-decoration: none; }
 .dv2 .nt-row__link:hover { background: var(--card-2); }
 .dv2 .nt-row__dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: transparent; }
-.dv2 .nt-row.is-unread .nt-row__dot { background: var(--pin); box-shadow: 0 0 0 3px var(--accent-soft, rgba(255,90,54,.18)); }
+.dv2 .nt-row.is-unread .nt-row__dot { background: var(--pin); box-shadow: 0 0 0 3px var(--accent-soft, rgba(0,203,182,.18)); }
 .dv2 .nt-row.is-unread .nt-row__text { font-weight: 600; }
 .dv2 .nt-row__text { flex: 1 1 auto; min-width: 0; font-size: var(--fs-sm, .875rem); line-height: 1.4; overflow-wrap: anywhere; }
 .dv2 .nt-row__at { flex: none; font-size: .75rem; color: var(--muted); white-space: nowrap; }
@@ -192,13 +194,13 @@ body.is-dv2 .dash::before { content: none; }
    the input had square corners), the knob its ::after (appearance none, as the Pause switch does) */
 .dv2 .nt-switch { appearance: none; -webkit-appearance: none; flex: none; width: 52px; height: 44px; margin: 0; border: 0; border-radius: 999px; position: relative; cursor: pointer; background: none; }
 .dv2 .nt-switch::before { content: ""; position: absolute; top: 9px; left: 4px; width: 44px; height: 26px; border-radius: 13px; background: var(--line-2); }
-.dv2 .nt-switch::after { content: ""; position: absolute; top: 12px; left: 7px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.35); }
-.dv2 .nt-switch:checked::before { background: var(--ok-text, #37C29A); }
+.dv2 .nt-switch::after { content: ""; position: absolute; top: 12px; left: 7px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(2,8,20,.35); }
+.dv2 .nt-switch:checked::before { background: var(--ok-text, #7CE8A6); }
 .dv2 .nt-switch:checked::after { left: 25px; }
 .dv2 .nt-switch:focus-visible { outline: 2px solid var(--pin); outline-offset: -2px; }
 
 /* ---------- D3: the profiles notice, one short banner ---------- */
-.dv2 .pf-notice { display: flex; flex-wrap: nowrap; align-items: center; gap: 4px; margin: 0; padding: 4px 4px 4px 14px; border-radius: var(--r-card, 18px); border: 1px solid rgba(255,90,54,.3); background: var(--accent-soft, rgba(255,90,54,.1)); }
+.dv2 .pf-notice { display: flex; flex-wrap: nowrap; align-items: center; gap: 4px; margin: 0; padding: 4px 4px 4px 14px; border-radius: var(--r-card, 18px); border: 1px solid rgba(var(--accent-rgb),.3); background: var(--accent-soft, rgba(0,203,182,.1)); }
 .dv2 .pf-notice__line { flex: 1 1 auto; margin: 0; padding: 8px 0; font-size: var(--fs-sm, .875rem); line-height: 1.4; color: var(--text-2); }
 .dv2 .pf-notice__line strong { color: var(--text); }
 .dv2 .pf-notice__open { color: var(--pin-2); font-weight: 600; white-space: nowrap; }
@@ -213,7 +215,7 @@ body.is-dv2 .dash::before { content: none; }
 .dv2 .pass .idcard__avatar { width: 48px; height: 48px; border-radius: 14px; font-size: 1.3rem; }
 .dv2 .pass__name { font-size: 1.3rem; white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
 .dv2 .pass__home { display: flex; align-items: flex-start; gap: 4px; white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.35; }
-.dv2 .pass__pin { flex: none; margin-top: 2px; color: #FFD3B8; }
+.dv2 .pass__pin { flex: none; margin-top: 2px; color: rgba(255,255,255,.85); }
 .dv2 .pass__bio { margin-top: 2px; font-size: .88rem; color: rgba(255,255,255,.88); }
 .dv2 .pass__coin { width: 56px; height: 56px; }
 .dv2 .pass__bottom { align-items: center; gap: 4px 12px; padding-top: 10px; font-size: .8rem; min-height: 44px; }
@@ -226,7 +228,7 @@ body.is-dv2 .dash::before { content: none; }
 .dv2 .pass__provider { color: rgba(255,255,255,.8); }
 .dv2 .pass__brand { color: #fff; } /* "Vicinity Pass" sits on the corner glow: at .85 white it read 4.4:1 on a 320 px phone (measured on the pixels) */
 .dv2 .pass .live-note { margin-left: auto; color: #DFFFF2; }
-.dv2 .pass .live-dot, .dv2 .pass .live-dot::after { background: #7CF0C5; }
+.dv2 .pass .live-dot, .dv2 .pass .live-dot::after { background: #7CE8A6; } /* the dark theme's --ok-text, literal: the pass is navy in both themes */
 .dv2 #me-checked { min-width: 6.4em; } /* the room of "Live · 59m ago": the row never re-wraps as the time grows */
 .dv2 .pass__top { flex-wrap: wrap; row-gap: 8px; }
 .dv2 .pass .role-pill { white-space: nowrap; }
@@ -261,7 +263,7 @@ body.is-dv2 .dash::before { content: none; }
 .dv2 .standing[data-state="none"] .standing__empty, .dv2 .standing[data-state="nowallet"] .standing__empty, .dv2 .standing[data-state="prelaunch"] .standing__empty { min-height: 44px; }
 
 /* ---------- D5: a new member: the welcome and the wallet card read as ONE first card; tickers never cut ---------- */
-.dv2 .welcome { margin: 0; padding: var(--dd-pad); grid-template-columns: auto minmax(0, 1fr); gap: 12px 14px; border: 1px solid var(--line); background: linear-gradient(135deg, rgba(255,90,54,.12), rgba(255,200,87,.06) 60%, transparent), var(--dd-card); box-shadow: var(--dd-shadow); }
+.dv2 .welcome { margin: 0; padding: var(--dd-pad); grid-template-columns: auto minmax(0, 1fr); gap: 12px 14px; border: 1px solid var(--line); background: linear-gradient(135deg, rgba(var(--accent-rgb),.12), rgba(var(--gold-rgb),.06) 60%, transparent), var(--dd-card); box-shadow: var(--dd-shadow); }
 .dv2 .welcome__text { padding-right: 34px; }
 .dv2 .welcome__text h2 { font-size: var(--fs-lg, 1.375rem); }
 .dv2 .welcome__text p { font-size: var(--fs-sm, .875rem); line-height: 1.45; color: var(--text-2); }
@@ -289,13 +291,12 @@ body.is-dv2 .dash::before { content: none; }
 /* tickers: the whole ticker, a smaller size for a longer one (dashboard.js and profile.js set data-len) */
 .dv2 .coin-disc span, .dv2 .pass__coin span { max-width: none; overflow: visible; white-space: nowrap; }
 /* one coin, one look: the city's coin disc wears the colour its founder chose (gold until then) on the welcome, the Pass and the City
-   tab (dashboard.js paintCoin sets data-color on each). AA on every disc: the letters solid dark on its light colours (white on a dark
-   band on the "ink" one); the profile avatar on a deeper ember, so its white letter passes (white on the gold end was 2.2:1) */
+   tab (dashboard.js paintCoin sets data-color on each). AA on every disc: the letters the brand navy (--on-gold, 6.4:1 at the gold's
+   darkest stop) on its light colours, white on a dark band on the "ink" one; the profile avatar is the site's gold disc (style.css) */
 .dv2 :is(.coin-disc, .welcome__disc) { background: radial-gradient(circle at 32% 28%, var(--c1), var(--c2) 45%, var(--c3) 100%); }
-.dv2 .welcome__disc { color: #1A1206; box-shadow: inset 0 -4px 10px rgba(0,0,0,.28), inset 0 3px 6px rgba(255,255,255,.5); }
-.dv2 :is(.coin-disc, .coin-art, .welcome__disc) span { color: #1A1206; text-shadow: 0 1px 0 rgba(255,255,255,.35); }
-.dv2 :is(.coin-disc, .coin-art, .welcome__disc)[data-color="ink"] span { color: #fff; text-shadow: none; padding: 1px 3px; border-radius: 6px; background: rgba(10,14,22,.5); } /* the silver coin: its letters on a dark band */
-.dv2 .profile__head .idcard__avatar { background: linear-gradient(135deg, #C2370F, #9A5A06); color: #fff; }
+.dv2 .welcome__disc { color: var(--on-gold); box-shadow: inset 0 -4px 10px rgba(2,8,20,.28), inset 0 3px 6px rgba(255,255,255,.5); }
+.dv2 :is(.coin-disc, .coin-art, .welcome__disc) span { color: var(--on-gold); text-shadow: 0 1px 0 rgba(255,255,255,.35); }
+.dv2 :is(.coin-disc, .coin-art, .welcome__disc)[data-color="ink"] span { color: #fff; text-shadow: none; padding: 1px 3px; border-radius: 6px; background: rgba(7,20,38,.55); } /* the silver coin: its letters on a dark band */
 .dv2 .pass__coin span { font-size: .8rem; }
 .dv2 .pass__coin[data-len="5"] span { font-size: .72rem; }
 .dv2 .pass__coin[data-len="6"] span, .dv2 .pass__coin[data-len="7"] span { font-size: .66rem; }
@@ -383,7 +384,7 @@ body.is-dv2 .dash::before { content: none; }
 .dv2 .danger-zone__body { display: grid; gap: 10px; padding-bottom: var(--dd-pad); }
 .dv2 .danger-zone__body p { margin: 0; }
 .dv2 .danger-btn { justify-self: start; min-height: 44px; color: var(--bad-text); background: none; border: 1px solid currentColor; }
-.dv2 .danger-btn:hover { background: rgba(255,90,54,.08); }
+.dv2 .danger-btn:hover { background: var(--bad-soft); }
 
 /* the city head: the status tag under the name; the coin's contract as a short chip with a 44 px Copy */
 .dv2 .city-head .community-card__head { align-items: center; }
@@ -445,7 +446,8 @@ body.is-dv2 .dash::before { content: none; }
 .dv2 .profile__body .link-list a { display: flex; align-items: center; min-height: 44px; }
 .dv2 .profile__body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 0 0 16px; } /* one track that never grows past the fold: the username form's input made an auto track 338 px wide on a 320 px phone */
 .dv2 .profile__body > p { margin: 0; }
-.dv2 #profile-modal :is(input, textarea) { min-height: 44px; padding: 10px 12px; font-size: 16px; border-radius: var(--r-chip, 12px); border: 1px solid var(--line-2); background: var(--dd-inset); color: var(--text); }
+.dv2 #profile-modal :is(input, textarea) { min-height: 44px; padding: 10px 12px; font-size: 16px; border-radius: var(--r-chip, 12px); border: 1px solid var(--field-line, rgba(255,255,255,.36)); background: var(--dd-inset); color: var(--text); }
+.dv2 #profile-modal :is(input, textarea):focus { outline: none; border-color: var(--pin); box-shadow: 0 0 0 3px var(--accent-soft, rgba(0,203,182,.12)); }
 .dv2 #profile-modal .contact-row { align-items: flex-start; flex-wrap: wrap; }
 .dv2 .profile__danger { display: flex; align-items: center; width: 100%; min-height: 52px; padding: 0; border: 0; border-top: 1px solid var(--line); background: none; color: var(--bad-text); font: 600 1rem var(--body); text-align: left; cursor: pointer; }
 .dv2 .profile__danger[hidden] { display: none; }
@@ -462,7 +464,7 @@ body.is-dv2 .dash::before { content: none; }
 .dv2 .roles-fold #roles .role-row::before { content: none; }
 
 /* Moderate: "All clear" when every queue is empty; each queue a fold; a contract to check as a small card */
-.dv2 .mod-clear { display: flex; align-items: center; gap: 10px; margin: 8px 0 4px; padding: 12px 14px; border-radius: var(--r-chip, 12px); background: var(--ok-soft, rgba(55,194,154,.14)); color: var(--ok-text); font-weight: 600; }
+.dv2 .mod-clear { display: flex; align-items: center; gap: 10px; margin: 8px 0 4px; padding: 12px 14px; border-radius: var(--r-chip, 12px); background: var(--ok-soft, rgba(52,211,153,.14)); color: var(--ok-text); font-weight: 600; }
 .dv2 .mod-clear::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--moss); }
 .dv2 .mod-section > summary .fold__meta { margin-left: auto; padding-right: 8px; }
 .dv2 .mod-section > .req-list, .dv2 .mod-section > .posts { padding-bottom: 12px; }
@@ -485,7 +487,7 @@ body.is-dv2 .dash::before { content: none; }
 .dv2 .feed__head .seg button { min-width: 0; overflow-wrap: anywhere; }
 .dv2 .feed .chips { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; padding: 2px; border-radius: 999px; border: 1px solid var(--line); background: var(--card-2); }
 .dv2 .feed .chips button { border: 0; padding: 0 6px; white-space: nowrap; }
-.dv2 .feed .chips button[aria-selected="true"] { background: var(--accent-soft, rgba(255,90,54,.12)); box-shadow: inset 0 0 0 1px rgba(255,90,54,.55); color: var(--text); }
+.dv2 .feed .chips button[aria-selected="true"] { background: var(--accent-soft, rgba(0,203,182,.12)); box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb),.55); color: var(--text); }
 /* feed v2 (FEED_V2=on, dashboard.js adds chips--4 with the Updates chip): four equal kinds; on the narrowest phones two rows of two */
 .dv2 .feed .chips.chips--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 @media (max-width: 360px) { .dv2 .feed .chips.chips--4 { grid-template-columns: repeat(2, minmax(0, 1fr)); border-radius: 18px; } }
@@ -546,45 +548,45 @@ body.is-dv2 .dash::before { content: none; }
    Nothing in it is shifted sideways or wider than its column (on 3 Oct 2026 the old staggered cards widened the page at 320px). */
 .dpv { position: relative; isolation: isolate; width: 100%; max-width: 540px; min-width: 0; justify-self: center; user-select: none; -webkit-user-select: none; cursor: default; }
 .dpv::before { content: ""; position: absolute; inset: 6% 0 0; z-index: -1; pointer-events: none; border-radius: 40px;
-  background: radial-gradient(55% 45% at 22% 18%, rgba(255,90,54,.30), transparent 70%), radial-gradient(55% 45% at 82% 82%, rgba(91,140,255,.24), transparent 70%); }
+  background: radial-gradient(55% 45% at 22% 18%, rgba(var(--accent-rgb),.30), transparent 70%), radial-gradient(55% 45% at 82% 82%, rgba(var(--gold-rgb),.22), transparent 70%); }
 :root[data-theme="light"] .dpv::before { opacity: .55; }
 .dpv__frame { position: relative; display: grid; gap: 10px; padding: 14px; border-radius: 28px; border: 1px solid var(--line-2);
   background: linear-gradient(180deg, rgba(var(--ink),.05), rgba(var(--ink),.012)), var(--bg-2);
-  box-shadow: 0 40px 90px -42px rgba(0,0,0,.9), inset 0 1px 0 rgba(var(--ink),.08); }
-:root[data-theme="light"] .dpv__frame { box-shadow: 0 34px 70px -38px rgba(11,22,38,.45), inset 0 1px 0 #fff; }
+  box-shadow: 0 40px 90px -42px rgba(2,8,20,.9), inset 0 1px 0 rgba(var(--ink),.08); }
+:root[data-theme="light"] .dpv__frame { box-shadow: 0 34px 70px -38px rgba(12,35,68,.45), inset 0 1px 0 #fff; }
 .dpv__frame > * { min-width: 0; }
 .dpv__top { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .dpv__tag { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 999px; font: 700 .72rem/1.4 var(--body);
-  color: var(--gold-text); background: rgba(255,200,87,.13); border: 1px dashed rgba(255,200,87,.6); white-space: nowrap; }
-:root[data-theme="light"] .dpv__tag { background: rgba(217,154,26,.1); border-color: rgba(217,154,26,.7); }
+  color: var(--gold-text); background: var(--gold-soft, rgba(248,193,58,.14)); border: 1px dashed rgba(var(--gold-rgb),.6); white-space: nowrap; }
+:root[data-theme="light"] .dpv__tag { border-color: rgba(var(--gold-rgb),.8); }
 .dpv__what { font-size: .74rem; color: var(--muted); }
 .dpv__tabs { display: flex; gap: 2px; overflow: hidden; padding-bottom: 8px; border-bottom: 1px solid var(--line);
   -webkit-mask-image: linear-gradient(90deg, #000 78%, transparent); mask-image: linear-gradient(90deg, #000 78%, transparent); }
 .dpv__tabs span { flex: none; padding: 5px 12px; border-radius: 999px; font: 600 .76rem/1.4 var(--body); color: var(--muted); }
 .dpv__tabs .is-on { color: var(--text); background: var(--card-2); box-shadow: inset 0 -2px 0 var(--pin); }
-/* the pass: the real Vicinity Pass, smaller */
-.dpv__pass { position: relative; overflow: hidden; isolation: isolate; display: grid; gap: 12px; padding: 14px 16px 12px; border-radius: 20px; color: #fff; border: 1px solid rgba(255,255,255,.16);
-  background: radial-gradient(90% 120% at 0% 0%, rgba(255,106,61,.95), transparent 60%), radial-gradient(90% 120% at 100% 100%, rgba(122,92,255,.9), transparent 60%), linear-gradient(135deg, #1B1030, #0B1426);
-  box-shadow: 0 26px 50px -30px rgba(255,90,54,.65), inset 0 1px 0 rgba(255,255,255,.22); }
+/* the pass: the real Pass, smaller (style.css .pass: navy in both themes, lit by the emblem's teal and the coin's gold) */
+.dpv__pass { position: relative; overflow: hidden; isolation: isolate; display: grid; gap: 12px; padding: 14px 16px 12px; border-radius: 20px; color: #fff; border: 1px solid var(--pass-line, rgba(255,255,255,.14));
+  background: radial-gradient(90% 120% at 0% 0%, var(--pass-glow-1, rgba(0,203,182,.38)), transparent 60%), radial-gradient(90% 120% at 100% 100%, var(--pass-glow-2, rgba(248,193,58,.42)), transparent 60%), linear-gradient(135deg, var(--pass-a, #12345F), var(--pass-b, #071426));
+  box-shadow: 0 26px 50px -30px rgba(0,203,182,.45), inset 0 1px 0 rgba(255,255,255,.22); }
 .dpv__pass::after { content: ""; position: absolute; inset: 0; z-index: -1; opacity: .25; pointer-events: none; background: repeating-linear-gradient(115deg, rgba(255,255,255,.06) 0 1px, transparent 1px 14px); }
 .dpv__shine { position: absolute; inset: -60% -30%; z-index: -1; pointer-events: none; background: linear-gradient(110deg, transparent 42%, rgba(255,255,255,.22) 50%, transparent 58%); transform: translateX(-70%); }
 .dpv__row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .dpv__brand { display: inline-flex; align-items: center; gap: 8px; font: 700 .66rem var(--display); letter-spacing: .2em; text-transform: uppercase; color: rgba(255,255,255,.85); white-space: nowrap; }
-.dpv__mark { width: 14px; height: 14px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: linear-gradient(135deg, #FFD37A, #FF6A3D); box-shadow: 0 0 0 3px rgba(255,255,255,.18); }
+.dpv__mark { width: 14px; height: 14px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: var(--gold); box-shadow: 0 0 0 3px rgba(255,255,255,.18); }
 .dpv__pill { font: 800 .62rem/1.5 var(--body); letter-spacing: .08em; text-transform: uppercase; padding: 2px 9px; border-radius: 999px; color: #fff; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.3); }
 .dpv__who { display: flex; align-items: center; gap: 11px; }
 .dpv__avatar { flex: none; width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; font: 700 1.2rem var(--display); background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.3); }
 .dpv__id { flex: 1; min-width: 0; display: grid; }
 .dpv__name { font: 700 1.12rem/1.2 var(--display); letter-spacing: -.01em; overflow-wrap: anywhere; }
 .dpv__home { display: flex; align-items: center; gap: 4px; min-width: 0; font-size: .8rem; color: rgba(255,255,255,.86); }
-.dpv__pin { flex: none; color: #FFD3B8; }
+.dpv__pin { flex: none; color: rgba(255,255,255,.85); }
 .dpv__coin, .dpv__disc { flex: none; display: grid; place-items: center; border-radius: 50%; font: 800 .6rem/1 var(--display); color: #062A1F; letter-spacing: .02em; text-shadow: 0 1px 0 rgba(255,255,255,.45);
-  background: radial-gradient(circle at 32% 28%, #DBFFF1, #37C29A 45%, #0E7C5A 100%); border: 2px solid rgba(255,255,255,.7); box-shadow: inset 0 -3px 8px rgba(0,60,40,.4), inset 0 3px 6px rgba(255,255,255,.55), 0 8px 20px -8px rgba(55,194,154,.7); }
+  background: radial-gradient(circle at 32% 28%, #DBFFF1, #34D399 45%, #0E7C5A 100%); border: 2px solid rgba(255,255,255,.7); box-shadow: inset 0 -3px 8px rgba(0,60,40,.4), inset 0 3px 6px rgba(255,255,255,.55), 0 8px 20px -8px rgba(52,211,153,.7); }
 .dpv__coin { width: 46px; height: 46px; }
 .dpv__foot { font-size: .72rem; color: rgba(255,255,255,.78); padding-top: 9px; border-top: 1px solid rgba(255,255,255,.16); }
 .dpv__live { display: inline-flex; align-items: center; gap: 7px; }
-.dpv__dot { position: relative; width: 7px; height: 7px; border-radius: 50%; background: #FF6A3D; }
-.dpv__dot::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: #FF8A5B; opacity: 0; }
+.dpv__dot { position: relative; width: 7px; height: 7px; border-radius: 50%; background: #7CE8A6; } /* the Pass's live dot (navy pass in both themes) */
+.dpv__dot::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: #7CE8A6; opacity: 0; }
 /* the standing card (as on the real Home): the big number, then three rank chips */
 .dpv__standing { display: grid; gap: 4px; padding: 12px; border-radius: 18px; border: 1px solid var(--line); background: linear-gradient(180deg, rgba(var(--ink),.06), rgba(var(--ink),.02)), var(--card); }
 .dpv__label { display: flex; align-items: center; gap: 7px; font: 600 .74rem/1.3 var(--body); color: var(--muted); }
@@ -604,7 +606,7 @@ body.is-dv2 .dash::before { content: none; }
 .dpv__disc { width: 38px; height: 38px; font-size: .52rem; }
 .dpv__kicker { display: block; font: 600 .74rem/1.4 var(--body); color: var(--muted); }
 .dpv__city-name { font: 650 1.05rem/1.2 var(--display); }
-.dpv__seat { flex: none; font: 700 .68rem/1.5 var(--body); padding: 2px 9px; border-radius: 999px; color: var(--bad-text); background: rgba(255,90,54,.12); border: 1px solid rgba(255,90,54,.4); white-space: nowrap; }
+.dpv__seat { flex: none; font: 700 .68rem/1.5 var(--body); padding: 2px 9px; border-radius: 999px; color: var(--bad-text); background: var(--bad-soft, rgba(255,154,134,.12)); border: 1px solid rgba(var(--bad-rgb),.4); white-space: nowrap; }
 .dpv__kv { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 .dpv__kv > span { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 6px; padding: 6px 10px; border-radius: 12px; background: rgba(var(--ink),.045); }
 .dpv__k { font-size: .72rem; color: var(--text-2); }
@@ -613,7 +615,7 @@ body.is-dv2 .dash::before { content: none; }
 .dpv__path { font-size: .76rem; font-weight: 600; color: var(--text-2); }
 .dpv__pct { font: 700 1rem var(--display); color: var(--gold-text); font-variant-numeric: tabular-nums; }
 .dpv__bar { height: 8px; border-radius: 6px; background: rgba(var(--ink),.08); overflow: hidden; }
-.dpv__fill { position: relative; display: block; width: 33%; height: 100%; border-radius: 6px; overflow: hidden; transform-origin: left center; background: linear-gradient(90deg, var(--moss), var(--gold), var(--pin)); }
+.dpv__fill { position: relative; display: block; width: 33%; height: 100%; border-radius: 6px; overflow: hidden; transform-origin: left center; background: linear-gradient(90deg, var(--pin), var(--gold-ui)); }
 .dpv__fill::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent); transform: translateX(-100%); }
 .dpv__step { font-size: .72rem; color: var(--muted); }
 .dpv__days { white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -693,24 +695,25 @@ body.is-dv2 .dash::before { content: none; }
 @media (prefers-reduced-motion: no-preference) {
   /* design v4 has no Pause control (WCAG 2.2.2: nothing that moves by itself runs past 5 s): the line takes one breath (4 s) and rests;
      the chosen tab's old second animation (lbBreath, whose keyframes left with the live buttons) is gone */
-  .dv2 .dtab[aria-selected="true"]::after { animation: ddTabIn var(--dur-3, 320ms) var(--ease-out, cubic-bezier(.2,.8,.2,1)) both; }
+  .dv2 .dtab[aria-selected="true"]::after { animation: ddTabIn var(--dur-3, 320ms) var(--ease-out, cubic-bezier(.22,.61,.36,1)) both; }
   .dv2 .dtabs__ind::after { animation: ddLineBreath 4s steps(16) var(--dur-3, 320ms) 1 alternate var(--lb-play, running); }
-  .dv2 .dtabs.has-ind .dtab { transition: color var(--dur-3, 320ms) var(--ease-out, cubic-bezier(.2,.8,.2,1)), background var(--dur-2, 200ms); }
-  .dv2 .dpanel:not([hidden]) { animation: ddPanelIn var(--dur-3, 320ms) var(--ease-out, cubic-bezier(.2,.8,.2,1)) both; }
+  .dv2 .dtabs.has-ind .dtab { transition: color var(--dur-3, 320ms) var(--ease-out, cubic-bezier(.22,.61,.36,1)), background var(--dur-2, 180ms); }
+  .dv2 .dpanel:not([hidden]) { animation: ddPanelIn var(--dur-3, 320ms) var(--ease-out, cubic-bezier(.22,.61,.36,1)) both; }
   .dv2[data-dir="next"] .dpanel:not([hidden]) { animation-name: ddPanelNext; }
   .dv2[data-dir="prev"] .dpanel:not([hidden]) { animation-name: ddPanelPrev; }
-  .dv2 .pf-notice__ok, .dv2 .pass__copy::after, .dv2 .role-tile, .dv2 .today__card { transition: background-color var(--dur-2, 200ms), border-color var(--dur-2, 200ms), transform var(--dur-1, 120ms); }
+  .dv2 .pf-notice__ok, .dv2 .pass__copy::after, .dv2 .role-tile, .dv2 .today__card, .dv2 .nt-row__link, .dv2 .welcome__close, .dv2 .danger-btn, .dv2 .profile__danger, .dv2 .wtab-refresh, .dv2 .subnav__link { transition: background-color var(--dur-2, 180ms) var(--ease-out, cubic-bezier(.22,.61,.36,1)), border-color var(--dur-2, 180ms) var(--ease-out, cubic-bezier(.22,.61,.36,1)), color var(--dur-2, 180ms) var(--ease-out, cubic-bezier(.22,.61,.36,1)), transform var(--dur-1, 120ms); }
+  .dv2 #profile-modal :is(input, textarea) { transition: border-color var(--dur-2, 180ms), box-shadow var(--dur-2, 180ms); }
   .dv2 .today__card:active, .dv2 .role-tile:active { transform: scale(.98); }
 }
 @keyframes ddTabIn { from { transform: scaleX(.3); opacity: 0; } }
 @keyframes ddPanelIn { from { opacity: 0; transform: translateY(6px); } }
-/* the ember line on the pill breathes between 85% and full, never fainter: it is the mark of the chosen tab that keeps 3:1 against the
-   pill at every moment (WCAG 1.4.11; measured on the pixels at its faintest: 4.3:1 dark, 3.6:1 light) */
+/* the teal line on the pill breathes between 85% and full, never fainter: it is the mark of the chosen tab that keeps 3:1 against the
+   pill at every moment (WCAG 1.4.11) */
 @keyframes ddLineBreath { from { opacity: .85; } to { opacity: 1; } }
 @keyframes ddPanelNext { from { opacity: 0; transform: translateX(16px); } }
 @keyframes ddPanelPrev { from { opacity: 0; transform: translateX(-16px); } }
 /* a phone's icon strip (D2c): the chosen tab's name rises in under its icon as the pill arrives (at once with reduced motion) */
 @media (prefers-reduced-motion: no-preference) and (max-width: 600px) {
-  .dv2 .dtabs .dtab__text { transition: opacity var(--dur-2, 200ms) var(--ease-out, cubic-bezier(.2,.8,.2,1)), transform var(--dur-3, 320ms) var(--ease-out, cubic-bezier(.2,.8,.2,1)); }
-  .dv2 .dtabs .dtab__ico { transition: background-color var(--dur-2, 200ms); }
+  .dv2 .dtabs .dtab__text { transition: opacity var(--dur-2, 180ms) var(--ease-out, cubic-bezier(.22,.61,.36,1)), transform var(--dur-3, 320ms) var(--ease-out, cubic-bezier(.22,.61,.36,1)); }
+  .dv2 .dtabs .dtab__ico { transition: background-color var(--dur-2, 180ms); }
 }

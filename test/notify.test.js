@@ -705,7 +705,7 @@ test("the switches (signed-in test of 17 Oct, N1): the track is a 44x26 pill dra
   assert.deepEqual(t, { top: 9, left: 4, w: 44, h: 26, r: 13 });
   assert.equal(t.left * 2 + t.w, 52); assert.equal(t.top * 2 + t.h, 44); assert.equal(t.r * 2, t.h, "rounded ends");
   assert.match(track, /background: var\(--line-2\);/, "off: the quiet line colour");
-  assert.deepEqual(bodiesOf(".dv2 .nt-switch:checked::before"), ["background: var(--ok-text, #37C29A);"], "on: green");
+  assert.deepEqual(bodiesOf(".dv2 .nt-switch:checked::before"), ["background: var(--ok-text, #7CE8A6);"], "on: green (the fallback is the dark theme's --ok-text, design v5)");
   // the knob inside the track, 3 px in from either end
   const [knob] = bodiesOf(".dv2 .nt-switch::after"), [on] = bodiesOf(".dv2 .nt-switch:checked::after");
   assert.equal(px(knob, "top"), t.top + 3); assert.equal(px(knob, "left"), t.left + 3);

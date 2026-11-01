@@ -500,7 +500,7 @@ test("design v2: the city-coin sheets read the site's tokens with a fallback, th
   assert.match(read("public/lp-sign.js"), /node\("details", "fold lp-sum__more"\)/);
   assert.match(DASH, /<p class="kicker"><span class="ico ico--sm" aria-hidden="true"><svg [^>]*>[\s\S]*?<\/svg><\/span>City coin · Vicinity launchpad<\/p>/);
   assert.doesNotMatch(LP_LAUNCH + read("public/admin-lp.js") + read("public/lp-sign.js"), /[\u{1F300}-\u{1FAFF}⚙⚡]/u, "no pictographic emoji");
-  assert.match(block, /\.lp-approve \{ border: 2px solid var\(--gold, #FFC857\);/, "the 'You are approving' box (SEC-1) stands out");
+  assert.match(block, /\.lp-approve \{ border: 2px solid var\(--gold, #F8C13A\);/, "the 'You are approving' box (SEC-1) stands out (the fallback is the brand gold, design v5)");
 });
 
 test("launched, the chain's symbol not in the answer: the city's ticker, never 'Your coin Your coin is live.'", async () => {

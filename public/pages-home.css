@@ -2,7 +2,8 @@
    Get $VICINITY, "the website does not look that premium"). Loaded only by the home page, after the shared sheets and app-phone.css.
    Four parts: the hero (headline, one line, two buttons, the live numbers bar), How it works (three cards), the app teaser (in
    development) and the FAQ. One glow, at the top. Nothing moves by itself except the hero's one entrance; with reduced motion nothing
-   moves at all (style.css's reduce block stops every animation and transition). */
+   moves at all (style.css's reduce block stops every animation and transition). Design v5 (1 Nov 2026): tokens only (the links and
+   focus rings teal, the live dot the ok colour); the hover colour changes sit in the one no-preference block below. */
 
 /* ---------- hero ---------- */
 .hero4 { position: relative; isolation: isolate; overflow: hidden; text-align: center; padding: clamp(48px, 9vh, 120px) 0 8px; }
@@ -88,6 +89,8 @@
   .hero4__title, .hero4__lead { animation: hero4Rise .4s var(--ease-out) backwards; }
   .hero4__cta, .tk { animation: hero4In .4s var(--ease-out) backwards; }
   .hero4__lead { animation-delay: 60ms; } .hero4__cta { animation-delay: 120ms; } .tk { animation-delay: 180ms; }
+  /* the links and the FAQ's +/− change colour softly (180 ms, the site's curve) */
+  .tk__src a, .how4__link, .teaser4__link, .faq4 summary::after { transition: color var(--dur-2) var(--ease-out), text-decoration-color var(--dur-2) var(--ease-out), background-color var(--dur-2) var(--ease-out); }
 }
 @keyframes hero4Rise { from { transform: translateY(8px); } }
 @keyframes hero4In { from { opacity: 0; transform: translateY(8px); } }
@@ -110,7 +113,7 @@
 /* the whole card is the link's tap target (the title link pattern of the Launchpad cards), its focus ring the card's */
 .how4__link::after { content: ""; position: absolute; inset: 0; border-radius: inherit; }
 .how4__link:focus-visible { outline: none; }
-.how4__card:focus-within { outline: 3px solid var(--pin-2); outline-offset: 3px; }
+.how4__card:focus-within { outline: 3px solid var(--focus-ring); outline-offset: 3px; }
 @media (hover: hover) and (pointer: fine) { .how4__card:hover .how4__link { text-decoration: underline; text-underline-offset: 4px; } }
 
 /* ---------- the app teaser: copy on one side, the phone on the other, cut by the card's edge ---------- */
@@ -123,7 +126,7 @@
 .teaser4__link { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; font-weight: 600; color: var(--pin-2); text-decoration: none; }
 .teaser4__link::after { content: ""; position: absolute; inset: 0; border-radius: inherit; }
 .teaser4__link:focus-visible { outline: none; }
-.teaser4__card:focus-within { outline: 3px solid var(--pin-2); outline-offset: 3px; }
+.teaser4__card:focus-within { outline: 3px solid var(--focus-ring); outline-offset: 3px; }
 .teaser4__stage { display: flex; justify-content: center; align-items: flex-start; height: 250px; padding-top: 16px; pointer-events: none;
   background: radial-gradient(50% 60% at 50% 70%, var(--accent-soft), transparent 75%); }
 .teaser4__phone { --pw: 240px; }
@@ -143,7 +146,7 @@
 .faq4 .tabpanel details:last-child { border-bottom: 0; }
 .faq4 summary { min-height: 60px; padding: 12px 0; align-items: center; font-family: var(--body); font-size: 1rem; font-weight: 600; line-height: 1.4; }
 .faq4 summary::after { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: rgba(var(--ink), .06); color: var(--text-2); font: 400 1.2rem/1 var(--body); }
-.faq4 details[open] summary::after { color: var(--pin-2); }
+.faq4 details[open] summary::after { color: var(--pin-2); background: var(--accent-soft); }
 .faq4 details p { margin: 0 0 14px; color: var(--text-2); max-width: 62ch; }
 .faq4 details p + p { margin-top: -4px; }
 @media (max-width: 600px) { .faq4 .tabpanel { padding: 2px 16px; } .faq4 summary { min-height: 56px; font-size: .95rem; } }

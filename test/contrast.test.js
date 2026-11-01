@@ -52,7 +52,7 @@ test("the example dashboard's smallest text reads clearly: the 'Your community' 
   const muted = /--muted: (#[0-9A-Fa-f]{6})/.exec(light)[1];
   assert.ok(ratio(muted, "#FFFFFF") >= 4.5, `light --muted ${muted} on white: ${ratio(muted, "#FFFFFF").toFixed(2)}:1`);
   assert.match(dashCss, /\.dpv__coin, \.dpv__disc \{[^}]*color: #062A1F;/);
-  assert.ok(ratio("#062A1F", "#37C29A") >= 6, "on the coin's green, where the label sits");
+  assert.ok(ratio("#062A1F", "#34D399") >= 6, "on the coin's green (design v5: the ok fill #34D399), where the label sits");
 });
 
 test("the small text that carries each number's source, age and reason reads at 4.5:1 or more in both themes (review A11Y-CONTRAST-SOURCES)", () => {

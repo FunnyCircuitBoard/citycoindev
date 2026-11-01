@@ -119,7 +119,7 @@ test("D4: the Pass has no Sign out (Log out lives in Profile, the same action) a
   assert.match(bottom, /<span class="pass__provider" data-me-login><\/span>/);
   assert.match(bottom, /<span class="live-note"><span class="live-dot" aria-hidden="true"><\/span> <span id="me-checked">live<\/span><\/span>/);
   assert.match(css, /\.dv2 \.pass__copy \{[^}]*width: 44px; height: 44px;/, "a 44 px target");
-  assert.match(css, /\.dv2 \.pass \.live-dot, \.dv2 \.pass \.live-dot::after \{ background: #7CF0C5; \}/);
+  assert.match(css, /\.dv2 \.pass \.live-dot, \.dv2 \.pass \.live-dot::after \{ background: #7CE8A6; \}/, "the dark theme's --ok-text, literal: the pass is navy in both themes (design v5)");
   assert.match(css, /\.dv2 #me-checked \{ min-width: 6\.4em; \}/, "the room of its longest text: no jump");
 });
 

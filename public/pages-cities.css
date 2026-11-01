@@ -2,7 +2,9 @@
    Phone first; the shared tokens come from style.css, each with a fallback here; motion only inside prefers-reduced-motion: no-preference.
    d3 (11 Oct 2026, the owner: "the claim a city page in both phone and desktop version: there are significant design issues"):
    a calm title block with strong facts only, on one line; the whole world inside the map on a computer and the map inside the first
-   screen; nothing picked for the visitor ("Find your city" in the map's bottom slot); the card above a phone's tab bar; no empty blocks. */
+   screen; nothing picked for the visitor ("Find your city" in the map's bottom slot); the card above a phone's tab bar; no empty blocks.
+   Design v5 (1 Nov 2026, Midnight Atlas): every colour is a token or a triplet tint (teal = live, gold = founded, navy-black shadows); the
+   find pill, the menu and the suggestions are glass on --bg-2 with --e3; hover and focus move on --dur-2/--ease-out, motion only when welcome. */
 
 /* headings never end on a lone word (the Most wanted title, the panel's, the list's) */
 main :is(h1, h2, h3) { text-wrap: balance; }
@@ -44,10 +46,10 @@ main :is(h1, h2, h3) { text-wrap: balance; }
   #cities .cities-intro { grid-template-columns: auto minmax(0, 1fr); align-items: stretch; column-gap: var(--sp-6, 32px); padding-bottom: var(--sp-4, 16px); }
   #cities .cities-intro .lead { white-space: nowrap; font-size: var(--fs-md, 1.125rem); }
   #cities .cities-intro__side { display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between; gap: var(--sp-3, 12px); padding-bottom: 4px; }
-  #cities .city-status { display: inline-flex; align-items: center; gap: 6px; margin: 2px 0 0; padding: 5px 12px 5px 9px; border-radius: var(--r-pill, 999px); border: 1px solid rgba(55,194,154,.32);
-    background: var(--ok-soft, rgba(55,194,154,.14)); color: var(--ok-text); font: 600 var(--fs-xs, .75rem)/1.2 var(--body); letter-spacing: .01em; white-space: nowrap; }
+  #cities .city-status { display: inline-flex; align-items: center; gap: 6px; margin: 2px 0 0; padding: 5px 12px 5px 9px; border-radius: var(--r-pill, 999px); border: 1px solid rgba(var(--ok-rgb),.35);
+    background: var(--ok-soft, rgba(52,211,153,.14)); color: var(--ok-text); font: 600 var(--fs-xs, .75rem)/1.2 var(--body); letter-spacing: .01em; white-space: nowrap; }
   #cities .city-status svg { flex: none; }
-  :root[data-theme="light"] #cities .city-status { color: #0C6B4E; } /* 12 px on its green tint over the page: 5.4:1 (was 4.43:1) */
+  :root[data-theme="light"] #cities .city-status { color: var(--ok-text); } /* 12 px on its green tint over the page: the light --ok-text reads 5.2:1 */
   #cities .cities-intro .city-stats { justify-content: flex-end; align-items: stretch; }
   #cities .cities-intro .city-stats li { display: grid; align-content: end; gap: 5px; text-align: left; }
   #cities .cities-intro .city-stats li:not([hidden]) ~ li:not([hidden]) { margin-left: var(--sp-4, 16px); padding-left: var(--sp-4, 16px); border-left: 1px solid var(--line); }
@@ -58,7 +60,6 @@ main :is(h1, h2, h3) { text-wrap: balance; }
 @media (min-width: 1280px) {
   #cities .cities-intro .city-stats li:not([hidden]) ~ li:not([hidden]) { margin-left: var(--sp-5, 24px); padding-left: var(--sp-5, 24px); }
 }
-:root[data-theme="light"] #cities .city-status { border-color: rgba(30,158,120,.35); }
 
 /* =====================================================================
    The map stage: inside the first screen. A phone: from under the title to 8 px above the tab bar (cities.js sets --stage-top, the
@@ -91,8 +92,8 @@ html.map-is-full #cities.page-hero { isolation: auto; }
 .citymap canvas.is-quiet-focus:focus-visible { outline: none; }
 /* the light map: no grey vignette on its edges (it read as dirt on the white land), and a faint blue ocean so the land stands out */
 /* (measured: the edges of the light map within about 10% of its middle's lightness; they were 30% darker) */
-:root[data-theme="light"] #city-canvas { box-shadow: inset 0 0 60px rgba(11,22,38,.08); }
-:root[data-theme="light"] #city-stage { --map-bg: radial-gradient(80% 70% at 30% 35%, rgba(232,67,31,.04), transparent 60%), radial-gradient(120% 90% at 55% 45%, #E6F0FA, #D9E6F4); }
+:root[data-theme="light"] #city-canvas { box-shadow: inset 0 0 60px rgba(var(--ink),.08); }
+:root[data-theme="light"] #city-stage { --map-bg: radial-gradient(80% 70% at 30% 35%, rgba(0,203,182,.04), transparent 60%), radial-gradient(120% 90% at 55% 45%, #E6F0FA, #D9E6F4); }
 
 /* =====================================================================
    The map's controls: the magnifier (zoomed in: back to the search), + and − as one control, ⋯ for the rest (whole world, find my city,
@@ -106,7 +107,7 @@ html.map-is-full #cities.page-hero { isolation: auto; }
 .map-search svg, .map-more svg { display: block; margin: auto; }
 #city-stage[data-crosshair="off"] .map-search { display: none; }
 .map-menu { display: none; position: absolute; right: calc(100% + 8px); top: 0; z-index: 5; width: 196px; padding: 6px; border-radius: var(--r-chip, 12px); background: var(--surface-2, var(--bg-2));
-  border: 1px solid var(--line-2); box-shadow: var(--shadow-2, 0 24px 60px -24px rgba(0,0,0,.8)); }
+  border: 1px solid var(--line-2); box-shadow: var(--e3, 0 24px 60px -24px rgba(2,8,20,.8)); }
 .map-ctrl.is-menu .map-menu { display: grid; gap: 2px; }
 .map-ctrl .map-more { display: grid; place-items: center; }
 .map-menu__ic { display: grid; place-items: center; font: inherit; }
@@ -115,7 +116,7 @@ html.map-is-full #cities.page-hero { isolation: auto; }
   background: none; backdrop-filter: none; font: 600 var(--fs-sm, .875rem) var(--body); text-align: left; }
 .map-ctrl .map-menu button::after { inset: 0; }
 .map-ctrl .map-menu button:hover { background: var(--card-2); transform: none; }
-.map-ctrl .map-menu button[aria-pressed="true"] { background: var(--accent-soft, rgba(255,90,54,.12)); }
+.map-ctrl .map-menu button[aria-pressed="true"] { background: var(--accent-soft, rgba(0,203,182,.12)); color: var(--pin-2); }
 .map-menu .map-menu__ic { width: 22px; font-size: 1.1rem; }
 .map-menu .map-menu__label { display: inline; font-style: normal; }
 .map-ctrl button { width: 44px; height: 44px; }
@@ -128,13 +129,16 @@ html.map-is-full #cities.page-hero { isolation: auto; }
    ===================================================================== */
 .map-find { position: absolute; z-index: 4; left: 10px; right: 10px; bottom: 10px; display: flex; align-items: center; gap: 6px; height: 56px; margin: 0; padding: 5px 5px 5px 6px;
   border-radius: var(--r-pill, 999px); background: var(--glass); -webkit-backdrop-filter: blur(16px) saturate(1.4); backdrop-filter: blur(16px) saturate(1.4); border: 1px solid var(--line-2);
-  box-shadow: 0 18px 44px -18px rgba(0,0,0,.75), inset 0 1px 0 rgba(var(--ink),.06); }
-.map-find:focus-within { border-color: rgba(255,138,91,.55); box-shadow: 0 0 0 4px var(--accent-soft, rgba(255,90,54,.12)), 0 18px 44px -18px rgba(0,0,0,.75); }
-:root[data-theme="light"] .map-find { box-shadow: 0 18px 40px -20px rgba(11,22,38,.4), inset 0 1px 0 rgba(255,255,255,.8); }
+  box-shadow: 0 18px 44px -18px rgba(2,8,20,.75), inset 0 1px 0 rgba(var(--ink),.06); }
+@media (hover: hover) { .map-find:hover { border-color: var(--accent-line); } }
+.map-find:focus-within { border-color: rgba(var(--accent-rgb),.55); box-shadow: 0 0 0 4px var(--accent-soft, rgba(0,203,182,.12)), 0 18px 44px -18px rgba(2,8,20,.75); }
+:root[data-theme="light"] .map-find { box-shadow: 0 18px 40px -20px rgba(12,35,68,.4), inset 0 1px 0 rgba(255,255,255,.8); }
+/* the light pill's own shadow is more specific than the focus rule above: its teal ring, said again (the ring used to vanish in light) */
+:root[data-theme="light"] .map-find:focus-within { box-shadow: 0 0 0 4px var(--accent-soft, rgba(11,122,112,.09)), 0 18px 40px -20px rgba(12,35,68,.4), inset 0 1px 0 rgba(255,255,255,.8); }
 .map-find__title { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .map-find__row { position: relative; flex: 1 1 auto; min-width: 0; display: flex; align-items: center; }
 .map-find__ico { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
-.map-find input { width: 100%; height: 44px; min-height: 44px; margin: 0; padding: 0 14px 0 42px; border: 0; border-radius: var(--r-pill, 999px); background: var(--surface-inset, rgba(255,255,255,.04));
+.map-find input { width: 100%; height: 44px; min-height: 44px; margin: 0; padding: 0 14px 0 42px; border: 0; border-radius: var(--r-pill, 999px); background: var(--surface-inset, rgba(var(--ink),.04));
   color: var(--text); font: 500 16px/1.2 var(--body); outline: none; -webkit-appearance: none; appearance: none; }
 .map-find input::placeholder { color: var(--muted); opacity: 1; }
 .map-find input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
@@ -143,11 +147,11 @@ html.map-is-full #cities.page-hero { isolation: auto; }
   border: 1px solid var(--line-2); background: var(--card-2); color: var(--text); font: 600 var(--fs-sm, .875rem)/1 var(--body); white-space: nowrap; cursor: pointer; }
 .map-find__loc svg { flex: none; color: var(--pin-2); }
 .map-find__loc span { display: none; }
-.map-find__loc:hover { border-color: rgba(var(--ink),.3); background: rgba(var(--ink),.1); }
+.map-find__loc:hover { border-color: var(--accent-line); background: var(--accent-soft, rgba(0,203,182,.12)); }
 .map-find__loc:disabled { cursor: progress; opacity: .7; }
 @media (prefers-reduced-motion: no-preference) { .map-find__loc.is-busy svg { animation: spin 1.2s linear infinite var(--lb-play, running); } }
 .map-find__list { position: absolute; left: 0; right: 0; bottom: calc(100% + 8px); z-index: 1; margin: 0; padding: 6px; list-style: none; max-height: calc(var(--stage-h, 280px) - 80px); overflow-y: auto;
-  overscroll-behavior: contain; border-radius: var(--r-card, 18px); background: var(--surface-2, var(--bg-2)); border: 1px solid var(--line-2); box-shadow: var(--shadow-2, 0 24px 60px -24px rgba(0,0,0,.8)); }
+  overscroll-behavior: contain; border-radius: var(--r-card, 18px); background: var(--surface-2, var(--bg-2)); border: 1px solid var(--line-2); box-shadow: var(--e3, 0 24px 60px -24px rgba(2,8,20,.8)); }
 .map-find__opt { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 6px 10px; border-radius: var(--r-chip, 12px); cursor: pointer; }
 .map-find__opt + .map-find__opt { margin-top: 2px; }
 .map-find__opt:hover, .map-find__opt[aria-selected="true"] { background: var(--card-2); }
@@ -241,7 +245,7 @@ html.map-is-full #cities.page-hero { isolation: auto; }
 .claim-feed__who::before, .claim-feed__ago::before { content: "·"; }
 .claim-feed__wallet { padding: 1px 6px; border-radius: var(--r-xs, 6px); background: var(--surface-inset, rgba(var(--ink), .06)); color: var(--text-2); font-size: .75rem; }
 @media (max-width: 600px) {
-  .claim-feed { display: grid; gap: 0; overflow: hidden; border: 1px solid var(--line); border-radius: var(--r-card, 18px); background: var(--card-2); }
+  .claim-feed { display: grid; gap: 0; overflow: hidden; border: 1px solid var(--line); border-radius: var(--r-card, 18px); background: var(--surface-1, var(--card-2)); box-shadow: var(--e1); }
   .claim-feed li { position: relative; white-space: normal; max-width: 100%; border: 0; border-radius: 0; background: none; }
   .claim-feed li + li { border-top: 1px solid var(--line); }
   .claim-feed li:not(.claim-feed__empty) { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 2px 10px; min-height: 0; padding: 8px 14px 10px; line-height: 1.4; }
@@ -269,4 +273,11 @@ html.map-is-full #cities.page-hero { isolation: auto; }
   .city-list:not(.is-all) > li:nth-child(n+9) { display: none; }
 }
 @media (min-width: 601px) { .city-more { display: none; } }
-:root[data-theme="light"] .tag--active { color: #0B6E57; }
+/* the light Active pill's 12 px text: --st-active (#0E7C63, frozen by cities.js) reads 4.2:1 on the pill's own tint over the page, so the
+   pill reads the light --pin-2 (#006F67, the same teal family, 5:1 on the tint; the map's marks and the legend keep --st-active) */
+:root[data-theme="light"] .tag--active { color: var(--pin-2); }
+/* hover and focus glide (180 ms, one curve); nothing moves for those who asked for less motion */
+@media (prefers-reduced-motion: no-preference) {
+  .map-find { transition: border-color var(--dur-2, .18s) var(--ease-out, ease-out), box-shadow var(--dur-2, .18s) var(--ease-out, ease-out); }
+  .map-find__loc, .map-find__opt, .map-ctrl .map-menu button, .map-attrib a { transition: background-color var(--dur-2, .18s) var(--ease-out, ease-out), border-color var(--dur-2, .18s) var(--ease-out, ease-out), color var(--dur-2, .18s) var(--ease-out, ease-out); }
+}

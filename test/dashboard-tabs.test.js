@@ -115,8 +115,8 @@ test("the glass pill: one static marker, the last child of the tab list, hidden 
   assert.ok(top.some((b) => b.head === ".dv2 .dtabs__ind::after" && /bottom: -1px; height: 2px/.test(b.body)), "the ember line on the pill");
   // a phone: the tabs hug their words, so no rim
   assert.match(media("(max-width: 600px)").join("\n"), /\.dv2 \.dtabs__ind, :root\[data-theme="light"\] \.dv2 \.dtabs__ind \{ border-color: transparent; \}/);
-  // the light line a shade deeper than --pin, so it keeps 3:1 against the pill at its faintest breath
-  assert.match(css, /:root\[data-theme="light"\] \.dv2 \.dtabs__ind::after \{ background: linear-gradient\(90deg, rgba\(207,58,26,0\), #CF3A1A 25%, #CF3A1A 75%, rgba\(207,58,26,0\)\);/);
+  // the light line is the light theme's --pin-2 (#006F67), a shade deeper than --pin, so it keeps 3:1 against the pill at its faintest breath (design v5)
+  assert.match(css, /:root\[data-theme="light"\] \.dv2 \.dtabs__ind::after \{ background: linear-gradient\(90deg, rgba\(0,111,103,0\), #006F67 25%, #006F67 75%, rgba\(0,111,103,0\)\);/);
   assert.match(css, /\.dv2 \.dtabs\.has-ind \.dtabs__ind \{ display: block; \}/, "shown once it has measured its tab");
   assert.match(css, /\.dv2 \.dtabs\.has-ind \.dtab\[aria-selected="true"\] \{ background: none; \}/, "the pill takes over the chosen tab's fill");
   assert.match(css, /\.dv2 \.dtabs\.has-ind \.dtab\[aria-selected="true"\]::after \{ content: none; \}/, "and its ember line (it rides on the pill)");

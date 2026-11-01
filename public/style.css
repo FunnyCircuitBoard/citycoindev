@@ -281,6 +281,9 @@ code { font-family: var(--mono); font-size: .88em; background: var(--card-2); pa
 .btn--lg { min-height: 56px; padding: 0 28px; font-size: 1.05rem; }
 .btn--block { width: 100%; }
 .btn[disabled], .btn.is-busy { opacity: .6; cursor: progress; transform: none; }
+/* a main action that cannot be taken yet (the Buy sheet before a wallet is connected): a quiet well in the text's muted colour, not the gold
+   at 60 % (which read olive on the navy and grey-blue on paper); a busy main button keeps its gold and the 60 % */
+.btn--primary[disabled]:not(.is-busy) { opacity: 1; background: var(--card-2); color: var(--muted); border-color: var(--line-2); box-shadow: none; }
 .btn__dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,.75); }
 .link-btn { background: none; border: 0; color: var(--muted); font: 500 .9rem var(--body); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; padding: 6px 0; }
 .link-btn:hover { color: var(--text); }
@@ -1727,7 +1730,7 @@ a[role="tab"][aria-selected="true"]::after { content: ""; position: absolute; le
 .token-chip[data-token="sol"] .token-chip__dot { background: linear-gradient(135deg, #9945FF, #14F195); }
 .token-chip[data-token="usdc"] .token-chip__dot { background: linear-gradient(135deg, #2775CA, #5AA0F0); }
 .token-chip[data-token="ray"] .token-chip__dot { background: linear-gradient(135deg, #C200FB, #3772FF); }
-.token-chip[data-token="vic"] .token-chip__dot { background: radial-gradient(circle at 35% 30%, #FFD37A, #FF6A3D 60%, #B8340F); }
+.token-chip[data-token="vic"] .token-chip__dot { background: linear-gradient(135deg, #00CBB6, #F8C13A); } /* the legacy mark: the emblem's teal into the coin's gold, as .lp-ava[data-kind="vicinity"] */
 .trade__alt { margin-top: 8px; }
 .trade__note { margin: 12px 0 0; }
 

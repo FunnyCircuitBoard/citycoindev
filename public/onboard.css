@@ -5,8 +5,9 @@
 
 /* ---- the wizard (design v4): Location → Account → Wallet (optional, later). Three equal columns on one row at every width; each step
    is an icon in a 32-px circle, its label and a few muted words. signup.js drawSteps() sets the states (.is-active, .is-done,
-   aria-current, disabled); nothing here changes them. Upcoming: a quiet ring (--field-line, 3:1); current: the accent ring on a soft
-   accent fill; done: a filled moss circle with a check. The 2-px track between two circles fills (scaleX) once the step before it is
+   aria-current, disabled); nothing here changes them. Upcoming: a quiet ring (--field-line, 3:1); current: the teal ring on a soft
+   teal fill; done: a filled mint disc (--ok-text) with a navy check (design v5's filled-status pattern, one rule for both themes). The
+   2-px track between two circles fills (scaleX) once the step before it is
    done; the wallet's track and ring are dashed: it is not part of the sign-up. ---- */
 .stepper--two { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; margin: 0; align-items: start; }
 .stepper--two > li { position: relative; display: block; min-width: 0; text-align: center; color: var(--muted); font-size: inherit; }
@@ -18,24 +19,23 @@
 .stepper--two .stepper__sub { margin-top: 2px; font: 500 .75rem/1.3 var(--body); color: var(--muted); text-wrap: balance; }
 .stepper--two > li.is-active .stepper__n { border-color: var(--pin-2); background: var(--accent-soft); color: var(--pin-2); box-shadow: 0 0 0 4px var(--accent-soft); }
 .stepper--two > li.is-active .stepper__label { color: var(--text); }
-.stepper--two > li.is-done .stepper__n { border-color: var(--moss); background: var(--moss); color: #062A1F; font-size: 0; }
+.stepper--two > li.is-done .stepper__n { border-color: var(--ok-text); background: var(--ok-text); color: var(--on-accent); font-size: 0; }
 .stepper--two > li.is-done .stepper__n::after { content: none; }
 .stepper--two > li.is-done .stepper__ico { display: none; }
 .stepper--two > li.is-done .stepper__ok { display: block; }
 .stepper--two > li.is-done .stepper__label { color: var(--text); }
-.stepper--two .stepper__btn:not(:disabled):hover .stepper__n { border-color: var(--moss); box-shadow: 0 0 0 4px var(--ok-soft, rgba(55,194,154,.14)); }
-:root[data-theme="light"] .stepper--two > li.is-done .stepper__n { color: #fff; }
+.stepper--two .stepper__btn:not(:disabled):hover .stepper__n { border-color: var(--ok-text); box-shadow: 0 0 0 4px var(--ok-soft, rgba(52,211,153,.14)); }
 /* the track between two circles: from the edge of the circle before to the edge of this one (columns of equal width, no gap) */
 .stepper--two > li + li::before, .stepper--two > li + li::after { content: ""; position: absolute; top: 15px; left: calc(-50% + 24px); right: calc(50% + 24px); height: 2px; border-radius: 2px; pointer-events: none; }
 .stepper--two > li + li::before { background: var(--line-2); }
-.stepper--two > li + li::after { background: var(--moss); transform: scaleX(0); transform-origin: left center; }
+.stepper--two > li + li::after { background: var(--ok-text); transform: scaleX(0); transform-origin: left center; }
 .stepper--two > li.is-done + li::after { transform: scaleX(1); }
 .stepper--two > .su-later { cursor: help; }
 .stepper--two > .su-later .stepper__n { border-style: dashed; }
 .stepper--two > .su-later::before { background: none; border-top: 2px dashed var(--line-2); height: 0; }
 .stepper--two > .su-later::after { content: none; }
 @media (prefers-reduced-motion: no-preference) {
-  .stepper--two .stepper__n { transition: border-color var(--dur-2, .2s), background-color var(--dur-2, .2s), color var(--dur-2, .2s), box-shadow var(--dur-2, .2s); }
+  .stepper--two .stepper__n { transition: border-color var(--dur-2, .18s) var(--ease-out, ease-out), background-color var(--dur-2, .18s) var(--ease-out, ease-out), color var(--dur-2, .18s) var(--ease-out, ease-out), box-shadow var(--dur-2, .18s) var(--ease-out, ease-out); }
   .stepper--two > li + li::after { transition: transform var(--dur-3, .32s) var(--ease-out, ease-out); }
   .stepper--two > li.is-done .stepper__ok { animation: suStepOk var(--dur-3, .32s) var(--ease-spring, ease-out) both; }
 }
@@ -69,7 +69,7 @@
 /* ---- the wallet app's confirm screen (/connect?link=): a mini pass of the account the wallet joins ---- */
 .link-in .su-carry { display: grid; gap: 12px; }
 .link-in__pass { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 16px; background: var(--card); border: 1px solid var(--line-2); }
-.link-in__avatar { flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; font: 800 1.1rem var(--display); background: linear-gradient(135deg, var(--pin), var(--gold)); color: #fff; }
+.link-in__avatar { flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; font: 800 1.1rem var(--display); background: var(--gold); color: var(--on-gold); box-shadow: 0 10px 24px -10px rgba(var(--gold-rgb),.55); }
 .link-in__who { display: grid; gap: 2px; min-width: 0; }
 .link-in__who strong { font-size: 1.05rem; overflow-wrap: anywhere; }
 .link-in #carry-in-wallets { margin-top: 4px; }
@@ -87,8 +87,8 @@
 .welcome, .wcard { grid-column: 1 / -1; }
 
 /* ---- the dashboard: the welcome card ---- */
-.welcome { position: relative; display: grid; grid-template-columns: auto 1fr auto; gap: 16px; align-items: center; background: linear-gradient(135deg, rgba(255,90,54,.16), rgba(255,200,87,.1)), var(--card); border: 1px solid rgba(255,200,87,.35); border-radius: var(--radius); padding: 22px; margin-bottom: 18px; }
-.welcome__disc { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; font: 800 1.4rem var(--display); color: #fff; background: linear-gradient(135deg, var(--pin), var(--gold)); box-shadow: 0 14px 30px -14px rgba(255,90,54,.8); }
+.welcome { position: relative; display: grid; grid-template-columns: auto 1fr auto; gap: 16px; align-items: center; background: linear-gradient(135deg, rgba(var(--accent-rgb),.14), rgba(var(--gold-rgb),.08)), var(--card); border: 1px solid rgba(var(--gold-rgb),.35); border-radius: var(--radius); padding: 22px; margin-bottom: 18px; box-shadow: var(--e1); }
+.welcome__disc { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; font: 800 1.4rem var(--display); color: var(--on-gold); background: var(--gold); box-shadow: 0 14px 30px -14px rgba(var(--gold-rgb),.8), inset 0 1px 0 rgba(255,255,255,.35); }
 .welcome__text { display: grid; gap: 4px; min-width: 0; }
 .welcome__text .kicker { margin-bottom: 0; }
 .welcome__text h2 { margin: 0; font-size: 1.5rem; line-height: 1.2; overflow-wrap: anywhere; }
@@ -102,17 +102,17 @@
 .ring { display: inline-grid; grid-template-columns: auto 1fr; gap: 14px; align-items: center; }
 .ring__svg { width: 64px; height: 64px; transform: rotate(-90deg); }
 .ring__track { fill: none; stroke: var(--line-2); stroke-width: 6; }
-.ring__arc { fill: none; stroke: var(--moss); stroke-width: 6; stroke-linecap: round; stroke-dasharray: calc(var(--ring-done, 0) * 163) 163; transition: stroke-dasharray .6s ease; }
+.ring__arc { fill: none; stroke: var(--pin); stroke-width: 6; stroke-linecap: round; stroke-dasharray: calc(var(--ring-done, 0) * 163) 163; transition: stroke-dasharray .6s ease; }
 .ring__num { font: 800 .95rem var(--display); fill: var(--text); transform: rotate(90deg); transform-origin: 32px 32px; }
 .ring__ticks { display: grid; gap: 2px; font-size: .84rem; color: var(--muted); margin: 0; padding: 0; list-style: none; }
 .ring__ticks li::before { content: "○ "; color: var(--muted); }
-.ring__ticks li.is-done::before { content: "✓ "; color: var(--moss); }
+.ring__ticks li.is-done::before { content: "✓ "; color: var(--ok-text); }
 .ring--sm .ring__svg { width: 36px; height: 36px; }
 .ring--sm .ring__num { font-size: 22px; transform-origin: 32px 32px; }
 @media (prefers-reduced-motion: reduce) { .ring__arc { transition: none; } }
 
 /* ---- the dashboard's link card ---- */
-.wcard { background: linear-gradient(180deg, rgba(var(--ink),.06), rgba(var(--ink),.02)); border: 1px solid rgba(255,200,87,.35); border-radius: var(--radius); padding: 22px; margin-bottom: 18px; display: grid; gap: 12px; }
+.wcard { background: linear-gradient(180deg, rgba(var(--ink),.06), rgba(var(--ink),.02)); border: 1px solid rgba(var(--gold-rgb),.35); border-radius: var(--radius); padding: 22px; margin-bottom: 18px; display: grid; gap: 12px; box-shadow: var(--e1); }
 .wcard[hidden] { display: none; }
 .wcard .kicker { margin-bottom: 0; }
 .wcard h2 { margin: 0; font-size: 1.35rem; }
@@ -126,7 +126,7 @@
 .wcard__other { text-align: center; }
 .wcard__wait { margin: 0; color: var(--muted); font-size: .9rem; display: flex; align-items: center; gap: 8px; }
 .wcard__tiny { margin: 0; color: var(--faint); font-size: .8rem; }
-.wcard.is-done { border-color: rgba(55,194,154,.45); }
+.wcard.is-done { border-color: rgba(var(--ok-rgb),.45); }
 .wcard.is-done .kicker { color: var(--ok-text); }
 .wcard--folded { padding: 14px 18px; }
 

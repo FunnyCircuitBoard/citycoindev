@@ -1,16 +1,17 @@
 /* Design v2 (10 Oct 2026): a coin's page. One sheet per page, loaded last there (scripts/pages/src/<page>.html "styles").
-   Phone first; the shared tokens come from style.css, each with a fallback here; motion only inside prefers-reduced-motion: no-preference. */
+   Phone first; the shared tokens come from style.css, each with a fallback here; motion only inside prefers-reduced-motion: no-preference.
+   Design v5 (1 Nov 2026): every colour reads a token (the coin discs the brand gold with navy ink, the pills the accent tint). */
 /* one avatar recipe (the Launchpad, its strip and the coin page; the same block as in pages-launchpad.css, a test keeps the two equal): the city's initials on the city's colour, a 2 px ring */
-:where(.lp-ava) { --c2: #FFC857; --c3: #D98A1F; } /* gold unless the city chose a colour ([data-color] in style.css) */
+:where(.lp-ava) { --c2: #F8C13A; --c3: #D99A1A; } /* the coin's gold unless the city chose a colour ([data-color] in style.css) */
 .lp-ava { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 50%; overflow: hidden; color: #fff;
   background: linear-gradient(140deg, var(--c2), var(--c3)); border: 2px solid rgba(var(--ink),.18); box-shadow: none; }
 .lp-ava[data-color] { background: linear-gradient(140deg, var(--c2), var(--c3)); }
-.lp-ava span { font: 700 .8rem/1 var(--display); letter-spacing: .02em; color: inherit; text-shadow: 0 1px 1px rgba(0,0,0,.25); max-width: none; overflow: visible; }
-.lp-ava[data-color="gold"], .lp-ava:not([data-color]) { color: #3A2300; }
-.lp-ava[data-color="gold"] span { text-shadow: none; }
-/* $VICINITY: the same mark as in the Buy panel's token pill (the pin orange into gold, a white V), not a city's gold disc */
-.lp-ava[data-kind="vicinity"] { color: #fff; background: linear-gradient(135deg, #FF5A36, #FFC857); }
-.lp-ava[data-kind="vicinity"] span { font-size: 1.05rem; text-shadow: 0 1px 2px rgba(0,0,0,.35); } /* one letter: a little larger than two initials */
+.lp-ava span { font: 700 .8rem/1 var(--display); letter-spacing: .02em; color: inherit; text-shadow: 0 1px 1px rgba(2,8,20,.3); max-width: none; overflow: visible; }
+.lp-ava[data-color="gold"], .lp-ava:not([data-color]) { color: var(--on-gold); } /* navy on the gold disc: 6.4:1 at its darkest end */
+.lp-ava[data-color="gold"] span, .lp-ava:not([data-color]) span { text-shadow: none; }
+/* $VICINITY: the legacy token's own mark (the emblem's teal into the coin's gold, a navy V: 8.6:1 at the teal end), not a city's gold disc */
+.lp-ava[data-kind="vicinity"] { color: #0C2344; background: linear-gradient(135deg, #00CBB6, #F8C13A); }
+.lp-ava[data-kind="vicinity"] span { font-size: 1.05rem; text-shadow: none; } /* one letter: a little larger than two initials */
 .lp-ava--sm[data-kind="vicinity"] span { font-size: .85rem; }
 .lp-ava img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
 .lp-ava--sm { width: 30px; height: 30px; }
@@ -41,7 +42,7 @@
 .coin-chart.is-none .coin-chart__controls, .coin-chart.is-none .coin-chart__legend { display: none; }
 .coin-chart.is-none .coin-chart__stage { height: auto; min-height: 120px; margin: var(--sp-3, 12px) 0 0; }
 .coin-chart.is-none .coin-chart__canvas { position: absolute; inset: 0; visibility: hidden; }
-.coin-chart.is-none .coin-chart__state { position: relative; inset: auto; min-height: 120px; gap: var(--sp-2, 8px); border: 1px dashed var(--line-2); border-radius: var(--r-chip, 12px); }
+.coin-chart.is-none .coin-chart__state { position: relative; inset: auto; min-height: 120px; gap: var(--sp-2, 8px); border: 1px dashed var(--line-2); border-radius: var(--r-chip, 12px); background: var(--surface-inset, rgba(var(--ink),.04)); }
 .coin-chart.is-none .coin-chart__ico { display: inline-grid; }
 .coin-chart.is-none .coin-chart__msg { text-wrap: balance; }
 .coin-tile[hidden] { display: none; }
@@ -50,7 +51,7 @@
 .coin-tiles__none { margin: var(--sp-3, 12px) 2px 0; }
 /* the contract card's three links: one row of equal pills (Jupiter · the chart site · Solscan), like the token page's */
 .coin-ca__links { display: flex; flex-wrap: wrap; gap: var(--sp-2, 8px); margin-top: var(--sp-3, 12px); } /* "GeckoTerminal" is long: the row wraps, never cuts */
-.coin-ca__links .contract__ext { flex: 1 1 auto; flex-direction: row; justify-content: center; align-items: center; gap: 6px; min-height: 44px; padding: 0 8px; border-radius: var(--r-pill, 999px); font: 600 var(--fs-sm, .875rem)/1.15 var(--body); }
+.coin-ca__links .contract__ext { flex: 1 1 auto; flex-direction: row; justify-content: center; align-items: center; gap: 6px; min-height: 44px; padding: 0 8px; border-radius: var(--r-pill, 999px); font: 600 var(--fs-sm, .875rem)/1.15 var(--body); background: var(--card-2); }
 .coin-ca__links .contract__ext svg { width: 16px; height: 16px; flex: none; }
 .coin-ca__links .contract__ext span { white-space: nowrap; overflow-wrap: normal; }
 .coin-ca__links .contract__ext .contract__out { position: static; font-size: var(--fs-xs, .75rem); }

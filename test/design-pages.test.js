@@ -142,7 +142,8 @@ test("on a phone: a short hero (the tagline on two lines and one button), so the
   assert.match(CSS, /\.lp4-hero \{ position: relative; isolation: isolate; padding: 28px 0 24px; text-align: center; \}/, "phone first");
   assert.match(CSS, /@media \(min-width: 601px\) \{ \.lp4-hero \{ padding: 48px 0 36px; \}/);
   assert.match(CSS, /\.lp4-hero__title > span \{ display: inline-block; \}/, "'Every city gets' / 'its own coin.': never a lone word");
-  assert.match(CSS, /\.lp-ava\[data-kind="vicinity"\] \{ color: #fff; background: linear-gradient\(135deg, #FF5A36, #FFC857\); \}/);
+  // design v5 (1 Nov 2026): the legacy mark keeps its own two colours, now the emblem's teal into the coin's gold, with navy ink (8.6:1 at the teal end)
+  assert.match(CSS, /\.lp-ava\[data-kind="vicinity"\] \{ color: #0C2344; background: linear-gradient\(135deg, #00CBB6, #F8C13A\); \}/);
   assert.match(read("public/launchpad.js"), /if \(c\.kind === "vicinity"\) disc\.dataset\.kind = "vicinity";/);
   assert.match(read("public/coin.js"), /if \(c\.kind === "vicinity"\) disc\.dataset\.kind = "vicinity"; else delete disc\.dataset\.kind;/);
 });

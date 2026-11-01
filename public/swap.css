@@ -2,7 +2,9 @@
    sheet on phones. Answer first: the amounts, a one-line summary, the button; the slippage and the details sit in a "Price
    details" fold whose summary line keeps every cost and risk in sight. Self-contained (swap.js injects it on any page for the
    sheet): the design tokens are read with a fallback. 44 px targets; no horizontal scroll; motion only when the person allows it.
-   Narrow panels (a 320-360 px phone, the token page's card) are styled by the panel's own width (container "swap"). */
+   Narrow panels (a 320-360 px phone, the token page's card) are styled by the panel's own width (container "swap").
+   Design v5 (1 Nov 2026): wells on --surface-inset, the focus ring and the chosen chip teal (the *-rgb triplets serve both themes), the
+   coin mark the brand gold with navy ink, the sheet on --bg-2 with --e3; the scrim literals are navy (::backdrop reads no custom property). */
 .swap { container: swap / inline-size; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; min-width: 0; } /* the one column may shrink below its content's widest line (320 px phones) */
 .swap__head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px 10px; min-height: 26px; } /* the tag's room is kept while it is hidden: nothing below moves */
 .swap__head .kicker { margin: 0; }
@@ -10,7 +12,7 @@
 /* the amounts: two wells, the big numbers in tabular figures */
 .swap__box { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
 .swap__row { display: flex; flex-direction: column; gap: 2px; padding: 10px 14px 8px; border-radius: var(--r-chip, 12px); background: var(--surface-inset, rgba(var(--ink), .04)); }
-.swap__row:has(.swap__amt:focus) { outline: 3px solid var(--pin-2); outline-offset: 2px; } /* the amount's own focus ring is the well's: the site's 3 px ring */
+.swap__row:has(.swap__amt:focus) { outline: 3px solid var(--focus-ring, #37E0CA); outline-offset: 2px; } /* the amount's own focus ring is the well's: the site's 3 px ring */
 .swap.is-warn .swap__row--out { box-shadow: inset 0 0 0 1px var(--warn); }
 .swap.is-bad .swap__row--out { box-shadow: inset 0 0 0 1px var(--bad-text); }
 .swap__label { font-size: var(--fs-xs, .75rem); font-weight: 600; color: var(--muted); }
@@ -23,19 +25,19 @@
 .swap__amt--out { display: block; }
 .swap__amt--out.is-empty { color: var(--muted); }
 .swap__token { flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 44px; min-height: 44px; padding: 0 12px 0 8px; border-radius: var(--r-pill, 999px); border: 1px solid var(--line-2); background: var(--card-2); color: var(--text); font: 700 .92rem var(--body); white-space: nowrap; cursor: pointer; } /* never cut: "$VICINITY" in full */
-:root[data-theme="light"] .swap__token { background: #fff; }
+:root[data-theme="light"] .swap__token { background: var(--card); box-shadow: var(--e1, none); }
 .swap__token:disabled { cursor: default; padding-right: 14px; }
-.swap__token:not(:disabled):hover { border-color: rgba(var(--ink), .3); }
+.swap__token:not(:disabled):hover { border-color: var(--accent-line, rgba(0,203,182,.38)); }
 .swap__caret { font-size: .75rem; color: var(--muted); }
 .swap__mark { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; font: 800 .78rem var(--display); color: #fff; flex: none; }
-/* a coin's own avatar from the page that opened the sheet (the city's initials on its colour, the Launchpad's recipe) */
-:where(.swap__mark--ava) { --c2: #FFC857; --c3: #D98A1F; }
-.swap__mark--ava { background: linear-gradient(140deg, var(--c2), var(--c3)); font-size: .66rem; letter-spacing: .02em; text-shadow: 0 1px 1px rgba(0,0,0,.25); }
-.swap__mark--ava[data-color="gold"] { color: #3A2300; text-shadow: none; }
+/* a coin's own avatar from the page that opened the sheet (the city's initials on its colour, the Launchpad's recipe: the coin's gold with navy ink unless the city chose a colour) */
+:where(.swap__mark--ava) { --c2: #F8C13A; --c3: #D99A1A; }
+.swap__mark--ava { background: linear-gradient(140deg, var(--c2), var(--c3)); font-size: .66rem; letter-spacing: .02em; text-shadow: 0 1px 1px rgba(2,8,20,.3); }
+.swap__mark--ava[data-color="gold"], .swap__mark--ava:not([data-color]) { color: var(--on-gold, #0C2344); text-shadow: none; }
 .swap__sub { display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 20px; font-size: var(--fs-xs, .75rem); line-height: 1.4; color: var(--muted); font-variant-numeric: tabular-nums; }
 .swap__max { min-height: 44px; margin: -12px -10px -12px 0; padding: 0 10px; font-size: var(--fs-xs, .75rem); } /* a 44 px target that takes no more room than the line */
 .swap__flip { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 1; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line-2); background: var(--surface-2, var(--bg-2)); color: var(--text); font-size: 1.1rem; cursor: pointer; display: grid; place-items: center; box-shadow: var(--shadow-1, none); }
-.swap__flip:hover { border-color: var(--pin-2); }
+.swap__flip:hover { border-color: var(--pin-2); color: var(--pin-2); }
 .swap__flip:disabled { opacity: .5; cursor: default; }
 
 /* the summary line under the amounts, the 10 % box when it applies, the one main action */
@@ -43,13 +45,13 @@
 .swap__status.is-bad { color: var(--bad-text); }
 .swap__status.is-ok { color: var(--ok-text); font-weight: 600; }
 .swap__status.is-moved { color: var(--warn); font-weight: 600; }
-.swap__warn { display: flex; gap: 10px; align-items: flex-start; margin-top: -4px; padding: 8px 12px; border-radius: var(--r-chip, 12px); background: var(--accent-soft, rgba(255,90,54,.1)); border: 1px solid rgba(255,90,54,.45); font-size: var(--fs-sm, .875rem); line-height: 1.35; color: var(--text); cursor: pointer; } /* the whole box is the checkbox's label (a big target), held close to the line that names the impact */
+.swap__warn { display: flex; gap: 10px; align-items: flex-start; margin-top: -4px; padding: 8px 12px; border-radius: var(--r-chip, 12px); background: var(--accent-soft, rgba(0,203,182,.12)); border: 1px solid rgba(var(--accent-rgb), .45); font-size: var(--fs-sm, .875rem); line-height: 1.35; color: var(--text); cursor: pointer; } /* the whole box is the checkbox's label (a big target), held close to the line that names the impact */
 .swap__warn input { width: 22px; height: 22px; margin: 0; flex: none; accent-color: var(--pin); }
 .swap__go { min-height: 52px; font-size: 1.05rem; }
 .swap__again { justify-self: center; min-height: 44px; min-width: 44px; margin-top: -6px; padding: 0 10px; } /* "Try again" under Connect wallet when a price did not load: a 44 px target */
 .swap__again[hidden] { display: none; }
 /* "Filled in from your link" */
-.swap__note { margin: 0; padding: 8px 12px; border-radius: var(--r-chip, 12px); background: rgba(91,140,255,.12); border: 1px solid rgba(91,140,255,.35); font-size: var(--fs-sm, .875rem); color: var(--text); }
+.swap__note { margin: 0; padding: 8px 12px; border-radius: var(--r-chip, 12px); background: rgba(var(--blue-rgb), .12); border: 1px solid rgba(var(--blue-rgb), .35); font-size: var(--fs-sm, .875rem); color: var(--text); }
 .swap__links { margin: 0; font-size: var(--fs-xs, .75rem); color: var(--muted); min-height: 0; }
 .swap__links:empty { display: none; }
 .swap__foot { margin: 0; font-size: var(--fs-xs, .75rem); line-height: 1.45; }
@@ -73,7 +75,7 @@
 .swap__slip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
 .swap__slip-label { grid-column: 1 / -1; font-size: var(--fs-xs, .75rem); font-weight: 600; color: var(--muted); }
 .swap__chip { min-width: 0; min-height: 44px; padding: 0 6px; border-radius: var(--r-pill, 999px); border: 1px solid var(--line-2); background: var(--card); color: var(--text); font: 600 var(--fs-sm, .875rem) var(--body); font-variant-numeric: tabular-nums; cursor: pointer; }
-.swap__chip[aria-pressed="true"] { background: var(--accent-soft, rgba(255,90,54,.14)); border-color: rgba(255,90,54,.55); }
+.swap__chip[aria-pressed="true"] { background: var(--accent-soft, rgba(0,203,182,.12)); border-color: rgba(var(--accent-rgb), .55); color: var(--pin-2); }
 .swap__chip--custom { width: 100%; font-size: var(--fs-base, 1rem); text-align: center; cursor: text; } /* 16 px: a phone does not zoom into it */
 .swap__chip--custom::placeholder { font-size: var(--fs-sm, .875rem); color: var(--muted); opacity: 1; }
 .swap__help { margin: 0; font-size: var(--fs-xs, .75rem); line-height: 1.5; }
@@ -138,9 +140,9 @@
 /* the bottom sheet (open() on /coin and the Launchpad): a centred dialog on a computer, a sheet from the bottom on a phone */
 .swap-sheet { position: fixed; inset: 0; width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; margin: 0; padding: 0; border: 0; background: transparent; display: none; }
 .swap-sheet[open] { display: grid; place-items: center; }
-.swap-sheet::backdrop { background: rgba(3,7,14,.55); }
-:root[data-theme="light"] .swap-sheet::backdrop { background: rgba(11,22,38,.3); }
-.swap-sheet__card { position: relative; width: min(460px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; overscroll-behavior: contain; padding: var(--card-pad, 16px); border-radius: var(--r-hero, 24px); background: var(--surface-2, var(--bg-2)); border: 1px solid var(--line-2); box-shadow: var(--shadow-2, var(--shadow)); }
+.swap-sheet::backdrop { background: rgba(3,10,22,.6); }
+:root[data-theme="light"] .swap-sheet::backdrop { background: rgba(12,35,68,.32); }
+.swap-sheet__card { position: relative; width: min(460px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; overscroll-behavior: contain; padding: var(--card-pad, 16px); border-radius: var(--r-hero, 24px); background: var(--surface-2, var(--bg-2)); border: 1px solid var(--line-2); box-shadow: var(--e3, var(--shadow)); }
 .swap-sheet__close { position: absolute; top: 6px; right: 6px; z-index: 2; width: 44px; height: 44px; border: 0; border-radius: 50%; background: none; color: var(--muted); font-size: 1rem; cursor: pointer; }
 .swap-sheet__close:hover { color: var(--text); background: var(--card-2); }
 .swap-sheet .swap__head { padding-right: 40px; } /* the close button sits over the head's right end: the state tag keeps clear of it */
@@ -149,9 +151,9 @@
   .swap-sheet__card { width: 100vw; max-height: calc(100dvh - 24px); border-bottom: 0; border-radius: var(--r-hero, 24px) var(--r-hero, 24px) 0 0; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
 }
 
-/* the token page's Buy card: the page's hero object, glass with a thin ember line along its top edge */
+/* the token page's Buy card: the page's hero object, glass with a thin teal line along its top edge */
 #buy-slot.swap { position: relative; margin-top: 0; padding: var(--card-pad, 16px); border-radius: var(--r-hero, 24px); border: 1px solid var(--line-2); background: var(--surface-1, var(--card)); box-shadow: var(--shadow-1, none); }
-#buy-slot.swap::before { content: ""; position: absolute; top: -1px; left: 18%; right: 18%; height: 1px; background: linear-gradient(90deg, transparent, rgba(255,90,54,.7), transparent); pointer-events: none; }
+#buy-slot.swap::before { content: ""; position: absolute; top: -1px; left: 18%; right: 18%; height: 1px; background: linear-gradient(90deg, transparent, rgba(var(--accent-rgb), .7), transparent); pointer-events: none; }
 
 /* motion: the sheet slides up, the details settle, the flip turns; transform and opacity only, never with reduced motion or after
    "Pause animations" */

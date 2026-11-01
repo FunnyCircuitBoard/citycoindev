@@ -35,10 +35,10 @@
 
 /* ---------- the three phones ---------- */
 .app4-stage { position: relative; isolation: isolate; min-width: 0; }
-/* the soft accent light under the frames */
+/* the soft teal light under the frames (design v5: the accent's triplet, half strength on paper) */
 .app4-stage::before { content: ""; position: absolute; left: 12%; right: 12%; bottom: 8%; height: 34%; z-index: -1; pointer-events: none;
-  background: radial-gradient(closest-side, rgba(255,90,54,.22), transparent); }
-:root[data-theme="light"] .app4-stage::before { background: radial-gradient(closest-side, rgba(232,67,31,.12), transparent); }
+  background: radial-gradient(closest-side, rgba(var(--accent-rgb),.18), transparent); }
+:root[data-theme="light"] .app4-stage::before { background: radial-gradient(closest-side, rgba(var(--accent-rgb),.08), transparent); }
 .app4-phones { --app-pw: 240px; display: flex; align-items: flex-start; }
 .app4-phones .phone4 { --pw: var(--app-pw); }
 .app4-fig { position: relative; margin: 0; flex: none; display: flex; flex-direction: column; align-items: center; gap: 14px; }
@@ -58,7 +58,7 @@
 .app4-dots span { width: 6px; height: 6px; border-radius: 3px; background: var(--line-2); }
 .app4-dots span.is-on { transform: scaleX(3); background: var(--text-2); }
 .app4-dots.is-off { visibility: hidden; }
-@media (prefers-reduced-motion: no-preference) { .app4-dots span { transition: transform var(--dur-2) var(--ease-out), background-color var(--dur-2); } }
+@media (prefers-reduced-motion: no-preference) { .app4-dots span { transition: transform var(--dur-2) var(--ease-out), background-color var(--dur-2) var(--ease-out); } }
 /* the swipeable strip takes the keyboard on a phone or tablet (app.js gives it a Tab stop only while it scrolls): its ring drawn inside */
 .app4-phones:focus-visible { outline: 3px solid var(--pin-2); outline-offset: -3px; border-radius: var(--r-lg, 20px); }
 
