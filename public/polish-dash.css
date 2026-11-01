@@ -524,8 +524,10 @@ body.is-dv2 .dash::before { content: none; }
   .dv2 #panel-home:has(> #trade.is-locked) > #badges { grid-column: 2; }
   .dv2 #panel-home:has(> #trade.is-locked) > #role-home { grid-column: 1 / -1; }
   /* no Buy card at all (.cc-off under the Citycoin.dev brand, or hidden for a wallet app): the pass and the role card on the left, the
-     portfolio and the badges on the right, each row's two cards the same height (the pass's bottom row stays at its foot) */
-  .dv2 #panel-home:not(:has(> #trade:not([hidden]):not(.cc-off))) { align-items: stretch; }
+     portfolio and the badges on the right, each row's two paired cards the same height (the pass's bottom row stays at its foot). Only
+     those four stretch: the grid keeps align-items: start, so the "Next for you" block (#today, a grid of one-line rows) and the one-line
+     Buy card keep their own height beside a taller card instead of spreading their rows down it */
+  .dv2 #panel-home:not(:has(> #trade:not([hidden]):not(.cc-off))) > :is(#dash-top, #role-home, #portfolio, #badges) { align-self: stretch; }
   .dv2 #panel-home:not(:has(> #trade:not([hidden]):not(.cc-off))) > :is(#portfolio, #badges) { grid-column: 2; }
   /* one main action never runs the width of the screen */
   .dv2 .wcard:not(.wcard--folded) .wcard__actions { justify-items: center; }

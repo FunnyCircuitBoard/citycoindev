@@ -160,9 +160,13 @@ test("design v5, fix round 1: the portfolio ring's eight slots sit on the brand 
   assert.equal(hex(LIGHT, decls(/^:root\[data-theme="light"\] \{ (--pf-0[^}]*)\}/m.exec(block)[1])["--pf-0"]), hex(LIGHT, "--gold-ui"), "light slot 0 is the light theme's gold for marks");
   // the pre-v5 ring palette never returns
   assert.doesNotMatch(block, /#3987e5|#d95926|#199e70|#c98500|#d55181|#008300|#9085e9|#e66767|#898781|#2a78d6|#eb6834|#1baf7a|#eda100|#e87ba4|#4a3aa7|#e34948/i);
-  // the quiet well is only for a main button that cannot be used: a working one (busy by class, aria or data attribute) keeps its gold
-  assert.match(css, /\.btn--primary\[disabled\]:not\(\.is-busy, \[aria-busy="true"\], \[data-busy\]\) \{ opacity: 1; background: var\(--card-2\); color: var\(--muted\); border-color: var\(--line-2\); box-shadow: none; \}/);
-  assert.match(read("wallet-send.css"), /\.wsend__go\.btn--primary\[disabled\] \{ opacity: \.6; background: linear-gradient\(135deg, var\(--cta-a\), var\(--cta-b\)\); color: var\(--on-cta\);/, "the Send sheet's Send button (no marker) keeps its gold");
+  // fix round 2 (FR-1-R1): a disabled main button is the gold at 60 % by default (the scripts disable a WORKING button with .is-busy,
+  // aria-busy, data-busy or no marker at all, so a generic well would show "cannot" mid-action); the quiet well is opted in by selector
+  // only where the page knows the button cannot be used yet (the coin studio's Use this coin, the app mock)
+  assert.match(css, /^\.btn\[disabled\], \.btn\.is-busy \{ opacity: \.6; cursor: progress; transform: none; \}$/m, "a disabled button dims to 60 % (main's rule)");
+  assert.doesNotMatch(css, /\.btn--primary\[disabled\][^{]*\{[^}]*opacity: 1;/, "no generic quiet well on a disabled main button");
+  assert.match(css, /^#cr-use\[disabled\] \{ opacity: 1; background: var\(--card-2\); color: var\(--muted\); border-color: var\(--line-2\); box-shadow: none; \}$/m, "the coin studio's Use this coin (disabled only while no usable design is shown) is the quiet well");
+  assert.doesNotMatch(read("wallet-send.css"), /\.wsend__go[^{]*\[disabled\]/, "the Send sheet needs no exception any more");
   assert.match(read("app-phone.css"), /\.pm-btn--primary\.is-off \{ opacity: 1; background: var\(--card-2\); color: var\(--muted\); border-color: var\(--line-2\); \}/, "the app mock's disabled main button is the same quiet well");
   // the pass avatar's initial is white on the frosted tile (the pass is navy in both themes)
   assert.match(css, /\.pass \.idcard__avatar \{[^}]*color: #fff;/);
@@ -175,8 +179,11 @@ test("design v5, fix round 1: the portfolio ring's eight slots sit on the brand 
   // the owner console's chosen queue chip is said for the light theme too; the map's find pill rings on keyboard focus
   assert.match(read("admin.css"), /\.adm-subtabs \.adm-subtab\[aria-selected="true"\], :root\[data-theme="light"\] \.adm-subtabs \.adm-subtab\[aria-selected="true"\] \{ background: var\(--text\); color: var\(--bg\); box-shadow: none; \}/);
   assert.match(read("pages-cities.css"), /\.map-find:has\(:focus-visible\) \{ outline: 3px solid var\(--focus-ring\); outline-offset: 2px; \}/);
-  // the small coin disc: white initials 4.5:1 or more at the lightest stop of every city colour
-  for (const sheet of ["pages-launchpad.css", "pages-coin.css"]) { const t = read(sheet); for (const m of t.matchAll(/\.lp-ava\[data-color="(ocean|emerald|rose|violet|ink)"\] \{ --c2: (#[0-9A-F]{6}); \}/g)) assert.ok(ratio("#FFFFFF", m[2]) >= 4.5, `${sheet} ${m[1]} ${m[2]}: ${ratio("#FFFFFF", m[2]).toFixed(2)}`); assert.equal([...t.matchAll(/\.lp-ava\[data-color="(ocean|emerald|rose|violet|ink)"\] \{ --c2:/g)].length, 5, `${sheet}: five deeper discs`); }
+  // the small coin disc (the coin sheets' .lp-ava and, fix round 2 A11Y-4-R, the Buy sheet's own copy .swap__mark--ava): white initials
+  // 4.5:1 or more at the lightest stop of every city colour, the same five stops in all three sheets
+  const discStops = {};
+  for (const [sheet, disc] of [["pages-launchpad.css", "lp-ava"], ["pages-coin.css", "lp-ava"], ["swap.css", "swap__mark--ava"]]) { const t = read(sheet); const re = new RegExp(`\\.${disc}\\[data-color="(ocean|emerald|rose|violet|ink)"\\] \\{ --c2: (#[0-9A-F]{6}); \\}`, "g"); const found = {}; for (const m of t.matchAll(re)) { assert.ok(ratio("#FFFFFF", m[2]) >= 4.5, `${sheet} ${m[1]} ${m[2]}: ${ratio("#FFFFFF", m[2]).toFixed(2)}`); found[m[1]] = m[2]; } assert.equal(Object.keys(found).length, 5, `${sheet}: five deeper discs`); discStops[sheet] = found; }
+  assert.deepEqual(discStops["swap.css"], discStops["pages-launchpad.css"], "the Buy sheet's mark takes the coin sheets' stops");
   // the dead alias is gone; the header's blur is back at 18 px
   assert.doesNotMatch(head, /--shadow-2/); assert.match(head, /--glass-blur: saturate\(1\.5\) blur\(18px\);/);
 });

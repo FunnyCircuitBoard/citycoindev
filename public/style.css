@@ -283,10 +283,12 @@ code { font-family: var(--mono); font-size: .88em; background: var(--card-2); pa
 .btn--lg { min-height: 56px; padding: 0 28px; font-size: 1.05rem; }
 .btn--block { width: 100%; }
 .btn[disabled], .btn.is-busy { opacity: .6; cursor: progress; transform: none; }
-/* a main action that cannot be taken yet (the Buy sheet before a wallet is connected): a quiet well, not the gold at 60 % (olive on the navy).
-   A main button disabled because it is WORKING keeps its gold: the scripts mark that with .is-busy, aria-busy or data-busy (the Send
-   sheet's Send carries no marker; wallet-send.css keeps it gold) */
-.btn--primary[disabled]:not(.is-busy, [aria-busy="true"], [data-busy]) { opacity: 1; background: var(--card-2); color: var(--muted); border-color: var(--line-2); box-shadow: none; }
+/* a main button disabled while it WORKS keeps its gold at 60 % (the rule above): the scripts mark that state with .is-busy, aria-busy,
+   data-busy or nothing at all (the feedback widget's Send, the Send sheet's Review and Send, the founder Apply, the launch approval…), so
+   the default must never read as "cannot". The quiet well is opted in by selector, only where the page knows the button cannot be used
+   yet: the coin studio's "Use this coin" (coin-ready.js disables it only while no usable design is shown) and the app mock
+   (app-phone.css .pm-btn--primary.is-off) */
+#cr-use[disabled] { opacity: 1; background: var(--card-2); color: var(--muted); border-color: var(--line-2); box-shadow: none; }
 .btn__dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,.75); }
 .link-btn { background: none; border: 0; color: var(--muted); font: 500 .9rem var(--body); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; padding: 6px 0; }
 .link-btn:hover { color: var(--text); }
