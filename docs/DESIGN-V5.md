@@ -27,6 +27,7 @@ This file ships with the change. Sections 11 (test pins) and 12 (contrast) are t
 13. Residuals (JavaScript is frozen)
 Appendix A. The display serif (Fraunces): deferred, with the recipe
 Appendix B. Changed-assertion log (builders fill this in)
+Appendix C. What shipped (stage C, the integration)
 
 ---
 
@@ -875,6 +876,15 @@ implementation report's section 11 together.
 | ae4054e | `launchpad-ui.test.js` 492 | `:root[data-theme="light"] { --up: #1E9E78; --down: #E8431F;` | `… --down: #C0392B;` | the old accent is not a status colour; `--down` = light `--bad-text` |
 | ae4054e | `d3-fix.test.js` 55 | light `.m-coin circle { fill: #FFC857; stroke: #B9780F; stroke-width: 2.5; }` / `.m-coin text { fill: #3F2702; }` | `{ fill: var(--gold); stroke: var(--gold-ui); stroke-width: 2.5; }` / `{ fill: var(--on-gold); }` | the home coin reads the tokens (navy on the light gold 7.5:1) |
 | ae4054e | `d3-fix.test.js` 64 | `.section--glow … rgba(255,90,54,.075)` | `rgba(var(--accent-rgb),.075)` | the tint reads the token |
+| d67eb33 (B2) | `v4-review.test.js` 137 | `:root[data-theme="light"] #cities .city-status { color: #0C6B4E; }` | `{ color: var(--ok-text); }` | the status pill reads the token (light `#0C6F4F`, 5.2:1 on its tint over the page, 5.5:1 over a card); the AA intent is unchanged |
+| d67eb33 (B1) | `design-pages.test.js` 145 | `.lp-ava[data-kind="vicinity"] { color: #fff; background: linear-gradient(135deg, #FF5A36, #FFC857); }` | `{ color: #0C2344; background: linear-gradient(135deg, #00CBB6, #F8C13A); }` | the legacy mark keeps its own two colours, now the emblem's teal into the coin's gold, with navy ink (8.6:1 at the teal end, 9.5:1 at the gold end); the block stays byte-identical in `pages-launchpad.css` and `pages-coin.css` (the equality assertion is unchanged) |
+| d67eb33 (B1) | `v4-review.test.js` 99 | `.btn--soft { background: rgba(255,90,54,.15); border-color: rgba(255,110,70,.62); color: var(--pin-2); font-weight: 700; }` | `.btn--soft { background: rgba(var(--accent-rgb),.15); border-color: rgba(var(--accent-rgb),.62); color: var(--pin-2); font-weight: 700; }` | the Buy tint reads the accent triplet (teal), one rule for both themes; the two light-theme overrides are deleted |
+| d67eb33 (B1) | `token-tabs.test.js` 61 | `.trade__side.is-sell { color: var(--bad-text); background: var(--bad-soft, rgba(255,90,54,.1)); }` | `… var(--bad-soft, rgba(255,154,134,.12)); }` | the fallback is the new dark coral tint; the rule still reads the token first |
+| d67eb33 (B3) | `dashboard-tabs.test.js` 119 | light `.dtabs__ind::after` `rgba(207,58,26,0), #CF3A1A 25%, #CF3A1A 75%, rgba(207,58,26,0)` | `rgba(0,111,103,0), #006F67 25%, #006F67 75%, rgba(0,111,103,0)` (its glow `rgba(0,111,103,.4)`) | the light `--pin-2`, a shade deeper than `--pin`, so the chosen tab's line keeps 3:1 against the pill at its faintest breath; the intent (a 3:1 mark, WCAG 1.4.11) is unchanged |
+| d67eb33 (B3) | `dashboard-design.test.js` 122 | `.dv2 .pass .live-dot, .dv2 .pass .live-dot::after { background: #7CF0C5; }` | `{ background: #7CE8A6; }` | the dark theme's `--ok-text`, written out because the pass is navy in both themes (4.3:1 on the pass's gold corner, section 12) |
+| d67eb33 (B3) | `notify.test.js` 708 | `.dv2 .nt-switch:checked::before { background: var(--ok-text, #37C29A); }` | `{ background: var(--ok-text, #7CE8A6); }` | the fallback is the new dark `--ok-text`; the rule reads the token first |
+| d67eb33 (B3) | `contrast.test.js` 50 | `#062A1F` on `#37C29A` ≥ 6 (the preview's sample coin) | `#062A1F` on `#34D399` ≥ 6 (8.0) | the sample coin's green is the new ok fill (`--moss` / `--up`); the 6:1 bar is unchanged |
+| d67eb33 (B3) | `lp-launch-ui.test.js` 503 | `.lp-approve { border: 2px solid var(--gold, #FFC857);` | `var(--gold, #F8C13A);` | the fallback is the brand gold; the rule reads the token first |
 
 Stage A (`public/style.css`, `public/polish.css`, `public/feedback.css`; `public/brand/citycoin.css`, `public/theme.js` and
 `scripts/pages/build.mjs` unchanged because the Citycoin.dev `theme-color` `#071426` already equals the new `--bg`) also departs from the
@@ -884,3 +894,194 @@ fills are one colour (`--pin`, `--pin`, `--bad-text`) as section 6.10 says, whil
 is a flat `--ok-text` disc with a white inset highlight and `--on-accent` ink (a mint-to-green gradient would put white text on a light
 corner in the light theme). The `.dpv` preview pass, the dashboard strip, `onboard.css`, `swap.css` and every page sheet are the next owners'
 (B, C, D): until they land, those still show the old orange and purple.
+
+### Build notes — stage B2 (`pages-cities.css`, `polish-map.css`, `pages-app.css`, `app-phone.css`, `pages-connect.css`, `onboard.css`)
+
+Every literal of the old palette in the six sheets became a token or a triplet tint; the pinned rule texts of `test/cities-find.test.js`,
+`test/d3-fix.test.js`, `test/design-pages.test.js`, `test/home-v4.test.js`, `test/map-labels.test.js` (the `--st-active` lines, the four pill
+rules), `test/dashboard-wallet-card.test.js`, `test/dashboard-inwallet.test.js` and `test/connect-v3-ui.test.js` are untouched; the one changed
+assertion is the Appendix B row above. Four places depart from the section 9 text, each a value choice inside these sheets:
+
+- **Light `.tag--active` reads `var(--pin-2)`, not `var(--st-active)`** (`pages-cities.css`): the light `--st-active` `#0E7C63` is frozen by
+  `cities.js` and reads 4.2:1 on the pill's own tint (`rgba(14,124,99,.1)`) over the page, 3.98:1 over `--bg-3`, so the 12 px pill text would
+  be under AA; the light `--pin-2` `#006F67` (the same teal family, 10° apart) reads 5.0:1 there. The map's marks, the legend dot and the
+  card's bar keep `--st-active`; the old literal `#0B6E57` is gone.
+- **`.tag--open::before` margins** (`polish-map.css`): `margin: 0 5px 0 -2px`, the same as the pinned `.tag--active::before`, instead of
+  section 6.8's `margin-right: 6px`, so the hollow dot and the ring sit on the same optical left edge in a list of pills.
+- **The stepper's filled track and the done step's hover ring read `--ok-text`** (`onboard.css`), the done disc's own colour, rather than
+  `--moss` (`#34D399` next to a `#7CE8A6` disc read as two greens); `--moss` is now unused in the sheet. The setup ring's arc is `--pin` as
+  section 9 says.
+- **A light-theme focus ring restated** (`pages-cities.css`): `:root[data-theme="light"] .map-find` (0,3,0) outranked
+  `.map-find:focus-within` (0,2,0), so the find pill's teal focus ring never showed in light; a
+  `:root[data-theme="light"] .map-find:focus-within` rule now carries the ring with the light shadow. A hover (`--accent-line`, fine pointers
+  only) and 180 ms transitions on the pill, the location button, the suggestions and the menu rows sit in one `no-preference` block.
+
+Renders: `/cities`, `/app`, `/connect`, `/locate` at 390 and 1440, dark and light (16 full pages, `report.json`: no console or page error
+beyond the two unmocked `/api/seats` and `/api/members` 404s on `/cities`, no horizontal overflow) plus 32 component crops at 2× (the find
+pill at rest/focus/with suggestions, the city card after a pick, the controls' menu, the legend, the browse list, the sign-up panel on both
+tabs, the stepper current/done/hover, the safe fold open, the phone frames) in
+`/tmp/claude-0/-home-user/259e7af3-62d7-56de-8406-76246b95043c/scratchpad/shots-B2-map-onboarding`. The `/connect` wizard was rendered with a
+**synthetic** `/api/signup/state` fixture (hand-written from `src/signup.js registerState`, `next: "location"`; never fetched) served by the
+harness's `serve.cjs` from a copy of its fixtures; `/api/me` is the live answer of 26 Oct. `pages-connect.css` is 7,975 bytes (budget 8,000).
+
+### Build notes — stage B1 (`pages-home.css`, `pages-launchpad.css`, `pages-coin.css`, `pages-token.css`, `lp-launch.css`, `swap.css`)
+
+Every literal of the old palette in the six sheets became a token, a triplet tint or the new dark value where a fallback is required
+(`#C6D3E6` for `--text-2`, `rgba(52,211,153,.14)` / `rgba(255,154,134,.12)` for the ok / bad tints, `#37E0CA` for `--focus-ring`, `#0C2344` for
+`--on-gold`); the three changed assertions are the B1 rows above. Every other pinned rule text of `test/home-v4.test.js`, `test/home-d3.test.js`,
+`test/d3-fix.test.js`, `test/v4-review.test.js`, `test/design-pages.test.js`, `test/launchpad-ui.test.js`, `test/lp-launch-ui.test.js`,
+`test/swap-ui.test.js`, `test/swap-links.test.js`, `test/token-card.test.js`, `test/token-tabs.test.js`, `test/mobile-polish.test.js`,
+`test/motion.test.js` and `test/dashboard-design.test.js` is untouched (221 tests, all pass). What the sheets now do, beyond section 9:
+
+- **Launchpad**: the chosen list's count pill is one rule for both themes (style.css's `--accent-soft` + `--pin-2`, 9:1 dark, 5:1 light); the
+  light `rgba(232,67,31,.08)` override is deleted and the pinned `:root[data-theme="light"] .lp-tabs__n` line is kept. `.btn--soft` hover `.24`
+  / `.85` on the triplet. `.lp-card--live:hover` reads `--accent-line` with no fallback. The open "Filter and sort" button takes a
+  `rgba(var(--ink),.10)` fill with its `--field-line` edge. The avatar's text shadow is the navy-black `rgba(2,8,20,.3)` and is off on the gold
+  and legacy discs (navy ink carries no shadow).
+- **Coin page**: the contract card's three pills take the token page's `--card-2` chip (style.css lifts them and tints them teal under a
+  mouse); the "nothing recorded yet" chart state sits on `--surface-inset` inside its dashed line.
+- **Token page**: `.token-quote__chg.is-down` reads `--bad-soft` and `rgba(var(--bad-rgb),.4)` (7.4:1 dark, 4.5:1 light on the tint: the light
+  `#A8321A` override is deleted); the trades list is a `--surface-inset` well with `--r-chip` corners (was a bare 14 px box); the placeholder
+  rows' corners read `--r-xs`.
+- **Buy panel and sheet** (`swap.css`): the amount well's focus ring reads `--focus-ring`; the light token pill is `var(--card)` with `--e1`; a
+  hovered token pill or flip button takes `--accent-line` / `--pin-2`; the chosen slippage chip reads `--pin-2` on its teal tint; the sheet
+  card's shadow is `--e3`; the scrim literals are the navy values of section 5 (`rgba(3,10,22,.6)` / `rgba(12,35,68,.32)`).
+- **Home**: the card focus rings read `--focus-ring`; the open FAQ question's +/− disc takes `--accent-soft`; the links' colour changes (180 ms,
+  `--ease-out`) sit in the page's one `no-preference` block.
+
+Renders (harness B, `serve.cjs` with a copy of its fixtures plus **synthetic** `/api/launchpad` (three live city coins on a curve and a pool,
+one designed), `/api/coin`, `/api/coin/chart` (7 days of readings) and `/api/members`, hand-written from the API shapes in the tests, never
+fetched) in `/tmp/claude-0/-home-user/259e7af3-62d7-56de-8406-76246b95043c/scratchpad/shots-B1-public-pages`: `/`, `/launchpad`,
+`/coin?mint=…` and `/token` at 390 and 1440, dark and light (16 full pages; `report.json`: no page error, no failed request, no horizontal
+overflow, the one 404 is the unmocked `/api/snapshots`) plus 78 state crops (`st-*`: a coin card at rest, hovered, with Details open and with
+Buy's keyboard ring, the filters open, the Buy sheet at rest, focused and with Price details open, the coin head, chart, tiles, contract
+card, trades and the hero's Buy sheet, the home numbers bar, a hovered and a focused step card, the FAQ open, the teaser). Under the
+Citycoin.dev build `/token` is the "not live yet" page (`pages-404.css`), so `pages-token.css` and the Buy panel were rendered from a scratch
+build of the default-label pages (`buildPages({ brand: LEGACY_BRAND })` over a copy of `public/`, nothing written into the worktree) with
+synthetic `/api/official`, `/api/token` and `/api/holders` fixtures: `token-legacy-build/` holds the four full pages and the Buy panel at rest,
+focused and with Price details, the hero, the contract card, the Trades card, the Holders tab and its find box. `lp-launch.css` (the
+founder's launch card on the dashboard, the graduation box on the coin page) needs a signed-in founder and was not rendered; its edits are
+fallback values only.
+
+### Build notes — stage B3 (`polish-dash.css`, `admin.css`, `pages-profile.css`, `pages-official.css`, `pages-docs.css`, `pages-credits.css`, `pages-404.css`)
+
+Every literal of the old palette in the seven sheets became a token, a triplet tint or the new dark value where a fallback is required
+(`admin.css`: every `var(--x, fallback)` fallback is now the dark theme's value: `#C6D3E6 #93A4BE #7CE8A6 #FF9A86 #FFDC8A #FFD27A #2BD9C3
+#F8C13A #0B1B33`, `rgba(0,203,182,.12)`, `rgba(52,211,153,.14)`, `rgba(248,193,58,.14)`); every `rgba(0,0,0,…)` shadow is navy-black
+`rgba(2,8,20,…)` and every light `rgba(11,22,38,…)` is the brand navy `rgba(12,35,68,…)`. The pinned rule texts of `test/dashboard-design.test.js`
+(every selector scoped to `.dv2` / `.dpv` / `body.is-dv2` / `[data-page="dashboard"]`, no ellipsis, motion only when welcome),
+`test/dashboard-tabs.test.js` (the pill's geometry, its outer shadows within 4 px), `test/phone-dash.test.js` (the opaque strip recipe),
+`test/notify.test.js` (the 44 × 26 switch), `test/wallet-tab.test.js` (the QR code white with `#0B1626`), `test/layout-shift.test.js`,
+`test/feed-v2.test.js`, `test/site.test.js` (`pages-credits.css` under 4,000 B, nothing moves), `test/design-pages.test.js` (the small
+sheets under 8,000 B, no `!important` added), `test/admin-ui.test.js`, `test/admin-coin-reviews-ui.test.js`, `test/lpadmin-ui.test.js`,
+`test/program-pins.test.js` and `test/v4-review.test.js` are untouched; the five changed assertions are the B3 rows above (every one a
+pinned colour literal, its threshold or structure kept). Where the sheets depart from the section 6 / section 9 text, each a value choice
+inside these files:
+
+- **The strip pill's glow colours are written out** (`polish-dash.css` 6.7): the dark rule's `rgba(0,203,182,.7)` / `.55` and the light
+  rule's `rgba(11,122,112,.5)` / `rgba(0,111,103,.4)` instead of `rgba(var(--accent-rgb),…)`, because `test/dashboard-tabs.test.js` reads
+  every outer shadow's reach (y + spread + blur ≤ 4 px) with a pattern that strips a plain `rgba()` only: a nested `var()` would leave its
+  alpha in the numbers and the assertion would read it as a 4.55 px reach. The pill's fill gradient and its line do read `--accent-rgb`.
+- **`.nt-switch:focus-visible` keeps `outline: 2px solid var(--pin)`** (section 6.15 names `--focus-ring`): the rule's text is pinned by
+  `test/notify.test.js` and `--pin` is the same teal family (9:1 on the dark page, 4.9:1 on the light one), so the pin was not touched.
+- **The preview's progress bar is the teal-to-gold hairline** (`.dpv__fill`: `linear-gradient(90deg, var(--pin), var(--gold-ui))`, as
+  `.lp-bar`), not one colour: nothing is written on it. Its "Next for you" cards keep the `--blue` bar of the real `.dv2 .today__card`
+  (style.css), so the preview matches the dashboard it previews.
+- **The admin sparkline is one series** (`.adm-spark__line` and `.adm-spark__end` both `--chart-1`; the line was the second series' colour
+  with an accent end dot), the sticky table head sits on `--bg-3` (6.9), and the preview-mode banner (`.admin-banner`, "Test environment")
+  reads the warn family rather than gold: it is a warning, not the coin.
+- **The pass's pin icon and the preview's are white at .85** (`#FFD3B8` was the old orange's tint); the live dot, the preview's dot and the
+  sample coin are the dark theme's mint, written out, because the pass is navy in both themes (section 6.16).
+- **One rule deleted**: `.dv2 .profile__head .idcard__avatar` (a deeper-orange gradient with a white letter, kept because white on the old
+  gold end was 2.2:1) — the shared `.idcard__avatar` (style.css: `--gold` with `--on-gold`, 9.5:1) now serves the Profile tab too.
+- **Fields on the Profile tab and in the console read the field line**: `.dv2 #profile-modal :is(input, textarea)`, `.admin-row .field select`,
+  `.lp-input`, `.lp-select`, `.adm-pic__reject` controls were on `--line-2` (2:1); every one is `var(--field-line, …)` with the teal ring on
+  focus (section 6.5). `pages-official.css` read `var(--r-sm, 12px)`, a token that does not exist: it is `--r-chip` now, and the wide-screen
+  table sits on `--surface-1` with `--e1` and a `--line-2` head rule (6.9); on a phone it is the plain stacked list it was.
+- **Motion**: the dashboard's and the console's hover transitions run 180 ms on the one soft curve (fallbacks updated; the notice rows,
+  the welcome card's close, the danger buttons, the wallet refresh, the sub-navigation links, the console's sidebar, icon button, card
+  links, sub-tabs, table rows and the fields' focus ring ease too), all inside the existing `no-preference` blocks; nothing loops.
+- Not changed: `.dv2 .feed { padding: var(--dd-pad) !important; }` is the sheet's one pre-existing `!important` (not in any pinned
+  "no !important" list; removing it would change the feed card's padding against style.css); the inverted chip's count pill in the
+  console's phone sub-tabs keeps its neutral `rgba(127,127,127,.22)` (a translucent tint on a `--text`-coloured chip, right in both themes).
+
+Renders in `/tmp/claude-0/-home-user/259e7af3-62d7-56de-8406-76246b95043c/scratchpad/shots-B3-dashboard-admin`: `/dashboard` (signed in:
+Home and every tab — Wallet, City, Feed, Notifications, Rankings, Founder, Profile), `/admin` (the owner: Overview, Inbox, Moderation,
+Users, Audit, Config), `/profile` (the search page and `?u=harbor_jo`, the pass), `/official`, `/rules`, `/terms`, `/credits` and `/404x`
+at 390 and 1440, dark and light (32 full pages from `shoot.cjs`, `report.json`: no page error, no horizontal overflow, the one console
+line per dashboard load is an unmocked `/api/*` 404; 56 more full pages and 2× crops of the strip, the pass, the metric cards, the charts,
+the live activity, the focused filter field; `hover-*` / `focus-*` crops of the sidebar, a table row, a card link, a role tile, the pass copy
+button, a notice row, a switch and the username field), and `signed-out/` (the `.dpv` preview, 4 full pages). Harness B with
+**synthetic** fixtures (hand-written from the shapes in `test/helpers/dashpage.js` and `test/admin-ui.test.js`; never fetched):
+`/api/me` as a signed-in member with a wallet and two unread notices, `/api/posts`, `/api/notices`, `/api/me/portfolio`,
+`/api/swap/balances`, `/api/profile`, `/api/admin/me` (the owner), `/api/admin/overview`, `growth`, `audit`, `feedback`, `users`,
+`claims`, `reports`, `logos` and the rest, served by the harness's `serve.cjs` from a copy of its fixtures folder; the signed-out
+preview from the stock fixtures. The standing card, the rank chips and the Today cards did not show under the Citycoin.dev build with the
+token "not live yet", so their rules (token-only changes) were not rendered. `npm test` on the worktree with every stage's edits:
+2,736 tests, 2,735 pass, 1 skipped, 0 fail.
+
+## Appendix C. What shipped (stage C, the integration)
+
+Written 1 Nov 2026 after the three builders' sheets were merged, checked against this file, rendered and committed. The branch is
+`cc/design-premium` on `main` `0204191`: **built, not merged**. Four commits carry the design: `ae4054e` (stage A, the foundation:
+`style.css`, `polish.css`, `feedback.css`, 18 assertion rows) and `02e89d5` (its hash in Appendix B); `d67eb33` (stages B1, B2, B3 and
+the integration below: every page sheet, the two coin feature sheets, nine assertion rows, the new `test/design-v5.test.js`); and the
+documents commit that carries this appendix and the implementation report's rows.
+
+**What the integration changed, beyond the three builders' reports** (each a value inside the files, no selector or structure moved):
+
+- `public/coin-ready.css` and `public/coin-review.css` (the ready-made coin and the review of a coin request; loaded by their scripts when
+  `COIN_V2_READY` / `COIN_V2_REVIEW` are on, so nothing on the live site reads them today): their keyboard rings read
+  `var(--focus-ring, #37E0CA)` (section 3.5: `--focus` is the map focus card's local colour, so the rings fell back to the old orange);
+  `.crv-over, .crv-bad` read `var(--bad-text, #FF9A86)` (`--warn-text` was never a token, so the "over the limit" words were always the old
+  orange); the pending / ok / changes tints read the `--warn-rgb` / `--ok-rgb` / `--bad-rgb` triplets and the `*-soft` tokens (they were
+  literal amber, green and orange alphas); the `--muted` fallbacks are the dark value `#93A4BE`; the two drop shadows are navy-black.
+- `public/style.css`: `.token-chip[data-token="vic"] .token-chip__dot` (the legacy token's mark in the Buy panel's token pill) is the
+  emblem's teal into the coin's gold, the same pair as `.lp-ava[data-kind="vicinity"]` and `.pm-coin--vic` (it was the old orange radial,
+  the last of the old accent in `public/`); `.btn--primary[disabled]:not(.is-busy)` is a quiet well (`--card-2`, `--muted`, `--line-2`, no
+  glow) instead of the gold at 60 % (B1's open issue: olive on the navy, grey-blue on paper; a *busy* main button keeps its gold).
+- Nothing else: the sweep of the old accent (`FF5A36 FF8A5B E8431F FFC857 C93512 D0441C CF3A1A B8430F F25C24` and their `rgba(…)` tints, and
+  every other retired value of sections 3 and 11) finds nothing in `public/*.css` and `public/brand/citycoin.css`; `public/brand/tokens.css`
+  is the unlinked draft (frozen by `test/coinart-t2.test.js`). The `[data-color]` member palettes, the `--pf-*` palette, the third-party
+  colours (SOL, USDC, RAY, Google, the mainnet red, the QR) stay literal by design.
+
+**The new test, `test/design-v5.test.js`** (section 11, "New"; 4 tests): it reads both theme blocks and both scale blocks of `style.css`
+(every `--name: value;` of the four `:root` blocks before the base marker), the map's `--st-*` lines, the market's `--up/--down` lines and
+`polish-map.css`'s `--st-active`, resolves `var()` chains and `rgba(var(--x-rgb), a)` tints, composites the surfaces as section 12 says
+(glass over the page, the well as ink over `--bg-2`, the chip over the water, the pass corners as the glows over the pass) and asserts every
+row of section 12 at its bar (T 4.5, L 3, U 3, D recorded without a bar) in both themes; the figure/ground of land and water, the 30° hue
+rule for the four map statuses and the "also held" pairs; that the light block restates every colour token of the dark block; and the token
+discipline (no old-palette literal anywhere in `public/*.css` and `brand/`, no white text on a `var(--pin)` fill, no `var(--focus,` in the two
+coin sheets). `node --test test/design-v5.test.js` prints the table it checked (the section 12 numbers, recomputed). No assertion of an
+existing test changed in stage C.
+
+**The suite.** `node scripts/brand/switch-trial.mjs --local && npm run build` with `NODE_OPTIONS=--unhandled-rejections=strict` (the CI job
+`brand-switch-trial`'s two steps; `npm run build` is `copy-assets`, the page build and `npm test`): the trial writes nothing (`wrangler.jsonc`
+already carries the switch with its prerequisites; exit 0; `git status` shows no change to it); the page build leaves `public/*.html` byte
+for byte as committed (no HTML source changed; `test/build-parity.test.js` holds); **2,740 tests, 2,739 pass, 0 fail, 1 skipped** (the
+opt-in live Squads read), against 2,736 on `main`: the four new ones are `test/design-v5.test.js`. The same command run before the
+integration edits, with the three builders' sheets as they were, gave 2,736 / 2,735 / 0 / 1.
+
+**The renders** (`/tmp/claude-0/-home-user/259e7af3-62d7-56de-8406-76246b95043c/scratchpad/shots-stageC`): harness B (`render-harness/serve.cjs`
++ `shoot.cjs`) over this worktree's `public/`, with the seven live fixtures of 26 Oct plus the builders' **synthetic** fixtures (B1's
+`/api/launchpad`, `/api/coin`, `/api/coin/chart`, `/api/members`; B2's `/api/signup/state`; never fetched), so `/launchpad` shows three coin
+cards and `/connect` its wizard. All 16 pages × 390 / 1440 × dark / light = 64 full pages + 30 component captures (header, tab bar, main and
+secondary button, card, the find box, the theme toggle's keyboard ring, the account sheet); `report.json`: every shot `ok`, **no horizontal
+overflow, no console or page error, no failed request**; the one 4xx is the unmocked `/api/seats` on the component pass. `extra/`: the
+signed-in `/dashboard`, the owner's `/admin` and `/profile?u=harbor_jo` (B3's synthetic member, owner and admin fixtures) and
+`/coin?mint=…` (B1's synthetic coin) at both sizes in both themes, the disabled main button in both themes, and the keyboard pass on `/`
+and `/cities` (`focus-*`): the skip link navy on teal (dark) / white on deep teal (light), the main button's 3 px teal ring offset 3 px,
+the find pill's teal ring. Every one of the 64 + 16 pages was looked at: nothing of the old accent remains (the places it hid: admin,
+profile, coin, official, rules/terms, 404), the pass is navy in both themes with its teal and gold corners, the light main action is navy
+with gold text, the lockups sit right on both canvases, the map legend reads against the canvas, the status pills carry their glyphs,
+field borders show on cards. Compared with `shots-before/` (the live site of 26 Oct) the pages are the same pages: nothing moved, only the
+colours, the lines, the depth and the motion timing.
+
+**Known and left as is** (none a defect of this design; each recorded by its builder above):
+`cities.js`'s canvas label colours (`foundedText #FFB39C` …) are the old palette and JavaScript is frozen (section 13); `coinchart.js`'s
+canvas grows during a full-page phone capture (the `/coin` phone shots are 4,176 px tall in B1's run and this one; the chart is 546 px on
+screen, as B1's 2× crops show); `.dv2 .feed { … !important }` is pre-existing; the dashboard strip pill's glow colours are literal
+`rgba()` (the test's reach regex); `:root[data-theme="light"] #cities .city-status { color: var(--ok-text); }` repeats the base rule
+(kept for the pin); `.nt-switch:focus-visible` keeps `var(--pin)` (pinned); `lp-launch.css` is unrendered (a founder's card); the light
+`#city-stage --map-bg` keeps its `#E6F0FA / #D9E6F4` stops (a step off the light `--map-bg`, by design: the map tray is its own surface);
+Fraunces stays deferred (Appendix A). Next: pull request, CI, merge, deploy, then the live before / after for the owner.
