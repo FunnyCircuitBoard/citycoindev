@@ -1,6 +1,8 @@
 # Build output (includes target/deploy/*-keypair.json and target/idl; the IDL
-# that clients use is the committed copy under sdk/idl/).
+# that clients use is the committed copy under sdk/idl/). The bare `target` also
+# matches a symlink named target, which `target/` does not.
 target/
+target
 .anchor/
 test-ledger/
 node_modules/
@@ -17,6 +19,7 @@ id.json
 *.key
 !sdk/idl/vicinity_rewards.json
 !sdk/idl/vicinity_launchpad.json
+!sdk/idl/citycoin_curve.json
 
 # Local tooling noise
 *.log
